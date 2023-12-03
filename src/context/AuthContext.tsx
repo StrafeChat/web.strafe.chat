@@ -1,17 +1,47 @@
-import { usePathname } from "next/navigation";
-import { createContext, useEffect } from "react";
+"use client";
+import AuthService from "@/services/AuthService";
+import { Dispatch, SetStateAction, createContext, useContext, useState } from "react";
 
-export interface User {}
+export interface User {
+  id: string;
+  username: string;
+  discriminator: number;
+  global_name: string;
+  avatar: string;
+  bot: boolean;
+  system: boolean;
+  mfa_enabled: boolean;
+  banner: string;
+  accent_color: number;
+  locale: string;
+  verified: boolean;
+  email: string;
+  flags: number;
+  premium_type: number;
+  public_flags: number;
+  avatar_decoration: string;
+  created_at: Date;
+  edited_at: Date;
+}
 
-const AuthContext = createContext<User>({});
+interface Context {
+  user: User;
+  setUser: Dispatch<SetStateAction<User>>;
+}
 
-export const AuthProvider = () => {
-  const pathname = usePathname();
+const AuthContext = createContext<Context>({
+  user: {} as unknown as User,
+  setUser: {} as Dispatch<SetStateAction<User>>,
+});
 
-  useEffect(() => {
-    if (pathname == "/register" || pathname == "/login") return;
-    const ws = new WebSocket(process.env.NEXT_PUBLIC_WS!);
-  }, [pathname]);
+export const AuthProvider = ({ children }: { children: JSX.Element }) => {
+  const [user, setUser] = useState<User>({} as unknown as User);
 
-  return <div></div>;
+  return (
+    <AuthContext.Provider value={{ user, setUser }}>
+      <AuthService>{children}</AuthService>
+    </AuthContext.Provider>
+  );
 };
+
+export const useAuth = () => useContext(AuthContext);

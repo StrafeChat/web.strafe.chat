@@ -22,8 +22,8 @@ interface Data {
 }
 
 export default function Page() {
-    const router = useRouter()
-    const form = useForm<Data>({
+  const router = useRouter();
+  const form = useForm<Data>({
     defaultValues: {
       email: "",
       username: "",
@@ -49,7 +49,7 @@ export default function Page() {
     const data = await res.json();
 
     if (!res.ok) return console.error(data);
-    
+
     cookie.set("token", data.token);
     router.push("/");
   };
@@ -154,14 +154,14 @@ export default function Page() {
                         }
                       />
                     </FormControl>
-                    <div className="submit">
-                      <Button>Register</Button>
-                    </div>
                   </FormItem>
                 )}
               />
             </li>
           </ul>
+          <div className="submit">
+            <Button>Register</Button>
+          </div>
         </form>
       </Form>
     </main>
