@@ -1,7 +1,8 @@
 import type { Metadata } from "next";
-import "./globals.css";
+import "./globals.scss";
 import { Roboto } from "next/font/google";
 import { AuthProvider } from "@/context/AuthContext";
+import Layout from "@/components/Layout";
 
 export const metadata: Metadata = {
   title: "StrafeChat",
@@ -22,7 +23,11 @@ export default function RootLayout({
     <html lang="en" className={roboto.className}>
       <body>
         <AuthProvider>
-          <div id="app-root">{children}</div>
+          <div id="app-root">
+            <Layout>
+              <>{children}</>
+            </Layout>
+          </div>
         </AuthProvider>
       </body>
     </html>

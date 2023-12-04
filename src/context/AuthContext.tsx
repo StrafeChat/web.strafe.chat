@@ -1,6 +1,12 @@
 "use client";
 import AuthService from "@/services/AuthService";
-import { Dispatch, SetStateAction, createContext, useContext, useState } from "react";
+import {
+  Dispatch,
+  SetStateAction,
+  createContext,
+  useContext,
+  useState,
+} from "react";
 
 export interface User {
   id: string;
@@ -36,6 +42,8 @@ const AuthContext = createContext<Context>({
 
 export const AuthProvider = ({ children }: { children: JSX.Element }) => {
   const [user, setUser] = useState<User>({} as unknown as User);
+
+  if(!user) return <></>
 
   return (
     <AuthContext.Provider value={{ user, setUser }}>

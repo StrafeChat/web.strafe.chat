@@ -1,0 +1,74 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --background-main: hsl(0, 0%, 15%);
+  --button-primary: rgb(239, 68, 68);
+  --servers-list-background: hsl(0, 0%, 8%);
+  --channels-list-background: hsl(0, 0%, 12%);
+  --chat-background: var(--background-main);
+  --chat-header-text: white;
+  --chat-header-background: hsl(0, 0%, 20%);
+}
+
+div#app-root {
+  width: 100vw;
+  height: 100vh;
+  background: var(--background-main);
+}
+
+main.layout {
+  width: 100%;
+  height: 100%;
+  display: flex;
+
+  div.servers {
+    width: 4rem;
+    min-height: 100%;
+    background: var(--servers-list-background);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    overflow-x: hidden;
+    align-items: center;
+
+    div.avatar {
+      width: 2.5rem;
+      height: 2.5rem;
+      margin-top: 1rem;
+
+      img {
+        border-radius: 100%;
+        background-color: black;
+      }
+    }
+  }
+
+  div.channels {
+    width: 13.5rem;
+    min-height: 100%;
+    background: var(--channels-list-background);
+  }
+
+  div.chat {
+    width: calc(100% - 17.5rem);
+    min-height: 100%;
+    background: var(--chat-background);
+    overflow: auto;
+
+    div.header {
+      width: 100%;
+      height: 3rem;
+      background: var(--chat-header-background);
+      border-bottom-left-radius: 0.5rem;
+      border-bottom-right-radius: 0.5rem;
+      font-size: large;
+      color: var(--chat-header-text);
+      display: flex;
+      align-items: center;
+      padding-left: 1rem;
+      padding-right: 1rem;
+    }
+  }
+}

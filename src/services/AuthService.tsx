@@ -2,11 +2,12 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import cookie from "js-cookie";
 import { useAuth } from "@/context/AuthContext";
+import Layout from "@/components/Layout";
 
 export default function AuthService({ children }: { children: JSX.Element }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { setUser, user } = useAuth();
+  const { user, setUser } = useAuth();
 
   const wsRef = useRef<WebSocket | null>(null);
   const connectedRef = useRef(false);
