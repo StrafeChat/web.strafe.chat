@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import cookie from "js-cookie";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 
 interface Data {
   email: string;
@@ -92,6 +93,7 @@ export default function Page() {
           <div className="submit">
             <Button>Login</Button>
           </div>
+          <Link href={"/register"}>Need an account?</Link>
         </form>
       </Form>
     </main>
