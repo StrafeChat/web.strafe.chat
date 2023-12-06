@@ -5,11 +5,22 @@
 :root {
   --background-main: hsl(0, 0%, 15%);
   --button-primary: rgb(239, 68, 68);
-  --servers-list-background: hsl(0, 0%, 8%);
-  --channels-list-background: hsl(0, 0%, 12%);
+  --spaces-list-background: hsl(0, 0%, 8%);
+  --rooms-list-background: hsl(0, 0%, 12%);
   --chat-background: var(--background-main);
   --chat-header-text: white;
   --chat-header-background: hsl(0, 0%, 20%);
+  --ui-card: hsl(0, 0%, 20%);
+  --ui-context-menu: hsl(0, 0%, 5%);
+  --ui-context-menu-hover: hsl(0, 0%, 10%);
+  --ui-context-menu-text: hsl(0, 0%, 95%);
+  --ui-settings-sidebar: hsl(0, 0%, 12%);
+  --ui-settings: hsl(0, 0%, 15%);
+  --ui-settings-active: hsl(0, 0%, 20%);
+  --ui-settings-hover: hsl(0, 0%, 17%);
+  --ui-settings-text: hsl(0, 0%, 75%);
+  --ui-backdrop: rgba(13, 13, 13, 0.75);
+  user-select: none;
 }
 
 div#app-root {
@@ -23,10 +34,10 @@ main.layout {
   height: 100%;
   display: flex;
 
-  div.servers {
+  div.spaces {
     width: 4rem;
     min-height: 100%;
-    background: var(--servers-list-background);
+    background: var(--spaces-list-background);
     display: flex;
     flex-direction: column;
     overflow-y: auto;
@@ -34,21 +45,26 @@ main.layout {
     align-items: center;
 
     div.avatar {
-      width: 2.5rem;
-      height: 2.5rem;
+      width: 3rem;
+      height: 3rem;
       margin-top: 1rem;
+
+      a {
+        border-radius: 100%;
+      }
 
       img {
         border-radius: 100%;
         background-color: black;
+        border: solid #2F3136;
       }
     }
   }
 
-  div.channels {
+  div.rooms {
     width: 13.5rem;
     min-height: 100%;
-    background: var(--channels-list-background);
+    background: var(--rooms-list-background);
   }
 
   div.chat {
@@ -69,6 +85,187 @@ main.layout {
       align-items: center;
       padding-left: 1rem;
       padding-right: 1rem;
+    }
+  }
+}
+
+div[data-radix-popper-content-wrapper] {
+  background: var(--ui-context-menu);
+  color: var(--ui-context-menu-text);
+
+  div {
+    border: none;
+
+    div[role="menuitem"] {
+      outline: none !important;
+      cursor: pointer;
+      transition-duration: 500ms;
+
+      &:hover {
+        background: var(--ui-context-menu-hover);
+      }
+    }
+  }
+}
+
+div.modal {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+
+  div.backdrop {
+    background: var(--ui-backdrop);
+    width: 100%;
+    height: 100%;
+  }
+
+  div.no-backdrop {
+    background: var(--ui-settings);
+    width: 100%;
+    height: 100%;
+  }
+
+  div.wrapper {
+    display: flex;
+    width: 100%;
+    height: 100%;
+
+    div.sidebar {
+      background: var(--ui-settings-sidebar);
+      width: 17.5rem;
+      height: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: end;
+      gap: 0.5rem;
+      padding-left: 1rem;
+      padding-right: 1rem;
+      padding-top: 2rem;
+      padding-bottom: 2rem;
+      overflow-y: auto;
+
+      ul {
+        width: fit-content;
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+
+        li {
+          font-size: large;
+          text-transform: capitalize;
+          color: var(--ui-settings-text);
+          padding: 0.25rem 0.5rem 0.25rem 0.5rem;
+          border-radius: 4px;
+          cursor: pointer;
+
+          &:hover {
+            background: var(--ui-settings-hover);
+          }
+
+          &.active {
+            background: var(--ui-settings-active);
+          }
+        }
+      }
+    }
+
+    div.settings {
+      background: var(--ui-settings);
+      height: 100%;
+      width: calc(100% - 17.5rem);
+
+      div.header {
+        width: 100%;
+        height: 2.5rem;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding-left: 1rem;
+        padding-right: 1rem;
+
+        h1.title {
+          color: var(--chat-header-text);
+          font-size: large;
+          text-transform: uppercase;
+          font-weight: bold;
+        }
+
+        svg.close {
+          fill: var(--button-primary);
+          transform: scale(1.25);
+        }
+      }
+
+      div.body {
+        width: 100%;
+        height: calc(100% - 2.5rem);
+        overflow-y: auto;
+        overflow-x: hidden;
+        // padding-left: 2.5rem;
+        // padding-right: 2.5rem;
+        padding: 1rem 2.5rem 1rem 2.5rem;
+
+        img.avatar {
+          border-radius: 50%;
+        }
+
+        div.account-card {
+          width: 100%;
+          height: 15rem;
+          position: relative;
+          background: var(--ui-card);
+          padding: 1rem;
+          border-radius: 1rem;
+
+          div.banner {
+            width: 100%;
+            height: 6rem;
+            position: relative;
+            border-radius: 4px;
+          }
+
+          div.avatar-back {
+            width: 80px;
+            height: 80px;
+            position: absolute;
+            border-radius: 50%;
+            border: var(--ui-card) 1rem solid;
+            top: 5rem;
+            background-color: white;
+          }
+
+          div.info-container {
+            display: flex;
+            gap: 1rem;
+          }
+
+          div.wrapper {
+            display: flex;
+            width: 100%;
+            height: fit-content;
+            position: relative;
+          }
+
+          div.avatar-container {
+            position: absolute;
+            top: -2.5rem;
+            left: 2rem;
+            border: var(--ui-card) 0.5rem solid;
+            border-radius: 50%;
+          }
+
+          // img.avatar {
+          //   position: absolute;
+          //   top: 5rem;
+          // }
+        }
+      }
     }
   }
 }

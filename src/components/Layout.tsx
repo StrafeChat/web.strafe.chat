@@ -1,7 +1,8 @@
 "use client";
 import { useAuth } from "@/context/AuthContext";
-import Image from "next/image";
 import { usePathname } from "next/navigation";
+import SpaceList from "./SpaceList";
+import RoomList from "./RoomList";
 
 export default function Layout({ children }: { children: JSX.Element }) {
   const pathname = usePathname();
@@ -12,18 +13,8 @@ export default function Layout({ children }: { children: JSX.Element }) {
 
   return (
     <main className="layout">
-      <div className="servers">
-        <div className="avatar">
-          <Image
-            priority
-            src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${user.avatar}.png`}
-            width={40}
-            height={40}
-            alt="avatar"
-          />
-        </div>
-      </div>
-      <div className="channels"></div>
+      <SpaceList user={user} />
+      <RoomList />
       <div className="chat">{children}</div>
     </main>
   );

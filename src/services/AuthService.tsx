@@ -2,12 +2,11 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import cookie from "js-cookie";
 import { useAuth } from "@/context/AuthContext";
-import Layout from "@/components/Layout";
 
 export default function AuthService({ children }: { children: JSX.Element }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { user, setUser } = useAuth();
+  const { setUser } = useAuth();
 
   const wsRef = useRef<WebSocket | null>(null);
   const connectedRef = useRef(false);
@@ -46,10 +45,17 @@ export default function AuthService({ children }: { children: JSX.Element }) {
     [setUser]
   );
 
-  const handleWsClose = (event: CloseEvent) => {
-    console.log("WebSocket closed:", event.reason);
-    connectedRef.current = false;
-  };
+  const handleWsClose = useCallback(
+    (event: CloseEvent) => {
+      connectedRef.current = false;
+      switch (event.code) {
+        case 4004:
+          router.push("/login");
+          break;
+      }
+    },
+    [router]
+  );
 
   const handleWsError = (event: Event) => {
     connectedRef.current = false;
@@ -65,6 +71,9 @@ export default function AuthService({ children }: { children: JSX.Element }) {
       wsRef.current.addEventListener("message", handleWsMessage);
       wsRef.current.addEventListener("close", handleWsClose);
       wsRef.current.addEventListener("error", handleWsError);
+      document.addEventListener("contextmenu", (event) =>
+        event.preventDefault()
+      );
     }
 
     return () => {
@@ -72,8 +81,11 @@ export default function AuthService({ children }: { children: JSX.Element }) {
       wsRef.current?.removeEventListener("message", handleWsMessage);
       wsRef.current?.removeEventListener("close", handleWsClose);
       wsRef.current?.removeEventListener("error", handleWsError);
+      document.removeEventListener("contextmenu", (event) =>
+        event.preventDefault()
+      );
     };
-  }, [connectedRef, handleWsMessage, pathname, router, wsRef]);
+  }, [connectedRef, handleWsClose, handleWsMessage, pathname, router, wsRef]);
 
   return <>{children}</>;
 }
