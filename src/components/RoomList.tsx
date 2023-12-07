@@ -18,11 +18,11 @@ export default function RoomList() {
       </li>
       <li className={tab == "notes" ? "active" : ""} onClick={() => setTab("notes")}>
         <FontAwesomeIcon className="icon" icon={faNoteSticky} />
-        <span className="content">&nbsp;&nbsp;Notes</span>
+        <span className="content">&nbsp;Notes</span>
       </li>
       <li className={tab == "test" ? "active" : ""} onClick={() => setTab("test")}>
         <FontAwesomeIcon className="icon" icon={faNoteSticky} />
-        <span className="content">&nbsp;&nbsp;TEST</span>
+        <span className="content">&nbsp;TEST</span>
       </li>
     </ul>
   );

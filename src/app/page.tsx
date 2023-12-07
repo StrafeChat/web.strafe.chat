@@ -7,7 +7,7 @@ export default function Home() {
 
   return (
     <>
-      <div className="header">Test</div>
+      <div className="header">Home</div>
       {screenContext == "not_found" && (
         <div className="min-w-full h-[calc(100%-3rem)] flex justify-center items-center">
           <h1 className="text-2xl">NOT FOUND!</h1>
