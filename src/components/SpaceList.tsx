@@ -35,6 +35,7 @@ export default function SpaceList({ user }: { user: User }) {
             </ContextMenuItem>
           </ContextMenuContent>
         </ContextMenu>
+        <hr className="hr"></hr>
       </div>
       <UserSettingsModal show={showSettings} set={setShowSettings} />
     </div>

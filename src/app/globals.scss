@@ -3,11 +3,11 @@
 @tailwind utilities;
 
 :root {
-  --background-main: hsl(0, 0%, 15%);
+  --background-main: hsl(0, 0%, 8%);
   --button-primary: rgb(239, 68, 68);
   --spaces-list-background: hsl(0, 0%, 8%);
   --rooms-list-background: hsl(0, 0%, 12%);
-  --chat-background: var(--background-main);
+  --chat-background: hsl(0, 0%, 15%);
   --chat-header-text: white;
   --chat-header-background: hsl(0, 0%, 20%);
   --ui-card: hsl(0, 0%, 20%);
@@ -47,7 +47,7 @@ main.layout {
     div.avatar {
       width: 3rem;
       height: 3rem;
-      margin-top: 1rem;
+      margin-top: 0.5rem;
 
       a {
         border-radius: 100%;
@@ -59,12 +59,71 @@ main.layout {
         border: solid #2F3136;
       }
     }
+    hr {
+     min-height: 72px;
+     padding: 0.5rem;
+     display: flex;
+     color: #2F3136;
+     align-items: center;
+    }
   }
 
-  div.rooms {
+  ul.rooms {
     width: 13.5rem;
     min-height: 100%;
     background: var(--rooms-list-background);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    border-top-left-radius: 0.75rem;
+    
+
+    div.header {
+      width: 100%;
+      height: 3rem;
+      background: var(--rooms-list-background);
+      box-shadow: 0 1px 0 rgba(4,4,5,0.2),0 1.5px 0 rgba(6,6,7,0.05),0 2px 0 rgba(4,4,5,0.05);
+      border-bottom-left-radius: 0.5rem;
+      border-bottom-right-radius: 0.5rem;
+      font-size: large;
+      color: var(--chat-header-text);
+      display: flex;
+      align-items: center;
+      padding-left: 1rem;
+      padding-right: 1rem;
+      border-radius: 0;
+      border-top-left-radius: 0.75rem;
+    }
+
+    li {
+      margin-top: 0.5rem;
+      width: 90%;
+      padding-top: 0.5rem;
+      padding-bottom: 0.25rem;
+      padding-left: 0.5rem;
+      padding-right: 0.5rem;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;      
+      gap: 0.75rem;
+      cursor: pointer;
+
+      &:hover {
+        background: var(--ui-settings-hover);
+      }
+
+      &.active {
+        background: var(--ui-settings-active);
+      }
+
+      *.icon {
+        color: white;
+      }
+
+      *.content {
+        color: white;
+      }
+    }
   }
 
   div.chat {
@@ -77,11 +136,10 @@ main.layout {
       width: 100%;
       height: 3rem;
       background: var(--chat-header-background);
-      border-bottom-left-radius: 0.5rem;
-      border-bottom-right-radius: 0.5rem;
       font-size: large;
       color: var(--chat-header-text);
       display: flex;
+      box-shadow: 0 1px 0 rgba(4,4,5,0.2),0 1.5px 0 rgba(6,6,7,0.05),0 2px 0 rgba(4,4,5,0.05);
       align-items: center;
       padding-left: 1rem;
       padding-right: 1rem;
@@ -173,6 +231,11 @@ div.modal {
           }
         }
       }
+      hr {
+        width: 0.5;
+        border: none;
+        border-bottom: 1px solid var(--ui-settings-text);
+      }
     }
 
     div.settings {
@@ -217,53 +280,65 @@ div.modal {
 
         div.account-card {
           width: 100%;
-          height: 15rem;
-          position: relative;
-          background: var(--ui-card);
-          padding: 1rem;
-          border-radius: 1rem;
+          display: flex;
+          flex-direction: column;
 
-          div.banner {
+          div.banner-container {
             width: 100%;
             height: 6rem;
+            margin-top: 1rem;
             position: relative;
-            border-radius: 4px;
+
+            div.wrapper {
+              width: 100%;
+              height: 100%;
+
+              div.banner {
+                width: 100%;
+                height: 100%;
+                border-top-left-radius: 0.75rem;
+                border-top-right-radius: 0.75rem;
+              }
+            }
           }
 
-          div.avatar-back {
-            width: 80px;
-            height: 80px;
+          div.header {
+            display: flex;
+            margin-left: 1rem;
+            margin-right: 1rem;
+
+            div.placeholder {
+              position: absolute;
+              top: 4rem;
+              border-radius: 100%;
+              border: var(--ui-card) 0.5rem solid;
+              background: black;
+              width: 80px;
+              height: 80px;              
+            }
+
+            img.avatar {
+              // absolute top-[4rem] rounded-full border-4 border-[#1E1F22] group-hover:opacity-75
+              position: absolute;
+              top: 4rem;
+              border-radius: 100%;
+              border: var(--ui-card) 0.25rem solid;              
+            }
+          }
+
+          p.username {
             position: absolute;
-            border-radius: 50%;
-            border: var(--ui-card) 1rem solid;
-            top: 5rem;
-            background-color: white;
+            left: 7.75rem;
+            top: 6.5rem;
+            color: white;
+            font-size: x-large;
           }
 
-          div.info-container {
-            display: flex;
-            gap: 1rem;
-          }
-
-          div.wrapper {
-            display: flex;
+          div.body {
             width: 100%;
-            height: fit-content;
-            position: relative;
+            height: 12rem;
+            background: var(--ui-card);
           }
-
-          div.avatar-container {
-            position: absolute;
-            top: -2.5rem;
-            left: 2rem;
-            border: var(--ui-card) 0.5rem solid;
-            border-radius: 50%;
-          }
-
-          // img.avatar {
-          //   position: absolute;
-          //   top: 5rem;
-          // }
         }
       }
     }

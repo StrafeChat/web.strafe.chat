@@ -2,6 +2,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import cookie from "js-cookie";
 import { useAuth } from "@/context/AuthContext";
+import { RoomProvider } from "@/context/RoomContext";
 
 export default function AuthService({ children }: { children: JSX.Element }) {
   const pathname = usePathname();
@@ -52,6 +53,10 @@ export default function AuthService({ children }: { children: JSX.Element }) {
         case 4004:
           router.push("/login");
           break;
+        default:
+          console.log(event);
+          wsRef.current = new WebSocket(process.env.NEXT_PUBLIC_WS!)
+          break;
       }
     },
     [router]
@@ -87,5 +92,5 @@ export default function AuthService({ children }: { children: JSX.Element }) {
     };
   }, [connectedRef, handleWsClose, handleWsMessage, pathname, router, wsRef]);
 
-  return <>{children}</>;
+  return <RoomProvider>{children}</RoomProvider>;
 }

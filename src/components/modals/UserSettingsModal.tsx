@@ -24,13 +24,13 @@ export default function UserSettingsModal({
       <div className="no-backdrop">
         <div className="wrapper">
           <div className="sidebar">
-            <h2>Settings</h2>
+          <p style={{ color: "grey", fontSize: "10px"}}>USER SETTINGS</p>
             <ul>
               <li
                 onClick={() => setCurrentSetting("account")}
                 className={currentSetting == "account" ? "active" : ""}
               >
-                Account
+               My Account
               </li>
               <li
                 onClick={() => setCurrentSetting("profile")}
@@ -63,7 +63,7 @@ export default function UserSettingsModal({
 function AccountSettings({ user }: { user: User }) {
   return (
     <>
-      <div className="account-card">
+      {/* <div className="account-card">
         {user.banner ? (
           <div
             style={{
@@ -90,6 +90,35 @@ function AccountSettings({ user }: { user: User }) {
           <span onClick={() => navigator.clipboard.writeText(user.id)} className="text-lg text-white p-1 mt-1 hover:bg-black cursor-pointer rounded-xl h-fit">{user.username}#{user.discriminator}</span>
           <button className="m-2 p-2 rounded-xl bg-red-500">Edit Profile</button>
         </div>
+      </div> */}
+      <div className="account-card">
+        <div className="banner-container">
+          <div className="wrapper">
+            <div
+              style={{
+                background:
+                  "#" + user.accent_color.toString(16).padStart(6, "0"),
+              }}
+              className="banner"
+            />
+          </div>
+          <div className="header">
+            <div className="placeholder" />
+            <Image
+              width={80}
+              height={80}
+              style={{ objectFit: "cover", width: "80px", height: "80px" }}
+              src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${user.avatar}.png`}
+              className="avatar"
+              alt="profile picture"
+              draggable={false}
+            />
+          </div>
+          <p className="username">
+            {user.username}#{user.discriminator}
+          </p>
+        </div>
+        <div className="body"></div>
       </div>
     </>
   );

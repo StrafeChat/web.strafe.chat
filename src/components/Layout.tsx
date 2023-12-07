@@ -3,6 +3,7 @@ import { useAuth } from "@/context/AuthContext";
 import { usePathname } from "next/navigation";
 import SpaceList from "./SpaceList";
 import RoomList from "./RoomList";
+import { RoomProvider } from "@/context/RoomContext";
 
 export default function Layout({ children }: { children: JSX.Element }) {
   const pathname = usePathname();
