@@ -12,7 +12,7 @@ export default function AuthService({ children }: { children: JSX.Element }) {
   const wsRef = useRef<WebSocket | null>(null);
   const connectedRef = useRef(false);
 
-  const handleWsOpen = (event: Event) => {
+  const handleWsOpen = (_event: Event) => {
     console.log("Connected");
     connectedRef.current = true;
   };
@@ -55,14 +55,14 @@ export default function AuthService({ children }: { children: JSX.Element }) {
           break;
         default:
           console.log(event);
-          wsRef.current = new WebSocket(process.env.NEXT_PUBLIC_WS!)
+          wsRef.current = new WebSocket(process.env.NEXT_PUBLIC_WS!);
           break;
       }
     },
     [router]
   );
 
-  const handleWsError = (event: Event) => {
+  const handleWsError = (_event: Event) => {
     connectedRef.current = false;
   };
 
@@ -72,6 +72,7 @@ export default function AuthService({ children }: { children: JSX.Element }) {
     if (!token) return router.push("/login");
     if (!connectedRef.current) {
       wsRef.current = new WebSocket(process.env.NEXT_PUBLIC_WS!);
+      console.log("Yuh")
       wsRef.current.addEventListener("open", handleWsOpen);
       wsRef.current.addEventListener("message", handleWsMessage);
       wsRef.current.addEventListener("close", handleWsClose);
@@ -79,6 +80,22 @@ export default function AuthService({ children }: { children: JSX.Element }) {
       document.addEventListener("contextmenu", (event) =>
         event.preventDefault()
       );
+
+      fetch(`${process.env.NEXT_PUBLIC_API}/users/@me/relationships`, {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: cookie.get("token")!,
+        },
+      }).then(async (res) => {
+        const data = await res.json();
+
+        if (!res.ok) {
+          console.log(data);
+          return;
+        }
+
+        console.log(data);
+      });
     }
 
     return () => {

@@ -4,13 +4,16 @@
 
 :root {
   --background-main: hsl(0, 0%, 8%);
-  --button-primary: rgb(239, 68, 68);
+  --button-primary: #737d3c;
+  --button-danger: rgb(255, 128, 128);
   --spaces-list-background: hsl(0, 0%, 8%);
   --rooms-list-background: hsl(0, 0%, 12%);
   --chat-background: hsl(0, 0%, 15%);
   --chat-header-text: white;
-  --chat-header-background: hsl(0, 0%, 20%);
+  --chat-header-background: hsl(0, 0%, 15%);
   --ui-card: hsl(0, 0%, 20%);
+  --ui-card-2: hsl(0, 0%, 10%);
+  --ui-input: var(--ui-card-2);
   --ui-context-menu: hsl(0, 0%, 5%);
   --ui-context-menu-hover: hsl(0, 0%, 10%);
   --ui-context-menu-text: hsl(0, 0%, 95%);
@@ -27,6 +30,14 @@ div#app-root {
   width: 100vw;
   height: 100vh;
   background: var(--background-main);
+}
+
+button.primary {
+  background: var(--button-primary);
+}
+
+button.danger {
+  background: var(--button-danger);
 }
 
 main.layout {
@@ -47,24 +58,42 @@ main.layout {
     div.avatar {
       width: 3rem;
       height: 3rem;
-      margin-top: 0.5rem;
+      margin-top: 0.25rem;
 
       a {
         border-radius: 100%;
       }
 
       img {
-        border-radius: 100%;
+        border-radius: 50%;
         background-color: black;
         border: solid #2F3136;
+        content: "text";
       }
     }
-    hr {
-     min-height: 72px;
-     padding: 0.5rem;
-     display: flex;
-     color: #2F3136;
-     align-items: center;
+    div.spacebar {
+      width: 35px;
+      height: 2px;
+      background-color: #2F3136;
+      opacity: 30;
+      margin-top: 0.5rem;
+      margin-bottom: 0.5rem;
+      margin-right: auto;
+      margin-left: auto;
+      border-radius: 4px;
+    }
+    ul.spaces {
+      width: 3rem;
+      min-height: 100%;
+      background: var(--spaces-list-background);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      overflow-x: hidden;
+      align-items: center;
+      margin-bottom: 0.5rem;
+      margin-right: auto;
+      margin-left: auto;
     }
   }
 
@@ -116,13 +145,37 @@ main.layout {
         background: var(--ui-settings-active);
       }
 
-      *.icon {
+      span.icon {
         color: white;
+
+        svg {
+          width: 20px !important;
+          height: 20px !important;
+        }
       }
 
-      *.content {
+      span.content {
         color: white;
       }
+    }
+  }
+
+  div.home {
+    width: 100%;
+    min-height: 100%;
+    overflow: auto;
+
+    div.header {
+      width: 100%;
+      height: 3rem;
+      background: var(--chat-background);
+      font-size: large;
+      color: var(--chat-background);
+      display: flex;
+      box-shadow: 0 1px 0 rgba(4,4,5,0.2),0 1.5px 0 rgba(6,6,7,0.05),0 2px 0 rgba(4,4,5,0.05);
+      align-items: center;
+      padding-left: 1rem;
+      padding-right: 1rem;
     }
   }
 
@@ -143,6 +196,35 @@ main.layout {
       align-items: center;
       padding-left: 1rem;
       padding-right: 1rem;
+
+      h1.title {
+        border-right-width: 1px;
+        border-right-color: rgb(107 114 128);
+        padding-right: 1rem;
+      }
+
+      div.tabs {
+        display: flex;
+        gap: 1rem;
+        padding-left: 1rem;
+
+        button {
+          padding: 0.25rem;
+          border-radius: 0.5rem;
+
+          &:hover {
+            background: var(--ui-settings-hover)
+          }
+
+          &.active {
+            background: var(--ui-settings-active);
+          }
+
+          &.add-friend {
+            background: var(--button-primary);
+          }
+        }
+      }
     }
   }
 }
@@ -181,6 +263,51 @@ div.modal {
     background: var(--ui-backdrop);
     width: 100%;
     height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+
+    div.card {
+      padding: 1rem;
+      background: var(--ui-card);
+      border-radius: 7px;
+
+      h1.title {
+        color: white;
+        font-weight: bold;
+        text-transform: uppercase;
+        padding: 0.1rem;
+      }
+
+      input {
+        background: var(--ui-input);
+        border-radius: 5px;
+        border: 1px solid var(--button-primary);
+        color: white;
+      }
+
+      button {
+        border-radius: 5px;
+        color: white;
+      }
+    }
+
+    div.card-2 {
+      width: 100%;
+      padding-left: 0.5rem;
+      padding-right: 0.5rem;
+      padding-top: 1rem;
+      padding-bottom: 1rem;
+      background: var(--ui-card-2);
+      border-radius: 7px;
+
+      button {
+        border-radius: 5px;
+        color: white;
+        padding: 0.25rem;
+      }
+    }
   }
 
   div.no-backdrop {
@@ -230,11 +357,6 @@ div.modal {
             background: var(--ui-settings-active);
           }
         }
-      }
-      hr {
-        width: 0.5;
-        border: none;
-        border-bottom: 1px solid var(--ui-settings-text);
       }
     }
 
@@ -317,8 +439,8 @@ div.modal {
               height: 80px;              
             }
 
+
             img.avatar {
-              // absolute top-[4rem] rounded-full border-4 border-[#1E1F22] group-hover:opacity-75
               position: absolute;
               top: 4rem;
               border-radius: 100%;

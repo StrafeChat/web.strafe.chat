@@ -1,29 +1,66 @@
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUserGroup, faNoteSticky } from "@fortawesome/free-solid-svg-icons";
+import {
+  faUserGroup,
+  faNoteSticky,
+  faHouseChimney,
+} from "@fortawesome/free-solid-svg-icons";
 import { useRoom } from "@/context/RoomContext";
+import { usePathname, useRouter } from "next/navigation";
 
 export default function RoomList() {
-  const { tab, setTab } = useRoom();
+  const { setTab } = useRoom();
+
+  const router = useRouter();
+  const pathname = usePathname();
 
   return (
+    <div>
     <ul className="rooms">
       <div className="header">
         <span>
           <b>Private Messages</b>
         </span>
       </div>
-      <li className={tab == "friends" ? "active" : ""} onClick={() => setTab("friends")}>
-        <FontAwesomeIcon className="icon" icon={faUserGroup} />
+      <li
+        className={pathname == "/" ? "active" : ""}
+        onClick={() => {
+          setTab("home");
+          router.push("/");
+        }}
+      >
+        <span className="icon">
+          <FontAwesomeIcon icon={faHouseChimney} />
+        </span>
+        <span className="content">Home</span>
+      </li>
+      <li
+        className={pathname == "/friends" ? "active" : ""}
+        onClick={() => {
+          setTab("friends");
+          router.push("/friends");
+        }}
+      >
+        <span className="icon">
+          <FontAwesomeIcon icon={faUserGroup} />
+        </span>
         <span className="content">Friends</span>
       </li>
-      <li className={tab == "notes" ? "active" : ""} onClick={() => setTab("notes")}>
-        <FontAwesomeIcon className="icon" icon={faNoteSticky} />
-        <span className="content">&nbsp;Notes</span>
+      <li
+        className={pathname == "/notes" ? "active" : ""}
+        onClick={() => {
+          setTab("notes");
+          router.push("/notes");
+        }}
+      >
+        <span className="icon">
+          <FontAwesomeIcon icon={faNoteSticky} />
+        </span>
+        <span className="content">Notes</span>
       </li>
-      <li className={tab == "test" ? "active" : ""} onClick={() => setTab("test")}>
-        <FontAwesomeIcon className="icon" icon={faNoteSticky} />
-        <span className="content">&nbsp;TEST</span>
-      </li>
+       <span className="mt-2.5 pl-4 text-gray-500 font-bold uppercase text-[12px] w-full">
+            Conversations
+      </span>
     </ul>
+    </div>
   );
 }
