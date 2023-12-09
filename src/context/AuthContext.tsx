@@ -1,5 +1,6 @@
 "use client";
 import AuthService from "@/services/AuthService";
+import LoadingScreen from "@/components/LoadingScreen";
 import {
   Dispatch,
   SetStateAction,
@@ -28,25 +29,42 @@ export interface User {
   avatar_decoration: string;
   created_at: Date;
   edited_at: Date;
+  presence: {
+    status: string;
+  };
+}
+
+export interface Relationship {
+  sender_id: string;
+  sender: User;
+  receiver_id: string;
+  receiver: User;
+  created_at: Date;
+  status: "pending" | "accepted" | "blocked";
 }
 
 interface Context {
   user: User;
+  relationships: Relationship[];
   setUser: Dispatch<SetStateAction<User>>;
+  setRelationships: Dispatch<SetStateAction<Relationship[]>>;
 }
 
 const AuthContext = createContext<Context>({
   user: {} as unknown as User,
+  relationships: [],
   setUser: {} as Dispatch<SetStateAction<User>>,
+  setRelationships: {} as Dispatch<SetStateAction<Relationship[]>>,
 });
 
 export const AuthProvider = ({ children }: { children: JSX.Element }) => {
   const [user, setUser] = useState<User>({} as unknown as User);
-
-  if(!user) return <></>
+  const [relationships, setRelationships] = useState<Relationship[]>([]);
 
   return (
-    <AuthContext.Provider value={{ user, setUser }}>
+    <AuthContext.Provider
+      value={{ user, relationships, setUser, setRelationships }}
+    >
       <AuthService>{children}</AuthService>
     </AuthContext.Provider>
   );

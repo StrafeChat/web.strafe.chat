@@ -40,6 +40,10 @@ button.danger {
   background: var(--button-danger);
 }
 
+img.avatar {
+  border-radius: 50%;
+}
+
 main.layout {
   width: 100%;
   height: 100%;
@@ -226,12 +230,19 @@ main.layout {
         }
       }
     }
+
+    div.body {
+      width: 100%;
+      height: calc(100% - 3rem);
+    }
   }
 }
 
+// Context Menu Stuff
 div[data-radix-popper-content-wrapper] {
   background: var(--ui-context-menu);
   color: var(--ui-context-menu-text);
+  border-radius: 6px;
 
   div {
     border: none;
@@ -395,10 +406,6 @@ div.modal {
         // padding-left: 2.5rem;
         // padding-right: 2.5rem;
         padding: 1rem 2.5rem 1rem 2.5rem;
-
-        img.avatar {
-          border-radius: 50%;
-        }
 
         div.account-card {
           width: 100%;

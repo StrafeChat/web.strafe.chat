@@ -1,21 +1,37 @@
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import cookie from "js-cookie";
-import { useAuth } from "@/context/AuthContext";
+import LoadingScreen from "@/components/LoadingScreen";
+import { Relationship, useAuth } from "@/context/AuthContext";
 import { RoomProvider } from "@/context/RoomContext";
 
 export default function AuthService({ children }: { children: JSX.Element }) {
   const pathname = usePathname();
   const router = useRouter();
-  const { setUser } = useAuth();
+  const { user, setUser, setRelationships } = useAuth();
 
   const wsRef = useRef<WebSocket | null>(null);
   const connectedRef = useRef(false);
 
-  const handleWsOpen = (_event: Event) => {
-    console.log("Connected");
-    connectedRef.current = true;
-  };
+  const handleWsOpen = useCallback(
+    (_event: Event) => {
+      console.log("Connected");
+      connectedRef.current = true;
+      fetch(`${process.env.NEXT_PUBLIC_API}/users/@me/relationships`, {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: cookie.get("token")!,
+        },
+      }).then(async (res) => {
+        const data = await res.json();
+
+        if (!res.ok) return console.log(data);
+
+        setRelationships(data.relationships);
+      });
+    },
+    [setRelationships]
+  );
 
   const handleWsMessage = useCallback(
     (evt: MessageEvent<any>) => {
@@ -41,9 +57,46 @@ export default function AuthService({ children }: { children: JSX.Element }) {
               break;
           }
           break;
+        case 4:
+          console.log(data.status, data);
+          switch (data.status) {
+            case "accepted":
+              setRelationships((prev) => {
+                const updatedRelationships = prev.map((relationship) => {
+                  if (
+                    relationship.receiver_id === data.receiver_id &&
+                    relationship.sender_id === data.sender_id
+                  ) {
+                    return {
+                      ...relationship,
+                      status: "accepted",
+                    } as Relationship;
+                  }
+                  return relationship;
+                });
+
+                return updatedRelationships;
+              });
+              break;
+            case "rejected":
+              setRelationships((prev) =>
+                prev.filter((relationship) => {
+                  console.log(relationship.receiver_id, data.receiver_id);
+                  return (
+                    relationship.receiver_id != data.receiver_id &&
+                    relationship.sender_id != data.sender_id
+                  );
+                })
+              );
+              break;
+            default:
+              setRelationships((prev) => [...prev, data]);
+              break;
+          }
+          break;
       }
     },
-    [setUser]
+    [setRelationships, setUser]
   );
 
   const handleWsClose = useCallback(
@@ -54,12 +107,20 @@ export default function AuthService({ children }: { children: JSX.Element }) {
           router.push("/login");
           break;
         default:
-          console.log(event);
-          wsRef.current = new WebSocket(process.env.NEXT_PUBLIC_WS!);
+          if (wsRef.current?.CLOSED) {
+            wsRef.current = new WebSocket(process.env.NEXT_PUBLIC_WS!);
+            wsRef.current.addEventListener("open", handleWsOpen);
+            wsRef.current.addEventListener("message", handleWsMessage);
+            wsRef.current.addEventListener("close", handleWsClose);
+            wsRef.current.addEventListener("error", handleWsError);
+            document.addEventListener("contextmenu", (event) =>
+              event.preventDefault()
+            );
+          }
           break;
       }
     },
-    [router]
+    [handleWsMessage, handleWsOpen, router]
   );
 
   const handleWsError = (_event: Event) => {
@@ -72,7 +133,6 @@ export default function AuthService({ children }: { children: JSX.Element }) {
     if (!token) return router.push("/login");
     if (!connectedRef.current) {
       wsRef.current = new WebSocket(process.env.NEXT_PUBLIC_WS!);
-      console.log("Yuh")
       wsRef.current.addEventListener("open", handleWsOpen);
       wsRef.current.addEventListener("message", handleWsMessage);
       wsRef.current.addEventListener("close", handleWsClose);
@@ -80,22 +140,6 @@ export default function AuthService({ children }: { children: JSX.Element }) {
       document.addEventListener("contextmenu", (event) =>
         event.preventDefault()
       );
-
-      fetch(`${process.env.NEXT_PUBLIC_API}/users/@me/relationships`, {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: cookie.get("token")!,
-        },
-      }).then(async (res) => {
-        const data = await res.json();
-
-        if (!res.ok) {
-          console.log(data);
-          return;
-        }
-
-        console.log(data);
-      });
     }
 
     return () => {
@@ -106,8 +150,20 @@ export default function AuthService({ children }: { children: JSX.Element }) {
       document.removeEventListener("contextmenu", (event) =>
         event.preventDefault()
       );
+      setRelationships([]);
     };
-  }, [connectedRef, handleWsClose, handleWsMessage, pathname, router, wsRef]);
+  }, [
+    connectedRef,
+    handleWsClose,
+    handleWsMessage,
+    handleWsOpen,
+    pathname,
+    router,
+    setRelationships,
+    wsRef,
+  ]);
 
+  if (!user.id && pathname != "/login" && pathname != "/register")
+    return <LoadingScreen />;
   return <RoomProvider>{children}</RoomProvider>;
 }
