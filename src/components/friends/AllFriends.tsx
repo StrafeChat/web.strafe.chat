@@ -1,4 +1,13 @@
 import { Relationship, User, useAuth } from "@/context/AuthContext";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import {
+  faCopy,
+  faBan,
+  faUserMinus,
+  faPhone,
+  faMessage,
+  faIdCard
+} from "@fortawesome/free-solid-svg-icons";
 import Image from "next/image";
 import { ContextMenu } from "../ui/context-menu";
 import {
@@ -6,13 +15,14 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { copy, createPM, removeFriend } from "@/scripts/ContextMenu";
 
 export default function AllFriends({
   relationships,
 }: {
   relationships: Relationship[];
 }) {
-  const { user } = useAuth();
+  const { user,setRelationships } = useAuth();
 
   return (
     <div className="p-[2rem] flex flex-col">
@@ -42,7 +52,10 @@ export default function AllFriends({
                       {currentUser.username}
                     </span>
                     <span className="block text-sm">
-                      {currentUser.presence.status}
+                    {currentUser.presence.online
+              ? currentUser.presence.status.charAt(0).toUpperCase() +
+              currentUser.presence.status.slice(1)
+              : "Offline"}
                     </span>
                   </span>
                 </div>{" "}
@@ -50,15 +63,26 @@ export default function AllFriends({
               </div>
             </ContextMenuTrigger>
             <ContextMenuContent>
-              <ContextMenuItem>Profile</ContextMenuItem>
-              <ContextMenuItem>Message</ContextMenuItem>
-              <ContextMenuItem>Call</ContextMenuItem>
-              <ContextMenuItem>Remove Friend</ContextMenuItem>
-              <ContextMenuItem>Block</ContextMenuItem>
+            <ContextMenuItem><FontAwesomeIcon icon={faIdCard} className="pr-[6px]" />Profile</ContextMenuItem>
+              <ContextMenuItem onClick={() => createPM(currentUser.id)}>
+              <FontAwesomeIcon icon={faMessage} className="pr-[7px]" />Message
+              </ContextMenuItem>
+              <ContextMenuItem><FontAwesomeIcon icon={faPhone} className="pr-[7px]" />Call</ContextMenuItem>
               <ContextMenuItem
-                onClick={() => navigator.clipboard.writeText(currentUser.id)}
+                onClick={() =>
+                  removeFriend(
+                    currentUser.username,
+                    currentUser.discriminator,
+                    setRelationships
+                  )
+                }
               >
-                Copy User ID
+                <FontAwesomeIcon icon={faUserMinus} className="pr-[4px]" />Remove Friend
+              </ContextMenuItem>
+              <ContextMenuItem><FontAwesomeIcon icon={faBan} className="pr-[7px]" />Block</ContextMenuItem>
+              <hr></hr>
+              <ContextMenuItem onClick={() => copy(currentUser.id)}>
+              <FontAwesomeIcon icon={faCopy} className="pr-[8px]" />Copy User ID
               </ContextMenuItem>
             </ContextMenuContent>
           </ContextMenu>

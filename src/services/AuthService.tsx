@@ -3,7 +3,7 @@ import { useCallback, useEffect, useState, useRef } from "react";
 import cookie from "js-cookie";
 import LoadingScreen from "@/components/LoadingScreen";
 import { Relationship, useAuth } from "@/context/AuthContext";
-import { RoomProvider } from "@/context/RoomContext";
+import { useRoom } from "@/context/RoomContext";
 
 export default function AuthService({ children }: { children: JSX.Element }) {
   const pathname = usePathname();
@@ -11,6 +11,7 @@ export default function AuthService({ children }: { children: JSX.Element }) {
   const [clientError, setClientError] = useState(false);
 
   const { user, setUser, setRelationships } = useAuth();
+  const { setPMs } = useRoom();
 
   const wsRef = useRef<WebSocket | null>(null);
   const connectedRef = useRef(false);
@@ -32,8 +33,21 @@ export default function AuthService({ children }: { children: JSX.Element }) {
 
         setRelationships(data.relationships);
       });
+
+      fetch(`${process.env.NEXT_PUBLIC_API}/users/@me/rooms`, {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: cookie.get("token")!,
+        },
+      }).then(async (res) => {
+        const data = await res.json();
+
+        if (!res.ok) return console.log(data);
+
+        setPMs([...data.rooms]);
+      });
     },
-    [setRelationships]
+    [setPMs, setRelationships]
   );
 
   const handleWsMessage = useCallback(
@@ -170,7 +184,8 @@ export default function AuthService({ children }: { children: JSX.Element }) {
 
   if (!user.id && pathname != "/login" && pathname != "/register")
     return <LoadingScreen />;
-  if (clientError && pathname != "/login" && pathname != "/register") 
+  if (clientError && pathname != "/login" && pathname != "/register")
     return <LoadingScreen />;
-  return <RoomProvider>{children}</RoomProvider>;
+
+  return <>{children}</>;
 }

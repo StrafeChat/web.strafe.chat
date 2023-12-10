@@ -23,6 +23,8 @@
   --ui-settings-hover: hsl(0, 0%, 17%);
   --ui-settings-text: hsl(0, 0%, 75%);
   --ui-backdrop: rgba(13, 13, 13, 0.75);
+  --text-primary: hsl(100, 100, 100);
+  --text-secondary: rgb(100, 100, 100);
   user-select: none;
 }
 
@@ -101,7 +103,7 @@ main.layout {
     }
   }
 
-  ul.rooms {
+  ul.rooms-wrapper {
     width: 13.5rem;
     height: 100%;
     background: var(--rooms-list-background);
@@ -126,6 +128,36 @@ main.layout {
       padding-right: 1rem;
       border-radius: 0;
       border-top-left-radius: 0.75rem;
+    }
+
+    div.rooms-container {
+      width: 100%;
+      height: calc(100% - 3rem);
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    span.convo-title {
+      margin-top: 0.625rem;
+      padding-left: 1rem;
+      color: var(--text-secondary);
+      font-weight: bold;
+      text-transform: uppercase;
+      font-size: 12px;
+      width: 100%;
+    }
+
+    ul.rooms {
+      width: 100%;
+      padding-left: 0.25rem;
+      padding-right: 0.25rem;
+      padding-top: 0.5rem;
+      padding-bottom: 0.5rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
     }
 
     li {
@@ -160,6 +192,20 @@ main.layout {
 
       span.content {
         color: white;
+        overflow: hidden;
+        white-space: nowrap;
+        text-overflow: ellipsis;
+
+        span.username {
+          font-size: 0.875rem;
+        }
+
+        span.status-text {
+          font-size: 0.75rem;
+          display: block;
+          color: var(--text-secondary);
+
+        }
       }
     }
   }
@@ -200,6 +246,12 @@ main.layout {
       align-items: center;
       padding-left: 1rem;
       padding-right: 1rem;
+
+      div.between {
+        display: flex;
+        justify-content: space-between;
+        width: 100%;
+      }
 
       h1.title {
         border-right-width: 1px;

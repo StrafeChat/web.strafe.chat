@@ -8,6 +8,7 @@ import {
   useContext,
   useState,
 } from "react";
+import { RoomProvider } from "./RoomContext";
 
 export interface User {
   id: string;
@@ -31,6 +32,8 @@ export interface User {
   edited_at: Date;
   presence: {
     status: string;
+    status_text: string;
+    online: boolean;
   };
 }
 
@@ -65,7 +68,9 @@ export const AuthProvider = ({ children }: { children: JSX.Element }) => {
     <AuthContext.Provider
       value={{ user, relationships, setUser, setRelationships }}
     >
-      <AuthService>{children}</AuthService>
+      <RoomProvider>
+        <AuthService>{children}</AuthService>
+      </RoomProvider>
     </AuthContext.Provider>
   );
 };
