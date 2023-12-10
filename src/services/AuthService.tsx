@@ -156,7 +156,6 @@ export default function AuthService({ children }: { children: JSX.Element }) {
       document.removeEventListener("contextmenu", (event) =>
         event.preventDefault()
       );
-      setRelationships([]);
     };
   }, [
     connectedRef,
