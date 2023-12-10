@@ -14,7 +14,6 @@ export default function RoomList() {
   const pathname = usePathname();
 
   return (
-    <div>
     <ul className="rooms">
       <div className="header">
         <span>
@@ -57,10 +56,9 @@ export default function RoomList() {
         </span>
         <span className="content">Notes</span>
       </li>
-       <span className="mt-2.5 pl-4 text-gray-500 font-bold uppercase text-[12px] w-full">
-            Conversations
+      <span className="mt-2.5 pl-4 text-gray-500 font-bold uppercase text-[12px] w-full">
+        Conversations
       </span>
     </ul>
-    </div>
   );
 }

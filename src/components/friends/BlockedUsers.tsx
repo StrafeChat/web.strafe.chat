@@ -17,7 +17,7 @@ export default function BlockedUsers({
   return (
     <div className="p-[2rem] flex flex-col">
       <span className="uppercase font-bold text-gray-500 pb-[7px]">
-        Blocked Users - {relationships.length}
+        Blocked - {relationships.length}
       </span>
       {relationships.map((relationship, key) => {
         const currentUser: User =

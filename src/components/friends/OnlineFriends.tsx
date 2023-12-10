@@ -6,25 +6,26 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { removeFriend } from "@/scripts/ContextMenu";
 
 export default function OnlineFriends({
   relationships,
 }: {
   relationships: Relationship[];
 }) {
-  const { user } = useAuth();
+  const { user, setRelationships } = useAuth();
 
   return (
     <div className="p-[2rem] flex flex-col">
       <span className="uppercase font-bold text-gray-500 pb-[7px]">
-        Online Friends - {relationships.length}
+        Online - {relationships.length}
       </span>
       {relationships.map((relationship, key) => {
         const currentUser: User =
           relationship.receiver_id != user.id
             ? relationship.receiver
             : relationship.sender;
-            
+
         return (
           <ContextMenu key={key}>
             <ContextMenuTrigger>
@@ -53,7 +54,17 @@ export default function OnlineFriends({
               <ContextMenuItem>Profile</ContextMenuItem>
               <ContextMenuItem>Message</ContextMenuItem>
               <ContextMenuItem>Call</ContextMenuItem>
-              <ContextMenuItem>Remove Friend</ContextMenuItem>
+              <ContextMenuItem
+                onClick={() =>
+                  removeFriend(
+                    currentUser.username,
+                    currentUser.discriminator,
+                    setRelationships
+                  )
+                }
+              >
+                Remove Friend
+              </ContextMenuItem>
               <ContextMenuItem>Block</ContextMenuItem>
               <ContextMenuItem
                 onClick={() => navigator.clipboard.writeText(currentUser.id)}

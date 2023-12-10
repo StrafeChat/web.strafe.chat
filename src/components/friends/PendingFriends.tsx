@@ -51,10 +51,11 @@ export default function PendingFriends({
                     </span>
                   </span>
                 </div>{" "}
-                <div className="flex w-fit items-center">
-                  <button
-                    onClick={async () => {
-                      if (relationship.receiver_id == user.id) {
+                <div className="flex w-fit items-center gap-4">
+                  {relationship.receiver_id == user.id && (
+                    <button
+                      className="text-white bg-gray-700 w-[30px] h-[30px] rounded-full flex items-center justify-center"
+                      onClick={async () => {
                         const res = await fetch(
                           `${process.env.NEXT_PUBLIC_API}/users/@me/relationships/${relationship.sender.username}-${relationship.sender.discriminator}`,
                           {
@@ -93,49 +94,50 @@ export default function PendingFriends({
 
                           return updatedRelationships;
                         });
-                      } else if (relationship.sender_id == user.id) {
-                        const res = await fetch(
-                          `${process.env.NEXT_PUBLIC_API}/users/@me/relationships/${relationship.receiver.username}-${relationship.receiver.discriminator}`,
-                          {
-                            method: "PATCH",
-                            headers: {
-                              "Content-Type": "application/json",
-                              Authorization: cookie.get("token")!,
-                            },
-                            body: JSON.stringify({
-                              action: "reject",
-                            }),
-                          }
-                        );
-
-                        const data = await res.json();
-
-                        if (!res.ok) return console.log(data);
-
-                        setRelationships((prev) =>
-                          prev.filter(
-                            (relationship) =>
-                              relationship.receiver_id !=
-                                data.relationship.receiver_id &&
-                              relationship.sender_id !=
-                                data.relationship.receiver_id
-                          )
-                        );
-                      }
-                    }}
-                    className="text-white bg-gray-700 w-[30px] h-[30px] rounded-full flex items-center justify-center"
-                  >
-                    {relationship.receiver_id == user.id ? (
+                      }}
+                    >
                       <FontAwesomeIcon
                         className="w-[24px] h-[24px]"
                         icon={faCheck}
                       />
-                    ) : (
-                      <FontAwesomeIcon
-                        className="w-[24px] h-[24px]"
-                        icon={faXmark}
-                      />
-                    )}
+                    </button>
+                  )}
+                  <button
+                    className="text-white bg-gray-700 w-[30px] h-[30px] rounded-full flex items-center justify-center"
+                    onClick={async () => {
+                      const res = await fetch(
+                        `${process.env.NEXT_PUBLIC_API}/users/@me/relationships/${currentUser.username}-${currentUser.discriminator}`,
+                        {
+                          method: "PATCH",
+                          headers: {
+                            "Content-Type": "application/json",
+                            Authorization: cookie.get("token")!,
+                          },
+                          body: JSON.stringify({
+                            action: "reject",
+                          }),
+                        }
+                      );
+
+                      const data = await res.json();
+
+                      if (!res.ok) return console.log(data);
+
+                      setRelationships((prev) =>
+                        prev.filter(
+                          (relationship) =>
+                            relationship.receiver_id !=
+                              data.relationship.receiver_id &&
+                            relationship.sender_id !=
+                              data.relationship.receiver_id
+                        )
+                      );
+                    }}
+                  >
+                    <FontAwesomeIcon
+                      className="w-[24px] h-[24px]"
+                      icon={faXmark}
+                    />
                   </button>
                 </div>
               </div>

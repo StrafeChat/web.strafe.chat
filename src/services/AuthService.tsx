@@ -1,5 +1,5 @@
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useState, useRef } from "react";
 import cookie from "js-cookie";
 import LoadingScreen from "@/components/LoadingScreen";
 import { Relationship, useAuth } from "@/context/AuthContext";
@@ -8,6 +8,8 @@ import { RoomProvider } from "@/context/RoomContext";
 export default function AuthService({ children }: { children: JSX.Element }) {
   const pathname = usePathname();
   const router = useRouter();
+  const [clientError, setClientError] = useState(false);
+
   const { user, setUser, setRelationships } = useAuth();
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -16,6 +18,7 @@ export default function AuthService({ children }: { children: JSX.Element }) {
   const handleWsOpen = useCallback(
     (_event: Event) => {
       console.log("Connected");
+      setClientError(false);
       connectedRef.current = true;
       fetch(`${process.env.NEXT_PUBLIC_API}/users/@me/relationships`, {
         headers: {
@@ -54,11 +57,11 @@ export default function AuthService({ children }: { children: JSX.Element }) {
           switch (event) {
             case "READY":
               setUser(data);
+              setClientError(false);
               break;
           }
           break;
         case 4:
-          console.log(data.status, data);
           switch (data.status) {
             case "accepted":
               setRelationships((prev) => {
@@ -79,6 +82,7 @@ export default function AuthService({ children }: { children: JSX.Element }) {
               });
               break;
             case "rejected":
+            case "deleted":
               setRelationships((prev) =>
                 prev.filter((relationship) => {
                   console.log(relationship.receiver_id, data.receiver_id);
@@ -89,7 +93,7 @@ export default function AuthService({ children }: { children: JSX.Element }) {
                 })
               );
               break;
-            default:
+            case "pending":
               setRelationships((prev) => [...prev, data]);
               break;
           }
@@ -102,6 +106,7 @@ export default function AuthService({ children }: { children: JSX.Element }) {
   const handleWsClose = useCallback(
     (event: CloseEvent) => {
       connectedRef.current = false;
+      setClientError(true);
       switch (event.code) {
         case 4004:
           router.push("/login");
@@ -125,6 +130,7 @@ export default function AuthService({ children }: { children: JSX.Element }) {
 
   const handleWsError = (_event: Event) => {
     connectedRef.current = false;
+    setClientError(true);
   };
 
   useEffect(() => {
@@ -164,6 +170,8 @@ export default function AuthService({ children }: { children: JSX.Element }) {
   ]);
 
   if (!user.id && pathname != "/login" && pathname != "/register")
+    return <LoadingScreen />;
+  if (clientError && pathname != "/login" && pathname != "/register") 
     return <LoadingScreen />;
   return <RoomProvider>{children}</RoomProvider>;
 }
