@@ -1,5 +1,5 @@
 "use client";
-import { Relationship } from "@/context/AuthContext";
+import { Relationship, User } from "@/context/AuthContext";
 import { Dispatch, SetStateAction } from "react";
 import cookie from "js-cookie";
 
@@ -55,4 +55,17 @@ export const createPM = async (recipientId: string) => {
     if (!res.ok) return console.log(data);
 
     console.log(data);
+}
+
+export const updatePresence = (ws: WebSocket | null | undefined, setUser: Dispatch<SetStateAction<User>>, { status }: { status: string }) => {
+    ws?.send(JSON.stringify({
+        op: 5,
+        data: {
+            status
+        }
+    }));
+
+    setUser((prev) => {
+        return { ...prev, presence: { status, status_text: prev.presence.status_text, online: true } };
+    })
 }

@@ -8,13 +8,15 @@
   --button-danger: rgb(255, 128, 128);
   --spaces-list-background: hsl(0, 0%, 8%);
   --rooms-list-background: hsl(0, 0%, 12%);
+  --skeleton-background-primary: hsl(0, 0%, 15%);
+  --skeleton-background-secondary: hsl(0, 0%, 20%);
   --chat-background: hsl(0, 0%, 15%);
   --chat-header-text: white;
   --chat-header-background: hsl(0, 0%, 15%);
   --ui-card: hsl(0, 0%, 20%);
   --ui-card-2: hsl(0, 0%, 10%);
   --ui-input: var(--ui-card-2);
-  --ui-context-menu: hsl(0, 0%, 5%);
+  --ui-context-menu: hsl(0, 0%, 12%);
   --ui-context-menu-hover: hsl(0, 0%, 10%);
   --ui-context-menu-text: hsl(0, 0%, 95%);
   --ui-settings-sidebar: hsl(0, 0%, 12%);
@@ -28,6 +30,10 @@
   user-select: none;
 }
 
+div.skeleton {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
 div#app-root {
   width: 100vw;
   height: 100vh;
@@ -36,6 +42,7 @@ div#app-root {
 
 button.primary {
   background: var(--button-primary);
+
 }
 
 button.danger {
@@ -77,6 +84,7 @@ main.layout {
         content: "text";
       }
     }
+
     div.spacebar {
       width: 35px;
       height: 2px;
@@ -88,6 +96,7 @@ main.layout {
       margin-left: auto;
       border-radius: 4px;
     }
+
     ul.spaces {
       width: 3rem;
       min-height: 100%;
@@ -111,13 +120,13 @@ main.layout {
     flex-direction: column;
     align-items: center;
     border-top-left-radius: 0.75rem;
-    
+
 
     div.header {
       width: 100%;
       height: 3rem;
       background: var(--rooms-list-background);
-      box-shadow: 0 1px 0 rgba(4,4,5,0.2),0 1.5px 0 rgba(6,6,7,0.05),0 2px 0 rgba(4,4,5,0.05);
+      box-shadow: 0 1px 0 rgba(4, 4, 5, 0.2), 0 1.5px 0 rgba(6, 6, 7, 0.05), 0 2px 0 rgba(4, 4, 5, 0.05);
       border-bottom-left-radius: 0.5rem;
       border-bottom-right-radius: 0.5rem;
       font-size: large;
@@ -142,6 +151,7 @@ main.layout {
     span.convo-title {
       margin-top: 0.625rem;
       padding-left: 1rem;
+      margin-bottom: -10px;
       color: var(--text-secondary);
       font-weight: bold;
       text-transform: uppercase;
@@ -151,25 +161,26 @@ main.layout {
 
     ul.rooms {
       width: 100%;
+      margin-top: .25rem;
+      margin-bottom: .25rem;
       padding-left: 0.25rem;
       padding-right: 0.25rem;
-      padding-top: 0.5rem;
-      padding-bottom: 0.5rem;
+      padding-top: 0.25rem;
+      padding-bottom: 0.25rem;
       display: flex;
       flex-direction: column;
       align-items: center;
     }
 
-    li {
-      margin-top: 0.5rem;
+    li.pm {
       width: 90%;
-      padding-top: 0.5rem;
-      padding-bottom: 0.25rem;
+      padding-top: -10px;
+      padding-bottom: 1px;
       padding-left: 0.5rem;
       padding-right: 0.5rem;
       border-radius: 4px;
       display: flex;
-      align-items: center;      
+      align-items: center;
       gap: 0.75rem;
       cursor: pointer;
 
@@ -203,10 +214,46 @@ main.layout {
         span.status-text {
           font-size: 0.75rem;
           display: block;
-          color: var(--text-secondary);
-
         }
       }
+    }
+
+    li {
+      margin-top: 0.5rem;
+      width: 90%;
+      padding-top: 0.5rem;
+      padding-bottom: 0.25rem;
+      padding-left: 0.5rem;
+      padding-right: 0.5rem;
+      border-radius: 4px;
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      cursor: pointer;
+
+      &:hover {
+        background: var(--ui-settings-hover);
+      }
+
+      &.active {
+        background: var(--ui-settings-active);
+      }
+
+      span.icon {
+        color: white;
+
+        svg {
+          width: 20px !important;
+          height: 20px !important;
+        }
+      }
+    }
+
+    span.content {
+      color: white;
+      overflow: hidden;
+      white-space: nowrap;
+      text-overflow: ellipsis;
     }
   }
 
@@ -222,7 +269,7 @@ main.layout {
       font-size: large;
       color: var(--chat-background);
       display: flex;
-      box-shadow: 0 1px 0 rgba(4,4,5,0.2),0 1.5px 0 rgba(6,6,7,0.05),0 2px 0 rgba(4,4,5,0.05);
+      box-shadow: 0 1px 0 rgba(4, 4, 5, 0.2), 0 1.5px 0 rgba(6, 6, 7, 0.05), 0 2px 0 rgba(4, 4, 5, 0.05);
       align-items: center;
       padding-left: 1rem;
       padding-right: 1rem;
@@ -242,7 +289,7 @@ main.layout {
       font-size: large;
       color: var(--chat-header-text);
       display: flex;
-      box-shadow: 0 1px 0 rgba(4,4,5,0.2),0 1.5px 0 rgba(6,6,7,0.05),0 2px 0 rgba(4,4,5,0.05);
+      box-shadow: 0 1px 0 rgba(4, 4, 5, 0.2), 0 1.5px 0 rgba(6, 6, 7, 0.05), 0 2px 0 rgba(4, 4, 5, 0.05);
       align-items: center;
       padding-left: 1rem;
       padding-right: 1rem;
@@ -265,8 +312,11 @@ main.layout {
         padding-left: 1rem;
 
         button {
-          padding: 0.25rem;
           border-radius: 0.5rem;
+          padding-top: 0.25rem;
+          padding-bottom: 0.25rem;
+          padding-left: 0.5rem;
+          padding-right: 0.5rem;
 
           &:hover {
             background: var(--ui-settings-hover)
@@ -321,6 +371,7 @@ div.modal {
   left: 0;
   width: 100%;
   height: 100%;
+  z-index: 99;
 
   div.backdrop {
     background: var(--ui-backdrop);
@@ -348,6 +399,10 @@ div.modal {
         border-radius: 5px;
         border: 1px solid var(--button-primary);
         color: white;
+
+        &::placeholder {
+          color: gray;
+        }
       }
 
       button {
@@ -368,7 +423,10 @@ div.modal {
       button {
         border-radius: 5px;
         color: white;
-        padding: 0.25rem;
+        padding-top: 0.25rem;
+        padding-bottom: 0.25rem;
+        padding-left: 0.5rem;
+        padding-right: 0.5rem;
       }
     }
   }
@@ -422,6 +480,8 @@ div.modal {
         }
       }
     }
+
+
 
     div.settings {
       background: var(--ui-settings);
@@ -495,7 +555,7 @@ div.modal {
               border: var(--ui-card) 0.5rem solid;
               background: black;
               width: 80px;
-              height: 80px;              
+              height: 80px;
             }
 
 
@@ -503,7 +563,7 @@ div.modal {
               position: absolute;
               top: 4rem;
               border-radius: 100%;
-              border: var(--ui-card) 0.25rem solid;              
+              border: var(--ui-card) 0.25rem solid;
             }
           }
 
@@ -523,5 +583,45 @@ div.modal {
         }
       }
     }
+  }
+}
+
+div.status-online {
+  background-color: #22c55e;
+}
+
+div.status-offline {
+  background-color: #6b7280;
+}
+
+div.status-idle {
+  background-color: #eab308;
+}
+
+div.status-dnd {
+  background-color: #ef4444;
+}
+
+div.status-coding {
+  background-color: #3b82f6;
+}
+
+div.status-streaming {
+  background-color: #a855f7;
+}
+
+div.status-sleeping {
+  background-color: #f97316;
+}
+
+@keyframes pulse {
+
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: .5;
   }
 }

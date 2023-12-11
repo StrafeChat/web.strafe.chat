@@ -24,7 +24,7 @@ export default function Page({ params }: { params: { id: string } }) {
           <>
             <div className="header">
               <div className="between">
-                <span>@{currentUser?.username}</span>
+                <span><b>@{currentUser?.username}</b></span>
                 <span className="flex gap-5 items-center text-2xl">
                     <FontAwesomeIcon icon={faPhone}/>
                     <FontAwesomeIcon icon={faVideoCamera}/>

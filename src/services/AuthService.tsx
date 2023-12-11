@@ -10,10 +10,9 @@ export default function AuthService({ children }: { children: JSX.Element }) {
   const router = useRouter();
   const [clientError, setClientError] = useState(false);
 
-  const { user, setUser, setRelationships } = useAuth();
+  const { user, setUser, relationships, setRelationships, ws } = useAuth();
   const { setPMs } = useRoom();
 
-  const wsRef = useRef<WebSocket | null>(null);
   const connectedRef = useRef(false);
 
   const handleWsOpen = useCallback(
@@ -56,14 +55,14 @@ export default function AuthService({ children }: { children: JSX.Element }) {
       switch (op) {
         case 0:
           setInterval(() => {
-            wsRef.current?.send(
+            ws?.current?.send(
               JSON.stringify({
                 op: 1,
                 data: null,
               })
             );
           }, data.heartbeat_interval);
-          wsRef.current?.send(
+          ws?.current?.send(
             JSON.stringify({ op: 2, data: { token: cookie.get("token") } })
           );
           break;
@@ -117,6 +116,16 @@ export default function AuthService({ children }: { children: JSX.Element }) {
     [setRelationships, setUser]
   );
 
+  // const handleWsMessage2 = useCallback((evt: MessageEvent<any>) => {
+  //   const { op, data, event } = JSON.parse(evt.data);
+  //   switch (op) {
+  //     case 5:
+  //       console.log(relationships);
+  //       break;
+  //   }
+
+  // }, [relationships]);
+
   const handleWsClose = useCallback(
     (event: CloseEvent) => {
       connectedRef.current = false;
@@ -126,12 +135,12 @@ export default function AuthService({ children }: { children: JSX.Element }) {
           router.push("/login");
           break;
         default:
-          if (wsRef.current?.CLOSED) {
-            wsRef.current = new WebSocket(process.env.NEXT_PUBLIC_WS!);
-            wsRef.current.addEventListener("open", handleWsOpen);
-            wsRef.current.addEventListener("message", handleWsMessage);
-            wsRef.current.addEventListener("close", handleWsClose);
-            wsRef.current.addEventListener("error", handleWsError);
+          if (ws?.current?.CLOSED) {
+            ws.current = new WebSocket(process.env.NEXT_PUBLIC_WS!);
+            ws?.current.addEventListener("open", handleWsOpen);
+            ws?.current.addEventListener("message", handleWsMessage);
+            ws?.current.addEventListener("close", handleWsClose);
+            ws?.current.addEventListener("error", handleWsError);
             document.addEventListener("contextmenu", (event) =>
               event.preventDefault()
             );
@@ -152,21 +161,21 @@ export default function AuthService({ children }: { children: JSX.Element }) {
     const token = cookie.get("token");
     if (!token) return router.push("/login");
     if (!connectedRef.current) {
-      wsRef.current = new WebSocket(process.env.NEXT_PUBLIC_WS!);
-      wsRef.current.addEventListener("open", handleWsOpen);
-      wsRef.current.addEventListener("message", handleWsMessage);
-      wsRef.current.addEventListener("close", handleWsClose);
-      wsRef.current.addEventListener("error", handleWsError);
+      ws!.current = new WebSocket(process.env.NEXT_PUBLIC_WS!);
+      ws?.current.addEventListener("open", handleWsOpen);
+      ws?.current.addEventListener("message", handleWsMessage);
+      ws?.current.addEventListener("close", handleWsClose);
+      ws?.current.addEventListener("error", handleWsError);
       document.addEventListener("contextmenu", (event) =>
         event.preventDefault()
       );
     }
 
     return () => {
-      wsRef.current?.removeEventListener("open", handleWsOpen);
-      wsRef.current?.removeEventListener("message", handleWsMessage);
-      wsRef.current?.removeEventListener("close", handleWsClose);
-      wsRef.current?.removeEventListener("error", handleWsError);
+      ws?.current?.removeEventListener("open", handleWsOpen);
+      ws?.current?.removeEventListener("message", handleWsMessage);
+      ws?.current?.removeEventListener("close", handleWsClose);
+      ws?.current?.removeEventListener("error", handleWsError);
       document.removeEventListener("contextmenu", (event) =>
         event.preventDefault()
       );
@@ -179,8 +188,49 @@ export default function AuthService({ children }: { children: JSX.Element }) {
     pathname,
     router,
     setRelationships,
-    wsRef,
+    ws,
   ]);
+
+  useEffect(() => {
+    const handleWsMessage = (evt: MessageEvent<any>) => {
+      const { op, data, event } = JSON.parse(evt.data);
+      switch (op) {
+        case 5:
+          setRelationships((prev) => {
+            const updatedRelationships = prev.map((relationship) => {
+              if (
+                relationship.receiver_id === data.user_id ||
+                relationship.sender_id === data.user_id
+              ) {
+                const updatedUser =
+                  data.user_id === relationship.receiver_id
+                    ? { ...relationship.receiver, presence: { ...data, user_id: undefined } }
+                    : { ...relationship.sender, presence: { ...data, user_id: undefined } };
+  
+                return {
+                  ...relationship,
+                  receiver_id: relationship.receiver_id,
+                  sender_id: relationship.sender_id,
+                  receiver: data.user_id == relationship.receiver_id ? updatedUser : relationship.receiver,
+                  sender: data.user_id == relationship.sender_id ? updatedUser : relationship.sender,
+                };
+              }
+              return relationship;
+            });
+  
+            return updatedRelationships;
+          });
+          break;
+      }
+    };
+  
+    ws?.current?.addEventListener("message", handleWsMessage);
+  
+    return () => {
+      ws?.current?.removeEventListener("message", handleWsMessage);
+    };
+  }, [relationships]);
+  
 
   if (!user.id && pathname != "/login" && pathname != "/register")
     return <LoadingScreen />;

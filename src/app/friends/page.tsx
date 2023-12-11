@@ -63,7 +63,7 @@ export default function Friends() {
 
               return (
                 relationship.status == "accepted" &&
-                currentUser.presence.status == "online"
+                (currentUser.presence.online && currentUser.presence.status != "offline")
               );
             })}
           />

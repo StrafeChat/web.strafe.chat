@@ -38,8 +38,9 @@ export default function AllFriends({
         return (
           <ContextMenu key={key}>
             <ContextMenuTrigger>
-              <div className="w-full p-2 hover:rounded-[0.25rem] hover:bg-gray-500 flex justify-between cursor-pointer">
+              <div className="w-full p-2 hover:rounded-[0.25rem] hover:bg-[#2b2b2b] flex justify-between cursor-pointer">
                 <div className="flex gap-2 w-fit items-center">
+                  <div className="relative">
                   <Image
                     className="avatar"
                     src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${currentUser.avatar}.png`}
@@ -47,15 +48,24 @@ export default function AllFriends({
                     height={40}
                     alt="profile"
                   />
+                  { currentUser.presence.online === true ? <div
+                   className={`absolute right-0 mr-[-1.5px] mb-[-1.5px] border-[2.75px] border-[#262626] bottom-0 w-[17px] h-[17px] status-${currentUser.presence.status} rounded-full`}
+                  /> : <div className={`absolute mr-[-1.5px] mb-[-1.5px] right-0 border-[2.75px] border-[#262626] bottom-0 w-[17px] h-[17px] status-offline rounded-full`}></div>
+                    }
+                  </div>
                   <span className="text-white">
                     <span className="text-sm font-bold">
                       {currentUser.username}
                     </span>
-                    <span className="block text-sm">
-                    {currentUser.presence.online
-              ? currentUser.presence.status.charAt(0).toUpperCase() +
-              currentUser.presence.status.slice(1)
-              : "Offline"}
+                    <span className="block text-sm text-gray-400">
+                    {
+                         currentUser.presence.online
+                       ? currentUser.presence.status_text && currentUser.presence.status_text.trim() !== ''
+                       ? currentUser.presence.status_text
+                       : currentUser.presence.status.charAt(0).toUpperCase() +
+                         currentUser.presence.status.slice(1)
+                        : "Offline"
+                      }
                     </span>
                   </span>
                 </div>{" "}
@@ -68,7 +78,8 @@ export default function AllFriends({
               <FontAwesomeIcon icon={faMessage} className="pr-[7px]" />Message
               </ContextMenuItem>
               <ContextMenuItem><FontAwesomeIcon icon={faPhone} className="pr-[7px]" />Call</ContextMenuItem>
-              <ContextMenuItem
+              <hr className="opacity-5 mx-[5px]"></hr>
+              <ContextMenuItem className="text-red-600"
                 onClick={() =>
                   removeFriend(
                     currentUser.username,
@@ -79,8 +90,8 @@ export default function AllFriends({
               >
                 <FontAwesomeIcon icon={faUserMinus} className="pr-[4px]" />Remove Friend
               </ContextMenuItem>
-              <ContextMenuItem><FontAwesomeIcon icon={faBan} className="pr-[7px]" />Block</ContextMenuItem>
-              <hr></hr>
+              <ContextMenuItem className="text-red-600"><FontAwesomeIcon icon={faBan} className="pr-[7px]" />Block</ContextMenuItem>
+              <hr className="opacity-5 mx-[5px]"></hr>
               <ContextMenuItem onClick={() => copy(currentUser.id)}>
               <FontAwesomeIcon icon={faCopy} className="pr-[8px]" />Copy User ID
               </ContextMenuItem>

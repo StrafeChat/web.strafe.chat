@@ -18,14 +18,18 @@ export default function AddFriendModal({
   set: Dispatch<SetStateAction<boolean>>;
 }) {
   const { setRelationships } = useAuth();
+  const [query, setQuery] = useState("");
 
   useEffect(() => {
-    document.addEventListener("keydown", (event) => {
+    document.addEventListener("keydown", (event: KeyboardEvent) => {
       if (event.key === "Escape") set(false);
     });
+
+    document.addEventListener("click", (event: MouseEvent) => {
+      if ((event.target as HTMLElement).className.includes("backdrop")) set(false);
+    })
   }, [set]);
 
-  const [query, setQuery] = useState("");
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -54,7 +58,7 @@ export default function AddFriendModal({
   return show ? (
     <div className="modal">
       <div className="backdrop">
-        <div className="w-fit h-fit">
+        <div className="w-[25%] h-fit">
           <form onSubmit={handleSubmit}>
             <div className="card !rounded-b-none">
               <h1 className="title">Add Friend</h1>

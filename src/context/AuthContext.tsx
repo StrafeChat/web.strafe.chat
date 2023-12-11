@@ -3,9 +3,12 @@ import AuthService from "@/services/AuthService";
 import LoadingScreen from "@/components/LoadingScreen";
 import {
   Dispatch,
+  MutableRefObject,
   SetStateAction,
   createContext,
   useContext,
+  useEffect,
+  useRef,
   useState,
 } from "react";
 import { RoomProvider } from "./RoomContext";
@@ -49,24 +52,36 @@ export interface Relationship {
 interface Context {
   user: User;
   relationships: Relationship[];
+  statusText: string;
   setUser: Dispatch<SetStateAction<User>>;
   setRelationships: Dispatch<SetStateAction<Relationship[]>>;
+  setStatusText: Dispatch<SetStateAction<string>>;
+  ws: MutableRefObject<WebSocket | null> | null;
 }
 
 const AuthContext = createContext<Context>({
   user: {} as unknown as User,
   relationships: [],
+  statusText: "",
   setUser: {} as Dispatch<SetStateAction<User>>,
   setRelationships: {} as Dispatch<SetStateAction<Relationship[]>>,
+  setStatusText: {} as Dispatch<SetStateAction<string>>,
+  ws: null,
 });
 
 export const AuthProvider = ({ children }: { children: JSX.Element }) => {
   const [user, setUser] = useState<User>({} as unknown as User);
   const [relationships, setRelationships] = useState<Relationship[]>([]);
+  const [statusText, setStatusText] = useState("");
+  const ws = useRef<WebSocket | null>(null);
+
+  useEffect(() => {
+    if(user.presence) setStatusText(user.presence.status_text);
+  }, [user]);
 
   return (
     <AuthContext.Provider
-      value={{ user, relationships, setUser, setRelationships }}
+      value={{ user, relationships, statusText, ws, setUser, setRelationships, setStatusText }}
     >
       <RoomProvider>
         <AuthService>{children}</AuthService>
