@@ -65,30 +65,29 @@ export default function RoomList() {
         </li>
         <span className="convo-title">Conversations</span>
         <ul className="rooms">
-          {/* {pms.length == 0 && */}
-          {/* } */}
           {pms.length == 0 && (
-            <div className="flex flex-col gap-2 w-full items-center">
-              <Skeleton className="w-[calc(100%-12px)] h-[51px] bg-[var(--skeleton-background-primary)] rounded-[4px] opacity-[100%]">
+            <div className="flex flex-col gap-2 w-full items-center pt-[10px]">
+              <Skeleton className="w-[calc(100%-12px)] h-[51px] rounded-[4px]">
                 <div className="flex items-center w-full h-full px-4 gap-4">
                   <Skeleton className="w-[35px] h-[35px] bg-[var(--skeleton-background-secondary)] rounded-full" />
                   <Skeleton className="w-[calc(100%-51px)] h-[35px] bg-[var(--skeleton-background-secondary)] rounded-[4px]" />
                 </div>
               </Skeleton>
-              <Skeleton className="mt-2 w-[calc(100%-12px)] h-[51px] bg-[var(--skeleton-background-primary)] rounded-[4px]">
-                <div className="flex items-center w-full h-full px-4 gap-4">
+              <Skeleton className="w-[calc(100%-12px)] h-[51px] rounded-[4px]">
+                <div className="flex items-center w-full h-full px-4 gap-4 opacity-30">
                   <Skeleton className="w-[35px] h-[35px] bg-[var(--skeleton-background-secondary)] rounded-full" />
                   <Skeleton className="w-[calc(100%-51px)] h-[35px] bg-[var(--skeleton-background-secondary)] rounded-[4px]" />
                 </div>
               </Skeleton>
-              <Skeleton className="mt-2 w-[calc(100%-12px)] h-[51px] bg-[var(--skeleton-background-primary)] rounded-[4px]">
-                <div className="flex items-center w-full h-full px-4 gap-4">
+              <Skeleton className="w-[calc(100%-12px)] h-[51px] rounded-[4px]">
+                <div className="flex items-center w-full h-full px-4 gap-4 opacity-20">
                   <Skeleton className="w-[35px] h-[35px] bg-[var(--skeleton-background-secondary)] rounded-full" />
                   <Skeleton className="w-[calc(100%-51px)] h-[35px] bg-[var(--skeleton-background-secondary)] rounded-[4px]" />
                 </div>
               </Skeleton>
             </div>
-          )}
+          )
+        }
           {pms.map((pm, key) => {
             switch (pm.type) {
               case 0:
