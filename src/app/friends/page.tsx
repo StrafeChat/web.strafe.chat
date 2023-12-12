@@ -90,7 +90,7 @@ export default function Friends() {
           />
         )}
       </div>
-      <AddFriendModal show={showAddFriend} set={setShowAddFriend} />
+      {showAddFriend && <AddFriendModal show={showAddFriend} set={setShowAddFriend} />}
     </>
   );
 }

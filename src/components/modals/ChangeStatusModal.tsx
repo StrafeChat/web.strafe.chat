@@ -25,7 +25,11 @@ export default function ChangeStatusModal({
             if (event.key === "Escape") set(false);
         });
         document.addEventListener("click", (event: MouseEvent) => {
-            if ((event.target as HTMLElement).className.includes("backdrop")) set(false);
+            if(event.target) {
+                if(event.target as HTMLElement) {
+                    if ((event.target as HTMLElement).className.includes("backdrop")) set(false);
+                }
+            }
           })
     }, [set]);
 
@@ -37,7 +41,7 @@ export default function ChangeStatusModal({
         set(false);
     };
 
-    return show ? (
+    return (
         <div className="modal">
             <div className="backdrop">
                 <div className="w-[25%] h-fit">
@@ -67,7 +71,5 @@ export default function ChangeStatusModal({
                 </div>
             </div>
         </div>
-    ) : (
-        <></>
     );
 }

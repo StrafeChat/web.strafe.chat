@@ -82,14 +82,14 @@ export default function SpaceList({ user }: { user: User }) {
         </ContextMenu>
         <div className="spacebar"></div>
         <ul className="spaces">
-            {/* Make this trigger a modal to create a space*/}
-            <div
-              className="bg-[#1c1c1c] w-10 h-10 rounded-full flex items-center justify-center m-[3px] cursor-pointer"
-              title="Create Space"
-              onClick={() => setShowCreateSpace(true)}
-            >
-              <FontAwesomeIcon icon={faPlus} className="w-7 h-7 text-[#737d3c]" />
-            </div>
+          {/* Make this trigger a modal to create a space*/}
+          <div
+            className="bg-[#1c1c1c] w-10 h-10 rounded-full flex items-center justify-center m-[3px] cursor-pointer"
+            title="Create Space"
+            onClick={() => setShowCreateSpace(true)}
+          >
+            <FontAwesomeIcon icon={faPlus} className="w-7 h-7 text-[#737d3c]" />
+          </div>
           <Link href="/discover">
             {/* Make this trigger a modal to create a space*/}
             <div
@@ -104,9 +104,9 @@ export default function SpaceList({ user }: { user: User }) {
           </Link>
         </ul>
       </div>
-      <ChangeStatusModal show={showSetStatus} set={setShowSetStatus} />
-      <CreateSpaceModal show={showCreateSpace} set={setShowCreateSpace} />
-      <UserSettingsModal show={showSettings} set={setShowSettings} />
+      {showSetStatus && <ChangeStatusModal show={showSetStatus} set={setShowSetStatus} />}
+      {showCreateSpace && <CreateSpaceModal show={showCreateSpace} set={setShowCreateSpace} />}
+      {showSettings && <UserSettingsModal show={showSettings} set={setShowSettings} />}
     </div>
   );
 }
