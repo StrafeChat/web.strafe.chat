@@ -21,10 +21,12 @@ import UserSettingsModal from "./modals/UserSettingsModal";
 import Link from "next/link";
 import { copy, updatePresence } from "@/scripts/ContextMenu";
 import ChangeStatusModal from "./modals/ChangeStatusModal";
+import CreateSpaceModal from "./modals/CreateSpaceModal";
 
 export default function SpaceList({ user }: { user: User }) {
   const [showSettings, setShowSettings] = useState(false);
   const [showSetStatus, setShowSetStatus] = useState(false);
+  const [showCreateSpace, setShowCreateSpace] = useState(false);
   const { ws, setUser } = useAuth();
 
   return (
@@ -80,15 +82,14 @@ export default function SpaceList({ user }: { user: User }) {
         </ContextMenu>
         <div className="spacebar"></div>
         <ul className="spaces">
-          <Link href="/">
             {/* Make this trigger a modal to create a space*/}
             <div
-              className="bg-[#1c1c1c] w-10 h-10 rounded-full flex items-center justify-center m-[3px]"
-              title="Add Space"
+              className="bg-[#1c1c1c] w-10 h-10 rounded-full flex items-center justify-center m-[3px] cursor-pointer"
+              title="Create Space"
+              onClick={() => setShowCreateSpace(true)}
             >
               <FontAwesomeIcon icon={faPlus} className="w-7 h-7 text-[#737d3c]" />
             </div>
-          </Link>
           <Link href="/discover">
             {/* Make this trigger a modal to create a space*/}
             <div
@@ -104,6 +105,7 @@ export default function SpaceList({ user }: { user: User }) {
         </ul>
       </div>
       <ChangeStatusModal show={showSetStatus} set={setShowSetStatus} />
+      <CreateSpaceModal show={showCreateSpace} set={setShowCreateSpace} />
       <UserSettingsModal show={showSettings} set={setShowSettings} />
     </div>
   );
