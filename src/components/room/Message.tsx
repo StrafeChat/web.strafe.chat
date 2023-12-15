@@ -1,16 +1,19 @@
+import { useAuth } from "@/context/AuthContext";
 import {
   faEllipsisVertical,
   faFaceSmile,
   faInfo,
   faInfoCircle,
   faLink,
+  faPen,
   faReply,
+  faTrashCan,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { ContextMenu, ContextMenuTrigger } from "@radix-ui/react-context-menu";
 import Image from "next/image";
-import { useEffect, useRef, useState } from "react";
-import ReactTimeago from "react-timeago";
+import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
+import ReactTimeago, { contextType } from "react-timeago";
 
 export default function Message({
   message,
@@ -21,22 +24,66 @@ export default function Message({
   sameAuthor: boolean;
   showMoreOptions: boolean;
 }) {
-  const [showAdvancedOptions, setShowAdvancedOptions] = useState(false);
-  const ref = useRef<HTMLLIElement>(null);
+  const { user } = useAuth();
+  const contentRef = useRef<HTMLSpanElement>(null);
+  const [editable, setEditable] = useState(false);
+
+  useEffect(() => {
+    if (editable && contentRef.current) {
+      contentRef.current.focus();
+    }
+  }, [editable]);
+
+  const handleInput = (event: KeyboardEvent<HTMLSpanElement>) => {
+    if (event.key == "Escape") {
+      contentRef.current?.blur();
+      setEditable(false);
+      if (contentRef.current) contentRef.current.innerText = message.content;
+    } else if(event.key == "Enter") {
+      event.preventDefault();
+      contentRef.current?.blur();
+      setEditable(false);
+    }
+  };
 
   return (
-    <li ref={ref} id={message.id} className="group hover:bg-[rgba(0,0,0,0.1)]">
+    <li id={message.id} className="group hover:bg-[rgba(0,0,0,0.1)]">
       <div className="hidden group-hover:flex absolute bg-black text-white right-5 -translate-y-5 rounded-lg">
         <div style={{ borderColor: "transparent" }} className="flex">
-          <FontAwesomeIcon className="p-2" icon={faReply} />
-          <FontAwesomeIcon className="p-2" icon={faFaceSmile} />
-          <FontAwesomeIcon className="p-2" icon={faEllipsisVertical} />
+          <span className="w-8 h-8 flex items-center">
+            <FontAwesomeIcon className="p-2" icon={faReply} />
+          </span>
+          <span className="w-8 h-8 flex items-center">
+            <FontAwesomeIcon className="p-2" icon={faFaceSmile} />
+          </span>
+          {user.id == message.author_id && (
+            <>
+              <span
+                className="w-8 h-8 flex items-center"
+                onClick={() => setEditable(true)}
+              >
+                <FontAwesomeIcon className="p-2" icon={faPen} />
+              </span>
+              <span className="w-8 h-8 flex items-center">
+                <FontAwesomeIcon
+                  className="p-2 text-red-500"
+                  icon={faTrashCan}
+                />
+              </span>
+            </>
+          )}
+          <span className="w-8 h-8 flex items-center">
+            <FontAwesomeIcon className="p-2" icon={faEllipsisVertical} />
+          </span>
         </div>
         {showMoreOptions && (
           <div className="flex items-center">
-            <div className="w-0.5 h-[75%] bg-gray-500" />
-            <FontAwesomeIcon className="p-2" icon={faInfoCircle} />
-            <FontAwesomeIcon className="p-2" icon={faLink} />
+            <span className="w-8 h-8 flex items-center">
+              <FontAwesomeIcon className="p-2" icon={faInfoCircle} />
+            </span>
+            <span className="w-8 h-8 flex items-center">
+              <FontAwesomeIcon className="p-2" icon={faLink} />
+            </span>
           </div>
         )}
       </div>
@@ -73,8 +120,14 @@ export default function Message({
               />
             </span>
           )}
-          {/* <div ref={ref} /> */}
-          <span className="text-white">{message.content}</span>
+          <span
+            ref={contentRef}
+            contentEditable={editable}
+            onKeyDown={(event) => handleInput(event)}
+            className={`text-white ${editable && "p-2 bg-black rounded-xl"}`}
+          >
+            {message.content}
+          </span>
         </div>
       </div>
     </li>
