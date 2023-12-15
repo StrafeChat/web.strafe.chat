@@ -39,7 +39,7 @@ export default function Message({
       contentRef.current?.blur();
       setEditable(false);
       if (contentRef.current) contentRef.current.innerText = message.content;
-    } else if(event.key == "Enter") {
+    } else if(event.key == "Enter" && !event.shiftKey) {
       event.preventDefault();
       contentRef.current?.blur();
       setEditable(false);
@@ -121,10 +121,11 @@ export default function Message({
             </span>
           )}
           <span
+          style={{maxHeight: editable ? "50vh" : "fit-content"}}
             ref={contentRef}
             contentEditable={editable}
             onKeyDown={(event) => handleInput(event)}
-            className={`text-white ${editable && "p-2 bg-black rounded-xl"}`}
+            className={`text-white ${editable && "p-2 bg-black rounded-xl overflow-y-auto"}`}
           >
             {message.content}
           </span>
