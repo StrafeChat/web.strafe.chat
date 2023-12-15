@@ -4,6 +4,11 @@ import cookie from "js-cookie";
 import LoadingScreen from "@/components/LoadingScreen";
 import { Relationship, useAuth } from "@/context/AuthContext";
 import { useRoom } from "@/context/RoomContext";
+import {
+  cacheMessages,
+  clearCache,
+  getCachedMessages,
+} from "@/scripts/Caching";
 
 export default function AuthService({ children }: { children: JSX.Element }) {
   const pathname = usePathname();
@@ -18,6 +23,7 @@ export default function AuthService({ children }: { children: JSX.Element }) {
   const handleWsOpen = useCallback(
     (_event: Event) => {
       console.log("Connected");
+      clearCache();
       setClientError(false);
       connectedRef.current = true;
       fetch(`${process.env.NEXT_PUBLIC_API}/users/@me/relationships`, {
@@ -113,18 +119,30 @@ export default function AuthService({ children }: { children: JSX.Element }) {
           break;
       }
     },
-    [setRelationships, setUser]
+    [setRelationships, setUser, ws]
   );
 
   // const handleWsMessage2 = useCallback((evt: MessageEvent<any>) => {
+  //   console.log("TEST");
   //   const { op, data, event } = JSON.parse(evt.data);
   //   switch (op) {
-  //     case 5:
-  //       console.log(relationships);
+  //     case 3:
+  //       switch (event) {
+  //         case "MESSAGE_CREATE":
+  //           console.log("test");
+  //           const messages = getCachedMessages(data.room_id);
+  //           if (messages) {
+  //             cacheMessages(data.room_id, [...messages, data]);
+  //             console.log(data.room_id, [...messages, data]);
+  //           } else {
+  //             cacheMessages(data.room_id, [data]);
+  //             console.log(data.room_id, [data]);
+  //           }
+  //           break;
+  //       }
   //       break;
   //   }
-
-  // }, [relationships]);
+  // }, []);
 
   const handleWsClose = useCallback(
     (event: CloseEvent) => {
@@ -139,16 +157,18 @@ export default function AuthService({ children }: { children: JSX.Element }) {
             ws.current = new WebSocket(process.env.NEXT_PUBLIC_WS!);
             ws?.current.addEventListener("open", handleWsOpen);
             ws?.current.addEventListener("message", handleWsMessage);
+            // ws?.current.addEventListener("message", handleWsMessage2);
             ws?.current.addEventListener("close", handleWsClose);
             ws?.current.addEventListener("error", handleWsError);
-            document.addEventListener("contextmenu", (event) =>
-              event.preventDefault()
-            );
+            document.addEventListener("contextmenu", (event) => {
+              if ((event.target as HTMLElement).id != "textbox")
+                event.preventDefault();
+            });
           }
           break;
       }
     },
-    [handleWsMessage, handleWsOpen, router]
+    [handleWsMessage, handleWsOpen, router, ws]
   );
 
   const handleWsError = (_event: Event) => {
@@ -166,19 +186,22 @@ export default function AuthService({ children }: { children: JSX.Element }) {
       ws?.current.addEventListener("message", handleWsMessage);
       ws?.current.addEventListener("close", handleWsClose);
       ws?.current.addEventListener("error", handleWsError);
-      document.addEventListener("contextmenu", (event) =>
-        event.preventDefault()
-      );
+      document.addEventListener("contextmenu", (event) => {
+        if ((event.target as HTMLElement).id != "textbox")
+          event.preventDefault();
+      });
     }
 
     return () => {
       ws?.current?.removeEventListener("open", handleWsOpen);
       ws?.current?.removeEventListener("message", handleWsMessage);
+      // ws?.current?.removeEventListener("message", handleWsMessage2);
       ws?.current?.removeEventListener("close", handleWsClose);
       ws?.current?.removeEventListener("error", handleWsError);
-      document.removeEventListener("contextmenu", (event) =>
-        event.preventDefault()
-      );
+      document.removeEventListener("contextmenu", (event) => {
+        if ((event.target as HTMLElement).id != "textbox")
+          event.preventDefault();
+      });
     };
   }, [
     connectedRef,
@@ -192,9 +215,17 @@ export default function AuthService({ children }: { children: JSX.Element }) {
   ]);
 
   useEffect(() => {
-    const handleWsMessage = (evt: MessageEvent<any>) => {
+    const handleWsMessage = async (evt: MessageEvent<any>) => {
       const { op, data, event } = JSON.parse(evt.data);
       switch (op) {
+        case 3:
+          switch (event) {
+            case "MESSAGE_CREATE":
+              const messages = await getCachedMessages(data.room_id);
+              if(messages) cacheMessages(data.room_id, [...messages, data]);
+              break;
+          }
+          break;
         case 5:
           setRelationships((prev) => {
             const updatedRelationships = prev.map((relationship) => {
@@ -204,33 +235,46 @@ export default function AuthService({ children }: { children: JSX.Element }) {
               ) {
                 const updatedUser =
                   data.user_id === relationship.receiver_id
-                    ? { ...relationship.receiver, presence: { ...data, user_id: undefined } }
-                    : { ...relationship.sender, presence: { ...data, user_id: undefined } };
-  
+                    ? {
+                        ...relationship.receiver,
+                        presence: { ...data, user_id: undefined },
+                      }
+                    : {
+                        ...relationship.sender,
+                        presence: { ...data, user_id: undefined },
+                      };
+
                 return {
                   ...relationship,
                   receiver_id: relationship.receiver_id,
                   sender_id: relationship.sender_id,
-                  receiver: data.user_id == relationship.receiver_id ? updatedUser : relationship.receiver,
-                  sender: data.user_id == relationship.sender_id ? updatedUser : relationship.sender,
+                  receiver:
+                    data.user_id == relationship.receiver_id
+                      ? updatedUser
+                      : relationship.receiver,
+                  sender:
+                    data.user_id == relationship.sender_id
+                      ? updatedUser
+                      : relationship.sender,
                 };
               }
               return relationship;
             });
-  
+
             return updatedRelationships;
           });
           break;
       }
     };
-  
+
     ws?.current?.addEventListener("message", handleWsMessage);
-  
+    // ws?.current?.addEventListener("message", handleWsMessage2);
+
     return () => {
       ws?.current?.removeEventListener("message", handleWsMessage);
+      // ws?.current?.removeEventListener("message", handleWsMessage2);
     };
-  }, [relationships]);
-  
+  }, [relationships, setRelationships, ws]);
 
   if (!user.id && pathname != "/login" && pathname != "/register")
     return <LoadingScreen />;

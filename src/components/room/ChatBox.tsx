@@ -1,22 +1,23 @@
 import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
-import { faFileCirclePlus, faFaceSmile, faVideoCamera } from "@fortawesome/free-solid-svg-icons";
-import { PlusCircle, ScanSearch, Smile, File, XCircle } from "lucide-react";
+import {
+  faFileCirclePlus,
+  faFaceSmile,
+} from "@fortawesome/free-solid-svg-icons";
+import { ScanSearch, File, XCircle } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Room } from "@/context/RoomContext";
-import { Buffer } from "buffer";
-import { ChangeEvent, useCallback, useEffect, useRef, useState } from "react";
-import { emojis } from "@/assets/emojis";
+import { useCallback, useEffect, useRef, useState } from "react";
 import twemoji from "twemoji";
-import DOMPurify from 'dompurify';
+import cookie from "js-cookie";
 
 export default function ChatBox({ room }: { room: Room }) {
- const { user } = useAuth();
- const inputRef = useRef<HTMLDivElement>(null);
- const [viewImages, setViewImage] = useState<any[]>([]);
- const [content, setContent] = useState("");
+  const { user } = useAuth();
+  const inputRef = useRef<HTMLDivElement>(null);
+  const [viewImages, setViewImage] = useState<any[]>([]);
+  const [content, setContent] = useState("");
 
- const handleInput = useCallback((event: Event) => {
+  const handleInput = useCallback((event: Event) => {
     if (inputRef.current) {
       const text = inputRef.current.innerHTML;
       setContent(inputRef.current.innerText);
@@ -78,19 +79,20 @@ export default function ChatBox({ room }: { room: Room }) {
       ":([a-zA-Z0-9]+)(?::([a-zA-Z0-9]+))*:": (match, ...groups) => {
         const emojiArr: string[] = [];
         const parser = new DOMParser();
-        const emojiValue = groups.filter((group) => group !== undefined)
+        const emojiValue = groups
+          .filter((group) => group !== undefined)
           .map((content) => {
             const regex = /<img[^>]*>/g;
             if (regex.test(content)) {
               content.match(regex)?.forEach((match) => {
-                const doc = parser.parseFromString(match, 'text/html');
-                const imgElement = doc.querySelector('img');
-                if (imgElement) emojiArr.push(imgElement.getAttribute('alt')!);
+                const doc = parser.parseFromString(match, "text/html");
+                const imgElement = doc.querySelector("img");
+                if (imgElement) emojiArr.push(imgElement.getAttribute("alt")!);
               });
             }
             return emojiArr.join("");
           })
-          .join('');
+          .join("");
 
         console.log(emojiValue);
 
@@ -108,9 +110,9 @@ export default function ChatBox({ room }: { room: Room }) {
     return formattedText;
   };
 
-  const recipient = room.recipients!.find(
-    (recipient) => recipient.id != user.id
-  );
+  // const recipient = room.recipients!.find(
+  //   (recipient) => recipient.id != user.id
+  // );
 
   function isImage(value: any) {
     const types = ["image/png", "image/gif", "image/jpeg"];
@@ -126,7 +128,7 @@ export default function ChatBox({ room }: { room: Room }) {
     function clearFileInput(ctrl: any) {
       try {
         ctrl.value = null;
-      } catch (ex) { }
+      } catch (ex) {}
       if (ctrl.value) {
         ctrl.parentNode.replaceChild(ctrl.cloneNode(true), ctrl);
       }
@@ -140,75 +142,123 @@ export default function ChatBox({ room }: { room: Room }) {
           const reader = new FileReader();
           reader.readAsDataURL(file);
           reader.onload = async () => {
-            let id = Math.round(+(Date.now() * file.name.length * Math.random()).toString());
-            resolve({ id, file: reader.result, name: file.name, type: file.type });
+            let id = Math.round(
+              +(Date.now() * file.name.length * Math.random()).toString()
+            );
+            resolve({
+              id,
+              file: reader.result,
+              name: file.name,
+              type: file.type,
+            });
           };
         });
       })
     ).then((results: any) => {
-      clearFileInput((document.getElementById("images") as HTMLInputElement));
-      console.log(...results)
+      clearFileInput(document.getElementById("images") as HTMLInputElement);
+      console.log(...results);
       setViewImage([...viewImages, ...results]);
     });
   };
 
-useEffect(() => {
-  function onPaste(event: ClipboardEvent) {
-    event.preventDefault()
-    let text = event.clipboardData!.getData('text/plain');
-    if (event.clipboardData!.files.length > 0) onSelectFile(event.clipboardData!)
-    if (text) document.execCommand('insertText', false, text);
-  }
-  
-  window.addEventListener("paste", onPaste)
-  return () => window.removeEventListener("paste", onPaste)
-  }, [])
+  useEffect(() => {
+    function onPaste(event: ClipboardEvent) {
+      event.preventDefault();
+      let text = event.clipboardData!.getData("text/plain");
+      if (event.clipboardData!.files.length > 0)
+        onSelectFile(event.clipboardData!);
+      if (text) document.execCommand("insertText", false, text);
+    }
+
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, []);
+
+  const currentUser = room.recipients!.find(
+    (recipient) => recipient.id != user.id
+  );
 
   return (
     <div
-      style={{ height: `${inputRef?.current?.scrollHeight}`, maxHeight: "50vh" }}
-      className="w-full flex flex-col px-3 justify-center duration-1000 z-2"
+      style={{
+        height: `${inputRef?.current?.scrollHeight}`,
+        maxHeight: "50vh",
+      }}
+      className="w-full flex flex-col pt-5 px-3 justify-center duration-1000 z-2"
     >
-
-{viewImages.length > 0 && (
+      {viewImages.length > 0 && (
         <div className="relative w-full h-[10rem] bg-[#3C3C3C] rounded-t-[15px] flex overflow-x-auto overflow-y-hidden items-center px-2">
           <div className="absolute justify-between flex flex-row px-4 gap-4 items-center">
             {viewImages.map((fi) => (
-              <div className="relative text-white bg-[#2B2D31] h-[8rem] w-[8rem] pb-4 items-center justify-center rounded-sm flex"
-                key={fi.id}>
+              <div
+                className="relative text-white bg-[#2B2D31] h-[8rem] w-[8rem] pb-4 items-center justify-center rounded-sm flex"
+                key={fi.id}
+              >
                 <XCircle
-                  onClick={() => setViewImage((files) => files.filter((file) => file.id !== fi.id))}
+                  onClick={() =>
+                    setViewImage((files) =>
+                      files.filter((file) => file.id !== fi.id)
+                    )
+                  }
                   height="20"
                   className="cursor-pointer hover:text-red-500 rounded-sm absolute"
                   style={{ right: -10, bottom: -9 }}
                 />
-                <div className="absolute select-none" style={{ fontSize: "9px", left: 3, bottom: 0 }}>{fi.name.length > 16 ? `${fi.name.slice(0, 18)}...` : fi.name}</div>
-                  {isImage(fi.type) === "image" && (
-                    <Image src={fi.file} alt={fi.id} className="max-h-24 max-w-max" width="128" height="128" draggable={false}/>
-                  )}
+                <div
+                  className="absolute select-none"
+                  style={{ fontSize: "9px", left: 3, bottom: 0 }}
+                >
+                  {fi.name.length > 16 ? `${fi.name.slice(0, 18)}...` : fi.name}
+                </div>
+                {isImage(fi.type) === "image" && (
+                  <Image
+                    src={fi.file}
+                    alt={fi.id}
+                    className="max-h-24 max-w-max"
+                    width="128"
+                    height="128"
+                    draggable={false}
+                  />
+                )}
 
-                  {isImage(fi.type) === "video" && (
-                    <video disablePictureInPicture disableRemotePlayback className="max-h-24">
-                      <source src={fi.file} type="video/mp4" />
-                    </video>
-                  )}
+                {isImage(fi.type) === "video" && (
+                  <video
+                    disablePictureInPicture
+                    disableRemotePlayback
+                    className="max-h-24"
+                  >
+                    <source src={fi.file} type="video/mp4" />
+                  </video>
+                )}
 
-                  {isImage(fi.type) === "other" && (
-                    <File className="w-[75%] h-[75%]" />
-                  )}
-
+                {isImage(fi.type) === "other" && (
+                  <File className="w-[75%] h-[75%]" />
+                )}
               </div>
             ))}
           </div>
         </div>
       )}
 
-      <div style={{ borderTop: "1px solid " + (viewImages.length < 1 ? "transparent" : "rgba(255,255,255,0.1)") }} className={`overflow-y-auto w-full bg-[rgba(255,255,255,0.1)] rounded-[10px] ${viewImages.length < 1 && "rounded-lg"} flex`} tabIndex={0}>
+      <div
+        style={{
+          borderTop:
+            "1px solid " +
+            (viewImages.length < 1 ? "transparent" : "rgba(255,255,255,0.1)"),
+        }}
+        className={`overflow-y-auto w-full bg-[rgba(255,255,255,0.1)] rounded-b-[10px] ${
+          viewImages.length < 1 && "rounded-t-[10px]"
+        } flex`}
+        tabIndex={0}
+      >
         <div className="mx-4 flex items-center relative group w-7 rounded-[15px]">
-          <FontAwesomeIcon icon={faFileCirclePlus} className="w-7 h-7 group-hover:text-green-500 rounded-full text-white absolute top-2"/>
+          <FontAwesomeIcon
+            icon={faFileCirclePlus}
+            className="w-7 h-7 group-hover:text-green-500 rounded-full text-white absolute top-2"
+          />
           <input
             id="images"
-            className="absolute w-7 h-7 rounded-full opacity-0 cursor-pointer top-2"
+            className="absolute w-7 h-7 rounded-full opacity-0 cursor-pointer top-2 placeholder-white::placeholder"
             multiple={true}
             title="Select a file"
             type="file"
@@ -220,17 +270,40 @@ useEffect(() => {
           <div
             className="w-full h-full items-center text-white text-lg outline-none py-2 overflow-y-auto break-all resize-none scrollbar-none"
             contentEditable={true}
-            placeholder={`Message`}
+            placeholder={`Message @${currentUser?.global_name ?? currentUser?.username}`}
             id="textbox"
             role={"textbox"}
             ref={inputRef}
+            onKeyDown={async (event) => {
+              if (event.key == "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                await fetch(
+                  `${process.env.NEXT_PUBLIC_API}/rooms/${room.id}/messages`,
+                  {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                      Authorization: cookie.get("token")!,
+                    },
+                    body: JSON.stringify({
+                      content,
+                    }),
+                  }
+                );
+                setContent("");
+                (event.target as HTMLElement).innerText = "";
+              }
+            }}
           />
         </div>
         <div className="mx-4 flex items-center relative group w-7">
           <ScanSearch className="w-7 h-7 absolute top-2 text-white" />
         </div>
         <div className="mr-4 flex items-center relative group w-7">
-          <FontAwesomeIcon icon={faFaceSmile} className="w-7 h-7 absolute top-2 text-white" />
+          <FontAwesomeIcon
+            icon={faFaceSmile}
+            className="w-7 h-7 absolute top-2 text-white"
+          />
         </div>
       </div>
       <div className="w-full mt-[1rem]" />

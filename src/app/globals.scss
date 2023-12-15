@@ -586,6 +586,12 @@ div.modal {
   }
 }
 
+[contenteditable="true"]:empty:before {
+  content: attr(placeholder);
+  color: grey;
+  cursor: text;
+}
+
 div.status-online {
   background-color: #22c55e;
 }
