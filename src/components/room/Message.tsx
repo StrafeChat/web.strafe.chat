@@ -2,7 +2,6 @@ import { useAuth } from "@/context/AuthContext";
 import {
   faEllipsisVertical,
   faFaceSmile,
-  faInfo,
   faInfoCircle,
   faLink,
   faPen,
@@ -10,10 +9,10 @@ import {
   faTrashCan,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { ContextMenu, ContextMenuTrigger } from "@radix-ui/react-context-menu";
 import Image from "next/image";
-import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
-import ReactTimeago, { contextType } from "react-timeago";
+import { KeyboardEvent, useEffect, useRef, useState } from "react";
+import ReactTimeago from "react-timeago";
+import cookie from "js-cookie";
 
 export default function Message({
   message,
@@ -24,6 +23,7 @@ export default function Message({
   sameAuthor: boolean;
   showMoreOptions: boolean;
 }) {
+  console.log(message);
   const { user } = useAuth();
   const contentRef = useRef<HTMLSpanElement>(null);
   const [editable, setEditable] = useState(false);
@@ -34,15 +34,29 @@ export default function Message({
     }
   }, [editable]);
 
-  const handleInput = (event: KeyboardEvent<HTMLSpanElement>) => {
+  const handleInput = async (event: KeyboardEvent<HTMLSpanElement>) => {
     if (event.key == "Escape") {
       contentRef.current?.blur();
       setEditable(false);
       if (contentRef.current) contentRef.current.innerText = message.content;
-    } else if(event.key == "Enter" && !event.shiftKey) {
+    } else if (event.key == "Enter" && !event.shiftKey) {
       event.preventDefault();
       contentRef.current?.blur();
       setEditable(false);
+
+      await fetch(
+        `${process.env.NEXT_PUBLIC_API}/rooms/${message.room_id}/messages/${message.id}`,
+        {
+          method: "PATCH",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: cookie.get("token")!,
+          },
+          body: JSON.stringify({
+            content: contentRef.current!.innerText,
+          }),
+        }
+      );
     }
   };
 
@@ -51,10 +65,13 @@ export default function Message({
       <div className="hidden group-hover:flex absolute bg-black text-white right-5 -translate-y-5 rounded-lg">
         <div style={{ borderColor: "transparent" }} className="flex">
           <span className="w-8 h-8 flex items-center">
-            <FontAwesomeIcon className="p-2" icon={faReply} />
+            <FontAwesomeIcon className="p-2 cursor-pointer" icon={faReply} />
           </span>
           <span className="w-8 h-8 flex items-center">
-            <FontAwesomeIcon className="p-2" icon={faFaceSmile} />
+            <FontAwesomeIcon
+              className="p-2 cursor-pointer"
+              icon={faFaceSmile}
+            />
           </span>
           {user.id == message.author_id && (
             <>
@@ -62,27 +79,45 @@ export default function Message({
                 className="w-8 h-8 flex items-center"
                 onClick={() => setEditable(true)}
               >
-                <FontAwesomeIcon className="p-2" icon={faPen} />
+                <FontAwesomeIcon className="p-2 cursor-pointer" icon={faPen} />
               </span>
               <span className="w-8 h-8 flex items-center">
                 <FontAwesomeIcon
-                  className="p-2 text-red-500"
+                  className="p-2 text-red-500 cursor-pointer"
                   icon={faTrashCan}
+                  onClick={async () => {
+                    const res = await fetch(
+                      `${process.env.NEXT_PUBLIC_API}/rooms/${message.room_id}/messages/${message.id}`,
+                      {
+                        method: "DELETE",
+                        headers: {
+                          "Content-Type": "application/json",
+                          Authorization: cookie.get("token")!,
+                        },
+                      }
+                    );
+                  }}
                 />
               </span>
             </>
           )}
           <span className="w-8 h-8 flex items-center">
-            <FontAwesomeIcon className="p-2" icon={faEllipsisVertical} />
+            <FontAwesomeIcon
+              className="p-2 cursor-pointer"
+              icon={faEllipsisVertical}
+            />
           </span>
         </div>
         {showMoreOptions && (
           <div className="flex items-center">
             <span className="w-8 h-8 flex items-center">
-              <FontAwesomeIcon className="p-2" icon={faInfoCircle} />
+              <FontAwesomeIcon
+                className="p-2 cursor-pointer"
+                icon={faInfoCircle}
+              />
             </span>
             <span className="w-8 h-8 flex items-center">
-              <FontAwesomeIcon className="p-2" icon={faLink} />
+              <FontAwesomeIcon className="p-2 cursor-pointer" icon={faLink} />
             </span>
           </div>
         )}
@@ -120,15 +155,24 @@ export default function Message({
               />
             </span>
           )}
-          <span
-          style={{maxHeight: editable ? "50vh" : "fit-content"}}
-            ref={contentRef}
-            contentEditable={editable}
-            onKeyDown={(event) => handleInput(event)}
-            className={`text-white ${editable && "p-2 bg-black rounded-xl overflow-y-auto"}`}
-          >
-            {message.content}
-          </span>
+          <div className="flex gap-2 relative">
+            <span
+              style={{ maxHeight: editable ? "50vh" : "fit-content" }}
+              ref={contentRef}
+              contentEditable={editable}
+              onKeyDown={(event) => handleInput(event)}
+              className={`text-white ${
+                editable && "p-2 bg-black rounded-xl overflow-y-auto w-full"
+              }`}
+            >
+              <span className="select-text">{message.content}{" "}</span>
+              {message.edited_at && !editable && (
+                <span className="text-gray-500 text-[10px] relative">
+                  (edited)
+                </span>
+              )}
+            </span>
+          </div>
         </div>
       </div>
     </li>

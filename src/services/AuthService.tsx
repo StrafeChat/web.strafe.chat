@@ -215,14 +215,42 @@ export default function AuthService({ children }: { children: JSX.Element }) {
   ]);
 
   useEffect(() => {
+    const handleMessageCreate = async (data: any) => {
+      const messages = await getCachedMessages(data.room_id);
+      if (messages) cacheMessages(data.room_id, [...messages, data]);
+    };
+
+    const handleMessageUpdate = async (data: any) => {
+      const messages = await getCachedMessages(data.room_id);
+      if (messages)
+        cacheMessages(
+          data.room_id,
+          messages.map((message) => (message.id == data.id ? data : message))
+        );
+    };
+
+    const handleMessageDelete = async (data: any) => {
+      const messages = await getCachedMessages(data.room_id);
+      if (messages)
+        cacheMessages(
+          data.room_id,
+          messages.filter((message) => message.id != data.message_id)
+        );
+    };
+
     const handleWsMessage = async (evt: MessageEvent<any>) => {
       const { op, data, event } = JSON.parse(evt.data);
       switch (op) {
         case 3:
           switch (event) {
             case "MESSAGE_CREATE":
-              const messages = await getCachedMessages(data.room_id);
-              if(messages) cacheMessages(data.room_id, [...messages, data]);
+              handleMessageCreate(data);
+              break;
+            case "MESSAGE_UPDATE":
+              handleMessageUpdate(data);
+              break;
+            case "MESSAGE_DELETE":
+              handleMessageDelete(data);
               break;
           }
           break;

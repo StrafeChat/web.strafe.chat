@@ -50,8 +50,7 @@ export const createPM = async (recipientId: string) => {
         }
     );
 
-    const data = await res.json();
-
+    return await res.json();
 }
 
 export const updatePresence = (ws: WebSocket | null | undefined, setUser: Dispatch<SetStateAction<User>>, { status }: { status: string }) => {

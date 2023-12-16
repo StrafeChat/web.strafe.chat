@@ -18,7 +18,8 @@ export default function Page({ params }: { params: { id: string } }) {
   const [loadedMessageIds, setLoadedMessageIds] = useState<Set<string>>(
     new Set()
   );
-  const [showMoreOptionsForMessages, setShowMoreOptionsForMessages] = useState(false);
+  const [showMoreOptionsForMessages, setShowMoreOptionsForMessages] =
+    useState(false);
 
   const loadOlderMessages = async () => {
     console.log("POG!");
@@ -65,17 +66,17 @@ export default function Page({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
-      if(event.shiftKey) {
+      if (event.shiftKey) {
         setShowMoreOptionsForMessages(true);
       }
     };
 
     const handleKeyUp = (event: KeyboardEvent) => {
-      if(event.key == "Shift") {
-        console.log("Key Up"); 
+      if (event.key == "Shift") {
+        console.log("Key Up");
         setShowMoreOptionsForMessages(false);
       }
-    }
+    };
 
     document.addEventListener("keydown", (event) => handleKeyDown(event));
     document.addEventListener("keyup", (event) => handleKeyUp(event));
@@ -126,12 +127,28 @@ export default function Page({ params }: { params: { id: string } }) {
           switch (event) {
             case "MESSAGE_CREATE":
               if (currentRoom) {
-                console.log(event);
                 if (currentRoom.id == data.room_id)
                   setMessages((prev) => [...prev, data]);
                 setLoadedMessageIds((prev) => new Set([...prev]));
               }
               break;
+            case "MESSAGE_UPDATE":
+              if (currentRoom) {
+                if (currentRoom.id == data.room_id)
+                  setMessages((prevMessages) =>
+                    prevMessages.map((message) =>
+                      message.id == data.id ? data : message
+                    )
+                  );
+              }
+              break;
+          }
+        case "MESSAGE_DELETE":
+          if (currentRoom) {
+            if (currentRoom.id == data.room_id)
+              setMessages((prevMessages) =>
+                prevMessages.filter((message) => message.id != data.message_id)
+              );
           }
           break;
       }
@@ -143,11 +160,12 @@ export default function Page({ params }: { params: { id: string } }) {
       // eslint-disable-next-line react-hooks/exhaustive-deps
       ws?.current?.removeEventListener("message", handleWsMessage);
     };
-  }, [currentRoom, ws]);
+  }, [currentRoom, messages, ws]);
 
   useEffect(() => {
     if (scrollRef.current)
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+    console.log(messages);
   }, [messages]);
 
   useEffect(() => {
@@ -157,7 +175,7 @@ export default function Page({ params }: { params: { id: string } }) {
       // eslint-disable-next-line react-hooks/exhaustive-deps
       scrollRef.current?.removeEventListener("scroll", handleScroll);
     };
-  }, [currentRoom, messages, params.id]);
+  }, [currentRoom, handleScroll, messages, params.id]);
 
   switch (currentRoom?.type) {
     case 0:
@@ -190,10 +208,6 @@ export default function Page({ params }: { params: { id: string } }) {
                   <p>This is the start of your conversation.</p>
                 </div>
 
-                {/* {(() => {
-                if (messages.length < 1) 
-                  return <FontAwesomeIcon icon={faSpinner} className="animate-spin text-white text-4xl m-auto py-[50px]" />; 
-              })()} */}
                 {(() => {
                   if (messages[0])
                     return (
@@ -208,30 +222,6 @@ export default function Page({ params }: { params: { id: string } }) {
                       </div>
                     );
                 })()}
-                {/* {messages.map((message, key) => 
-                  if (key > 0) {
-                    const messageDate = new Date(message.created_at);
-                    const lastMessageDate = new Date(
-                      messages[key - 1].created_at
-                    );
-
-                    if (
-                      `${messageDate.getMonth()}/${messageDate.getDate()}/${messageDate.getFullYear()}` !=
-                      `${lastMessageDate.getMonth()}/${lastMessageDate.getDate()}/${lastMessageDate.getFullYear()}`
-                    )
-                      return (
-                        <div className="flex mt-6 mb-2 ml-3 mr-3 relative left-auto right-auto h-0 z-1 border-[0.1px] border-gray-500 items-center justify-center box-border">
-                          <time className="bg-[#262626] px-4 text-sm text-gray-400 select-none font-bold uppercase">
-                            {Intl.DateTimeFormat(user.locale, {
-                              day: "numeric",
-                              month: "long",
-                              year: "numeric",
-                            }).format(new Date(message.created_at))}
-                          </time>
-                        </div>
-                      );
-                  }
-                })} */}
                 {messages.map((message, key) => (
                   <>
                     {key > 0 && (
@@ -247,7 +237,10 @@ export default function Page({ params }: { params: { id: string } }) {
                             `${lastMessageDate.getMonth()}/${lastMessageDate.getDate()}/${lastMessageDate.getFullYear()}`
                           )
                             return (
-                              <div className="flex mt-6 mb-2 ml-3 mr-3 relative left-auto right-auto h-0 z-1 border-[0.1px] border-gray-500 items-center justify-center box-border">
+                              <div
+                                key={key}
+                                className="flex mt-6 mb-2 ml-3 mr-3 relative left-auto right-auto h-0 z-1 border-[0.1px] border-gray-500 items-center justify-center box-border"
+                              >
                                 <time className="bg-[#262626] px-4 text-sm text-gray-400 select-none font-bold uppercase">
                                   {Intl.DateTimeFormat(user.locale, {
                                     day: "numeric",
