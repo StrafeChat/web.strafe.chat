@@ -9,6 +9,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import cookie from "js-cookie";
+import { Formatting } from "@/scripts/Formatting";
 
 export default function PendingFriends({
   relationships,
@@ -18,10 +19,8 @@ export default function PendingFriends({
   const { user, setRelationships } = useAuth();
 
   return (
-    <div className="p-[2rem] flex flex-col">
-      <span className="uppercase font-bold text-gray-500 pb-[7px]">
-        Pending - {relationships.length}
-      </span>
+    <div className="friends">
+      <span className="count">Pending - {relationships.length}</span>
       {relationships.map((relationship, key) => {
         const currentUser: User =
           relationship.receiver_id != user.id
@@ -30,20 +29,19 @@ export default function PendingFriends({
         return (
           <ContextMenu key={key}>
             <ContextMenuTrigger>
-              <div className="w-full p-2 hover:rounded-[0.25rem] hover:bg-gray-500 flex justify-between cursor-pointer">
-                <div className="flex gap-2 w-fit items-center">
-                  <Image
+              <div className="friend">
+                <div className="info">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
                     className="avatar"
-                    src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${currentUser.avatar}.png`}
+                    src={Formatting.avatar(currentUser.id, currentUser.avatar)}
                     width={40}
                     height={40}
                     alt="profile"
                   />
-                  <span className="text-white">
-                    <span className="text-sm font-bold">
-                      {currentUser.username}
-                    </span>
-                    <span className="block text-sm">
+                  <span>
+                    <span className="username">{currentUser.username}</span>
+                    <span className="status">
                       {relationship.receiver_id == user.id
                         ? "Incoming"
                         : "Outgoing"}{" "}
@@ -51,10 +49,9 @@ export default function PendingFriends({
                     </span>
                   </span>
                 </div>{" "}
-                <div className="flex w-fit items-center gap-4">
+                <div className="interactions">
                   {relationship.receiver_id == user.id && (
                     <button
-                      className="text-white bg-gray-700 w-[30px] h-[30px] rounded-full flex items-center justify-center"
                       onClick={async () => {
                         const res = await fetch(
                           `${process.env.NEXT_PUBLIC_API}/users/@me/relationships/${relationship.sender.username}-${relationship.sender.discriminator}`,
@@ -71,8 +68,6 @@ export default function PendingFriends({
                         );
 
                         const data = await res.json();
-
-                        if (!res.ok) return console.log(data);
 
                         setRelationships((prev) => {
                           const updatedRelationships = prev.map(
@@ -103,7 +98,6 @@ export default function PendingFriends({
                     </button>
                   )}
                   <button
-                    className="text-white bg-gray-700 w-[30px] h-[30px] rounded-full flex items-center justify-center"
                     onClick={async () => {
                       const res = await fetch(
                         `${process.env.NEXT_PUBLIC_API}/users/@me/relationships/${currentUser.username}-${currentUser.discriminator}`,
@@ -120,9 +114,7 @@ export default function PendingFriends({
                       );
 
                       const data = await res.json();
-
-                      if (!res.ok) return console.log(data);
-
+                      
                       setRelationships((prev) =>
                         prev.filter(
                           (relationship) =>

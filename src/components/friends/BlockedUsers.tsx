@@ -6,6 +6,7 @@ import {
   ContextMenuItem,
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
+import { Formatting } from "@/scripts/Formatting";
 
 export default function BlockedUsers({
   relationships,
@@ -15,8 +16,8 @@ export default function BlockedUsers({
   const { user } = useAuth();
 
   return (
-    <div className="p-[2rem] flex flex-col">
-      <span className="uppercase font-bold text-gray-500 pb-[7px]">
+    <div className="friends">
+      <span className="count">
         Blocked - {relationships.length}
       </span>
       {relationships.map((relationship, key) => {
@@ -28,25 +29,26 @@ export default function BlockedUsers({
         return (
           <ContextMenu key={key}>
             <ContextMenuTrigger>
-              <div className="w-full p-2 hover:rounded-[0.25rem] hover:bg-gray-500 flex justify-between cursor-pointer">
-                <div className="flex gap-2 w-fit items-center">
-                  <Image
-                    className="avatar"
-                    src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${currentUser.avatar}.png`}
-                    width={40}
-                    height={40}
-                    alt="profile"
-                  />
-                  <span className="text-white">
-                    <span className="text-sm font-bold">
+              <div className="friend">
+                <div className="info">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      className="avatar"
+                      src={Formatting.avatar(currentUser.id, currentUser.avatar)}
+                      width={40}
+                      height={40}
+                      alt="profile"
+                    />
+                  <span>
+                    <span className="username">
                       {currentUser.username}
                     </span>
-                    <span className="block text-sm">
+                    <span className="status">
                       {currentUser.presence.status}
                     </span>
                   </span>
                 </div>{" "}
-                <div className="flex w-fit items-center"></div>
+                <div className="interactions"></div>
               </div>
             </ContextMenuTrigger>
             <ContextMenuContent>

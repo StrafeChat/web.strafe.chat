@@ -1,7 +1,7 @@
 "use client";
 import { useAuth } from "@/context/AuthContext";
 import { Room, useRoom } from "@/context/RoomContext";
-import { faPhone, faVideoCamera } from "@fortawesome/free-solid-svg-icons";
+import { faPhone, faVideoCamera, faXmarkCircle } from "@fortawesome/free-solid-svg-icons";
 import ChatBox from "@/components/room/ChatBox";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useEffect, useState, useRef } from "react";
@@ -20,49 +20,7 @@ export default function Page({ params }: { params: { id: string } }) {
   );
   const [showMoreOptionsForMessages, setShowMoreOptionsForMessages] =
     useState(false);
-
-  const loadOlderMessages = async () => {
-    console.log("POG!");
-    const oldestMessageId =
-      messages.length > 0 ? messages[messages.length - 1].id : null;
-
-    const res = await fetch(
-      `${process.env.NEXT_PUBLIC_API}/rooms/${params.id}/messages?before=${oldestMessageId}&limit=100`,
-      {
-        headers: {
-          "Content-Type": "application/json",
-          Authorization: cookie.get("token")!,
-        },
-      }
-    );
-
-    const data = await res.json();
-
-    if (res.ok && currentRoom) {
-      const newMessages = data.filter(
-        (message: any) => !loadedMessageIds.has(message.id)
-      );
-      if (newMessages.length < 1) return;
-      setMessages((prev) => [...newMessages, ...prev]);
-      setLoadedMessageIds(
-        (prevIds) =>
-          new Set([...prevIds, ...newMessages.map((msg: any) => msg.id)])
-      );
-      cacheMessages(currentRoom.id, [...newMessages, ...messages]);
-    }
-  };
-
-  const handleScroll = async () => {
-    if (scrollRef.current) {
-      const scrollTop = scrollRef.current.scrollTop;
-      const scrollHeight = scrollRef.current.scrollHeight;
-      const clientHeight = scrollRef.current.clientHeight;
-
-      if (scrollTop === 0 && scrollHeight > clientHeight) {
-        await loadOlderMessages();
-      }
-    }
-  };
+  const [referenceMessage, setReferenceMessage] = useState<any | null>(null);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -169,13 +127,56 @@ export default function Page({ params }: { params: { id: string } }) {
   }, [messages]);
 
   useEffect(() => {
+    const loadOlderMessages = async () => {
+      console.log("POG!");
+      const oldestMessageId =
+        messages.length > 0 ? messages[messages.length - 1].id : null;
+
+      const res = await fetch(
+        `${process.env.NEXT_PUBLIC_API}/rooms/${params.id}/messages?before=${oldestMessageId}&limit=100`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: cookie.get("token")!,
+          },
+        }
+      );
+
+      const data = await res.json();
+
+      if (res.ok && currentRoom) {
+        const newMessages = data.filter(
+          (message: any) => !loadedMessageIds.has(message.id)
+        );
+        if (newMessages.length < 1) return;
+        setMessages((prev) => [...newMessages, ...prev]);
+        setLoadedMessageIds(
+          (prevIds) =>
+            new Set([...prevIds, ...newMessages.map((msg: any) => msg.id)])
+        );
+        cacheMessages(currentRoom.id, [...newMessages, ...messages]);
+      }
+    };
+
+    const handleScroll = async () => {
+      if (scrollRef.current) {
+        const scrollTop = scrollRef.current.scrollTop;
+        const scrollHeight = scrollRef.current.scrollHeight;
+        const clientHeight = scrollRef.current.clientHeight;
+
+        if (scrollTop === 0 && scrollHeight > clientHeight) {
+          await loadOlderMessages();
+        }
+      }
+    };
+
     scrollRef.current?.addEventListener("scroll", handleScroll);
 
     return () => {
       // eslint-disable-next-line react-hooks/exhaustive-deps
       scrollRef.current?.removeEventListener("scroll", handleScroll);
     };
-  }, [currentRoom, handleScroll, messages, params.id]);
+  }, [currentRoom, loadedMessageIds, messages, params.id]);
 
   switch (currentRoom?.type) {
     case 0:
@@ -196,10 +197,10 @@ export default function Page({ params }: { params: { id: string } }) {
                 </span>
               </div>
             </div>
-            <div className="flex min-w-[5px] h-full flex-col justify-end">
+            <div className="messages-wrapper">
               <ul
                 ref={scrollRef}
-                className="overflow-y-auto w-full flex flex-col scrollbar-thin scrollbar-thumb-[#737d3c] scrollbar-thumb-rounded-full scrollbar-track-transparent relative break-all"
+                className="messages"
               >
                 <div className="pt-[25px] pl-[15px] text-white">
                   <h2 className="text-[27px] font-bold">
@@ -270,12 +271,21 @@ export default function Page({ params }: { params: { id: string } }) {
                         })()
                       }
                       showMoreOptions={showMoreOptionsForMessages}
+                      setReferenceMessage={setReferenceMessage}
+                      messages={messages}
                       message={message}
+                      scrollRef={scrollRef}
                     />
                   </>
                 ))}
               </ul>
-              <ChatBox room={currentRoom} />
+              {referenceMessage && (
+                <div className="reply-popup">
+                  <span>Replying to {referenceMessage.author.username}</span>
+                  <span className="icon"><FontAwesomeIcon onClick={() => setReferenceMessage(null)} icon={faXmarkCircle}/></span>
+                </div>
+              )}
+              <ChatBox room={currentRoom} setReferenceMessage={setReferenceMessage} referenceMessage={referenceMessage} />
             </div>
           </div>
         );

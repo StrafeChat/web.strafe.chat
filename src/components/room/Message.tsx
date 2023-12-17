@@ -1,6 +1,5 @@
 import { useAuth } from "@/context/AuthContext";
 import {
-  faEllipsisVertical,
   faFaceSmile,
   faInfoCircle,
   faLink,
@@ -9,24 +8,59 @@ import {
   faTrashCan,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import Image from "next/image";
-import { KeyboardEvent, useEffect, useRef, useState } from "react";
+import {
+  Dispatch,
+  RefObject,
+  SetStateAction,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import ReactTimeago from "react-timeago";
 import cookie from "js-cookie";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "../ui/tooltip";
+import { emojis } from "@/assets/emojis";
+import { Formatting } from "@/scripts/Formatting";
+import twemoji from "twemoji";
+import ReactMarkdown from "react-markdown";
+import gfm from "remark-gfm";
 
 export default function Message({
   message,
+  messages,
   sameAuthor,
   showMoreOptions,
+  setReferenceMessage,
+  scrollRef,
 }: {
   message: any;
+  messages: any[];
   sameAuthor: boolean;
   showMoreOptions: boolean;
+  setReferenceMessage: Dispatch<SetStateAction<any | null>>;
+  scrollRef: RefObject<HTMLUListElement>;
 }) {
   console.log(message);
   const { user } = useAuth();
   const contentRef = useRef<HTMLSpanElement>(null);
+  const replyRef = useRef<HTMLSpanElement>(null);
   const [editable, setEditable] = useState(false);
+
+  const CustomLink = ({ href, children }: { href?: any; children?: any }) => (
+    <a
+      href={href}
+      className="text-blue-500 hover:underline hover:text-blue-600"
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      {children}
+    </a>
+  );
 
   useEffect(() => {
     if (editable && contentRef.current) {
@@ -34,7 +68,25 @@ export default function Message({
     }
   }, [editable]);
 
-  const handleInput = async (event: KeyboardEvent<HTMLSpanElement>) => {
+  useEffect(() => {
+    if (contentRef.current) {
+      twemoji.parse(contentRef.current, {
+        folder: "svg",
+        ext: ".svg",
+        className: "w-7 h-7",
+      });
+    }
+
+    if (replyRef.current) {
+      twemoji.parse(replyRef.current, {
+        folder: "svg",
+        ext: ".svg",
+        className: "w-5 h-5",
+      });
+    }
+  }, [message.content]);
+
+  const handleInput = async (event: React.KeyboardEvent<HTMLSpanElement>) => {
     if (event.key == "Escape") {
       contentRef.current?.blur();
       setEditable(false);
@@ -60,81 +112,176 @@ export default function Message({
     }
   };
 
+  const transformMessage = (content: string) => {
+    const patterns: Record<
+      string,
+      (match: string, ...groups: string[]) => string
+    > = {
+      ":([^:]+):": (match, content) => {
+        const emojiValue = emojis[content];
+        return emojiValue ?? match;
+      },
+    };
+
+    let text = content;
+
+    for (const pattern in patterns) {
+      const regex = new RegExp(pattern, "g");
+      text = text.replace(regex, patterns[pattern]);
+    }
+
+    return text;
+  };
+
   return (
-    <li id={message.id} className="group hover:bg-[rgba(0,0,0,0.1)]">
-      <div className="hidden group-hover:flex absolute bg-black text-white right-5 -translate-y-5 rounded-lg">
-        <div style={{ borderColor: "transparent" }} className="flex">
-          <span className="w-8 h-8 flex items-center">
-            <FontAwesomeIcon className="p-2 cursor-pointer" icon={faReply} />
-          </span>
-          <span className="w-8 h-8 flex items-center">
-            <FontAwesomeIcon
-              className="p-2 cursor-pointer"
-              icon={faFaceSmile}
-            />
-          </span>
+    <li id={`message-${message.id}`} className="group message ">
+      {!editable && (
+        <div className="options group-hover:flex">
+          <div className="icon">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <span className="icon">
+                    <FontAwesomeIcon
+                      icon={faReply}
+                      onClick={() => setReferenceMessage(message)}
+                    />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>Reply</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+          <div className="icon">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger>
+                  <span className="icon">
+                    <FontAwesomeIcon icon={faFaceSmile} />
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>Add Reaction</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
           {user.id == message.author_id && (
             <>
-              <span
-                className="w-8 h-8 flex items-center"
-                onClick={() => setEditable(true)}
-              >
-                <FontAwesomeIcon className="p-2 cursor-pointer" icon={faPen} />
+              <div className="icon">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <span className="icon">
+                        <FontAwesomeIcon
+                          onClick={() => setEditable(true)}
+                          icon={faPen}
+                        />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>Edit Message</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+              <div className="icon">
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <span className="icon">
+                        <FontAwesomeIcon
+                          className="danger"
+                          icon={faTrashCan}
+                          onClick={async () => {
+                            await fetch(
+                              `${process.env.NEXT_PUBLIC_API}/rooms/${message.room_id}/messages/${message.id}`,
+                              {
+                                method: "DELETE",
+                                headers: {
+                                  "Content-Type": "application/json",
+                                  Authorization: cookie.get("token")!,
+                                },
+                              }
+                            );
+                          }}
+                        />
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent>Delete Message</TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            </>
+          )}
+          {showMoreOptions && (
+            <>
+              <span className="icon">
+                <FontAwesomeIcon icon={faInfoCircle} />
               </span>
-              <span className="w-8 h-8 flex items-center">
-                <FontAwesomeIcon
-                  className="p-2 text-red-500 cursor-pointer"
-                  icon={faTrashCan}
-                  onClick={async () => {
-                    const res = await fetch(
-                      `${process.env.NEXT_PUBLIC_API}/rooms/${message.room_id}/messages/${message.id}`,
-                      {
-                        method: "DELETE",
-                        headers: {
-                          "Content-Type": "application/json",
-                          Authorization: cookie.get("token")!,
-                        },
-                      }
-                    );
-                  }}
-                />
+              <span className="icon">
+                <FontAwesomeIcon icon={faLink} />
               </span>
             </>
           )}
-          <span className="w-8 h-8 flex items-center">
-            <FontAwesomeIcon
-              className="p-2 cursor-pointer"
-              icon={faEllipsisVertical}
-            />
-          </span>
         </div>
-        {showMoreOptions && (
-          <div className="flex items-center">
-            <span className="w-8 h-8 flex items-center">
-              <FontAwesomeIcon
-                className="p-2 cursor-pointer"
-                icon={faInfoCircle}
-              />
-            </span>
-            <span className="w-8 h-8 flex items-center">
-              <FontAwesomeIcon className="p-2 cursor-pointer" icon={faLink} />
-            </span>
-          </div>
-        )}
-      </div>
-      <div className={`flex p-0.5 pe-4 ${!sameAuthor && "mt-3"}`}>
-        <div className="w-[62px] flex flex-shrink-0 pt-0.5 justify-center">
-          {!sameAuthor ? (
-            <div className="rounded-full overflow-hidden w-10 h-10 duration-200 active:translate-y-0.5 cursor-pointer">
-              <Image
-                src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${message.author.avatar}.png`}
+      )}
+      {message.message_reference_id && (
+        <div className="min-w-fit w-full px-8 py-2 flex relative">
+          <div className="w-[3rem] h-[1rem] border-l-2 border-t-2 border-gray-500 rounded-tl-[0.5rem]" />
+          {(() => {
+            const currentMessage = messages.find(
+              (msg) => msg.id == message.message_reference_id
+            );
+            return (
+              <span className="absolute top-0 left-[5.5rem] text-sm flex w-fit cursor-pointer" onClick={() => {
+                const section = document.querySelector(`#message-${message.message_reference_id}`);
+                section?.scrollIntoView( { behavior: "smooth", block: "end" } );
+              }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={Formatting.avatar(
+                    currentMessage.author.id,
+                    currentMessage.author.avatar
+                  )}
+                  style={{ objectFit: "cover" }}
+                  className="avatar mr-2 w-[16px] h-[16px]"
+                  draggable={false}
+                  width={16}
+                  height={16}
+                  alt=""
+                />
+                <span className="font-bold text-white mr-2 flex">
+                  {currentMessage.author.username}
+                </span>
+                <span ref={replyRef} className="text-gray-400">
+                  {transformMessage(currentMessage.content)}
+                </span>
+              </span>
+            );
+          })()}
+        </div>
+      )}
+      <div
+        className={`message-wrapper ${!sameAuthor && "same-author"} ${
+          message.message_reference_id && "replied"
+        }`}
+      >
+        <div className="author-container">
+          {!sameAuthor || message.message_reference_id ? (
+            <div className="author-wrapper rounded-full">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={Formatting.avatar(
+                  message.author.id,
+                  message.author.avatar
+                )}
+                style={{ objectFit: "cover" }}
+                className="avatar"
+                draggable={false}
                 width={40}
                 height={40}
                 alt=""
               />
             </div>
           ) : (
-            <time className="text-sm invisible group-hover:visible text-gray-500 font-bold">
+            <time className="group-hover:!opacity-100">
               {Intl.DateTimeFormat(message.author.locale, {
                 hour: "numeric",
                 minute: "numeric",
@@ -143,36 +290,34 @@ export default function Message({
             </time>
           )}
         </div>
-        <div className="relative min-w-0 flex-grow flex flex-col justify-center text-sm">
-          {!sameAuthor && (
-            <span className="gap-2 flex items-center flex-shrink-0">
-              <span className="text-white overflow-hidden cursor-pointer text-ellipsis whitespace-normal font-bold">
+        <div className="content-container">
+          {(!sameAuthor || message.message_reference_id) && (
+            <span className="info">
+              <span className="username">
                 {message.author.global_name ?? message.author.username}
               </span>
-              <ReactTimeago
-                date={message.created_at}
-                className="flex-shrink-0 gap-1 text-xs text-gray-500"
-              />
+              <ReactTimeago date={message.created_at} />
             </span>
           )}
-          <div className="flex gap-2 relative">
-            <span
-              style={{ maxHeight: editable ? "50vh" : "fit-content" }}
-              ref={contentRef}
-              contentEditable={editable}
-              onKeyDown={(event) => handleInput(event)}
-              className={`text-white ${
-                editable && "p-2 bg-black rounded-xl overflow-y-auto w-full"
-              }`}
+          <span
+            style={{ maxHeight: editable ? "50vh" : "fit-content" }}
+            ref={contentRef}
+            contentEditable={editable}
+            onKeyDown={(event) => handleInput(event)}
+            className={`text-white ${editable && "message-edtitable"}`}
+          >
+            <ReactMarkdown
+              components={{
+                a: CustomLink,
+              }}
+              remarkPlugins={[gfm]}
             >
-              <span className="select-text">{message.content}{" "}</span>
-              {message.edited_at && !editable && (
-                <span className="text-gray-500 text-[10px] relative">
-                  (edited)
-                </span>
-              )}
-            </span>
-          </div>
+              {transformMessage(message.content)}
+            </ReactMarkdown>
+            {message.edited_at && !editable && (
+              <span className="edited">(edited)</span>
+            )}
+          </span>
         </div>
       </div>
     </li>

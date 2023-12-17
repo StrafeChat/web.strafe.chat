@@ -46,8 +46,6 @@ export default function AddFriendModal({
 
     const data = await res.json();
 
-    if (!res.ok) return console.log(data);
-
     setRelationships((prev) => [...prev, data.relationship]);
     set(false);
   };

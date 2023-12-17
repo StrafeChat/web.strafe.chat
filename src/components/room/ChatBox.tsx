@@ -7,11 +7,26 @@ import {
 import { ScanSearch, File, XCircle } from "lucide-react";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Room } from "@/context/RoomContext";
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  Dispatch,
+  SetStateAction,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import twemoji from "twemoji";
 import cookie from "js-cookie";
 
-export default function ChatBox({ room }: { room: Room }) {
+export default function ChatBox({
+  room,
+  setReferenceMessage,
+  referenceMessage,
+}: {
+  room: Room;
+  setReferenceMessage: Dispatch<SetStateAction<any | null>>;
+  referenceMessage: any | null;
+}) {
   const { user } = useAuth();
   const inputRef = useRef<HTMLDivElement>(null);
   const [viewImages, setViewImage] = useState<any[]>([]);
@@ -110,10 +125,6 @@ export default function ChatBox({ room }: { room: Room }) {
     return formattedText;
   };
 
-  // const recipient = room.recipients!.find(
-  //   (recipient) => recipient.id != user.id
-  // );
-
   function isImage(value: any) {
     const types = ["image/png", "image/gif", "image/jpeg"];
     const video = ["video/mp4"];
@@ -122,44 +133,48 @@ export default function ChatBox({ room }: { room: Room }) {
     else return "other";
   }
 
-  const onSelectFile = (e: any | null) => {
-    if (!e || e?.files?.length === 0 || e?.target?.files?.length === 0) return;
+  const onSelectFile = useCallback(
+    (e: any | null) => {
+      if (!e || e?.files?.length === 0 || e?.target?.files?.length === 0)
+        return;
 
-    function clearFileInput(ctrl: any) {
-      try {
-        ctrl.value = null;
-      } catch (ex) {}
-      if (ctrl.value) {
-        ctrl.parentNode.replaceChild(ctrl.cloneNode(true), ctrl);
+      function clearFileInput(ctrl: any) {
+        try {
+          ctrl.value = null;
+        } catch (ex) {}
+        if (ctrl.value) {
+          ctrl.parentNode.replaceChild(ctrl.cloneNode(true), ctrl);
+        }
       }
-    }
 
-    const selectedFiles = Array.from(e?.target?.files! || e?.files);
+      const selectedFiles = Array.from(e?.target?.files! || e?.files);
 
-    Promise.all(
-      selectedFiles.map((file: any) => {
-        return new Promise((resolve) => {
-          const reader = new FileReader();
-          reader.readAsDataURL(file);
-          reader.onload = async () => {
-            let id = Math.round(
-              +(Date.now() * file.name.length * Math.random()).toString()
-            );
-            resolve({
-              id,
-              file: reader.result,
-              name: file.name,
-              type: file.type,
-            });
-          };
-        });
-      })
-    ).then((results: any) => {
-      clearFileInput(document.getElementById("images") as HTMLInputElement);
-      console.log(...results);
-      setViewImage([...viewImages, ...results]);
-    });
-  };
+      Promise.all(
+        selectedFiles.map((file: any) => {
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = async () => {
+              let id = Math.round(
+                +(Date.now() * file.name.length * Math.random()).toString()
+              );
+              resolve({
+                id,
+                file: reader.result,
+                name: file.name,
+                type: file.type,
+              });
+            };
+          });
+        })
+      ).then((results: any) => {
+        clearFileInput(document.getElementById("images") as HTMLInputElement);
+        console.log(...results);
+        setViewImage([...viewImages, ...results]);
+      });
+    },
+    [viewImages]
+  );
 
   useEffect(() => {
     function onPaste(event: ClipboardEvent) {
@@ -172,7 +187,7 @@ export default function ChatBox({ room }: { room: Room }) {
 
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
-  }, []);
+  }, [onSelectFile]);
 
   const currentUser = room.recipients!.find(
     (recipient) => recipient.id != user.id
@@ -270,7 +285,9 @@ export default function ChatBox({ room }: { room: Room }) {
           <div
             className="w-full h-full items-center text-white text-lg outline-none py-2 overflow-y-auto break-all resize-none scrollbar-none"
             contentEditable={true}
-            placeholder={`Message @${currentUser?.global_name ?? currentUser?.username}`}
+            placeholder={`Message @${
+              currentUser?.global_name ?? currentUser?.username
+            }`}
             id="textbox"
             role={"textbox"}
             ref={inputRef}
@@ -287,11 +304,13 @@ export default function ChatBox({ room }: { room: Room }) {
                     },
                     body: JSON.stringify({
                       content,
+                      reference_id: referenceMessage ? referenceMessage.id : null
                     }),
                   }
                 );
                 setContent("");
                 (event.target as HTMLElement).innerText = "";
+                setReferenceMessage(null);
               }
             }}
           />

@@ -122,28 +122,6 @@ export default function AuthService({ children }: { children: JSX.Element }) {
     [setRelationships, setUser, ws]
   );
 
-  // const handleWsMessage2 = useCallback((evt: MessageEvent<any>) => {
-  //   console.log("TEST");
-  //   const { op, data, event } = JSON.parse(evt.data);
-  //   switch (op) {
-  //     case 3:
-  //       switch (event) {
-  //         case "MESSAGE_CREATE":
-  //           console.log("test");
-  //           const messages = getCachedMessages(data.room_id);
-  //           if (messages) {
-  //             cacheMessages(data.room_id, [...messages, data]);
-  //             console.log(data.room_id, [...messages, data]);
-  //           } else {
-  //             cacheMessages(data.room_id, [data]);
-  //             console.log(data.room_id, [data]);
-  //           }
-  //           break;
-  //       }
-  //       break;
-  //   }
-  // }, []);
-
   const handleWsClose = useCallback(
     (event: CloseEvent) => {
       connectedRef.current = false;
@@ -291,6 +269,35 @@ export default function AuthService({ children }: { children: JSX.Element }) {
 
             return updatedRelationships;
           });
+
+          setPMs((prev) => {
+            const updatedPMs = prev.map((pm) => {
+              const recipient = pm.recipients?.find(
+                (recipient) => recipient.id == data.user_id
+              );
+
+              if (recipient) {
+                const updatedUser = {
+                  ...recipient,
+                  presence: { ...data, user_id: undefined },
+                };
+
+                const updatedRecipients = pm.recipients!.map((r) =>
+                  r.id === data.user_id ? updatedUser : r
+                );
+
+                return {
+                  ...pm,
+                  recipients: updatedRecipients,
+                };
+              }
+
+              return pm;
+            });
+
+            return updatedPMs;
+          });
+
           break;
       }
     };

@@ -1,7 +1,8 @@
 import { User, useAuth } from "@/context/AuthContext";
-import { XSquare } from "lucide-react";
-import Image from "next/image";
+import { faXmarkCircle } from "@fortawesome/free-solid-svg-icons";
+import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { Dispatch, SetStateAction, useEffect, useState } from "react";
+import AccountSettings from "../settings/AccountSettings";
 
 export default function UserSettingsModal({
   show,
@@ -10,7 +11,7 @@ export default function UserSettingsModal({
   show: boolean;
   set: Dispatch<SetStateAction<boolean>>;
 }) {
-  const { user } = useAuth();
+  const { user, setUser } = useAuth();
   const [currentSetting, setCurrentSetting] = useState("account");
 
   useEffect(() => {
@@ -43,12 +44,14 @@ export default function UserSettingsModal({
           <div className="settings">
             <div className="header">
               <h1 className="title">{currentSetting}</h1>
-              <button onClick={() => set(false)}>
-                <XSquare className="close" />
+              <button onClick={() => set(false) }>
+              <FontAwesomeIcon icon={faXmarkCircle} className="text-white mt-8 w-6 h-6"/>
+              <br></br>
+             <span className="text-white"> ESC </span>
               </button>
             </div>
             <div className="body">
-              {currentSetting == "account" && <AccountSettings user={user} />}
+              {currentSetting == "account" && <AccountSettings user={user} setUser={setUser} />}
               {currentSetting == "profile" && <></>}
             </div>
           </div>
@@ -57,41 +60,5 @@ export default function UserSettingsModal({
     </div>
   ) : (
     <></>
-  );
-}
-
-function AccountSettings({ user }: { user: User }) {
-  return (
-    <>
-      <div className="account-card">
-        <div className="banner-container">
-          <div className="wrapper">
-            <div
-              style={{
-                background:
-                  "#" + user.accent_color.toString(16).padStart(6, "0"),
-              }}
-              className="banner"
-            />
-          </div>
-          <div className="header">
-            <div className="placeholder" />
-            <Image
-              width={80}
-              height={80}
-              style={{ objectFit: "cover", width: "80px", height: "80px" }}
-              src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${user.avatar}.png`}
-              className="avatar"
-              alt="profile picture"
-              draggable={false}
-            />
-          </div>
-          <p className="username">
-            {user.username}#{user.discriminator}
-          </p>
-        </div>
-        <div className="body"></div>
-      </div>
-    </>
   );
 }

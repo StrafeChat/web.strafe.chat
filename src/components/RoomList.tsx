@@ -9,8 +9,9 @@ import { usePathname, useRouter } from "next/navigation";
 import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
 import placeholderSVG from "@/assets/placeholder.svg";
-import React from "react"
+import React from "react";
 import Skeleton from "./Skeleton";
+import { Formatting } from "@/scripts/Formatting";
 
 export default function RoomList() {
   const { user } = useAuth();
@@ -86,8 +87,7 @@ export default function RoomList() {
                 </div>
               </Skeleton>
             </div>
-          )
-        }
+          )}
           {pms.map((pm, key) => {
             switch (pm.type) {
               case 0:
@@ -95,31 +95,42 @@ export default function RoomList() {
                   (recipient) => recipient.id != user.id
                 );
                 return (
-                  <li className="pm" onClick={() => router.push(`/rooms/${pm.id}`)} key={key}>
+                  <li
+                    className="pm"
+                    onClick={() => router.push(`/rooms/${pm.id}`)}
+                    key={key}
+                  >
                     <div className="relative">
-                      <Image
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
                         className="avatar"
-                        src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${currentUser?.avatar}.png`}
+                        src={Formatting.avatar(currentUser!.id, currentUser!.avatar)}
                         width={35}
                         height={35}
                         alt="profile"
                       />
-                      {currentUser?.presence.online === true ? <div
-                        className={`absolute bottom-0 right-0 mr-[-2.25px] mb-[-2.25px] border-[2.75px] border-[#1f1f1f] rounded-full w-[16px] h-[16px] status-${currentUser?.presence.status}`}
-                      /> : <div className={`absolute bottom-0 mr-[-2.25px] mb-[-2.25px] right-0 border-[2.75px] border-[#1f1f1f] w-[16px] h-[16px] status-offline rounded-full`}></div>
-                      }
+                      {currentUser?.presence.online === true ? (
+                        <div
+                          className={`absolute bottom-0 right-0 mr-[-2.25px] mb-[-2.25px] border-[2.75px] border-[#1f1f1f] rounded-full w-[16px] h-[16px] status-${currentUser?.presence.status}`}
+                        />
+                      ) : (
+                        <div
+                          className={`absolute bottom-0 mr-[-2.25px] mb-[-2.25px] right-0 border-[2.75px] border-[#1f1f1f] w-[16px] h-[16px] status-offline rounded-full`}
+                        ></div>
+                      )}
                     </div>
                     <span className="content">
                       <span className="username">{currentUser?.username}</span>
                       <span className="status-text text-gray-400">
-                        {
-                          currentUser?.presence.online
-                            ? currentUser?.presence.status_text && currentUser?.presence.status_text.trim() !== ''
-                              ? currentUser?.presence.status_text
-                              : currentUser?.presence.status.charAt(0).toUpperCase() +
+                        {currentUser?.presence.online
+                          ? currentUser?.presence.status_text &&
+                            currentUser?.presence.status_text.trim() !== ""
+                            ? currentUser?.presence.status_text
+                            : currentUser?.presence.status
+                                .charAt(0)
+                                .toUpperCase() +
                               currentUser?.presence.status.slice(1)
-                            : "Offline"
-                        }
+                          : "Offline"}
                       </span>
                     </span>
                   </li>

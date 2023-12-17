@@ -1,6 +1,5 @@
 "use client";
 import AuthService from "@/services/AuthService";
-import LoadingScreen from "@/components/LoadingScreen";
 import {
   Dispatch,
   MutableRefObject,
