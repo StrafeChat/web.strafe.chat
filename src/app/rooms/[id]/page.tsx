@@ -128,12 +128,11 @@ export default function Page({ params }: { params: { id: string } }) {
 
   useEffect(() => {
     const loadOlderMessages = async () => {
-      console.log("POG!");
       const oldestMessageId =
         messages.length > 0 ? messages[messages.length - 1].id : null;
 
       const res = await fetch(
-        `${process.env.NEXT_PUBLIC_API}/rooms/${params.id}/messages?before=${oldestMessageId}&limit=100`,
+        `${process.env.NEXT_PUBLIC_API}/rooms/${params.id}/messages?before=${oldestMessageId}&limit=25`,
         {
           headers: {
             "Content-Type": "application/json",
@@ -212,7 +211,7 @@ export default function Page({ params }: { params: { id: string } }) {
                 {(() => {
                   if (messages[0])
                     return (
-                      <div className="flex mt-6 mb-2 ml-3 mr-3 relative left-auto right-auto h-0 z-1 border-[0.1px] border-gray-500 items-center justify-center box-border">
+                      <div className="flex mt-6 mb-6 ml-3 mr-3 relative left-auto right-auto h-0 z-1 border-[0.1px] border-gray-500 items-center justify-center box-border">
                         <time className="bg-[#262626] px-4 text-sm text-gray-400 select-none font-bold uppercase">
                           {Intl.DateTimeFormat(user.locale, {
                             day: "numeric",
@@ -280,7 +279,7 @@ export default function Page({ params }: { params: { id: string } }) {
                 ))}
               </ul>
               {referenceMessage && (
-                <div className="reply-popup">
+                <div className="reply-popup h-[35px] pb-[7px] pt-2 ml-3 mr-3 justify-center">
                   <span>Replying to {referenceMessage.author.username}</span>
                   <span className="icon"><FontAwesomeIcon onClick={() => setReferenceMessage(null)} icon={faXmarkCircle}/></span>
                 </div>

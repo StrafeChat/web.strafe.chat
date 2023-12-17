@@ -35,10 +35,6 @@
   user-select: none;
 }
 
-div {
-  cursor: url("http://getdrawings.com/images/bee-line-drawing-15.jpg");
-}
-
 div.skeleton {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
@@ -64,9 +60,13 @@ img.avatar {
 
 div.reply-popup {
   background: hsl(0, 0%, 20%);
-  padding: 0.5rem;
+  color:white;
   display: flex;
   justify-content: space-between;
+  border-top-right-radius: 0.75rem;
+  border-top-left-radius: 0.75rem;
+  border-radius: 0.75rem;
+  padding: 0.5rem;
 
   span.icon {
     color: var(--text-primary);
@@ -382,6 +382,7 @@ main.layout {
       flex-direction: column;
       position: relative;
       word-break: break-all;
+      padding-bottom: 20px;
 
       &::-webkit-scrollbar { 
         width: 0.5rem;
@@ -899,9 +900,6 @@ li.message {
     padding: 0.125rem;
     padding-inline-end: 1rem;
 
-    &.same-author:not(.reply) {
-      margin-top: 0.75rem;
-    }
 
     div.author-container {
       width: 62px;

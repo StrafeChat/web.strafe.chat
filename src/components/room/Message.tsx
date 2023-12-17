@@ -29,6 +29,7 @@ import { Formatting } from "@/scripts/Formatting";
 import twemoji from "twemoji";
 import ReactMarkdown from "react-markdown";
 import gfm from "remark-gfm";
+import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 
 export default function Message({
   message,
@@ -36,14 +37,12 @@ export default function Message({
   sameAuthor,
   showMoreOptions,
   setReferenceMessage,
-  scrollRef,
 }: {
   message: any;
   messages: any[];
   sameAuthor: boolean;
   showMoreOptions: boolean;
   setReferenceMessage: Dispatch<SetStateAction<any | null>>;
-  scrollRef: RefObject<HTMLUListElement>;
 }) {
   console.log(message);
   const { user } = useAuth();
@@ -134,7 +133,7 @@ export default function Message({
   };
 
   return (
-    <li id={`message-${message.id}`} className="group message ">
+    <li id={`message-${message.id}`} className="group message pb-[5px]">
       {!editable && (
         <div className="options group-hover:flex">
           <div className="icon">
@@ -223,16 +222,16 @@ export default function Message({
         </div>
       )}
       {message.message_reference_id && (
-        <div className="min-w-fit w-full px-8 py-2 flex relative">
-          <div className="w-[3rem] h-[1rem] border-l-2 border-t-2 border-gray-500 rounded-tl-[0.5rem]" />
+        <div className="min-w-fit w-full px-8 flex relative pt-4">
+          <div className="w-[2rem] h-[0.75rem] border-l-2 border-t-2 border-gray-500 rounded-tl-[0.5rem]" />
           {(() => {
             const currentMessage = messages.find(
               (msg) => msg.id == message.message_reference_id
             );
             return (
-              <span className="absolute top-0 left-[5.5rem] text-sm flex w-fit cursor-pointer" onClick={() => {
+              <span className="absolute top-0 left-[4.50rem] text-sm flex w-fit cursor-pointer" onClick={() => {
                 const section = document.querySelector(`#message-${message.message_reference_id}`);
-                section?.scrollIntoView( { behavior: "smooth", block: "end" } );
+                section?.scrollIntoView({ behavior: "smooth", block: "end" });
               }}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
@@ -241,16 +240,16 @@ export default function Message({
                     currentMessage.author.avatar
                   )}
                   style={{ objectFit: "cover" }}
-                  className="avatar mr-2 w-[16px] h-[16px]"
+                  className="avatar mr-2 w-[16px] h-[16px] mt-2"
                   draggable={false}
                   width={16}
                   height={16}
                   alt=""
                 />
-                <span className="font-bold text-white mr-2 flex">
+                <span className="font-bold text-white pt-1.5 mr-2 flex">
                   {currentMessage.author.username}
                 </span>
-                <span ref={replyRef} className="text-gray-400">
+                <span ref={replyRef} className="text-gray-400 pt-1.5">
                   {transformMessage(currentMessage.content)}
                 </span>
               </span>
@@ -259,27 +258,41 @@ export default function Message({
         </div>
       )}
       <div
-        className={`message-wrapper ${!sameAuthor && "same-author"} ${
-          message.message_reference_id && "replied"
-        }`}
+        className={`message-wrapper ${!sameAuthor && "same-author"} ${message.message_reference_id && "replied"
+          }`}
       >
         <div className="author-container">
           {!sameAuthor || message.message_reference_id ? (
-            <div className="author-wrapper rounded-full">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={Formatting.avatar(
-                  message.author.id,
-                  message.author.avatar
-                )}
-                style={{ objectFit: "cover" }}
-                className="avatar"
-                draggable={false}
-                width={40}
-                height={40}
-                alt=""
-              />
-            </div>
+            <Popover>
+              <PopoverTrigger>
+                <div className="author-wrapper">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={Formatting.avatar(
+                      message.author.id,
+                      message.author.avatar
+                    )}
+                    style={{ objectFit: "cover" }}
+                    className="avatar"
+                    draggable={false}
+                    width={40}
+                    height={40}
+                    alt=""
+                  />
+                </div>
+              </PopoverTrigger>
+              <PopoverContent side="right" className="rounded-t-xl">
+                <div className="w-fit h-fit flex flex-col relative rounded-t-xl">
+                  <div className="w-[300px] h-[60px] rounded-t-xl" style={{ backgroundColor: `#${message.author.accent_color.toString(16).padStart(6, "0")}` }} />
+                  <div className="absolute top-[2.5rem] px-4">
+                    <img draggable={false} src={Formatting.avatar(message.author_id, message.author.avatar)} width={64} height={64} className="avatar"/>
+                  </div>
+                  <div className="flex justify-end py-4">
+                    test
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
           ) : (
             <time className="group-hover:!opacity-100">
               {Intl.DateTimeFormat(message.author.locale, {
@@ -314,9 +327,9 @@ export default function Message({
             >
               {transformMessage(message.content)}
             </ReactMarkdown>
-            {message.edited_at && !editable && (
+            {/* {message.edited_at && !editable && (
               <span className="edited">(edited)</span>
-            )}
+            )} */}
           </span>
         </div>
       </div>

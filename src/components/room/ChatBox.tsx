@@ -199,7 +199,7 @@ export default function ChatBox({
         height: `${inputRef?.current?.scrollHeight}`,
         maxHeight: "50vh",
       }}
-      className="w-full flex flex-col pt-5 px-3 justify-center duration-1000 z-2"
+      className="w-full flex flex-col px-3 justify-center duration-1000 z-2"
     >
       {viewImages.length > 0 && (
         <div className="relative w-full h-[10rem] bg-[#3C3C3C] rounded-t-[15px] flex overflow-x-auto overflow-y-hidden items-center px-2">
