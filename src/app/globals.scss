@@ -18,7 +18,7 @@
   --ui-card: hsl(0, 0%, 20%);
   --ui-card-2: hsl(0, 0%, 10%);
   --ui-input: var(--ui-card-2);
-  --ui-context-menu: hsl(0, 0%, 12%);
+  --ui-context-menu: hsl(0, 0%, 8%);
   --ui-context-menu-hover: hsl(0, 0%, 10%);
   --ui-context-menu-text: hsl(0, 0%, 95%);
   --ui-settings-sidebar: hsl(0, 0%, 12%);
@@ -56,6 +56,12 @@ button.danger {
 img.avatar {
   border-radius: 50%;
   aspect-ratio: 1/1;
+}
+
+img.avatar_modal {
+  border-radius: 50%;
+  aspect-ratio: 1/1;
+  border: #1f1f1f 0.4rem solid;
 }
 
 div.reply-popup {
@@ -199,7 +205,7 @@ main.layout {
     }
 
     li.pm {
-      width: 90%;
+      width: 200px;
       padding-top: -10px;
       padding-bottom: 1px;
       padding-left: 0.5rem;
@@ -978,6 +984,7 @@ li.message {
       span.edited {
         color: var(--text-secondary);
         font-size: 10px;
+        margin-top: 0.15rem;
         margin-left: 0.25rem;
       }
     }

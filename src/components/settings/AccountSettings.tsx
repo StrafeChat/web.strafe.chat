@@ -29,8 +29,6 @@ export default function AccountSettings({
   const [data, setData] = useState(currentData);
   const [updated, setUpdated] = useState(false);
 
-  console.log(data.accent_color);
-
   useEffect(() => {
     if (JSON.stringify(currentData) != JSON.stringify(data)) {
       setUpdated(true);
@@ -97,7 +95,7 @@ export default function AccountSettings({
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`${data.avatar}`}
-                  className="avatar"
+                  className="avatar z-[1000]"
                   draggable={false}
                   alt="profile picture"
                   width={80}
@@ -107,7 +105,7 @@ export default function AccountSettings({
                 <input
                   type="file"
                   accept="image/png, image/gif, image/jpeg"
-                  className="avatar group-hover:opacity-80"
+                  className="avatar group-hover:opacity-80 z-[1001]"
                   onChange={(event) => {
                     if (event.target.files) {
                       if (event.target.files.length > 0) {

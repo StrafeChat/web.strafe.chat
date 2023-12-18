@@ -31,7 +31,6 @@ export default function Page({ params }: { params: { id: string } }) {
 
     const handleKeyUp = (event: KeyboardEvent) => {
       if (event.key == "Shift") {
-        console.log("Key Up");
         setShowMoreOptionsForMessages(false);
       }
     };
@@ -71,7 +70,6 @@ export default function Page({ params }: { params: { id: string } }) {
             setLoadedMessageIds(new Set(data.map((msg: any) => msg.id)));
             cacheMessages(currentRoom.id, data);
           }
-          console.log(data);
         }
       }
     })();
@@ -123,7 +121,6 @@ export default function Page({ params }: { params: { id: string } }) {
   useEffect(() => {
     if (scrollRef.current)
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-    console.log(messages);
   }, [messages]);
 
   useEffect(() => {
@@ -273,7 +270,6 @@ export default function Page({ params }: { params: { id: string } }) {
                       setReferenceMessage={setReferenceMessage}
                       messages={messages}
                       message={message}
-                      scrollRef={scrollRef}
                     />
                   </>
                 ))}

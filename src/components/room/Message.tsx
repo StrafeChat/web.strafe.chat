@@ -30,6 +30,8 @@ import twemoji from "twemoji";
 import ReactMarkdown from "react-markdown";
 import gfm from "remark-gfm";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
+import Badges from "../Badges";
+import ProfilePopup from "../popup/ProfilePopup";
 
 export default function Message({
   message,
@@ -44,7 +46,6 @@ export default function Message({
   showMoreOptions: boolean;
   setReferenceMessage: Dispatch<SetStateAction<any | null>>;
 }) {
-  console.log(message);
   const { user } = useAuth();
   const contentRef = useRef<HTMLSpanElement>(null);
   const replyRef = useRef<HTMLSpanElement>(null);
@@ -229,10 +230,15 @@ export default function Message({
               (msg) => msg.id == message.message_reference_id
             );
             return (
-              <span className="absolute top-0 left-[4.50rem] text-sm flex w-fit cursor-pointer" onClick={() => {
-                const section = document.querySelector(`#message-${message.message_reference_id}`);
-                section?.scrollIntoView({ behavior: "smooth", block: "end" });
-              }}>
+              <span
+                className="absolute top-0 left-[4.50rem] text-sm flex w-fit cursor-pointer"
+                onClick={() => {
+                  const section = document.querySelector(
+                    `#message-${message.message_reference_id}`
+                  );
+                  section?.scrollIntoView({ behavior: "smooth", block: "end" });
+                }}
+              >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={Formatting.avatar(
@@ -258,41 +264,29 @@ export default function Message({
         </div>
       )}
       <div
-        className={`message-wrapper ${!sameAuthor && "same-author"} ${message.message_reference_id && "replied"
-          }`}
+        className={`message-wrapper ${!sameAuthor && "same-author"} ${
+          message.message_reference_id && "replied"
+        }`}
       >
         <div className="author-container">
           {!sameAuthor || message.message_reference_id ? (
-            <Popover>
-              <PopoverTrigger>
-                <div className="author-wrapper">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={Formatting.avatar(
-                      message.author.id,
-                      message.author.avatar
-                    )}
-                    style={{ objectFit: "cover" }}
-                    className="avatar"
-                    draggable={false}
-                    width={40}
-                    height={40}
-                    alt=""
-                  />
-                </div>
-              </PopoverTrigger>
-              <PopoverContent side="right" className="rounded-t-xl">
-                <div className="w-fit h-fit flex flex-col relative rounded-t-xl">
-                  <div className="w-[300px] h-[60px] rounded-t-xl" style={{ backgroundColor: `#${message.author.accent_color.toString(16).padStart(6, "0")}` }} />
-                  <div className="absolute top-[2.5rem] px-4">
-                    <img draggable={false} src={Formatting.avatar(message.author_id, message.author.avatar)} width={64} height={64} className="avatar"/>
-                  </div>
-                  <div className="flex justify-end py-4">
-                    test
-                  </div>
-                </div>
-              </PopoverContent>
-            </Popover>
+            <ProfilePopup user={message.author}>
+              <div className="author-wrapper">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={Formatting.avatar(
+                    message.author.id,
+                    message.author.avatar
+                  )}
+                  style={{ objectFit: "cover" }}
+                  className="avatar"
+                  draggable={false}
+                  width={40}
+                  height={40}
+                  alt=""
+                />
+              </div>
+            </ProfilePopup>
           ) : (
             <time className="group-hover:!opacity-100">
               {Intl.DateTimeFormat(message.author.locale, {
@@ -306,9 +300,11 @@ export default function Message({
         <div className="content-container">
           {(!sameAuthor || message.message_reference_id) && (
             <span className="info">
-              <span className="username">
-                {message.author.global_name ?? message.author.username}
-              </span>
+              <ProfilePopup user={message.author}>
+                <span className="username">
+                  {message.author.global_name ?? message.author.username}
+                </span>
+              </ProfilePopup>
               <ReactTimeago date={message.created_at} />
             </span>
           )}
@@ -317,7 +313,7 @@ export default function Message({
             ref={contentRef}
             contentEditable={editable}
             onKeyDown={(event) => handleInput(event)}
-            className={`text-white ${editable && "message-edtitable"}`}
+            className={`text-white select-text inline-flex ${editable && "message-edtitable"}`}
           >
             <ReactMarkdown
               components={{
@@ -327,9 +323,7 @@ export default function Message({
             >
               {transformMessage(message.content)}
             </ReactMarkdown>
-            {/* {message.edited_at && !editable && (
-              <span className="edited">(edited)</span>
-            )} */}
+            {message.edited_at && !editable && (<span className="edited">(edited)</span>)}
           </span>
         </div>
       </div>

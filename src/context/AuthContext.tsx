@@ -14,6 +14,7 @@ import { RoomProvider } from "./RoomContext";
 
 export interface User {
   id: string;
+  about: string | null;
   username: string;
   discriminator: number;
   global_name: string;
