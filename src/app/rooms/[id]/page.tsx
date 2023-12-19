@@ -270,6 +270,7 @@ export default function Page({ params }: { params: { id: string } }) {
                       setReferenceMessage={setReferenceMessage}
                       messages={messages}
                       message={message}
+                      recipients={currentRoom.recipients}
                     />
                   </>
                 ))}

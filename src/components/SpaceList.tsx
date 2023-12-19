@@ -64,6 +64,7 @@ export default function SpaceList({ user }: { user: User }) {
                 </TooltipTrigger>
                 <TooltipContent side="right">
                   {user.global_name && <span>{user.global_name}</span>}
+                  {user.global_name && <br />}
                   <span>
                     {user.username}#
                     {user.discriminator.toString().padStart(4, "0")}
