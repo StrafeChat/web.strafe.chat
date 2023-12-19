@@ -59,7 +59,9 @@ export default function Register() {
 
     cookie.set("token", data.token);
     router.replace("/");
+    setTimeout(function () {
     window.location.reload();
+    }, 1000);
   } catch (error) {
     console.error("An unexpected error occurred:", error);
     setErrorMessage("An unexpected error occurred");

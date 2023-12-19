@@ -9,7 +9,6 @@ import {
   faIdCard,
   faEllipsisVertical,
 } from "@fortawesome/free-solid-svg-icons";
-import Image from "next/image";
 import { ContextMenu } from "../ui/context-menu";
 import {
   ContextMenuContent,
@@ -29,6 +28,7 @@ export default function AllFriends({
   return (
     <div className="friends">
       <span className="count">All Friends - {relationships.length}</span>
+      <ul className="overflow-y-auto w-full flex flex-col scrollbar-thin scrollbar-thumb-[#737d3c] scrollbar-thumb-rounded-full scrollbar-track-transparent relative break-all">
       {relationships.map((relationship, key) => {
         const currentUser: User =
           relationship.receiver_id != user.id
@@ -123,6 +123,7 @@ export default function AllFriends({
           </ContextMenu>
         );
       })}
+      </ul>
     </div>
   );
 }
