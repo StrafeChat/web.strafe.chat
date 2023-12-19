@@ -9,6 +9,7 @@ import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import Image from "next/image";
 import { Dispatch, SetStateAction, useEffect, useState } from "react";
 import cookie from "js-cookie";
+import { useToast } from "@/components/ui/use-toast"
 import { Formatting } from "@/scripts/Formatting";
 
 export const dynamic = "force-dynamic";
@@ -28,6 +29,7 @@ export default function AccountSettings({
   });
   const [data, setData] = useState(currentData);
   const [updated, setUpdated] = useState(false);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (JSON.stringify(currentData) != JSON.stringify(data)) {
@@ -51,7 +53,25 @@ export default function AccountSettings({
 
     const fetched = await res.json();
 
-    if (!res.ok) return console.log(fetched);
+    if (!res.ok) {
+      toast({
+        variant: "destructive",
+        title: "SAVE ERROR",
+        description: fetched.message || "An error occurred while saving.",
+      })
+      setUpdated(false);
+      return;
+    }
+
+    if (res.ok) {
+      toast({
+        variant: "default",
+        title: "SAVED",
+        description: "Your changes have been saved.",
+      })
+        setUpdated(false);
+        return window.location.reload();
+    }
 
     setCurrentData({
       ...data,
@@ -122,7 +142,7 @@ export default function AccountSettings({
                   }}
                 />
               </div>
-              {currentData.avatar != data.avatar && (
+              {currentData.avatar != data.avatar && updated && (
                 <button
                   className="absolute top-[4rem] left-[5rem] bg-red-500 w-[32px] h-[32px] flex justify-center items-center rounded-full border border-black"
                   onClick={() =>
