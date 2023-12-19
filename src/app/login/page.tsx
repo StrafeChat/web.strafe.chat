@@ -7,6 +7,7 @@ import {
   FormLabel,
 } from "@/components/ui/form";
 import "./styles.scss";
+import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -19,7 +20,7 @@ interface Data {
   password: string;
 }
 
-export default function Page() {
+export default function Login() {
   const router = useRouter();
   const form = useForm<Data>({
     defaultValues: {
@@ -28,23 +29,33 @@ export default function Page() {
     },
   });
 
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const handleSubmit = async (values: Data) => {
-    const res = await fetch(`${process.env.NEXT_PUBLIC_API}/auth/login`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        ...values,
-      }),
-    });
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API}/auth/login`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...values,
+        }),
+      });
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (!res.ok) return console.error(data);
+      if (!res.ok) {
+        setErrorMessage(data.message || "An error occurred");
+        return;
+      }
 
-    cookie.set("token", data.token);
-    router.push("/");
+      cookie.set("token", data.token);
+      router.push("/");
+    } catch (error) {
+      console.error("An unexpected error occurred:", error);
+      setErrorMessage("An unexpected error occurred");
+    }
   };
 
   return (
@@ -90,6 +101,11 @@ export default function Page() {
               />
             </li>
           </ul>
+          {errorMessage && (
+            <div className="error-message">
+              <p><span className="font-bold">ERROR</span> • <span className="error-message-content">{errorMessage}</span></p>
+            </div>
+          )}
           <div className="submit">
             <Button>Login</Button>
           </div>

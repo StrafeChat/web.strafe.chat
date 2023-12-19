@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/form";
 import "./styles.scss";
 import { useForm } from "react-hook-form";
+import { useState } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import cookie from "js-cookie";
@@ -21,7 +22,7 @@ interface Data {
   dob: Date;
 }
 
-export default function Page() {
+export default function Register() {
   const router = useRouter();
   const form = useForm<Data>({
     defaultValues: {
@@ -33,7 +34,10 @@ export default function Page() {
     },
   });
 
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
   const handleSubmit = async (values: Data) => {
+    try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API}/auth/register`, {
       method: "POST",
       headers: {
@@ -48,10 +52,17 @@ export default function Page() {
 
     const data = await res.json();
 
-    if (!res.ok) return console.error(data);
+    if (!res.ok) {
+      setErrorMessage(data.message || "An error occurred");
+      return;
+    }
 
     cookie.set("token", data.token);
     router.push("/");
+  } catch (error) {
+    console.error("An unexpected error occurred:", error);
+    setErrorMessage("An unexpected error occurred");
+  }
   };
 
   return (
@@ -159,6 +170,11 @@ export default function Page() {
               />
             </li>
           </ul>
+          {errorMessage && (
+            <div className="error-message">
+              <p><span className="font-bold">ERROR</span> • <span className="error-message-content">{errorMessage}</span></p>
+            </div>
+          )}
           <div className="submit">
             <Button>Register</Button>
           </div>

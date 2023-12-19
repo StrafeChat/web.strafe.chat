@@ -19,6 +19,7 @@ export default function AddFriendModal({
 }) {
   const { setRelationships } = useAuth();
   const [query, setQuery] = useState("");
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   useEffect(() => {
     document.addEventListener("keydown", (event: KeyboardEvent) => {
@@ -30,12 +31,11 @@ export default function AddFriendModal({
     })
   }, [set]);
 
-
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
     const querySplit = query.split("#");
     if (querySplit.length < 2 || querySplit.length > 2)
-      return console.log("Something doesn't seem right with your request.");
+      return setErrorMessage("Something doesn't seem right with your request.");
     const res = await fetch(
       `${process.env.NEXT_PUBLIC_API}/users/@me/relationships/${querySplit[0]}-${querySplit[1]}`,
       {
@@ -49,8 +49,14 @@ export default function AddFriendModal({
 
     const data = await res.json();
 
+    if (!res.ok) {
+      setErrorMessage(data.message || "An error occurred");
+      return;
+    }
+
     setRelationships((prev) => [...prev, data.relationship]);
     set(false);
+
   };
 
   return show ? (
@@ -66,6 +72,11 @@ export default function AddFriendModal({
                 onChange={(event) => setQuery(event.target.value)}
                 required={true}
               />
+           {errorMessage && (
+            <div className="error-message pt-3 bg-[#333333]">
+              <p><span className="text-white font-bold">ERROR • </span><span className="error-message-content text-red-400">{errorMessage}</span></p>
+            </div>
+          )}  
             </div>
             <div className="card-2 !rounded-t-none flex justify-end gap-2">
               <button

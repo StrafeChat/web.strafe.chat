@@ -19,6 +19,7 @@ export default function ChangeStatusModal({
 }) {
 
     const { user, setStatusText, statusText, ws } = useAuth();
+    const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
     useEffect(() => {
         document.addEventListener("keydown", (event) => {
@@ -33,11 +34,15 @@ export default function ChangeStatusModal({
           })
     }, [set]);
 
-    const [query, setQuery] = useState("");
-
     const handleSubmit = async (event: FormEvent) => {
         event.preventDefault();
+        try {
         updatePresence(ws?.current, { status: user.presence.status, status_text: statusText });
+        } catch (error) {
+            console.error("An unexpected error occurred:", error);
+            setErrorMessage("An unexpected error occurred");
+            return;
+        }
         set(false);
     };
 
@@ -54,6 +59,11 @@ export default function ChangeStatusModal({
                                 onChange={(event) => setStatusText(event.target.value)}
                                 required={true}
                             />
+                            {errorMessage && (
+                             <div className="error-message pt-3 bg-[#333333]">
+                              <p><span className="text-white font-bold">ERROR • </span><span className="error-message-content text-red-400">{errorMessage}</span></p>
+                           </div>
+                           )} 
                         </div>
                         <div className="card-2 !rounded-t-none flex justify-end gap-2">
                             <button
