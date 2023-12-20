@@ -17,6 +17,7 @@ export interface Room {
   owner_id: string | null;
   parent_id: string | null;
   position: number | null;
+  last_message_id: string | null;
   recipients: User[] | null;
   space_id: string | null;
   topic: string | null;

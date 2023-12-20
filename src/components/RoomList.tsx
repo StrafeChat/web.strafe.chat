@@ -94,12 +94,17 @@ export default function RoomList() {
               </Skeleton>
             </div>
           )}
-          {pms.map((pm, key) => {
-            switch (pm.type) {
-              case 0:
-                const currentUser = pm.recipients?.find(
-                  (recipient) => recipient.id != user.id
-                );
+          {pms.sort((a, b) => {
+           const idA = parseInt(a.last_message_id! ?? 0);
+           const idB = parseInt(b.last_message_id! ?? 0);
+             return idB - idA;
+           })
+           .map((pm, key) => {
+              switch (pm.type) {
+                 case 0:
+                   const currentUser = pm.recipients?.find(
+                   (recipient) => recipient.id != user.id
+                 );
                 return (
                   <ContextMenu>
                     <ContextMenuTrigger>
