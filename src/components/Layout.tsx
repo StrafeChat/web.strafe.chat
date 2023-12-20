@@ -13,16 +13,16 @@ export default function Layout({ children }: { children: JSX.Element }) {
   const { user } = useAuth();
   const [electron, setElectron] = useState(false);
 
-  if (pathname == "/login" || pathname == "/register") return <>{children}</>;
-  if (Object.keys(user).length < 1) return <></>;
-  if (!user) return <LoadingScreen />;
-
   useEffect(() => {
     const userAgent = navigator.userAgent.toLowerCase();
     if (userAgent.indexOf(" electron/") > -1) {
       setElectron(true);
     }
-  });
+  }, [setElectron]);
+
+  if (pathname == "/login" || pathname == "/register") return <>{children}</>;
+  if (Object.keys(user).length < 1) return <></>;
+  if (!user) return <LoadingScreen />;
 
   return (
     <>

@@ -68,7 +68,7 @@ export default function Login() {
     if (userAgent.indexOf(" electron/") > -1) {
       setElectron(true);
     }
-  })
+  }, [setElectron]);
 
   return (
     <>

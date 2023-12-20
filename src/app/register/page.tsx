@@ -38,6 +38,7 @@ export default function Register() {
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [electron, setElectron] = useState(false);
 
+
   const handleSubmit = async (values: Data) => {
     try {
     const res = await fetch(`${process.env.NEXT_PUBLIC_API}/auth/register`, {
@@ -68,15 +69,14 @@ export default function Register() {
     console.error("An unexpected error occurred:", error);
     setErrorMessage("An unexpected error occurred");
   }
+};
 
-  useEffect(() => {
-    const userAgent = navigator.userAgent.toLowerCase();
-    if (userAgent.indexOf(" electron/") > -1) {
-      setElectron(true);
-    }
-  })
-
-  };
+useEffect(() => {
+  const userAgent = navigator.userAgent.toLowerCase();
+  if (userAgent.indexOf(" electron/") > -1) {
+    setElectron(true);
+  }
+}, [setElectron]);
 
   return (
     <>
