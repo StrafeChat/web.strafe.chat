@@ -8,11 +8,12 @@ import {
 } from "@/components/ui/form";
 import "./styles.scss";
 import { useForm } from "react-hook-form";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import cookie from "js-cookie";
 import { useRouter } from "next/navigation";
+import ElectronTitleBar from "@/components/ElectronTitleBar";
 
 interface Data {
   email: string;
@@ -35,6 +36,7 @@ export default function Register() {
   });
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [electron, setElectron] = useState(false);
 
   const handleSubmit = async (values: Data) => {
     try {
@@ -66,9 +68,19 @@ export default function Register() {
     console.error("An unexpected error occurred:", error);
     setErrorMessage("An unexpected error occurred");
   }
+
+  useEffect(() => {
+    const userAgent = navigator.userAgent.toLowerCase();
+    if (userAgent.indexOf(" electron/") > -1) {
+      setElectron(true);
+    }
+  })
+
   };
 
   return (
+    <>
+    { electron && <ElectronTitleBar /> }
     <main>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)}>
@@ -184,5 +196,6 @@ export default function Register() {
         </form>
       </Form>
     </main>
+    </>
   );
 }

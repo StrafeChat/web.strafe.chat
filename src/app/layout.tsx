@@ -1,3 +1,4 @@
+
 import type { Metadata } from "next";
 import "./globals.scss";
 import { Roboto } from "next/font/google";
@@ -19,13 +20,16 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+
   return (
     <html lang="en" className={roboto.className}>
       <body>
         <AuthProvider>
-          <div id="app-root">
+          <div id="app-root" className="overflow-hidden">
             <Layout>
-              <>{children}</>
+              <>
+              {children}
+              </>
             </Layout>
           </div>
         </AuthProvider>

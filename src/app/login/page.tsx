@@ -7,13 +7,14 @@ import {
   FormLabel,
 } from "@/components/ui/form";
 import "./styles.scss";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import cookie from "js-cookie";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import ElectronTitleBar from "@/components/ElectronTitleBar";
 
 interface Data {
   email: string;
@@ -30,6 +31,7 @@ export default function Login() {
   });
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [electron, setElectron] = useState(false);
 
   const handleSubmit = async (values: Data) => {
     try {
@@ -61,7 +63,16 @@ export default function Login() {
     }
   };
 
+  useEffect(() => {
+    const userAgent = navigator.userAgent.toLowerCase();
+    if (userAgent.indexOf(" electron/") > -1) {
+      setElectron(true);
+    }
+  })
+
   return (
+    <>
+   { electron && <ElectronTitleBar /> }
     <main>
       <Form {...form}>
         <form onSubmit={form.handleSubmit(handleSubmit)}>
@@ -116,5 +127,6 @@ export default function Login() {
         </form>
       </Form>
     </main>
+    </>
   );
 }
