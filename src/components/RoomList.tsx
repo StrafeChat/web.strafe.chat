@@ -106,12 +106,11 @@ export default function RoomList() {
                    (recipient) => recipient.id != user.id
                  );
                 return (
-                  <ContextMenu>
+                  <ContextMenu key={key}>
                     <ContextMenuTrigger>
                       <li
                         className="pm"
                         onClick={() => router.push(`/rooms/${pm.id}`)}
-                        key={key}
                       >
                         <div className="relative">
                           {/* eslint-disable-next-line @next/next/no-img-element */}

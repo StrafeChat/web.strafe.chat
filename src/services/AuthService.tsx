@@ -1,8 +1,8 @@
 import { usePathname, useRouter } from "next/navigation";
-import { useCallback, useEffect, useState, useRef } from "react";
+import { useEffect, useState } from "react";
 import cookie from "js-cookie";
 import LoadingScreen from "@/components/LoadingScreen";
-import { Relationship, User, useAuth } from "@/context/AuthContext";
+import { Relationship, useAuth } from "@/context/AuthContext";
 import { useRoom } from "@/context/RoomContext";
 import {
   cacheMessages,
@@ -15,14 +15,16 @@ export default function AuthService({ children }: { children: JSX.Element }) {
   const router = useRouter();
   const [clientError, setClientError] = useState(false);
 
-  const { user, setUser, setRelationships, relationships, ws } = useAuth();
+  const { user, setUser, setRelationships, ws } = useAuth();
   const { setPMs } = useRoom();
 
+  const wsInactive = pathname == "/register" || pathname == "/login";
+
   useEffect(() => {
-    if (pathname == "/register" || pathname == "/login") return;
+    if(wsInactive) return;
     const token = cookie.get("token");
     if (!token) return router.push("/login");
-  }, [pathname, router]);
+  }, [pathname, router, wsInactive]);
 
   useEffect(() => {
     const connect = () => {
@@ -56,14 +58,15 @@ export default function AuthService({ children }: { children: JSX.Element }) {
     };
 
     const handleWsClose = (event: CloseEvent) => {
-      console.log(event);
       connect();
     };
 
-    if (!ws?.current) connect();
+    if (!ws?.current) { 
+      connect()
+    };
 
     return () => cleanup();
-  }, [ws]);
+  }, [router, ws]);
 
   useEffect(() => {
     const handleWsOpen = (_event: Event) => {
@@ -75,7 +78,7 @@ export default function AuthService({ children }: { children: JSX.Element }) {
       }).then(async (res) => {
         const data = await res.json();
 
-        if (!res.ok) return console.log(data);
+        if (!res.ok) return;
 
         setRelationships(data.relationships);
       });
@@ -88,17 +91,19 @@ export default function AuthService({ children }: { children: JSX.Element }) {
       }).then(async (res) => {
         const data = await res.json();
 
-        if (!res.ok) return console.log(data);
+        if (!res.ok) return;
 
         setPMs([...data.rooms]);
       });
     };
 
-    ws?.current?.addEventListener("open", handleWsOpen);
+    if (cookie.get("token")) ws?.current?.addEventListener("open", handleWsOpen);
 
     let websocket = ws?.current;
 
-    return () => websocket?.removeEventListener("open", handleWsOpen);
+    return () => {
+      if(cookie.get("token")) websocket?.removeEventListener("open", handleWsOpen);
+    }
   }, [setPMs, setRelationships, ws]);
 
   useEffect(() => {
@@ -150,7 +155,7 @@ export default function AuthService({ children }: { children: JSX.Element }) {
             case "deleted":
               setRelationships((prev) =>
                 prev.filter((relationship) => {
-                  console.log(relationship.receiver_id, data.receiver_id);
+                  // console.log(relationship.receiver_id, data.receiver_id);
                   return (
                     relationship.receiver_id != data.receiver_id &&
                     relationship.sender_id != data.sender_id
@@ -163,6 +168,9 @@ export default function AuthService({ children }: { children: JSX.Element }) {
               break;
           }
           break;
+          case 6:
+            router.push('/login');
+            break;
       }
     };
 
@@ -171,7 +179,7 @@ export default function AuthService({ children }: { children: JSX.Element }) {
     let websocket = ws?.current;
 
     return () => websocket?.removeEventListener("message", handleWsMessage);
-  }, [setRelationships, setUser, ws]);
+  }, [router, setRelationships, setUser, ws]);
 
   useEffect(() => {
     const handleMessageCreate = async (data: any) => {
@@ -268,7 +276,7 @@ export default function AuthService({ children }: { children: JSX.Element }) {
     let websocket = ws?.current;
 
     return () => websocket?.removeEventListener("message", handleWsMessage);
-  }, [setRelationships, ws]);
+  }, [setPMs, setRelationships, ws]);
 
   useEffect(() => {
     const handleWsMessage = (evt: MessageEvent) => {
@@ -285,13 +293,13 @@ export default function AuthService({ children }: { children: JSX.Element }) {
                 const updatedUser =
                   data.user_id === relationship.receiver_id
                     ? {
-                        ...relationship.receiver,
-                        presence: { ...data, user_id: undefined },
-                      }
+                      ...relationship.receiver,
+                      presence: { ...data, user_id: undefined },
+                    }
                     : {
-                        ...relationship.sender,
-                        presence: { ...data, user_id: undefined },
-                      };
+                      ...relationship.sender,
+                      presence: { ...data, user_id: undefined },
+                    };
 
                 return {
                   ...relationship,
@@ -346,128 +354,6 @@ export default function AuthService({ children }: { children: JSX.Element }) {
 
     ws?.current?.addEventListener("message", handleWsMessage);
   }, [setPMs, setRelationships, ws]);
-
-  // useEffect(() => {
-  //   const handleMessageCreate = async (data: any) => {
-  //     const messages = await getCachedMessages(data.room_id);
-  //     if (messages) cacheMessages(data.room_id, [...messages, data]);
-  //   };
-
-  //   const handleMessageUpdate = async (data: any) => {
-  //     const messages = await getCachedMessages(data.room_id);
-  //     if (messages)
-  //       cacheMessages(
-  //         data.room_id,
-  //         messages.map((message) => (message.id == data.id ? data : message))
-  //       );
-  //   };
-
-  //   const handleMessageDelete = async (data: any) => {
-  //     const messages = await getCachedMessages(data.room_id);
-  //     if (messages)
-  //       cacheMessages(
-  //         data.room_id,
-  //         messages.filter((message) => message.id != data.message_id)
-  //       );
-  //   };
-
-  //   const handleWsMessage = async (evt: MessageEvent<any>) => {
-  //     const { op, data, event } = JSON.parse(evt.data);
-  //     switch (op) {
-  //       case 3:
-  //         switch (event) {
-  //           case "MESSAGE_CREATE":
-  //             handleMessageCreate(data);
-  //             break;
-  //           case "MESSAGE_UPDATE":
-  //             handleMessageUpdate(data);
-  //             break;
-  //           case "MESSAGE_DELETE":
-  //             handleMessageDelete(data);
-  //             break;
-  //           case "USER_UPDATE":
-  //             console.log("UPDATE");
-  //             break;
-  //         }
-  //         break;
-  //       case 5:
-  //         setRelationships((prev) => {
-  //           const updatedRelationships = prev.map((relationship) => {
-  //             if (
-  //               relationship.receiver_id === data.user_id ||
-  //               relationship.sender_id === data.user_id
-  //             ) {
-  //               const updatedUser =
-  //                 data.user_id === relationship.receiver_id
-  //                   ? {
-  //                       ...relationship.receiver,
-  //                       presence: { ...data, user_id: undefined },
-  //                     }
-  //                   : {
-  //                       ...relationship.sender,
-  //                       presence: { ...data, user_id: undefined },
-  //                     };
-
-  //               return {
-  //                 ...relationship,
-  //                 receiver_id: relationship.receiver_id,
-  //                 sender_id: relationship.sender_id,
-  //                 receiver:
-  //                   data.user_id == relationship.receiver_id
-  //                     ? updatedUser
-  //                     : relationship.receiver,
-  //                 sender:
-  //                   data.user_id == relationship.sender_id
-  //                     ? updatedUser
-  //                     : relationship.sender,
-  //               };
-  //             }
-  //             return relationship;
-  //           });
-
-  //           return updatedRelationships;
-  //         });
-
-  //         setPMs((prev) => {
-  //           const updatedPMs = prev.map((pm) => {
-  //             const recipient = pm.recipients?.find(
-  //               (recipient) => recipient.id == data.user_id
-  //             );
-
-  //             if (recipient) {
-  //               const updatedUser = {
-  //                 ...recipient,
-  //                 presence: { ...data, user_id: undefined },
-  //               };
-
-  //               const updatedRecipients = pm.recipients!.map((r) =>
-  //                 r.id === data.user_id ? updatedUser : r
-  //               );
-
-  //               return {
-  //                 ...pm,
-  //                 recipients: updatedRecipients,
-  //               };
-  //             }
-
-  //             return pm;
-  //           });
-
-  //           return updatedPMs;
-  //         });
-
-  //         break;
-  //     }
-  //   };
-
-  //   ws?.current?.addEventListener("message", handleWsMessage);
-  //   // ws?.current?.addEventListener("message", handleWsMessage2);
-
-  //   return () => {
-  //     ws?.current?.removeEventListener("message", handleWsMessage);
-  //     // ws?.current?.removeEventListener("message", handleWsMessage2);
-  //   };
-  // }, [relationships, setPMs, setRelationships, ws]);
 
   if (
     (!user.id || clientError) &&

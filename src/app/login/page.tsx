@@ -1,120 +1,71 @@
 "use client";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-} from "@/components/ui/form";
 import "./styles.scss";
-import { useState } from "react";
-import { useForm } from "react-hook-form";
+import { FormEvent, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import cookie from "js-cookie";
 import { useRouter } from "next/navigation";
+import { Label } from "@/components/ui/label";
+import { Button } from "@/components/ui/button";
 import Link from "next/link";
-
-interface Data {
-  email: string;
-  password: string;
-}
+import cookie from "js-cookie";
 
 export default function Login() {
   const router = useRouter();
-  const form = useForm<Data>({
-    defaultValues: {
-      email: "",
-      password: "",
-    },
+
+  const [register, setRegister] = useState({
+    email: "",
+    password: ""
   });
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
-  const handleSubmit = async (values: Data) => {
+  const handleSubmit = async (event: FormEvent) => {
+    event.preventDefault();
+
     try {
       const res = await fetch(`${process.env.NEXT_PUBLIC_API}/auth/login`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
+          "Content-Type": "application/json"
         },
-        body: JSON.stringify({
-          ...values,
-        }),
+        body: JSON.stringify(register)
       });
 
       const data = await res.json();
 
-      if (!res.ok) {
-        setErrorMessage(data.message || "An error occurred");
-        return;
-      }
+      if (!res.ok) return setErrorMessage(data.message);
 
       cookie.set("token", data.token);
-      router.replace("/");
-      setTimeout(function () {
-      window.location.reload();
-      }, 1000);
-    } catch (error) {
-      console.error("An unexpected error occurred:", error);
+      window.location.href = '/';
+    } catch (err) {
+      console.error(err);
       setErrorMessage("An unexpected error occurred");
     }
-  };
+  }
 
   return (
     <main>
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(handleSubmit)}>
-          <h1>Login</h1>
-          <ul>
-            <li>
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem className="w-full">
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="email"
-                        placeholder="username@strafe.chat"
-                        {...field}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            </li>
-            <li>
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem className="w-full">
-                    <FormLabel>Password</FormLabel>
-                    <FormControl>
-                      <Input
-                        type="password"
-                        placeholder="********"
-                        {...field}
-                      />
-                    </FormControl>
-                  </FormItem>
-                )}
-              />
-            </li>
-          </ul>
-          {errorMessage && (
-            <div className="error-message">
-              <p><span className="font-bold">ERROR</span> • <span className="error-message-content">{errorMessage}</span></p>
-            </div>
-          )}
-          <div className="submit">
-            <Button>Login</Button>
+      <form onSubmit={handleSubmit}>
+        <h1>Login</h1>
+        <ul>
+          <li>
+            <Label>Email</Label>
+            <Input type="email" autoComplete={"email"} value={register.email} onChange={(event) => setRegister({ ...register, email: event.target.value })} placeholder="username@strafe.chat" />
+          </li>
+          <li>
+            <Label>Password</Label>
+            <Input type="password" autoComplete={"current-password"} value={register.password} onChange={(event) => setRegister({ ...register, password: event.target.value })} placeholder="********" />
+          </li>
+        </ul>
+        {errorMessage && (
+          <div className="error-message">
+            <p><span className="font-bold">ERROR</span> • <span className="error-message-content">{errorMessage}</span></p>
           </div>
-          <Link href={"/register"}>Need an account?</Link>
-        </form>
-      </Form>
+        )}
+        <div className="submit">
+          <Button>Login</Button>
+        </div>
+        <Link href={"/register"}>Need an account?</Link>
+      </form>
     </main>
   );
 }
