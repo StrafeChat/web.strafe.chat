@@ -35,6 +35,10 @@
   user-select: none;
 }
 
+.font-cario {
+  font-family: 'Cario', sans-serif;
+}
+
 div.skeleton {
   animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
@@ -997,6 +1001,7 @@ li.message {
       display: flex;
       flex-shrink: 0;
       padding-top: 0.125rem;
+      padding-bottom: 0.125rem;
       justify-content: center;
 
       div.author-wrapper {

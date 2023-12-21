@@ -134,7 +134,7 @@ export default function Message({
   };
 
   return (
-    <li id={`message-${message.id}`} className="group message pb-[5px]">
+    <li id={`message-${message.id}`} className="group message">
       {!editable && (
         <div className="options group-hover:flex">
           <div className="icon">

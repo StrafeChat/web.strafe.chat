@@ -4,12 +4,10 @@ import {
   faNoteSticky,
   faHouseChimney,
 } from "@fortawesome/free-solid-svg-icons";
-import { useRoom } from "@/context/RoomContext";
+import { Room, useRoom } from "@/context/RoomContext";
 import { usePathname, useRouter } from "next/navigation";
-import Image from "next/image";
 import { useAuth } from "@/context/AuthContext";
-import placeholderSVG from "@/assets/placeholder.svg";
-import React from "react";
+import React, { useEffect, useState } from "react";
 import Skeleton from "./Skeleton";
 import { Formatting } from "@/scripts/Formatting";
 import { ContextMenu } from "./ui/context-menu";
@@ -20,11 +18,42 @@ import {
 } from "@radix-ui/react-context-menu";
 
 export default function RoomList() {
-  const { user } = useAuth();
-  const { setTab, pms } = useRoom();
-
+  const { user, ws } = useAuth();
+  const { pms } = useRoom();
   const router = useRouter();
   const pathname = usePathname();
+
+ /* useEffect(() => {
+    const handleWsMessage = (evt: MessageEvent<any>) => {
+      const { op, data, event } = JSON.parse(evt.data);
+      switch (op) {
+        case 3:
+          switch (event) {
+            case "MESSAGE_CREATE":
+              if (pms) {
+                setPmsList((pms) => {
+                const updatedPms = pms!.map((pm) => {
+                  if (pm.id === data.room_id) {
+                    return {
+                      ...pm,
+                      last_message_id: data.id,
+                    };
+                  }
+                  return pm;
+                });
+                return updatedPms;
+              });
+            }
+           break;
+      }
+    };
+  };
+  ws?.current?.addEventListener("message", handleWsMessage);
+
+  return () => {
+    ws?.current?.removeEventListener("message", handleWsMessage);
+  };
+}, [setPmsList, ws, pms]);*/
 
   return (
     <ul className="rooms-wrapper">
@@ -37,7 +66,6 @@ export default function RoomList() {
         <li
           className={pathname == "/" ? "active" : ""}
           onClick={() => {
-            setTab("home");
             router.push("/");
           }}
         >
@@ -49,7 +77,6 @@ export default function RoomList() {
         <li
           className={pathname == "/friends" ? "active" : ""}
           onClick={() => {
-            setTab("friends");
             router.push("/friends");
           }}
         >
@@ -61,7 +88,6 @@ export default function RoomList() {
         <li
           className={pathname == "/notes" ? "active" : ""}
           onClick={() => {
-            setTab("notes");
             router.push("/notes");
           }}
         >
@@ -94,7 +120,7 @@ export default function RoomList() {
               </Skeleton>
             </div>
           )}
-          {pms.sort((a, b) => {
+          {pms!.sort((a, b) => {
            const idA = parseInt(a.last_message_id! ?? 0);
            const idB = parseInt(b.last_message_id! ?? 0);
              return idB - idA;

@@ -2,21 +2,21 @@
 import "./styles.scss";
 import { FormEvent, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { useRouter } from "next/navigation";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import Link from "next/link";
 import cookie from "js-cookie";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import ElectronTitleBar from "@/components/ElectronTitleBar";
 
 export default function Login() {
-  const router = useRouter();
-
   const [register, setRegister] = useState({
     email: "",
     password: ""
   });
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [electron, _setElectron] = useState(false);
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -40,9 +40,11 @@ export default function Login() {
       console.error(err);
       setErrorMessage("An unexpected error occurred");
     }
-  }
+  };
 
   return (
+    <>
+   { electron && <ElectronTitleBar /> }
     <main>
       <form onSubmit={handleSubmit}>
         <h1>Login</h1>
@@ -67,5 +69,6 @@ export default function Login() {
         <Link href={"/register"}>Need an account?</Link>
       </form>
     </main>
+    </>
   );
 }

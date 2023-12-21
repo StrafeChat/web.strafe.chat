@@ -2,13 +2,12 @@
 import "./styles.scss";
 import { FormEvent, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { useRouter } from "next/navigation";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import cookie from "js-cookie";
+import ElectronTitleBar from "@/components/ElectronTitleBar";
 
 export default function Register() {
-  const router = useRouter();
 
   const date = new Date();
 
@@ -21,6 +20,8 @@ export default function Register() {
   })
 
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [electron, _setElectron] = useState(false);
+
 
   const handleSubmit = async (event: FormEvent) => {
     event.preventDefault();
@@ -49,6 +50,8 @@ export default function Register() {
   };
 
   return (
+    <>
+    { electron && <ElectronTitleBar /> }
     <main>
       <form onSubmit={handleSubmit}>
         <h1>Register</h1>
@@ -86,5 +89,6 @@ export default function Register() {
         </div>
       </form>
     </main>
+    </>
   );
 }
