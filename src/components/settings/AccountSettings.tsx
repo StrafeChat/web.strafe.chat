@@ -1,12 +1,13 @@
 import { User } from "@/context/AuthContext";
 import {
   faEnvelope,
+  faHashtag,
   faKey,
   faSignature,
+  faTag,
   faX,
 } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import Image from "next/image";
 import { Dispatch, SetStateAction, useEffect, useState } from "react";
 import cookie from "js-cookie";
 import { useToast } from "@/components/ui/use-toast"
@@ -26,6 +27,7 @@ export default function AccountSettings({
     email: `${user.email}`,
     username: `${user.username}`,
     discriminator: user.discriminator,
+    global_name: user.global_name
   });
   const [data, setData] = useState(currentData);
   const [updated, setUpdated] = useState(false);
@@ -47,7 +49,10 @@ export default function AccountSettings({
         Authorization: cookie.get("token")!,
       },
       body: JSON.stringify({
-        ...data,
+        username: data.username != currentData.username ? data.username : null,
+        discriminator: data.discriminator != currentData.discriminator ? data.discriminator : null,
+        avatar: data.avatar != currentData.avatar ? data.avatar : null,
+        global_name: data.global_name != currentData.global_name ? data.global_name : null
       }),
     });
 
@@ -65,26 +70,25 @@ export default function AccountSettings({
 
     if (res.ok) {
       toast({
-        variant: "default",
         title: "SAVED",
         description: "Your changes have been saved.",
       })
-        setUpdated(false);
-        return window.location.reload();
+      setUpdated(false);
+      return window.location.reload();
     }
 
-    setCurrentData({
-      ...data,
-      avatar: `${process.env.NEXT_PUBLIC_CDN}/avatars/${user.avatar}`.replace(
-        /_png$/,
-        ".png"
-      ),
-    });
-    setUser({
-      ...user,
-      ...data,
-      avatar: user.avatar,
-    });
+    // setCurrentData({
+    //   ...data,
+    //   avatar: `${process.env.NEXT_PUBLIC_CDN}/avatars/${user.avatar}`.replace(
+    //     /_png$/,
+    //     ".png"
+    //   ),
+    // });
+    // setUser({
+    //   ...user,
+    //   ...data,
+    //   avatar: user.avatar,
+    // });
   };
 
   return (
@@ -201,6 +205,57 @@ export default function AccountSettings({
                 </div>
                 <div className="input">
                   <span className="icon">
+                    <FontAwesomeIcon icon={faHashtag} />
+                  </span>
+                  <div className="info">
+                    <span className="title">Discriminator</span>
+                    <span
+                      className="content outline-none"
+                      placeholder={`${currentData.discriminator}`}
+                      spellCheck={false}
+                      contentEditable={true}
+                      suppressContentEditableWarning
+                      onKeyDown={(event) => {
+                        if (event.key == "Enter") return event.preventDefault();
+                        if ((event.target as HTMLSpanElement).innerText.length > 3 && event.key != "Backspace") return event.preventDefault();
+                        if (isNaN(parseInt(event.key)) && event.key != "Backspace") return event.preventDefault();
+                      }}
+                      onInput={(event) => {
+                        setData({ ...data, discriminator: parseInt((event.target as HTMLSpanElement).innerText) });
+                      }}
+                    >
+                      {currentData.discriminator}
+                    </span>
+                  </div>
+                </div>
+                <div className="input">
+                  <span className="icon">
+                    <FontAwesomeIcon icon={faTag} />
+                  </span>
+                  <div className="info">
+                    <span className="title">Display Name</span>
+                    <span
+                      className="content outline-none"
+                      placeholder={`${currentData.global_name ?? "No Display Name"}`}
+                      spellCheck={false}
+                      contentEditable={true}
+                      suppressContentEditableWarning
+                      onKeyDown={(event) => {
+                        if (event.key == "Enter") event.preventDefault();
+                      }}
+                      onInput={(event) => {
+                        setData({
+                          ...data,
+                          global_name: (event.target as HTMLSpanElement).innerText,
+                        });
+                      }}
+                    >
+                      {currentData.global_name ?? ""}
+                    </span>
+                  </div>
+                </div>
+                <div className="input">
+                  <span className="icon">
                     <FontAwesomeIcon icon={faKey} />
                   </span>
                   <div className="info">
@@ -209,6 +264,9 @@ export default function AccountSettings({
                       className="content outline-none"
                       placeholder="•••••••••"
                       contentEditable
+                      onKeyDown={(event) => {
+                        if (event.key == "Enter") event.preventDefault();
+                      }}
                     ></span>
                   </div>
                 </div>

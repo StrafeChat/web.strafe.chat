@@ -54,7 +54,7 @@ export default function PendingFriends({
                     <button
                       onClick={async () => {
                         const res = await fetch(
-                          `${process.env.NEXT_PUBLIC_API}/users/@me/relationships/${relationship.sender.username}-${relationship.sender.discriminator}`,
+                          `${process.env.NEXT_PUBLIC_API}/users/@me/relationships/${currentUser.id}`,
                           {
                             method: "PATCH",
                             headers: {
@@ -69,14 +69,16 @@ export default function PendingFriends({
 
                         const data = await res.json();
 
+                        if(!res.ok) return;
+
                         setRelationships((prev) => {
                           const updatedRelationships = prev.map(
                             (relationship) => {
                               if (
                                 relationship.receiver_id ===
-                                  data.relationship.receiver_id &&
+                                data.relationship.receiver_id &&
                                 relationship.sender_id ===
-                                  data.relationship.sender_id
+                                data.relationship.sender_id
                               ) {
                                 return {
                                   ...relationship,
@@ -100,7 +102,7 @@ export default function PendingFriends({
                   <button
                     onClick={async () => {
                       const res = await fetch(
-                        `${process.env.NEXT_PUBLIC_API}/users/@me/relationships/${currentUser.username}-${currentUser.discriminator}`,
+                        `${process.env.NEXT_PUBLIC_API}/users/@me/relationships/${currentUser.id}`,
                         {
                           method: "PATCH",
                           headers: {
@@ -114,14 +116,16 @@ export default function PendingFriends({
                       );
 
                       const data = await res.json();
-                      
+
+                      if (!res.ok) return;
+
                       setRelationships((prev) =>
                         prev.filter(
                           (relationship) =>
                             relationship.receiver_id !=
-                              data.relationship.receiver_id &&
+                            data.relationship.receiver_id &&
                             relationship.sender_id !=
-                              data.relationship.receiver_id
+                            data.relationship.receiver_id
                         )
                       );
                     }}

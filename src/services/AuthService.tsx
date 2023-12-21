@@ -59,6 +59,7 @@ export default function AuthService({ children }: { children: JSX.Element }) {
 
     const handleWsClose = (event: CloseEvent) => {
       connect();
+      setClientError(true);
     };
 
     if (!ws?.current) { 

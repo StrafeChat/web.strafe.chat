@@ -8,6 +8,7 @@ import {
    faNewspaper,
    } from "@fortawesome/free-solid-svg-icons";
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
 
 export default function Home() {
@@ -63,6 +64,7 @@ export default function Home() {
         </p>
       </div>
     </div>
+    <Link href="/discover">
     <div
       className={`bg-[#737d3c] rounded-[0.5rem] p-4 flex items-center cursor-pointer`}
     >
@@ -76,6 +78,7 @@ export default function Home() {
         </p>
       </div>
     </div>
+    </Link>
     <div
             className={`bg-[#737d3c] rounded-[0.5rem] p-4 flex items-center cursor-pointer`}
           >
