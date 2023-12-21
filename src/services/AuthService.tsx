@@ -12,6 +12,7 @@ export default function AuthService({ children }: { children: JSX.Element }) {
   const [clientError] = useState(false);
 
   const { user, connect, ws, setUser, setRelationships } = useAuth();
+  const [wsInterval, setWsInterval] = useState<NodeJS.Timeout | null>(null);
   const { setPMs } = useRoom();
 
   const handleWsOpen = () => {
@@ -74,14 +75,16 @@ export default function AuthService({ children }: { children: JSX.Element }) {
     const { op, data, event } = JSON.parse(evt.data);
     switch (op) {
       case OpCodes.HELLO:
-        setInterval(() => {
-          ws?.current?.send(
-            JSON.stringify({
-              op: OpCodes.HEARTBEAT,
-              data: null,
-            })
-          );
-        }, data.heartbeat_interval);
+        setWsInterval(setInterval(() => {
+          if (ws?.current?.OPEN) {
+            ws?.current?.send(
+              JSON.stringify({
+                op: OpCodes.HEARTBEAT,
+                data: null,
+              })
+            );
+          }
+        }, data.heartbeat_interval));
         ws?.current?.send(JSON.stringify({ op: OpCodes.IDENTIFY, data: { token: cookie.get("token") } }));
         break;
       case OpCodes.DISPATCH:
@@ -233,6 +236,7 @@ export default function AuthService({ children }: { children: JSX.Element }) {
   }
 
   const handleWsClose = (event: CloseEvent) => {
+    if (wsInterval) clearInterval(wsInterval);
     const websocket = new WebSocket(process.env.NEXT_PUBLIC_WS!);
     connect(websocket);
     websocket.addEventListener("open", handleWsOpen);
