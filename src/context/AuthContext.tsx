@@ -57,6 +57,8 @@ interface Context {
   setRelationships: Dispatch<SetStateAction<Relationship[]>>;
   setStatusText: Dispatch<SetStateAction<string>>;
   ws: MutableRefObject<WebSocket | null> | null;
+  connect: (websocket: WebSocket) => void;
+  cleanup: (websocket: WebSocket | null) => void;
 }
 
 const AuthContext = createContext<Context>({
@@ -67,6 +69,8 @@ const AuthContext = createContext<Context>({
   setRelationships: {} as Dispatch<SetStateAction<Relationship[]>>,
   setStatusText: {} as Dispatch<SetStateAction<string>>,
   ws: null,
+  connect: () => null,
+  cleanup: () => null
 });
 
 export const AuthProvider = ({ children }: { children: JSX.Element }) => {
@@ -76,12 +80,28 @@ export const AuthProvider = ({ children }: { children: JSX.Element }) => {
   const ws = useRef<WebSocket | null>(null);
 
   useEffect(() => {
-    if(user.presence) setStatusText(user.presence.status_text);
+    if (user.presence) setStatusText(user.presence.status_text);
   }, [user]);
+
+  const connect = (websocket: WebSocket) => {
+    ws.current = websocket;
+  };
+
+  const cleanup = (websocket: WebSocket | null) => {
+    if (websocket) {
+      websocket.removeEventListener("open", () => false);
+      websocket.removeEventListener("message", () => false);
+      websocket.removeEventListener("error", () => false);
+      websocket.removeEventListener("close", () => false);
+      websocket.close();
+      ws.current = null // Set ws to null after closing the connection
+    }
+  };
+
 
   return (
     <AuthContext.Provider
-      value={{ user, relationships, statusText, ws, setUser, setRelationships, setStatusText }}
+      value={{ user, relationships, statusText, ws, setUser, setRelationships, setStatusText, connect, cleanup }}
     >
       <RoomProvider>
         <AuthService>{children}</AuthService>

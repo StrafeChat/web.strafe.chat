@@ -7,6 +7,8 @@ import {
    faGear,
    faNewspaper,
    } from "@fortawesome/free-solid-svg-icons";
+import UserSettingsModal from "../components/modals/UserSettingsModal";
+import CreateSpaceModal from "../components/modals/CreateSpaceModal";
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useAuth } from "@/context/AuthContext";
@@ -14,6 +16,8 @@ import { useAuth } from "@/context/AuthContext";
 export default function Home() {
   const { user } = useAuth();
   const [greeting, setGreeting] = useState("");
+  const [showSettings, setShowSettings] = useState(false);
+  const [showCreateSpace, setShowCreateSpace] = useState(false);
 
   useEffect(() => {
     const getTimeBasedGreeting = () => {
@@ -35,24 +39,25 @@ export default function Home() {
   }, []);
 
   return (
-
-    <div className="home">
-      <div className="header">
-        <h1>
-          <FontAwesomeIcon icon={faHouseChimney} />
-          &nbsp;&nbsp;<b>Home</b>
-        </h1>
-      </div>
-  <div className="w-full container flex flex-col items-center justify-center min-h-[65vh] lg:pt-[-25px] text-white">
-  <h1 className={`text-5xl font-bold text-[#323C31]-primaryText`}>
-    {greeting}, {user.global_name || user.username}.
-  </h1>
-  <p className={`font-md text-xl text-white -secondaryText`}>
-    Welcome to Strafe, let&apos;s get started.
-  </p>
-  <div className="grid grid-cols-2 gap-4 mt-4">   
+  <>
+ <div className="home">
+        <div className="header">
+          <h1>
+            <FontAwesomeIcon icon={faHouseChimney} />
+            &nbsp;&nbsp;<b>Home</b>
+          </h1>
+        </div>
+        <div className="w-full container flex flex-col items-center justify-center min-h-[65vh] lg:pt-[-25px] text-white">
+          <h1 className={`text-5xl font-bold text-[#323C31]-primaryText`}>
+            {greeting}, {user.global_name || user.username}.
+          </h1>
+          <p className={`font-md text-xl text-white -secondaryText`}>
+            Welcome to Strafe, let&apos;s get started.
+          </p>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-4">
   <div
       className={`bg-[#737d3c] rounded-[0.5rem] p-4 flex items-center cursor-pointer`}
+      onClick={() => setShowCreateSpace(true)}
     >
       <div className="flex-shrink-0">
         <FontAwesomeIcon icon={faPlus} className="text-4xl" />
@@ -81,6 +86,7 @@ export default function Home() {
     </Link>
     <div
             className={`bg-[#737d3c] rounded-[0.5rem] p-4 flex items-center cursor-pointer`}
+            onClick={() => setShowSettings(true)}
           >
             <div className="flex-shrink-0">
             <FontAwesomeIcon icon={faGear} className="text-4xl" />
@@ -92,6 +98,7 @@ export default function Home() {
               </p>
             </div>
           </div>
+          <Link href="/invite/strafe">
           <div
             className={`bg-[#737d3c] rounded-[0.5rem] p-4 flex items-center cursor-pointer`}
           >
@@ -105,8 +112,16 @@ export default function Home() {
               </p>
             </div>
           </div>    
-  </div>
- </div>
-</div>
+        </Link>
+       </div>
+     </div>
+   </div>
+   {showSettings && (
+     <UserSettingsModal show={showSettings} set={setShowSettings} />
+   )}
+       {showCreateSpace && (
+        <CreateSpaceModal show={showCreateSpace} set={setShowCreateSpace} />
+      )}
+</>
   );
 }

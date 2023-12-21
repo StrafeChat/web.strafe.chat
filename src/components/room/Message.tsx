@@ -252,7 +252,7 @@ export default function Message({
                   height={16}
                   alt=""
                 />
-                <span className="font-bold text-white pt-1.5 mr-2 flex">
+                <span className="font-bold text-white pt-1.5 mr-2 flex mb-3">
                   {currentMessage.author.username}
                 </span>
                 <span ref={replyRef} className="text-gray-400 pt-1.5">
