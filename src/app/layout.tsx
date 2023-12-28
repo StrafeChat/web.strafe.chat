@@ -1,10 +1,9 @@
+import AppLayout from '@/components/app/AppLayout';
+import { Toaster } from '@/components/ui/toaster';
+import UIProvider from '@/providers/UIProvider';
 import type { Metadata } from 'next';
-import { Inter } from 'next/font/google';
 import './globals.css';
 import "./shadcn.css";
-import { Toaster } from '@/components/ui/toaster'
-
-const inter = Inter({ subsets: ['latin'] })
 
 export const metadata: Metadata = {
   title: 'Strafe',
@@ -16,10 +15,14 @@ export default function RootLayout({
 }: {
   children: React.ReactNode
 }) {
+
   return (
     <html lang="en">
-      <body className={inter.className}>
-        <>{children}</>
+      <head></head>
+      <body>
+        <UIProvider>
+          <AppLayout>{children}</AppLayout>
+        </UIProvider>
         <Toaster />
       </body>
     </html>

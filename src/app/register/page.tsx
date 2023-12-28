@@ -1,15 +1,15 @@
 "use client";
 import { Button } from "@/components/ui/button";
-import "./styles.css";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import { Register } from "@/types";
-import { validateReigster } from "@/helpers/validator";
 import { useToast } from "@/components/ui/use-toast";
+import { validateReigster } from "@/helpers/validator";
+import { Register } from "@/types";
 import Image from "next/image";
 import Link from "next/link";
+import { FormEvent, useCallback, useEffect, useState } from "react";
+import "./styles.css";
 
 export default function Page() {
 
@@ -30,7 +30,7 @@ export default function Page() {
     });
 
     const fetchCaptcha = useCallback(async () => {
-        const res = await fetch(process.env.NEXT_PUBLIC_CAPTCHA!);
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API}/auth/captcha`);
         if (!res.ok) return console.error("Failed to load captcha");
         const data: { image: string } = await res.json();
         setCaptchaImage(data.image);
