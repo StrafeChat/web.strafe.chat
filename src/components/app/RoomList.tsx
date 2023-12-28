@@ -15,7 +15,10 @@ export default function RoomList() {
                case "/":
                case "/friends":
                case "/notes":
-                  return <PrivateMessages />
+                  return <PrivateMessages />;
+               default:
+                  if(path.startsWith("/rooms")) return <PrivateMessages />
+                  break;
             }
          })()}
       </div>

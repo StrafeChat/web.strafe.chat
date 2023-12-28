@@ -2,6 +2,7 @@ div.app {
   width: 100vw;
   height: 100vh;
   display: flex;
+  border-top-left-radius: 20px;
 }
 
 div.header {
@@ -76,30 +77,41 @@ div.room-list {
   width: 290px;
   min-height: 100%;
   background: hsl(var(--room-list));
+  border-top-left-radius: 20px;
+  display: flex;
+  flex-direction: column;
 
   &[electron="true"] {
-    border-top-left-radius: 20px;
-
     div.header {
       border-top-left-radius: 20px;
     }
   }
 
+  div.seperator {
+    width: 100%;
+    height: 4px;
+    margin-top: 7px;
+    background: hsl(var(--seperator));
+    border-radius: 1rem;
+    width: 90%;
+    margin-left: 5%;
+  }
+
   div.tab-list {
     display: flex;
     flex-direction: column;
-    row-gap: 10px;
-    padding: 1rem;
+    row-gap: 3px;
+    padding: .5rem;
 
     a {
       width: 100%;
-      height: 60px;
+      height: 53px;
       background: transparent;
       display: flex;
       column-gap: 10px;
       align-items: center;
-      padding-left: 24px;
-      padding-right: 24px;
+      padding-left: 18px;
+      padding-right: 18px;
       border-radius: 5px;
       color: hsl(var(--muted-foreground));
 
@@ -119,6 +131,64 @@ div.room-list {
       }
     }
   }
+
+
+   ul.private-messages {
+      display: flex;
+      flex-direction: column;
+      flex-grow: 1;
+      padding: 1rem;
+      overflow-y: auto;
+      overflow-x: hidden;
+      color: hsl(var(--muted-foreground));
+
+      a[active="true"] {
+        li.private-message {
+          background: hsl(var(--background));
+          opacity: 1;
+        }
+      }
+
+      li.private-message {
+        width: 100%;
+        height: 53px;
+        background: transparent;
+        display: flex;
+        column-gap: 10px;
+        align-items: center;
+        padding-left: 10px;
+        padding-right: 10px;
+        border-radius: 5px;
+        color: hsl(var(--muted-foreground));
+        overflow-y: hidden;
+        overflow-x: hidden;
+        text-overflow: ellipsis;
+        cursor: pointer;
+
+        img {
+          width: 43px;
+          height: 43px;
+          aspect-ratio: "1:1";
+          border-radius: 100%;
+        }
+
+        span {
+          overflow: hidden;
+        }
+
+        .user-status {
+          white-space: nowrap;
+          color: gray;
+          overflow: hidden;
+          text-overflow: ellipsis;
+        }
+
+        &:hover {
+          background: hsl(var(--background));
+          opacity: 0.5;
+        }
+      }
+    }
 }
 
 div.app-view {
@@ -127,6 +197,10 @@ div.app-view {
   flex-direction: column;
   flex-grow: 1;
   min-height: 100%;
+  
+  &[room_list_hidden="true"] {
+    border-top-left-radius: 20px;
+  }
 
   div.header {
     display: flex;

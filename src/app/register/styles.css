@@ -8,6 +8,20 @@ form {
     gap: 1rem;
 }
 
+div.backdrop {
+    position: relative;
+    background: url('https://cdn.stocksnap.io/img-thumbs/960w/beautiful-sunset_FPWCPEUOJY.jpg') center/cover no-repeat;
+}
+
+div.watermark {
+    position: absolute;
+    bottom: 10px;
+    right: 10px; 
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 14px;
+    padding: 5px;
+  }
+
 div.field-full {
     width: 100%;
 }

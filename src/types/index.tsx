@@ -19,6 +19,8 @@ export interface Register {
 export interface UI {
     electron: boolean;
     hideRoomList: boolean;
+    isMobile: boolean;
     setElectron: Dispatch<SetStateAction<boolean>>;
     setHideRoomList: Dispatch<SetStateAction<boolean>>;
+    setIsMobile: Dispatch<SetStateAction<boolean>>;
 }

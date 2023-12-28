@@ -6,7 +6,7 @@ export default function AppView({ children }: { children: JSX.Element | ReactNod
    const { hideRoomList } = useUI();
 
    return (
-      <div className="app-view" {...{ room_list_hidden: `${hideRoomList}` }}>
+      <div className="app-view" {...{"room_list_hidden": `${hideRoomList}`}}>
          {children}
       </div>
    )

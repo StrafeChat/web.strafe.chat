@@ -68,7 +68,8 @@ export default function Page() {
     }
 
     return !captchaImage ? <div className="align-center">Loading...</div> : (
-        <div className="align-center">
+        <div className="backdrop align-center">
+          <div className="watermark"><Link target="_blank" href={"https://stocksnap.io/author/alteredreality"}> Altered Reality • stocksnap.io</Link></div>
             <Card>
                 <CardHeader>
                     <CardTitle>Sign Up</CardTitle>
@@ -81,8 +82,8 @@ export default function Page() {
                             <Input value={register.email} onChange={(event) => setRegister({ ...register, email: event.target.value })} autoComplete="email" id="email" type="email" />
                         </div>
                         <div className="field">
-                            <Label htmlFor="email">Display Name</Label>
-                            <Input value={register.global_name} onChange={(event) => setRegister({ ...register, global_name: event.target.value })} autoComplete="email" id="email" type="email" />
+                            <Label htmlFor="displayname">Display Name</Label>
+                            <Input value={register.global_name} onChange={(event) => setRegister({ ...register, global_name: event.target.value })} autoComplete="displayname" id="displayname" type="text" />
                         </div>
                         <div className="field-wrapper">
                             <div className="field-full">
@@ -106,11 +107,7 @@ export default function Page() {
                             <Label>Date of Birth</Label>
                             <Input value={register.dob} onChange={(event) => setRegister({ ...register, dob: event.target.value })} type="date" />
                         </div>
-                        <div className="field">
-                            <Label>Captcha</Label>
-                            <Image draggable={false} className="w-full" src={captchaImage} width={300} height={75} alt="captcha" />
-                            <Input onChange={(event) => setRegister({ ...register, captcha: event.target.value })} className="mt-4" />
-                        </div>
+                        
                         <Button>Register</Button>
                     </form>
                 </CardContent>

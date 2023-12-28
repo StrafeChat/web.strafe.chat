@@ -1,4 +1,4 @@
-import { FaCog, FaCompass, FaPlus } from "react-icons/fa";
+import { FaGear, FaCompass, FaPlus } from "react-icons/fa6";
 
 export default function SpaceList() {
    return (
@@ -17,7 +17,7 @@ export default function SpaceList() {
             <FaCompass />
          </button>
          <button className="primary">
-            <FaCog />
+            <FaGear />
          </button>
       </div>
    )

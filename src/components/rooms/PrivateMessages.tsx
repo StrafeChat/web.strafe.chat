@@ -1,21 +1,21 @@
-import { FaHouseDamage } from "react-icons/fa";
+import { FaHouseChimney } from "react-icons/fa6";
 import { FaNoteSticky } from "react-icons/fa6";
-import { FiUsers } from "react-icons/fi";
+import { FaUserGroup } from "react-icons/fa6";
 import NavLink from "../nav/NavLink";
 
 export default function PrivateMessages() {
     return (
         <>
             <div className="header">
-                <h1>Private Messages</h1>
+                <h1><b>Private Messages</b></h1>
             </div>
             <div className="tab-list">
                 <NavLink href={"/"}>
-                    <FaHouseDamage />
+                    <FaHouseChimney />
                     <span>Home</span>
                 </NavLink>
                 <NavLink href={"/friends"}>
-                    <FiUsers />
+                    <FaUserGroup />
                     <span>Friends</span>
                 </NavLink>
                 <NavLink href={"/notes"}>
@@ -23,6 +23,20 @@ export default function PrivateMessages() {
                     <span>Notes</span>
                 </NavLink>
             </div>
+
+            <div className="seperator" />
+
+              <ul className="private-messages">
+                <NavLink href={"/rooms/DJT"}>
+                <li className="private-message">
+                    <img src="https://cdn.discordapp.com/attachments/1135670060678123560/1189859177393291284/trumpshutdownraises.png?ex=659fb1b6&is=658d3cb6&hm=bef32dbb441eb1e95258d14d3bc107a5b66976fc10ec6001d96d2a90eecbac32&g"/>
+                    <span>
+                    <h2><b>Donald J. Trump</b></h2>
+                    <p className="user-status">Make America Great Again!</p>
+                    </span>
+                </li>
+                </NavLink>
+              </ul>
         </>
     )
 }
