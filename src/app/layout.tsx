@@ -4,6 +4,7 @@ import UIProvider from '@/providers/UIProvider';
 import type { Metadata } from 'next';
 import './globals.css';
 import "./shadcn.css";
+import ModalController from '@/controllers/modals/ModalController';
 
 export const metadata: Metadata = {
   title: 'Strafe',
@@ -20,9 +21,11 @@ export default function RootLayout({
     <html lang="en">
       <head></head>
       <body>
-        <UIProvider>
-          <AppLayout>{children}</AppLayout>
-        </UIProvider>
+        <ModalController>
+          <UIProvider>
+            <AppLayout>{children}</AppLayout>
+          </UIProvider>
+        </ModalController>
         <Toaster />
       </body>
     </html>

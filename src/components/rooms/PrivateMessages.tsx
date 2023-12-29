@@ -36,6 +36,15 @@ export default function PrivateMessages() {
                     </span>
                 </li>
                 </NavLink>
+                <NavLink href={"/rooms/VGR"}>
+                <li className="private-message">
+                    <img src="https://external-content.duckduckgo.com/iu/?u=https%3A%2F%2Fcfany.org%2Fwp-content%2Fuploads%2F2023%2F03%2FVivek-Ramaswamy.jpg&f=1&nofb=1&ipt=55fb8108b716413fb6a8a319ffef83dc20edbb5e7509c832ff292fc1162a0ee8&ipo=images"/>
+                    <span>
+                    <h2><b>Vivek G. Ramaswamy</b></h2>
+                    <p className="user-status">Offline</p>
+                    </span>
+                </li>
+                </NavLink>
               </ul>
         </>
     )

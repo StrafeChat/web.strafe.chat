@@ -34,6 +34,11 @@
     --room-list: 0 0% 12%;
     --app-view: 0 0% 15%;
     --seperator: 0 0% 15%;
+    --chat-input: 0 0% 22%;
+    --modal-sidebar: 0 0% 10%;
+    --modal-sidebar-tab: 0 0% 15%;
+    --modal-sidebar-foreground: 0 0% 20%;
+    --modal: 0 0% 12%;
 
     --link: 173 80% 40%;
     --border: 0 0% 9%;

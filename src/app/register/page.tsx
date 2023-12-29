@@ -9,7 +9,7 @@ import { Register } from "@/types";
 import Image from "next/image";
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useState } from "react";
-import "./styles.css";
+import "../auth.css";
 
 export default function Page() {
 

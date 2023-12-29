@@ -40,6 +40,22 @@ div.space-list {
     justify-content: center;
     flex-shrink: 0;
 
+    img {
+      width: 53px;
+      height: 53px;
+      aspect-ratio: "1:1";
+      border-radius: 100%;
+      object-fit: cover
+    }
+
+    img.space {
+      aspect-ratio: "1:1";
+      border-radius: 100%;
+      object-fit: cover;
+      width: 100%;
+      height: 100%;
+    }
+
     &.primary {
       svg {
         color: hsl(var(--primary)); 
@@ -59,7 +75,7 @@ div.space-list {
   div.spaces {
     display: flex;
     flex-direction: column;
-    row-gap: 15px;
+    row-gap: 10px;
     overflow-y: auto;
     flex-grow: 1;
     scroll-behavior: auto;
@@ -128,6 +144,7 @@ div.room-list {
       &[active="true"] {
         background: hsl(var(--background));
         opacity: 1;
+        color:white;
       }
     }
   }
@@ -146,6 +163,7 @@ div.room-list {
         li.private-message {
           background: hsl(var(--background));
           opacity: 1;
+          color:white;
         }
       }
 
@@ -159,6 +177,9 @@ div.room-list {
         padding-left: 10px;
         padding-right: 10px;
         border-radius: 5px;
+        padding-bottom: 1px;
+        padding-top: 1px;
+        margin-bottom: 5px;
         color: hsl(var(--muted-foreground));
         overflow-y: hidden;
         overflow-x: hidden;
@@ -170,6 +191,7 @@ div.room-list {
           height: 43px;
           aspect-ratio: "1:1";
           border-radius: 100%;
+          object-fit: cover
         }
 
         span {
@@ -216,6 +238,47 @@ div.app-view {
         cursor: pointer;
         filter: brightness(125%);
       }
+    }
+  }
+
+  div.body {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+  }
+}
+
+ul.messages {
+  display: flex;
+  flex-direction: column;
+  flex-grow: 1;
+  overflow-y: auto;
+}
+
+div.chat-input-container {
+  max-height: 50vh;
+  overflow-y: auto;
+  padding-left: 10px;
+  padding-right: 10px;
+  // padding-top: 5px;
+  margin-bottom: 10px;
+
+  div.chat-input {
+    width: 100%;
+    background: hsl(var(--chat-input));
+    border-radius: 10px;
+
+    [contenteditable="true"]:empty:before {
+      content: attr(placeholder);
+      color: grey;
+      cursor: text;
+    }
+
+    div.chat-input-middle {
+      height: inherit;
+      outline: none;
+      font-size: medium;
+      padding: 10px;
     }
   }
 }

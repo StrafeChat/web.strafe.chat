@@ -1,0 +1,77 @@
+div.modal-full {
+    position: fixed;
+    top: 0px;
+    left: 0px;
+    z-index: 100;
+    background: hsl(var(--modal));
+    width: 100%;
+    height: 100%;
+    display: flex;
+    
+
+    div.sidebar {
+        width: 400px;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        align-items: end;
+        background: hsl(var(--modal-sidebar));
+        padding: 1rem;
+
+        ul {
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            row-gap: 10px;
+            height: 100%;
+            overflow-y: auto;
+            overflow-x: hidden;
+
+            li.title {
+                color: hsl(var(--muted-foreground));
+                text-transform: uppercase;
+                font-weight: 700;
+            }
+
+            li.title.toggle, li:not(.title) {
+                cursor: pointer;
+            }
+
+            li:not(.title) {
+                // background: hsl(var(--modal-sidebar-tab));
+                padding-top: 0.5rem;
+                padding-bottom: 0.5rem;
+                padding-left: 1rem;
+                padding-right: 1rem;
+            }
+
+            div.seperator {
+                width: 100%;
+                height: 4px;
+                background: hsl(var(--seperator));
+                border-radius: 1rem;
+            }
+        }
+    }
+
+    button.close {
+        position: absolute;
+        right: 2.5rem;
+        top: 2.5rem;
+        width: 32px;
+        height: 32px;
+        border-radius: 100%;
+        background: hsl(var(--destructive));
+    }
+
+    div.content {
+        display: flex;
+        flex-direction: column;
+        flex-grow: 1;
+        padding: 1rem;
+
+        h1.title {
+            font-size: 1.5rem;
+        }
+    }
+}

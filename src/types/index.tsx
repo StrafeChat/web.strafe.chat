@@ -24,3 +24,12 @@ export interface UI {
     setHideRoomList: Dispatch<SetStateAction<boolean>>;
     setIsMobile: Dispatch<SetStateAction<boolean>>;
 }
+
+export interface ModalControllerState {
+    openModals: string[];
+}
+
+export interface ModalState {
+    name: string;
+    closeModal: (name: string) => void;
+}
