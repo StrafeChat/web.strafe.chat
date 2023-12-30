@@ -22,7 +22,6 @@ export const validateReigster = (register: Partial<Register>): { status: number,
     if ((register.discriminator as number) > 9999) return fail("Your discriminator cannot be more than 9999.");
     if (!register.password || register.password.trim() == '') return fail("The password field is required.");
     if (register.password.length > 128) return fail("The password cannot be more than 128 characters long.");
-    if (register.confirm_password != register.password) return fail("The confirm password field does not match the password field.");
     if (!register.dob) return fail("You need to specify how old you are before you can create an account.");
     
     const date = new Date();

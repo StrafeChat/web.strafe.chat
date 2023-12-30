@@ -8,7 +8,7 @@ import { validateReigster } from "@/helpers/validator";
 import { Register } from "@/types";
 import Image from "next/image";
 import Link from "next/link";
-import { FormEvent, useCallback, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import "../auth.css";
 
 export default function Page() {
@@ -17,6 +17,7 @@ export default function Page() {
 
     const { toast } = useToast()
     const [captchaImage, setCaptchaImage] = useState<string | null>(null)
+    const [sessionId, setSessionId] = useState("");
 
     const [register, setRegister] = useState<Register>({
         email: "",
@@ -24,7 +25,6 @@ export default function Page() {
         username: "",
         discriminator: (Math.floor(Math.random() * 9999) + 1).toString().padStart(4, '0'),
         password: "",
-        confirm_password: "",
         dob: `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`,
         captcha: "",
     });
@@ -32,13 +32,20 @@ export default function Page() {
     const fetchCaptcha = useCallback(async () => {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API}/auth/captcha`);
         if (!res.ok) return console.error("Failed to load captcha");
-        const data: { image: string } = await res.json();
+        const data: { image: string, sessionId: string } = await res.json();
         setCaptchaImage(data.image);
-    }, [])
+        setSessionId(data.sessionId);
+    }, []);
+
+    const fetchCaptchaCalled = useRef(false);
 
     useEffect(() => {
-        fetchCaptcha();
+        if (!fetchCaptchaCalled.current) {
+            fetchCaptcha();
+            fetchCaptchaCalled.current = true;
+        }
     }, [fetchCaptcha]);
+
 
     const handleSubmit = async (event: FormEvent) => {
         event.preventDefault();
@@ -54,22 +61,30 @@ export default function Page() {
             className: "bg-destructive"
         })
 
+
         const res = await fetch(`${process.env.NEXT_PUBLIC_API}/auth/register`, {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
+                "Session-ID": sessionId
             },
             body: JSON.stringify({ ...register, discriminator: parseInt(register.discriminator.toString()), locale: navigator.language }),
         });
 
         const data = await res.json();
 
-        if (!res.ok) return console.error(data);
+        if (!res.ok) return toast({
+            title: "Bad Request",
+            description: data.message,
+            className: "bg-destructive"
+        });
+
+        window.location.href = "/";
     }
 
     return !captchaImage ? <div className="align-center">Loading...</div> : (
         <div className="backdrop align-center">
-          <div className="watermark"><Link target="_blank" href={"https://stocksnap.io/author/alteredreality"}> Altered Reality • stocksnap.io</Link></div>
+            <div className="watermark"><Link target="_blank" href={"https://stocksnap.io/author/alteredreality"}> Altered Reality • stocksnap.io</Link></div>
             <Card>
                 <CardHeader>
                     <CardTitle>Sign Up</CardTitle>
@@ -100,14 +115,14 @@ export default function Page() {
                             <Input value={register.password} onChange={(event) => setRegister({ ...register, password: event.target.value })} autoComplete="current-password" id="password" type="password" />
                         </div>
                         <div className="field">
-                            <Label htmlFor="password">Confirm Password</Label>
-                            <Input value={register.confirm_password} onChange={(event) => setRegister({ ...register, confirm_password: event.target.value })} autoComplete="current-password" id="password" type="password" />
-                        </div>
-                        <div className="field">
                             <Label>Date of Birth</Label>
                             <Input value={register.dob} onChange={(event) => setRegister({ ...register, dob: event.target.value })} type="date" />
                         </div>
-                        
+                        <div className="field">
+                            <Label>Captcha</Label>
+                            <Image src={captchaImage} width={300} height={150} className="w-full rounded-md" alt="captcha" />
+                            <Input className="mt-4" onChange={(event) => setRegister({ ...register, captcha: event.target.value })} />
+                        </div>
                         <Button>Register</Button>
                     </form>
                 </CardContent>

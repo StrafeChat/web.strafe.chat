@@ -30,15 +30,14 @@ export default class ModalController extends Component<{ children: JSX.Element }
         return (
             <ModalControllerContext.Provider value={{ openModal: this.openModal, closeModal: this.closeModal }}>
                 <>
-                 {AnimatePresence}
                     {this.state.openModals.map((name, key) => {
                         switch (name) {
                             case "settings":
                                 return (
-                                  <AnimatePresence key={key}>
-                                    <SettingsModal key={key} name="settings" closeModal={this.closeModal} />
-                                  </AnimatePresence>
-                                ) 
+                                    <AnimatePresence key={key}>
+                                        <SettingsModal key={key} name="settings" closeModal={this.closeModal} />
+                                    </AnimatePresence>
+                                )
                         }
                     })}
                 </>
