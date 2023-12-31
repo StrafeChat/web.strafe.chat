@@ -17,7 +17,6 @@ export default function Page() {
 
     const { toast } = useToast()
     const [captchaImage, setCaptchaImage] = useState<string | null>(null)
-    const [sessionId, setSessionId] = useState("");
 
     const [register, setRegister] = useState<Register>({
         email: "",
@@ -30,11 +29,12 @@ export default function Page() {
     });
 
     const fetchCaptcha = useCallback(async () => {
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API}/auth/captcha`);
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API}/auth/captcha`, {
+            credentials: "include",
+        });
         if (!res.ok) return console.error("Failed to load captcha");
-        const data: { image: string, sessionId: string } = await res.json();
+        const data: { image: string } = await res.json();
         setCaptchaImage(data.image);
-        setSessionId(data.sessionId);
     }, []);
 
     const fetchCaptchaCalled = useRef(false);
@@ -66,8 +66,8 @@ export default function Page() {
             method: "POST",
             headers: {
                 "Content-Type": "application/json",
-                "Session-ID": sessionId
             },
+            credentials: "include",
             body: JSON.stringify({ ...register, discriminator: parseInt(register.discriminator.toString()), locale: navigator.language }),
         });
 
@@ -120,8 +120,8 @@ export default function Page() {
                         </div>
                         <div className="field">
                             <Label>Captcha</Label>
-                            <Image src={captchaImage} width={300} height={150} className="w-full rounded-md" alt="captcha" />
-                            <Input className="mt-4" onChange={(event) => setRegister({ ...register, captcha: event.target.value })} />
+                            <Image src={captchaImage} width={250} height={150} className="w-full rounded-md" alt="captcha" />
+                            <Input className="mt-2" onChange={(event) => setRegister({ ...register, captcha: event.target.value })} />
                         </div>
                         <Button>Register</Button>
                     </form>
