@@ -1,3 +1,4 @@
+import { useUI } from "@/providers/UIProvider";
 import Modal from './Modal';
 import { motion, AnimatePresence, animations } from "framer-motion";
 
@@ -23,14 +24,17 @@ class SettingsModal extends Modal {
             <ul>
               <li className="title">User Settings</li>
               <li>My Account</li>
+              <li>Profile</li>
+              <li>Desktop</li>
             </ul>
           </div>
           <button className='close' onClick={() => this.close()}>X</button>
           <div className="content">
             <h1 className="title">My Account</h1>
           </div>
+          
          </div>
-        </motion.div>
+       </motion.div>
       </AnimatePresence>
     </>
   )

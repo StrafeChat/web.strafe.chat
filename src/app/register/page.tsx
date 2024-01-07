@@ -76,7 +76,7 @@ export default function Register() {
         const data = await res.json();
 
         if (!res.ok) return toast({
-            title: "Bad Request",
+            title: "Registration Failed",
             description: data.message,
             className: "bg-destructive"
         });

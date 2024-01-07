@@ -1,6 +1,6 @@
 import AppLayout from '@/components/app/AppLayout';
 import { Toaster } from '@/components/ui/toaster';
-import UIProvider from '@/providers/UIProvider';
+import UIProvider, { useUI } from '@/providers/UIProvider';
 import type { Metadata } from 'next';
 import './globals.css';
 import "./shadcn.css";
@@ -19,7 +19,6 @@ export default function RootLayout({
 
   return (
     <html lang="en">
-      <head></head>
       <body>
         <ModalController>
           <UIProvider>
