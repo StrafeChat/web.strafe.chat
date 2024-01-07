@@ -1,7 +1,7 @@
 div.app {
-  width: 100vw;
-  height: 100vh;
+  height: 100%;
   display: flex;
+  flex-grow: 0;
   border-top-left-radius: 20px;
 }
 
@@ -281,4 +281,11 @@ div.chat-input-container {
       padding: 10px;
     }
   }
+}
+
+div.titlebar {
+    -webkit-app-region: drag;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
 }

@@ -15,6 +15,11 @@ export interface Register {
     captcha: string;
 }
 
+export interface Login {
+    email: string;
+    password: string;
+}
+
 export interface UI {
     electron: boolean;
     hideRoomList: boolean;

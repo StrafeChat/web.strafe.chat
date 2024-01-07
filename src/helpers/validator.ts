@@ -1,4 +1,5 @@
 import { Register } from "@/types";
+import { Login } from "@/types";
 
 const fail = (message: string) => {
     return {
@@ -29,6 +30,13 @@ export const validateReigster = (register: Partial<Register>): { status: number,
 
     if (!(chosenDate.getFullYear() <= (date.getFullYear() - 13))) return fail("You need to be 13 years or older to use strafe.");
     if (!register.captcha || register.captcha.trim() == '') return fail("Captcha is required.");
+
+    return { status: 1, message: null };
+}
+
+export const validateLogin = (login: Partial<Login>): { status: number, message: string | null } => {
+    if (!login.email || login.email.trim() == '') return fail("The email field is required.");
+    if (!login.password || login.password.trim() == '') return fail("The password field is required.");
 
     return { status: 1, message: null };
 }

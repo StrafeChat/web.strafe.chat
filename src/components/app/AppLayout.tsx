@@ -1,6 +1,7 @@
 "use client";
 import { useUI } from "@/providers/UIProvider";
 import { usePathname } from "next/navigation";
+import ElectronTitleBar from "../desktop/ElectronTitleBar";
 import { ReactNode, useEffect } from "react";
 import AppView from "./AppView";
 import RoomList from "./RoomList";
@@ -8,29 +9,40 @@ import SpaceList from "./SpaceList";
 import "./app.scss";
 import { MOBILE_REGEX_CHECK } from "@/constants";
 
-export default function AppLayout({ children }: { children: JSX.Element | ReactNode }) {
-    const pathname = usePathname();
+export default function AppLayout({
+  children,
+}: {
+  children: JSX.Element | ReactNode;
+}) {
+  const pathname = usePathname();
 
-    const { setElectron, setIsMobile, hideRoomList } = useUI();
+  const { setElectron, setIsMobile, electron } = useUI();
 
-    useEffect(() => {
-        document.addEventListener("contextmenu", (event) => event.preventDefault());
+  useEffect(() => {
+    document.addEventListener("contextmenu", (event) => event.preventDefault());
 
-        if (navigator.userAgent.toLowerCase().indexOf(" electron/") > -1) setElectron(true);
-        if (MOBILE_REGEX_CHECK.test(navigator.userAgent)) setIsMobile(true);
+    if (navigator.userAgent.toLowerCase().indexOf(" electron/") > -1)
+      setElectron(true);
+    if (MOBILE_REGEX_CHECK.test(navigator.userAgent)) setIsMobile(true);
 
-        
+    return () =>
+      document.removeEventListener("contextmenu", (event) =>
+        event.preventDefault()
+      );
+  }, [setElectron]);
 
-        return () => document.removeEventListener("contextmenu", (event) => event.preventDefault());
-    }, [setElectron]);
+  const override = ["/login", "/register"];
 
-    const override = ["/login", "/register"];
-
-    return override.includes(pathname) ? <>{children}</> : (
-        <div className="app">
-            <SpaceList />
-            <RoomList />
-            <AppView>{children}</AppView>
-        </div>
-    )
+  return override.includes(pathname) ? (
+    <>{children}</>
+  ) : (
+    <div className="flex flex-col w-full h-full">
+      {electron && <ElectronTitleBar />}
+      <div className="app">
+          <SpaceList />
+          <RoomList />
+          <AppView>{children}</AppView>
+      </div>
+    </div>
+  );
 }
