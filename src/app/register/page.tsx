@@ -6,12 +6,13 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { validateReigster } from "@/helpers/validator";
 import { Register } from "@/types";
+import cookie from "js-cookie";
 import Image from "next/image";
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import "../auth.css";
 
-export default function Page() {
+export default function Register() {
 
     const date = new Date();
 
@@ -32,6 +33,7 @@ export default function Page() {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API}/auth/captcha`, {
             credentials: "include",
         });
+
         if (!res.ok) return console.error("Failed to load captcha");
         const data: { image: string } = await res.json();
         setCaptchaImage(data.image);
@@ -78,6 +80,8 @@ export default function Page() {
             description: data.message,
             className: "bg-destructive"
         });
+
+        cookie.set("token", data.token);
 
         window.location.href = "/";
     }

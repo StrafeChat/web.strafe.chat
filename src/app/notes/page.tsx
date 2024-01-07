@@ -2,7 +2,7 @@
 import { useUI } from "@/providers/UIProvider";
 import { FaNoteSticky, FaArrowRight, FaArrowLeft } from "react-icons/fa6";
 
-export default function Page() {
+export default function Notes() {
 
    const { hideRoomList, setHideRoomList } = useUI();
 
