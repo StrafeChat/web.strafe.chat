@@ -3,7 +3,6 @@ import { ModalControllerState } from "@/types";
 import { AnimatePresence } from "framer-motion";
 import { Component, createContext, useContext } from "react";
 import SettingsModal from "./components/SettingsModal";
-import ElectronTitleBar from "@/components/desktop/ElectronTitleBar";
 
 const ModalControllerContext = createContext({
     openModal: (_name: string) => { },
@@ -48,4 +47,4 @@ export default class ModalController extends Component<{ children: JSX.Element }
     }
 }
 
-export const useModalController = () => useContext(ModalControllerContext);
+export const useModal = () => useContext(ModalControllerContext);
