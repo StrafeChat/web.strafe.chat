@@ -35,9 +35,10 @@ export default function Page() {
         })
 
 
-        const res = await fetch(`${process.env.NEXT_PUBLIC_API}/auth/verifu`, {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API}/auth/verify`, {
             method: "POST",
             headers: {
+                "authorization": `${cookie.get("token")!}`,
                 "Content-Type": "application/json",
             },
             credentials: "include",

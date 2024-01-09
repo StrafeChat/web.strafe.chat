@@ -8,6 +8,7 @@ import { useToast } from "@/components/ui/use-toast";
 import { validateLogin } from "@/helpers/validator";
 import { useUI } from "@/providers/UIProvider";
 import { Login } from "@/types";
+import cookie from "js-cookie";
 import Link from "next/link";
 import { FormEvent, useState } from "react";
 import "../auth.css";
@@ -50,7 +51,8 @@ export default function Page() {
             description: data.message,
             className: "bg-destructive"
         });
-
+        
+        cookie.set("token", data.token);
         window.location.href = "/";
     }
 

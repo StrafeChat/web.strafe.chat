@@ -5,17 +5,19 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { validateReigster } from "@/helpers/validator";
-import { Register } from "@/types";
+import type { Register } from "@/types";
 import cookie from "js-cookie";
 import Image from "next/image";
 import Link from "next/link";
+import { useUI } from "@/providers/UIProvider";
+import ElectronTitleBar from "@/components/desktop/ElectronTitleBar";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import "../auth.css";
 
 export default function Register() {
 
     const date = new Date();
-
+    const { electron } = useUI();
     const { toast } = useToast()
     const [captchaImage, setCaptchaImage] = useState<string | null>(null)
 
@@ -82,14 +84,17 @@ export default function Register() {
         });
 
         if (res.status == 201) {
-            cookie.set("emailVerifcation", "true", { expires: 10, });
+            cookie.set("emailVerifcation", "true", { expires: 15 });
+            cookie.set("token", data.token);
             return window.location.href = "/verify";
         }
         window.location.href = "/login";
     }
 
     return !captchaImage ? <div className="align-center">Loading...</div> : (
-        <div className="backdrop align-center">
+         <div className="flex flex-col w-full h-full">
+          {electron && <ElectronTitleBar />}
+           <div className="backdrop align-center">
             <div className="watermark"><Link target="_blank" href={"https://stocksnap.io/author/alteredreality"}> Altered Reality • stocksnap.io</Link></div>
             <Card>
                 <CardHeader>
@@ -137,5 +142,6 @@ export default function Register() {
                 </CardFooter>
             </Card>
         </div>
+      </div>
     )
 }

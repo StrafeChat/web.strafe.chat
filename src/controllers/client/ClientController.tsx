@@ -18,8 +18,7 @@ export default function ClientController({ children }: { children: JSX.Element }
     const client = new Client({config: {
       equinox: "http://localhost:443/v1"
     }});
-    console.log("Test!");
-    client.login(cookie.get("token")!);
+    client.login(`${String(cookie.get("token")!)}`).catch(() => {});
     setClient(client);
   }
 
