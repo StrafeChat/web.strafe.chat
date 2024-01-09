@@ -24,8 +24,8 @@ export default function ClientController({ children }: { children: JSX.Element }
   }
 
   useEffect(() => {
-    if(!cookie.get("token")! && !["/login", "/register"].includes(pathname)) window.location.href = "/login";
-    else if (!client && !["/login", "/register"].includes(pathname)) init();
+    if(!cookie.get("token")! && !["/login", "/register", "/verify"].includes(pathname)) window.location.href = "/login";
+    else if (!client && !["/login", "/register", "/verify"].includes(pathname)) init();
   }, [client, pathname]);
 
   return (

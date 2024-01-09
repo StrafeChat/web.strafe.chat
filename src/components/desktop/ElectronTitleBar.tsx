@@ -3,12 +3,12 @@ import React, { useEffect } from "react";
 export default function ElectronTitleBar() {
   useEffect(() => {
     if (window.WindowAPI)
-      window.WindowAPI.notificationApi.sendNotification(
-        "Make America Great Again!",
-        "http://localhost:3000/rooms/DJT",
-        "Donald J. Trump",
-        "https://cdn.discordapp.com/attachments/1135670060678123560/1189859177393291284/trumpshutdownraises.png"
-      );
+      window.WindowAPI.notificationApi.sendNotification({
+        message: "hi",
+        url: "http://localhost:3000/rooms/id?message=id",
+        title: "BrydenIsNotSmart",
+        url: "https://cdn.discordapp.com/attachments/1135670060678123560/1189859177393291284/brydenicon.png"
+  });
   }, []);
 
   return (

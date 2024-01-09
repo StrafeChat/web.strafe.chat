@@ -1,5 +1,4 @@
-import { Register } from "@/types";
-import { Login } from "@/types";
+import { Login, Register, Verify } from "@/types";
 
 const fail = (message: string) => {
     return {
@@ -37,6 +36,12 @@ export const validateReigster = (register: Partial<Register>): { status: number,
 export const validateLogin = (login: Partial<Login>): { status: number, message: string | null } => {
     if (!login.email || login.email.trim() == '') return fail("The email field is required.");
     if (!login.password || login.password.trim() == '') return fail("The password field is required.");
+
+    return { status: 1, message: null };
+}
+
+export const validateVerify = (login: Partial<Verify>): { status: number, message: string | null } => {
+    if (!login.code || login.code.trim() == '') return fail("The verification code is required.");
 
     return { status: 1, message: null };
 }

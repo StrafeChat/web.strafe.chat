@@ -81,9 +81,11 @@ export default function Register() {
             className: "bg-destructive"
         });
 
-        cookie.set("token", data.token);
-
-        window.location.href = "/";
+        if (res.status == 201) {
+            cookie.set("emailVerifcation", "true", { expires: 10, });
+            return window.location.href = "/verify";
+        }
+        window.location.href = "/login";
     }
 
     return !captchaImage ? <div className="align-center">Loading...</div> : (

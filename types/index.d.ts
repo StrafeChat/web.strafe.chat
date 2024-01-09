@@ -1,6 +1,6 @@
 interface WindowAPI {
     notificationApi: {
-        sendNotification: (message: string, title?: string, url?: string, avatar?: string) => void;
+        sendNotification: ({message, title, url, avatar}: {message?: string, title?: string, url?: string, avatar?: string}) => void;
     }
 }
 

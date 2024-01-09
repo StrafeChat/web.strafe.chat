@@ -20,6 +20,10 @@ export interface Login {
     password: string;
 }
 
+export interface Verify {
+    code: string;
+}
+
 export interface UI {
     electron: boolean;
     hideRoomList: boolean;
