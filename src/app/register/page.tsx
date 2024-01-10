@@ -9,6 +9,7 @@ import type { Register } from "@/types";
 import cookie from "js-cookie";
 import Image from "next/image";
 import Link from "next/link";
+import EmailVerifcation from "@/components/app/EmailVerifcation";
 import { useUI } from "@/providers/UIProvider";
 import ElectronTitleBar from "@/components/desktop/ElectronTitleBar";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
@@ -19,6 +20,7 @@ export default function Register() {
     const date = new Date();
     const { electron } = useUI();
     const { toast } = useToast()
+    const [showVerifyPage, setShowVerifyPage] = useState(false);
     const [captchaImage, setCaptchaImage] = useState<string | null>(null)
 
     const [register, setRegister] = useState<Register>({
@@ -84,9 +86,8 @@ export default function Register() {
         });
 
         if (res.status == 201) {
-            cookie.set("emailVerifcation", "true", { expires: 15 });
             cookie.set("token", data.token);
-            return window.location.href = "/verify";
+            return setShowVerifyPage(true);
         }
         window.location.href = "/login";
     }
@@ -96,6 +97,9 @@ export default function Register() {
           {electron && <ElectronTitleBar />}
            <div className="backdrop align-center">
             <div className="watermark"><Link target="_blank" href={"https://stocksnap.io/author/alteredreality"}> Altered Reality • stocksnap.io</Link></div>
+            {showVerifyPage ? (
+            <EmailVerifcation />
+            ) : (
             <Card>
                 <CardHeader>
                     <CardTitle>Sign Up</CardTitle>
@@ -141,6 +145,7 @@ export default function Register() {
                     <Link href={"/login"}>Already have an account?</Link>
                 </CardFooter>
             </Card>
+            )}
         </div>
       </div>
     )
