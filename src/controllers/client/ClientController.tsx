@@ -1,6 +1,7 @@
 "use client";
 import { Client } from "@strafechat/strafe.js";
 import cookie from "js-cookie";
+import LoadingScreen from "@/components/app/Loading";
 import { usePathname } from "next/navigation";
 import { createContext, useContext, useEffect, useState } from 'react';
 
@@ -21,20 +22,22 @@ export default function ClientController({ children }: { children: JSX.Element }
         equinox: "http://localhost:443/v1"
       }
     });
-    client.login(`${String(cookie.get("token")!)}`).catch(() => { });
+    client.login(`${cookie.get("token")!}`);
     setClient(client);
   }
 
   useEffect(() => {
-    if (!cookie.get("token")! && !["/login", "/register", "/verify"].includes(pathname)) window.location.href = "/login";
-    else if (!client && !["/login", "/register", "/verify"].includes(pathname)) init();
+    if (!cookie.get("token")! && !["/login", "/register"].includes(pathname)) window.location.href = "/login";
+    else if (!client && !["/login", "/register"].includes(pathname)) init();
   }, [client, pathname]);
 
-  console.log(client);
+  if ((!client /*|| clientError || ready*/) && pathname !== "/login" && pathname !== "/register") {
+    return <LoadingScreen />;
+  }
 
   return (
     <ClientControllerContext.Provider value={{ client }}>
-      {ready ? children : <></>}
+      {children}
     </ClientControllerContext.Provider>
   )
 }
