@@ -23,6 +23,9 @@ export default function ClientController({ children }: { children: JSX.Element }
       }
     });
     clt.login(`${cookie.get("token")!}`);
+    clt.on("ready", () => {
+      setReady(true);
+    });
     client.current = clt;
   }
 
@@ -31,7 +34,7 @@ export default function ClientController({ children }: { children: JSX.Element }
     else if (!client.current && !["/login", "/register"].includes(pathname)) init();
   }, [pathname]);
 
-  if ((!client) && pathname !== "/login" && pathname !== "/register") {//ready event too
+  if ((!client || !ready) && pathname !== "/login" && pathname !== "/register") {
     return <LoadingScreen />;
   }
 
