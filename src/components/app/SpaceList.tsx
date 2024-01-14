@@ -13,7 +13,7 @@ export default function SpaceList() {
          <Link href="/">
             <button>
                {/* eslint-disable-next-line @next/next/no-img-element */}
-               <img src={`http://localhost:446/avatars/6362990690116305920/b25caa834adff09b82c2f8ea421f401c065fdb493fdb0305cf859d4d62efa950.webp`} alt=""></img>
+               <img src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${client?.user?.id}/${client?.user?.avatar}`} alt="Avatar"></img>
             </button>
          </Link>
          <div className="seperator" />

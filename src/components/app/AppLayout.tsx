@@ -31,7 +31,7 @@ export default function AppLayout({
       );
   }, [setElectron]);
 
-  const override = ["/login", "/register", "/verify", "/forgot-password"];
+  const override = ["/login", "/register", "/forgot-password"];
 
   return override.includes(pathname) ? (
     <>{children}</>

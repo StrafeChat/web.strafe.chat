@@ -4,6 +4,7 @@ import { useUI } from "@/providers/UIProvider";
 import PrivateMessages from "../rooms/PrivateMessages";
 import { usePathname } from "next/navigation";
 import localForage from "localforage";
+import RoomsNav from "../spaces/RoomsNav";
 
 export default function RoomList() {
   const controls = useAnimation();
@@ -20,6 +21,8 @@ export default function RoomList() {
     controls.start({ width: hideRoomList ? 0 : "auto" });
     localForage.setItem("hide_room_list", hideRoomList);
   }, [hideRoomList, controls]);
+
+  const paths = path.trim().split("/").filter((x) => x !== "" && x !== "spaces" && x !== "rooms");
 
   return (
     <>
@@ -38,6 +41,10 @@ export default function RoomList() {
                 return <PrivateMessages />;
               default:
                 if (path.startsWith("/rooms")) return <PrivateMessages />;
+                if (path.startsWith("/spaces")) return <RoomsNav params={{
+                  spaceId: paths[0],
+                  rooms: [{ id: "general", name: "general" }, { id: "off-topic", name: "off-topic"}]
+                }} />;
                 break;
             }
           })()}
