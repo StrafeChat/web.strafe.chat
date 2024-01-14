@@ -7,13 +7,13 @@ export default function ElectronTitleBar() {
         message: "hi",
         url: "http://localhost:3000/rooms/id?message=id",
         title: "BrydenIsNotSmart",
-        url: "https://cdn.discordapp.com/attachments/1135670060678123560/1189859177393291284/brydenicon.png"
+        avatar: "https://cdn.discordapp.com/attachments/1135670060678123560/1189859177393291284/brydenicon.png"
   });
   }, []);
 
   return (
     <div className="titlebar p-1 h-6">
-      <p className="text-gray-500 pl-[10px] text-[14px] font-cario opacity-1 font-bold">
+      <p className="text-gray-500 pl-[12.5px] text-[14px] font-cario opacity-1 font-bold">
         <b>STRAFE</b>
       </p>
       {/* <button onClick={() => {}} className="absolute right-[85px]  text-gray-500 pr-3 top-[-4px] w-[20px] hover:bg-gray-500">

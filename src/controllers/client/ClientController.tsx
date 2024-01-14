@@ -34,18 +34,26 @@ export default function ClientController({ children }: { children: JSX.Element }
       setReady(true);
       setClientError(false);
       setVerified(clt.user!.verified);
+      console.log(clt.user!);
     });
     clt.login(cookie.get("token")!);
     clt.on("error", (err) => {
       if (err.code == 4004) {
         cookie.remove("token");
         window.location.href = "/login";
-      } else setClientError(true);
-      console.log(err);
-      toast({ title: "Something went wrong.", description: err, className: "bg-destructive" });
+      } else {
+        setClientError(true);
+        setTimeout(() => {
+          toast({
+            title: "Something went wrong!",
+            description: err.message,
+            duration: 5000,
+            className: "bg-destructive"
+          });
+        }, 1000);
+      }
     });
     client.current = clt;
-    // setVerified(clt.user!.verified);
   }
 
   useEffect(() => {

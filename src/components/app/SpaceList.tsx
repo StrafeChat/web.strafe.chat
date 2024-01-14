@@ -1,17 +1,19 @@
 import { useModal } from "@/controllers/modals/ModalController";
-import Link from "next/link";
+import Link from "next/link"
+import { useClient } from "@/controllers/client/ClientController";
 import { FaCompass, FaGear, FaPlus } from "react-icons/fa6";
 
 export default function SpaceList() {
 
    const { openModal } = useModal();
+   const { client } = useClient(); 
 
    return (
       <div className="space-list">
          <Link href="/">
             <button>
                {/* eslint-disable-next-line @next/next/no-img-element */}
-               <img src="https://cdn.discordapp.com/attachments/964645215644307477/1189946307549331516/Untitled502_20231228085911.png" alt=""></img>
+               <img src={`http://localhost:446/avatars/6362990690116305920/b25caa834adff09b82c2f8ea421f401c065fdb493fdb0305cf859d4d62efa950.webp`} alt=""></img>
             </button>
          </Link>
          <div className="seperator" />
