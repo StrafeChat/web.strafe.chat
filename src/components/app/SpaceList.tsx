@@ -1,21 +1,35 @@
-import { useModal } from "@/controllers/modals/ModalController";
-import Link from "next/link"
 import { useClient } from "@/controllers/client/ClientController";
+import { useModal } from "@/controllers/modals/ModalController";
+import Link from "next/link";
 import { FaCompass, FaGear, FaPlus } from "react-icons/fa6";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "../ui/context-menu";
 
 export default function SpaceList() {
 
    const { openModal } = useModal();
-   const { client } = useClient(); 
+   const { client } = useClient();
 
    return (
       <div className="space-list">
-         <Link href="/">
-            <button>
-               {/* eslint-disable-next-line @next/next/no-img-element */}
-               <img src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${client?.user?.id}/${client?.user?.avatar}`} alt="Avatar"></img>
-            </button>
-         </Link>
+         <ContextMenu>
+            <ContextMenuTrigger>
+               <Link href="/">
+                  <button>
+                     {/* eslint-disable-next-line @next/next/no-img-element */}
+                     <img src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${client?.user?.id}/${client?.user?.avatar}`} alt="Avatar"></img>
+                     <div className={`avatar-status ${client?.user?.presence.status}`}></div>
+                  </button>
+               </Link>
+            </ContextMenuTrigger>
+            <ContextMenuContent>
+               <ContextMenuItem onClick={() => openModal("settings")} className="flex gap-2 items-center"><FaGear className="w-3 h-3 rounded-full" /> Settings</ContextMenuItem>
+               <hr />
+               <ContextMenuItem className="flex gap-2"><div className="w-2.5 h-2.5 bg-green-500 rounded-full" /> Online</ContextMenuItem>
+               <ContextMenuItem className="flex gap-2"><div className="w-2.5 h-2.5 bg-yellow-500 rounded-full" />Idle</ContextMenuItem>
+               <ContextMenuItem className="flex gap-2"><div className="w-2.5 h-2.5 bg-red-500 rounded-full" />Do Not Disturb</ContextMenuItem>
+               <ContextMenuItem className="flex gap-2"><div className="w-2.5 h-2.5 bg-gray-500 rounded-full" />Invisible</ContextMenuItem>
+            </ContextMenuContent>
+         </ContextMenu>
          <div className="seperator" />
 
          <div className="spaces">
