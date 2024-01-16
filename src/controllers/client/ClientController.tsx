@@ -30,8 +30,8 @@ export default function ClientController({ children }: { children: JSX.Element }
   const handleReady = useCallback(() => {
     setReady(true);
     setClientError(false);
-    setVerified(client!.user!.verified);
-  }, [client])
+    setVerified(client!.user?.verified || false);
+}, [client])
 
   const handlePresenceUpdate = useCallback((data: any) => {
     if (client!.user && data.user.id == client!.user.id) {
@@ -73,15 +73,14 @@ export default function ClientController({ children }: { children: JSX.Element }
   }
 
   useEffect(() => {
-    console.log(client)
     client?.on("ready", handleReady);
     client?.on("presenceUpdate", handlePresenceUpdate);
 
     return () => {
-      client?.off("ready", handleReady);
-      client?.off("presenceUpdate", handlePresenceUpdate);
+        client?.off("ready", handleReady);
+        client?.off("presenceUpdate", handlePresenceUpdate);
     }
-  }, [client, handlePresenceUpdate, handleReady]);
+}, [client, handlePresenceUpdate, handleReady]);
 
   useEffect(() => {
     if (!cookie.get("token")! && !["/login", "/register"].includes(pathname)) window.location.href = "/login";
