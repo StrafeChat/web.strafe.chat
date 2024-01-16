@@ -21,13 +21,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <ClientController>
           <ModalController>
             <UIProvider>
               <AppLayout>{children}</AppLayout>
             </UIProvider>
           </ModalController>
-        </ClientController>
         <Toaster />
       </body>
     </html>
