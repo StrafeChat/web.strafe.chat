@@ -6,7 +6,7 @@ const modalVariants = {
   closed: { opacity: 0, transition: { ease: "backOut", duration: 0.3, x: { duration: 1 } } },
 };
 
-class SettingsModal extends Modal {
+class SettingsModal extends Modal<{}, {}> {
   render() {
     return (
       <>

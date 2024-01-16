@@ -38,13 +38,13 @@ export default class ModalController extends Component<{ children: JSX.Element }
                                     <AnimatePresence key={key}>
                                         <SettingsModal key={key} name="settings" closeModal={this.closeModal} />
                                     </AnimatePresence>
-                                )
+                                );
                             case "status":
                                 return (
                                     <AnimatePresence key={key}>
                                         <StatusModal key={key} name="status" closeModal={this.closeModal} />
                                     </AnimatePresence>
-                                )
+                                );
                         }
                     })}
                 </>
