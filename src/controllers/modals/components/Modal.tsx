@@ -1,10 +1,10 @@
-import "../modals.scss";
 import { ModalState } from '@/types';
-import { Component, useEffect } from 'react'
+import { Component, useEffect } from 'react';
+import "../modals.scss";
 
-export default class Modal extends Component<ModalState> {
+export default class Modal<Props, State> extends Component<ModalState & State, Props> {
 
-    constructor({ props }: { props: ModalState }) {
+    constructor({ props }: { props: ModalState & State }) {
         super(props);
     }
 

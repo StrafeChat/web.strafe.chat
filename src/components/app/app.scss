@@ -5,6 +5,55 @@ div.app {
   border-top-left-radius: 20px;
 }
 
+div.context-menu-item {
+  position: relative;
+  display: flex;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+  align-items: center;
+  border-radius: 0.5rem;
+  padding-left: 0.5rem;
+  padding-right: 0.5rem;
+  padding-top: 0.375rem;
+  padding-bottom: 0.375rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+
+  &:focus {
+    background: hsl(var(--accent));
+    color: hsl(var(--accent-background));
+  }
+
+  div.user-status {
+    width: 0.625rem;
+    height: 0.625rem;
+    border-radius: 100%;
+
+    &.online {
+      background-color: rgb(34 197 94);
+    }
+
+    &.idle {
+      background-color: rgb(234 179 8);
+    }
+
+    &.coding {
+      background-color: rgb(59, 130, 246);
+    }
+    
+    &.dnd {
+      background-color: rgb(239 68 68);
+    }
+
+    &.offline {
+      background-color: rgb(107 114 128);
+    }
+  }
+}
+
 div.header {
   width: 100%;
   height: 60px;
@@ -51,10 +100,11 @@ div.space-list {
 
     div.avatar-status {
       position: absolute;
-      bottom: 0.25rem;
-      right: 0.25rem;
-      width: 1rem;
-      height: 1rem;
+      bottom: 0.01rem;
+      right: 0.05rem;
+      width: 1.45rem;
+      height: 1.45rem;
+      border: 0.25rem solid hsl(var(--background));
       border-radius: 100%;
 
       &.online {
@@ -65,12 +115,15 @@ div.space-list {
         background-color: rgb(234 179 8);
       }
 
+      &.coding {
+        background-color: rgb(59, 130, 246);
+      }
+
       &.dnd {
         background-color: rgb(239 68 68);
       }
 
       &.offline {
-        border: 0.2rem solid rgb(74, 80, 92);
         background-color: rgb(107 114 128);
       }
     }
@@ -85,7 +138,7 @@ div.space-list {
 
     &.primary {
       svg {
-        color: hsl(var(--primary)); 
+        color: hsl(var(--primary));
         width: 32px;
         height: 32px;
       }
@@ -171,137 +224,138 @@ div.room-list {
       &[active="true"] {
         background: hsl(var(--background));
         opacity: 1;
-        color:white;
+        color: white;
       }
     }
   }
 
 
-   ul.private-messages {
-      display: flex;
-      flex-direction: column;
-      flex-grow: 1;
-      padding: 1rem;
-      overflow-y: auto;
-      overflow-x: hidden;
-      color: hsl(var(--muted-foreground));
+  ul.private-messages {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    padding: 1rem;
+    overflow-y: auto;
+    overflow-x: hidden;
+    color: hsl(var(--muted-foreground));
 
-      a[active="true"] {
-        li.private-message {
-          background: hsl(var(--background));
-          opacity: 1;
-          color:white;
-        }
-      }
-
+    a[active="true"] {
       li.private-message {
-        width: 100%;
-        height: 53px;
-        background: transparent;
-        display: flex;
-        column-gap: 10px;
-        align-items: center;
-        padding-left: 10px;
-        padding-right: 10px;
-        border-radius: 5px;
-        padding-bottom: 1px;
-        padding-top: 1px;
-        margin-bottom: 5px;
-        color: hsl(var(--muted-foreground));
-        overflow-y: hidden;
-        overflow-x: hidden;
-        text-overflow: ellipsis;
-        cursor: pointer;
-
-        img {
-          width: 43px;
-          height: 43px;
-          aspect-ratio: "1:1";
-          border-radius: 100%;
-          object-fit: cover
-        }
-
-        span {
-          overflow: hidden;
-        }
-
-        .user-status {
-          white-space: nowrap;
-          color: gray;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        &:hover {
-          background: hsl(var(--background));
-          opacity: 0.5;
-        }
+        background: hsl(var(--background));
+        opacity: 1;
+        color: white;
       }
     }
-    ul.space-rooms {
+
+    li.private-message {
+      width: 100%;
+      height: 53px;
+      background: transparent;
       display: flex;
-      flex-direction: column;
-      flex-grow: 1;
-      padding: 1rem;
-      overflow-y: auto;
-      overflow-x: hidden;
+      column-gap: 10px;
+      align-items: center;
+      padding-left: 10px;
+      padding-right: 10px;
+      border-radius: 5px;
+      padding-bottom: 1px;
+      padding-top: 1px;
+      margin-bottom: 5px;
       color: hsl(var(--muted-foreground));
+      overflow-y: hidden;
+      overflow-x: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
 
-      a[active="true"] {
-        li.space-room {
-          background: hsl(var(--background));
-          opacity: 1;
-          color:white;
-        }
+      img {
+        width: 43px;
+        height: 43px;
+        aspect-ratio: "1:1";
+        border-radius: 100%;
+        object-fit: cover
       }
 
-      li.space-room {
-        width: 100%;
-        height: 35px;
-        color: "gray";
-        background: transparent;
-        display: flex;
-        column-gap: 10px;
-        align-items: center;
-        padding-left: 10px;
-        padding-right: 10px;
-        border-radius: 5px;
-        padding-bottom: 1px;
-        padding-top: 1px;
-        margin-bottom: 5px;
-        color: hsl(var(--muted-foreground));
-        overflow-y: hidden;
-        overflow-x: hidden;
+      span {
+        overflow: hidden;
+      }
+
+      .user-status {
+        white-space: nowrap;
+        color: gray;
+        overflow: hidden;
         text-overflow: ellipsis;
-        cursor: pointer;
+      }
 
-        img {
-          width: 43px;
-          height: 43px;
-          aspect-ratio: "1:1";
-          border-radius: 100%;
-          object-fit: cover
-        }
-
-        span {
-          overflow: hidden;
-        }
-
-        .user-status {
-          white-space: nowrap;
-          color: gray;
-          overflow: hidden;
-          text-overflow: ellipsis;
-        }
-
-        &:hover {
-          background: hsl(var(--background));
-          opacity: 0.5;
-        }
+      &:hover {
+        background: hsl(var(--background));
+        opacity: 0.5;
       }
     }
+  }
+
+  ul.space-rooms {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    padding: 1rem;
+    overflow-y: auto;
+    overflow-x: hidden;
+    color: hsl(var(--muted-foreground));
+
+    a[active="true"] {
+      li.space-room {
+        background: hsl(var(--background));
+        opacity: 1;
+        color: white;
+      }
+    }
+
+    li.space-room {
+      width: 100%;
+      height: 35px;
+      color: "gray";
+      background: transparent;
+      display: flex;
+      column-gap: 10px;
+      align-items: center;
+      padding-left: 10px;
+      padding-right: 10px;
+      border-radius: 5px;
+      padding-bottom: 1px;
+      padding-top: 1px;
+      margin-bottom: 5px;
+      color: hsl(var(--muted-foreground));
+      overflow-y: hidden;
+      overflow-x: hidden;
+      text-overflow: ellipsis;
+      cursor: pointer;
+
+      img {
+        width: 43px;
+        height: 43px;
+        aspect-ratio: "1:1";
+        border-radius: 100%;
+        object-fit: cover
+      }
+
+      span {
+        overflow: hidden;
+      }
+
+      .user-status {
+        white-space: nowrap;
+        color: gray;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+
+      &:hover {
+        background: hsl(var(--background));
+        opacity: 0.5;
+      }
+    }
+  }
 }
-  
+
 
 div.app-view {
   background: hsl(var(--app-view));
@@ -309,7 +363,7 @@ div.app-view {
   flex-direction: column;
   flex-grow: 1;
   min-height: 100%;
-  
+
   &[room_list_hidden="true"] {
     border-top-left-radius: 20px;
   }
@@ -319,7 +373,7 @@ div.app-view {
     align-items: center;
     column-gap: 10px;
     color: hsl(var(--muted-foreground));
-    
+
     svg {
       width: 20px;
       height: 20px;
@@ -374,9 +428,9 @@ div.chat-input-container {
 }
 
 div.titlebar {
-    -webkit-app-region: drag;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background-color: transparent;
+  -webkit-app-region: drag;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: transparent;
 }

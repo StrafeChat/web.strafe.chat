@@ -3,9 +3,8 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
-import { useClient } from "@/controllers/client/ClientController";
+import { useClient } from "@/controllers/hooks";
 import { validateVerify } from "@/helpers/validator";
-import { useUI } from "@/providers/UIProvider";
 import { Verify } from "@/types";
 import cookie from "js-cookie";
 import { FormEvent, useState } from "react";
@@ -17,7 +16,7 @@ export default function EmailVerifcation() {
     const [verify, setVerify] = useState<Verify>({
         code: "",
     });
-    const { client, setVerified } = useClient();
+    const { client } = useClient();
 
     const handleSubmit = async (event: FormEvent) => {
         event.preventDefault();
@@ -50,8 +49,8 @@ export default function EmailVerifcation() {
             className: "bg-destructive"
         });
 
-        client!.user = { ...client!.user!, verified: true };
-        setVerified(true);
+        // @ts-ignore
+        client.user = { ...client.user, verified: true };
     }
 
     return (

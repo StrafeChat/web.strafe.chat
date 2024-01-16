@@ -1,5 +1,5 @@
 "use client";
-import { useClient } from "@/controllers/client/ClientController";
+import { useClient } from "@/controllers/hooks";
 import { useUI } from "@/providers/UIProvider";
 import {
   faClock,

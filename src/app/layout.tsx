@@ -8,8 +8,8 @@ import ModalController from '@/controllers/modals/ModalController';
 import ClientController from '@/controllers/client/ClientController';
 
 export const metadata: Metadata = {
-  title: 'Strafe',
-  description: 'A chatting application.',
+  title: 'Strafe Chat',
+  description: 'Make your censorship worries go down the drain with Straf Chat',
 }
 
 export default function RootLayout({

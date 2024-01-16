@@ -1,7 +1,6 @@
-import { useClient } from "@/controllers/client/ClientController";
-import { useModal } from "@/controllers/modals/ModalController";
+import { useClient, useModal } from "@/controllers/hooks";
 import Link from "next/link";
-import { FaCompass, FaGear, FaPlus } from "react-icons/fa6";
+import { FaCompass, FaGear, FaPlus, FaPenToSquare } from "react-icons/fa6";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "../ui/context-menu";
 
 export default function SpaceList() {
@@ -24,14 +23,16 @@ export default function SpaceList() {
             <ContextMenuContent>
                <ContextMenuItem onClick={() => openModal("settings")} className="flex gap-2 items-center"><FaGear className="w-3 h-3 rounded-full" /> Settings</ContextMenuItem>
                <hr />
-               <ContextMenuItem className="flex gap-2"><div className="w-2.5 h-2.5 bg-green-500 rounded-full" /> Online</ContextMenuItem>
-               <ContextMenuItem className="flex gap-2"><div className="w-2.5 h-2.5 bg-yellow-500 rounded-full" />Idle</ContextMenuItem>
-               <ContextMenuItem className="flex gap-2"><div className="w-2.5 h-2.5 bg-red-500 rounded-full" />Do Not Disturb</ContextMenuItem>
-               <ContextMenuItem className="flex gap-2"><div className="w-2.5 h-2.5 bg-gray-500 rounded-full" />Invisible</ContextMenuItem>
+               <ContextMenuItem onClick={() => client?.user?.setPresence({ status: "online" })}><div className="user-status online" /> Online</ContextMenuItem>
+               <ContextMenuItem onClick={() => client?.user?.setPresence({ status: "idle" })}><div className="user-status idle" />Idle</ContextMenuItem>
+               <ContextMenuItem onClick={() => client?.user?.setPresence({ status: "coding" })}><div className="user-status coding" />Coding</ContextMenuItem>
+               <ContextMenuItem onClick={() => client?.user?.setPresence({ status: "dnd" })}><div className="user-status dnd" />Do Not Disturb</ContextMenuItem>
+               <ContextMenuItem onClick={() => client?.user?.setPresence({ status: "offline" })}><div className="user-status offline" />Invisible</ContextMenuItem>
+               <hr />
+               <ContextMenuItem onClick={() => openModal("status")}><FaPenToSquare className="w-3 h-3" /> Custom Status</ContextMenuItem>
             </ContextMenuContent>
          </ContextMenu>
          <div className="seperator" />
-
          <div className="spaces">
             <Link href="/spaces/strafe">
                <button className="space">

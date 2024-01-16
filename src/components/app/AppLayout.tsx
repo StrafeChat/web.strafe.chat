@@ -29,7 +29,7 @@ export default function AppLayout({
       document.removeEventListener("contextmenu", (event) =>
         event.preventDefault()
       );
-  }, [setElectron]);
+  }, [setElectron, setIsMobile]);
 
   const override = ["/login", "/register", "/forgot-password"];
 
