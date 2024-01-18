@@ -1,16 +1,11 @@
+"use client";
 import AppLayout from '@/components/app/AppLayout';
 import { Toaster } from '@/components/ui/toaster';
-import UIProvider, { useUI } from '@/providers/UIProvider';
-import type { Metadata } from 'next';
+import ClientController from '@/controllers/client/ClientController';
+import ModalController from '@/controllers/modals/ModalController';
+import UIProvider from '@/providers/UIProvider';
 import './globals.css';
 import "./shadcn.css";
-import ModalController from '@/controllers/modals/ModalController';
-import { ClientControllerContext } from '@/controllers/client/ClientController';
-
-export const metadata: Metadata = {
-  title: 'Strafe Chat',
-  description: 'Make your censorship worries go down the drain with Straf Chat',
-}
 
 export default function RootLayout({
   children,
@@ -20,6 +15,10 @@ export default function RootLayout({
 
   return (
     <html lang="en">
+      <head>
+        <title>Strafe Chat</title>
+        <meta name='description' content='Make your censorship worries go down the drain with Straf Chat' />
+      </head>
       <body>
         <ClientController>
           <ModalController>

@@ -1,5 +1,5 @@
 import { ModalState } from '@/types';
-import { Component, useEffect } from 'react';
+import { Component } from 'react';
 import "../modals.scss";
 
 export default class Modal<Props, State> extends Component<ModalState & State, Props> {

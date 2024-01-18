@@ -5,12 +5,11 @@ import { useToast } from "@/components/ui/use-toast";
 import { Client } from "@strafechat/strafe.js";
 import cookie from "js-cookie";
 import { usePathname } from "next/navigation";
-import { Dispatch, SetStateAction, createContext, useCallback, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useEffect, useRef, useState } from 'react';
 import { useForceUpdate } from "../hooks";
 
-export const ClientControllerContext = createContext<{ client: Client | null, setVerified: Dispatch<SetStateAction<boolean>> }>({
+export const ClientControllerContext = createContext<{ client: Client | null }>({
   client: null,
-  setVerified: {} as Dispatch<SetStateAction<boolean>>,
 });
 
 export default function ClientController({ children }: { children: JSX.Element }) {
@@ -31,13 +30,15 @@ export default function ClientController({ children }: { children: JSX.Element }
     setReady(true);
     setClientError(false);
     setVerified(client!.user?.verified || false);
-}, [client])
+  }, [client])
 
   const handlePresenceUpdate = useCallback((data: any) => {
     if (client!.user && data.user.id == client!.user.id) {
       client!.user.presence = data.presence;
       forceUpdate();
     }
+
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client]);
 
   const init = () => {
@@ -77,10 +78,10 @@ export default function ClientController({ children }: { children: JSX.Element }
     client?.on("presenceUpdate", handlePresenceUpdate);
 
     return () => {
-        client?.off("ready", handleReady);
-        client?.off("presenceUpdate", handlePresenceUpdate);
+      client?.off("ready", handleReady);
+      client?.off("presenceUpdate", handlePresenceUpdate);
     }
-}, [client, handlePresenceUpdate, handleReady]);
+  }, [client, handlePresenceUpdate, handleReady]);
 
   useEffect(() => {
     if (!cookie.get("token")! && !["/login", "/register"].includes(pathname)) window.location.href = "/login";
@@ -94,14 +95,14 @@ export default function ClientController({ children }: { children: JSX.Element }
 
   if ((!verified) && pathname !== "/login" && pathname !== "/register") {
     return (
-      <ClientControllerContext.Provider value={{ client: client, setVerified }}>
+      <ClientControllerContext.Provider value={{ client: client }}>
         <EmailVerifcation />
       </ClientControllerContext.Provider>
     )
   }
 
   return (
-    <ClientControllerContext.Provider value={{ client: client, setVerified }}>
+    <ClientControllerContext.Provider value={{ client: client }}>
       {children}
     </ClientControllerContext.Provider>
   )
