@@ -5,7 +5,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import "./shadcn.css";
 import ModalController from '@/controllers/modals/ModalController';
-import ClientController from '@/controllers/client/ClientController';
+import { ClientControllerContext } from '@/controllers/client/ClientController';
 
 export const metadata: Metadata = {
   title: 'Strafe Chat',
