@@ -1,4 +1,15 @@
+import SettingsNotFound from "@/components/settings/SettingsNotFound";
+import AccountSettings from "@/components/settings/user/AccountSettings";
+import DesktopSettings from "@/components/settings/app/DesktopSettings";
+import ProfileSettings from "@/components/settings/user/ProfileSettings";
+import AuthorizedApps from "@/components/settings/user/AuthorizedAppsSettings";
 import { AnimatePresence, motion } from "framer-motion";
+import { 
+  FaIdCard,
+  FaUser,
+  FaUserLock, 
+  FaDesktop, 
+  FaBell } from 'react-icons/fa6';
 import Modal from './Modal';
 
 const modalVariants = {
@@ -7,6 +18,11 @@ const modalVariants = {
 };
 
 class SettingsModal extends Modal<{}, {}> {
+
+  state = {
+    currentTab: "account"
+  }
+
   render() {
     return (
       <>
@@ -22,14 +38,31 @@ class SettingsModal extends Modal<{}, {}> {
               <div className="sidebar">
                 <ul>
                   <li className="title">User Settings</li>
-                  <li>My Account</li>
-                  <li>Profile</li>
-                  <li>Desktop</li>
+                  <li onClick={() => this.setState({ currentTab: "account" })}><FaUser /> &nbsp;&nbsp;My Account</li>
+                  <li onClick={() => this.setState({ currentTab: "profile" })}><FaIdCard />&nbsp;&nbsp;Profile</li>
+                  <li onClick={() => this.setState({ currentTab: "authorized-apps" })}><FaUserLock />&nbsp;&nbsp;Authorized Apps</li>
+                  <hr />
+                  <li className="title">APP Settings</li>
+                  <li onClick={() => this.setState({ currentTab: "notifications" })}><FaBell />&nbsp;&nbsp;Notifications</li>
+                  <li onClick={() => this.setState({ currentTab: "desktop" })}><FaDesktop />&nbsp;&nbsp;Desktop</li>
                 </ul>
               </div>
-              <button className='close' onClick={() => this.close()}>X</button>
+              <button className="close" onClick={() => this.close()}>X</button>
               <div className="content">
-                <h1 className="title">My Account</h1>
+                {(() => {
+                  switch (this.state.currentTab) {
+                    case "account":
+                      return <AccountSettings />
+                    case "profile":
+                      return <ProfileSettings />
+                    case "authorized-apps":
+                      return <AuthorizedApps />
+                    case "desktop":
+                      return <DesktopSettings />  
+                    default:
+                      return <SettingsNotFound />
+                  }
+                })()}
               </div>
 
             </div>

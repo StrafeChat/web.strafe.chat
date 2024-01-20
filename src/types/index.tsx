@@ -34,7 +34,10 @@ export interface UI {
 }
 
 export interface ModalControllerState {
-    openModals: string[];
+    openModals: {
+        name: string;
+        data?: any;
+    }[];
 }
 
 export interface ModalState {
