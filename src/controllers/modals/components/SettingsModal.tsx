@@ -1,16 +1,16 @@
 import SettingsNotFound from "@/components/settings/SettingsNotFound";
-import AccountSettings from "@/components/settings/user/AccountSettings";
 import DesktopSettings from "@/components/settings/app/DesktopSettings";
-import ProfileSettings from "@/components/settings/user/ProfileSettings";
-import AuthorizedApps from "@/components/settings/user/AuthorizedAppsSettings";
+import NotificationSettings from "@/components/settings/user/NotificationSettings";
 import { AnimatePresence, motion } from "framer-motion";
-import { 
+import {
+  FaBell,
+  FaDesktop,
   FaIdCard,
   FaUser,
-  FaUserLock, 
-  FaDesktop, 
-  FaBell } from 'react-icons/fa6';
+  FaUserLock
+} from 'react-icons/fa6';
 import Modal from './Modal';
+import AccountSettings from "@/components/settings/user/AccountSettings";
 
 const modalVariants = {
   open: { opacity: 1, transition: { ease: "backIn", duration: 0.3, x: { duration: 1 } } },
@@ -42,7 +42,7 @@ class SettingsModal extends Modal<{}, {}> {
                   <li onClick={() => this.setState({ currentTab: "profile" })}><FaIdCard />&nbsp;&nbsp;Profile</li>
                   <li onClick={() => this.setState({ currentTab: "authorized-apps" })}><FaUserLock />&nbsp;&nbsp;Authorized Apps</li>
                   <hr />
-                  <li className="title">APP Settings</li>
+                  <li className="title">App Settings</li>
                   <li onClick={() => this.setState({ currentTab: "notifications" })}><FaBell />&nbsp;&nbsp;Notifications</li>
                   <li onClick={() => this.setState({ currentTab: "desktop" })}><FaDesktop />&nbsp;&nbsp;Desktop</li>
                 </ul>
@@ -53,12 +53,14 @@ class SettingsModal extends Modal<{}, {}> {
                   switch (this.state.currentTab) {
                     case "account":
                       return <AccountSettings />
-                    case "profile":
-                      return <ProfileSettings />
-                    case "authorized-apps":
-                      return <AuthorizedApps />
+                    // case "profile":
+                    //   return <ProfileSettings />
+                    // case "authorized-apps":
+                    //   return <AuthorizedApps />
+                    case "notifications":
+                      return <NotificationSettings />
                     case "desktop":
-                      return <DesktopSettings />  
+                      return <DesktopSettings />
                     default:
                       return <SettingsNotFound />
                   }

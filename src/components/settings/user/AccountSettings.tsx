@@ -1,6 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { useClient, useModal } from "@/controllers/hooks";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 export default function AccountSettings() {
 
@@ -17,33 +17,42 @@ export default function AccountSettings() {
         username: client?.user?.username!,
         email: client?.user?.email!,
         phone_number: client!.user!.phone_number
-    })
+    });
+
+    const saveData = () => {
+        setSavedData(data);
+    }
 
     return (
         <>
+            {JSON.stringify(data) != JSON.stringify(savedData) && <Button className="save" onClick={saveData}>Save</Button>}
             <h1 className="title">My Account</h1>
             <div className="account">
                 <div className="card">
                     <div className="item">
                         <div className="first">
                             <label>Username</label>
-                            <span>{savedData.username}</span>
+                            <span>{data.username}</span>
                         </div>
                         <div className="final">
-                            <Button>Edit</Button>
+                            <Button onClick={() => openModal("edit-data", {
+                                title: "Edit Username", defaultValue: client?.user?.username, type: "username", set: (username: string) => {
+                                    setData({ ...data, username });
+                                }
+                            })}>Edit</Button>
                         </div>
                     </div>
                     <div className="item">
                         <div className="first">
                             <label>Email</label>
                             <span>{(() => {
-                                const splitArr = savedData.email?.split('@')!;
+                                const splitArr = data.email?.split('@')!;
                                 return `${'*'.repeat(splitArr[0].length)}@${splitArr[1]}`
                             })()}</span>
                         </div>
                         <div className="final">
                             <Button onClick={() => openModal("edit-data", {
-                                type: "email", set: (email: string) => {
+                                title: "Edit Email", defaultValue: client?.user?.email, type: "email", set: (email: string) => {
                                     setData({ ...data, email });
                                 }
                             })}>Edit</Button>
@@ -53,14 +62,18 @@ export default function AccountSettings() {
                         <div className="first">
                             <label>Phone Number</label>
                             <span>{(() => {
-                                return savedData.phone_number ? <span>{'*'.repeat(savedData.phone_number.length - 4) + savedData.phone_number.slice(-4)}</span> : <span className="text-muted-foreground">No Phone Number Set</span>
+                                return data.phone_number ? <span>{'*'.repeat(data.phone_number.length - 4) + data.phone_number.slice(-4)}</span> : <span className="text-muted-foreground">No Phone Number Set</span>
                             })()}</span>
                         </div>
                         <div className="final">
-                            {savedData.phone_number ? (
+                            {data.phone_number ? (
                                 <>
                                     <Button className="bg-destructive">Remove</Button>
-                                    <Button>Edit</Button>
+                                    <Button onClick={() => openModal("edit-data", {
+                                        title: "Edit Phone Number", type: "phone_number", set: (phone_number: string) => {
+                                            setData({ ...data, phone_number });
+                                        }
+                                    })}>Edit</Button>
                                 </>
                             ) : <Button>Add</Button>}
                         </div>

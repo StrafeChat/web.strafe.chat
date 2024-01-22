@@ -1,5 +1,3 @@
-import { ClientControllerContext } from "@/controllers/client/ClientController";
-import { Client } from "@strafechat/strafe.js";
 import { AnimatePresence, motion } from "framer-motion";
 import { Dispatch, FormEvent, SetStateAction } from "react";
 import Modal from './Modal';
@@ -9,24 +7,23 @@ const modalVariants = {
     closed: { opacity: 0, transition: { ease: "backOut", duration: 0.3, x: { duration: 1 } } },
 };
 
-class EditDataModel extends Modal<{}, { data: { type: string, set?: Dispatch<SetStateAction<any>> } }> {
+class EditDataModel extends Modal<{ data: string }, { data: { title: string, defaultValue: string, type: string, set: Dispatch<SetStateAction<any>> } }> {
 
     constructor(props: any) {
         super(props);
-        this.state = { statusText: "" };
     }
 
-    static contextType = ClientControllerContext;
-
-    private handleKeyDown2 = (event: KeyboardEvent) => {
-        if (event.key.toLowerCase() == "escape") event.preventDefault();
-    }
-
-    componentDidMount(): void {
-        document.addEventListener("keydown", this.handleKeyDown2);
+    state = {
+        data: ""
     }
 
     render() {
+
+        const handleSubmit = (event: FormEvent) => {
+            event.preventDefault();
+            this.props.data.set(this.state.data);
+            this.close();
+        }
 
         return (
             <>
@@ -40,14 +37,14 @@ class EditDataModel extends Modal<{}, { data: { type: string, set?: Dispatch<Set
                     >
                         <div className='modal-window-wrapper'>
                             <div className="modal-window" style={{ width: "300px" }}>
-                                {/* <form onSubmit={handleSubmit}>
-                                    <h1>Set a custom status</h1>
-                                    <input defaultValue={client.user?.presence.status_text} onChange={(event) => this.setState({ statusText: event.target.value })} />
+                                <form onSubmit={handleSubmit}>
+                                    <h1>{this.props.data.title}</h1>
+                                    <input defaultValue={this.props.data.defaultValue} onChange={(event) => this.setState({ data: event.target.value })} />
                                     <div className="flex justify-end gap-4 mt-2">
                                         <button type="button" onClick={() => this.close()}>Cancel</button>
                                         <button type="submit">Save</button>
                                     </div>
-                                </form> */}
+                                </form>
                             </div>
                         </div>
                     </motion.div>

@@ -1,7 +1,8 @@
 "use client";
 import { ModalControllerState } from "@/types";
 import { AnimatePresence } from "framer-motion";
-import { Component, createContext, useContext } from "react";
+import { Component, createContext } from "react";
+import { ClientControllerContext } from "../client/ClientController";
 import EditDataModal from "./components/EditDataModal";
 import SettingsModal from "./components/SettingsModal";
 import StatusModal from "./components/StatusModal";
@@ -16,9 +17,12 @@ export const ModalControllerContext = createContext({
 });
 
 export default class ModalController extends Component<{ children: JSX.Element }, ModalControllerState> {
+
     state = {
         openModals: [] as { name: string, data?: any }[]
-    };
+    }
+
+    static contextType = ClientControllerContext;
 
     openModal = (name: string, data?: any) => {
         this.setState((prevState) => ({
@@ -27,9 +31,26 @@ export default class ModalController extends Component<{ children: JSX.Element }
     };
 
     closeModal = (name: string) => {
-        this.setState((prevState) => ({
-            openModals: prevState.openModals.filter((modal) => modal.name !== name)
-        }));
+        // this.state.openModals.find((modal) => {
+        //     switch(modal.name) {
+        //         case "settings":
+        //             if()
+        //             break;
+        //     } 
+        // })
+        switch (name) {
+            case "settings":
+                if (this.state.openModals.find((modal) => modal.name == "edit-data")) return;
+                else this.setState((prevState) => ({
+                    openModals: prevState.openModals.filter((modal) => modal.name !== name)
+                }));
+                break;
+            default:
+                this.setState((prevState) => ({
+                    openModals: prevState.openModals.filter((modal) => modal.name !== name)
+                }));
+        }
+        // if(this.state.openModals.)
     };
 
     render() {
@@ -53,7 +74,7 @@ export default class ModalController extends Component<{ children: JSX.Element }
                             case "edit-data":
                                 return (
                                     <AnimatePresence key={key}>
-                                        <EditDataModal name="edit-data" closeModal={this.closeModal} data={{ type: modal.data }} />
+                                        <EditDataModal name="edit-data" closeModal={this.closeModal} data={modal.data} />
                                     </AnimatePresence>
                                 )
                         }

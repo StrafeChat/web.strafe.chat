@@ -1,5 +1,5 @@
 export default function ProfileSettings() {
     return (
-        <h1 className="title">Profile Settings</h1>
+        <h1 className="title">Profile</h1>
     )
 }

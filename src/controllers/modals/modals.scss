@@ -139,6 +139,13 @@ div.modal-full {
             padding-top: 2.5rem;
             font-weight: bold;
         }
+
+        button.save {
+            position: absolute;
+            bottom: 1rem;
+            right: 1rem;
+            background: hsl(var(--primary));
+        }
     }
 }
 
