@@ -1,6 +1,6 @@
-import { useClient, useModal } from "@/controllers/hooks";
+import { useClient, useModal } from "@/hooks";
 import Link from "next/link";
-import { FaCompass, FaGear, FaPlus, FaPenToSquare } from "react-icons/fa6";
+import { FaCompass, FaGear, FaPenToSquare, FaPlus } from "react-icons/fa6";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "../ui/context-menu";
 
 export default function SpaceList() {

@@ -1,8 +1,15 @@
 import { LinkProps } from "next/link";
 import { Dispatch, SetStateAction } from "react";
+import { IconType } from "react-icons";
 
 export interface NavLinkProps extends LinkProps {
     children: JSX.Element | JSX.Element[] | string;
+}
+
+export interface ChatHeaderProps {
+    name: string;
+    icon?: IconType,
+    type: "pm" | "server"
 }
 
 export interface Register {

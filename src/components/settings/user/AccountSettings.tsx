@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { useClient, useModal } from "@/controllers/hooks";
+import { useClient, useModal } from "@/hooks";
 import { useState } from "react";
 
 export default function AccountSettings() {

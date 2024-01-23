@@ -4,8 +4,8 @@ import { Toaster } from '@/components/ui/toaster';
 import ClientController from '@/controllers/client/ClientController';
 import ModalController from '@/controllers/modals/ModalController';
 import UIProvider from '@/providers/UIProvider';
-import './globals.css';
-import "./shadcn.css";
+import '../styles/globals.css';
+import "../styles/shadcn.css";
 
 export default function RootLayout({
   children,

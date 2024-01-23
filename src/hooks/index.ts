@@ -1,6 +1,6 @@
 import { useCallback, useContext, useState } from "react";
-import { ModalControllerContext } from "./modals/ModalController";
-import { ClientControllerContext } from "./client/ClientController";
+import { ClientControllerContext } from "../controllers/client/ClientController";
+import { ModalControllerContext } from "../controllers/modals/ModalController";
 
 export const useModal = () => useContext(ModalControllerContext);
 export const useClient = () => useContext(ClientControllerContext);

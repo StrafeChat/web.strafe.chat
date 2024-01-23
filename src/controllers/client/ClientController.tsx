@@ -6,7 +6,7 @@ import { Client } from "@strafechat/strafe.js";
 import cookie from "js-cookie";
 import { usePathname } from "next/navigation";
 import { Dispatch, SetStateAction, createContext, useCallback, useEffect, useRef, useState } from 'react';
-import { useForceUpdate } from "../hooks";
+import { useForceUpdate } from "../../hooks";
 
 export const ClientControllerContext = createContext<{ client: Client | null }>({
   client: null,

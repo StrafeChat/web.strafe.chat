@@ -31,13 +31,6 @@ export default class ModalController extends Component<{ children: JSX.Element }
     };
 
     closeModal = (name: string) => {
-        // this.state.openModals.find((modal) => {
-        //     switch(modal.name) {
-        //         case "settings":
-        //             if()
-        //             break;
-        //     } 
-        // })
         switch (name) {
             case "settings":
                 if (this.state.openModals.find((modal) => modal.name == "edit-data")) return;
