@@ -39,10 +39,10 @@ We welcome all contributions as you okay it with any of the developers as they m
 | [strafe.chat](https://github.com/StrafeChat/strafe.chat) | The landing page for strafe.chat |
 
 ### Links
-- Website - (https://strafe.chat)
-- Discord - (https://discord.gg/JbVgfWXeKZ)
-- Twitter - (https://twitter.com/strafechat)
-- Reddit - (https://reddit.com/r/strafechat)
-- Github - (https://github.com/StrafeChat)
-- GitHub Sponsors - (https://github.com/sponsors/strafechat)
-- Buy Me A Coffee - (https://buymeacoffee.com/strafechat)
+- Website - https://strafe.chat
+- Discord - https://discord.gg/JbVgfWXeKZ
+- Twitter - https://twitter.com/strafechat
+- Reddit - https://reddit.com/r/strafechat
+- Github - https://github.com/StrafeChat
+- GitHub Sponsors - https://github.com/sponsors/strafechat
+<!-- - Buy Me A Coffee - https://buymeacoffee.com/strafechat -->
