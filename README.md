@@ -45,4 +45,4 @@ We welcome all contributions as you okay it with any of the developers as they m
 - Reddit - https://reddit.com/r/strafechat
 - Github - https://github.com/StrafeChat
 - GitHub Sponsors - https://github.com/sponsors/strafechat
-<!-- - Buy Me A Coffee - https://buymeacoffee.com/strafechat -->
+- Kofi - https://ko-fi.com/bryden
