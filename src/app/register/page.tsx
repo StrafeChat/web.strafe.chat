@@ -12,7 +12,7 @@ import cookie from "js-cookie";
 import Image from "next/image";
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
-import "../auth.css";
+import "../../styles/auth.css";
 
 export default function Register() {
 
