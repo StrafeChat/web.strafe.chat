@@ -45,7 +45,7 @@ export default function ClientController({ children }: { children: JSX.Element }
 
     const clt = new Client({
       config: {
-        equinox: "http://localhost:443/v1"
+        equinox: process.env.NEXT_PUBLIC_API
       }
     });
 
