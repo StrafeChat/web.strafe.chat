@@ -5,8 +5,8 @@ import { useToast } from "@/components/ui/use-toast";
 import { Client } from "@strafechat/strafe.js";
 import cookie from "js-cookie";
 import { usePathname } from "next/navigation";
-import { createContext, useCallback, useEffect, useRef, useState } from 'react';
-import { useForceUpdate } from "../hooks";
+import { Dispatch, SetStateAction, createContext, useCallback, useEffect, useRef, useState } from 'react';
+import { useForceUpdate } from "../../hooks";
 
 export const ClientControllerContext = createContext<{ client: Client | null }>({
   client: null,
@@ -19,7 +19,6 @@ export default function ClientController({ children }: { children: JSX.Element }
   const [client, setClient] = useState<Client | null>(null);
   const [ready, setReady] = useState(false);
   const [clientError, setClientError] = useState(false);
-  const [verified, setVerified] = useState(false);
   const connected = useRef(false);
 
   const forceUpdate = useForceUpdate();
@@ -29,8 +28,7 @@ export default function ClientController({ children }: { children: JSX.Element }
   const handleReady = useCallback(() => {
     setReady(true);
     setClientError(false);
-    setVerified(client!.user?.verified || false);
-  }, [client])
+  }, [])
 
   const handlePresenceUpdate = useCallback((data: any) => {
     if (client!.user && data.user.id == client!.user.id) {
@@ -93,16 +91,16 @@ export default function ClientController({ children }: { children: JSX.Element }
     return <LoadingScreen />;
   }
 
-  if ((!verified) && pathname !== "/login" && pathname !== "/register") {
+  if ((!client?.user?.verified) && pathname !== "/login" && pathname !== "/register") {
     return (
-      <ClientControllerContext.Provider value={{ client: client }}>
+      <ClientControllerContext.Provider value={{ client }}>
         <EmailVerifcation />
       </ClientControllerContext.Provider>
     )
   }
 
   return (
-    <ClientControllerContext.Provider value={{ client: client }}>
+    <ClientControllerContext.Provider value={{ client }}>
       {children}
     </ClientControllerContext.Provider>
   )
