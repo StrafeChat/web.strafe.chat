@@ -5,8 +5,8 @@ import { ModalControllerContext } from "../controllers/modals/ModalController";
 export const useModal = () => useContext(ModalControllerContext);
 export const useClient = () => useContext(ClientControllerContext);
 export const useForceUpdate = () => {
-    const [, forceUpdate] = useState(0);
+    const [, forceUpdate] = useState(false);
     return useCallback(() => {
-        forceUpdate((prev) => prev + 1);
+        forceUpdate(prev => !prev);
     }, []);
 }
