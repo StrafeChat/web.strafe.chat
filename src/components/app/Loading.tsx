@@ -1,10 +1,10 @@
-import React from "react";
 import quotes from "@/assets/loading.json";
 import Image from "next/image";
+import React from "react";
 export default function LoadingScreen() {
   return (
 
-    <div className="bg-[#262626] flex items-center justify-center flex-col h-[100vh]">
+    <div className="bg-[#262626] flex items-center justify-center flex-col h-[100vh] py-3 px-5 text-center">
       <div className="flex flex-row items-center justify-center">
         <Image
           className="select-none"
