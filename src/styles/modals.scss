@@ -140,11 +140,12 @@ div.modal-full {
             font-weight: bold;
         }
 
-        button.save {
+        div.action {
             position: absolute;
             bottom: 1rem;
             right: 1rem;
-            background: hsl(var(--primary));
+            display: flex;
+            gap: 1rem;
         }
     }
 }
