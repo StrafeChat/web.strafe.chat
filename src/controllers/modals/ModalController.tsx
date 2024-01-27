@@ -3,6 +3,7 @@ import { ModalControllerState } from "@/types";
 import { AnimatePresence } from "framer-motion";
 import { Component, createContext } from "react";
 import { ClientControllerContext } from "../client/ClientController";
+import DeleteAccountModal from "./components/DeleteAccountModal";
 import EditDataModal from "./components/EditDataModal";
 import SettingsModal from "./components/SettingsModal";
 import StatusModal from "./components/StatusModal";
@@ -68,6 +69,12 @@ export default class ModalController extends Component<{ children: JSX.Element }
                                 return (
                                     <AnimatePresence key={key}>
                                         <EditDataModal name="edit-data" closeModal={this.closeModal} data={modal.data} />
+                                    </AnimatePresence>
+                                )
+                            case "delete-account":
+                                return (
+                                    <AnimatePresence key={key}>
+                                        <DeleteAccountModal name="delete-account" closeModal={this.closeModal} />
                                     </AnimatePresence>
                                 )
                         }
