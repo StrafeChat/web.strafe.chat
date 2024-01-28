@@ -78,16 +78,3 @@
   cursor: not-allowed;
   opacity: 0.25;
 }
-
-a {
-  color: hsl(var(--link));
-  transition-duration: 425ms;
-}
-
-a:active, button:active {
-  transform: scaleY(90%);
-}
-
-a:hover {
-  filter: brightness(75%);
-}
