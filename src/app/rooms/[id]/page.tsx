@@ -1,15 +1,13 @@
 "use client";
-import ChatHeader from "@/components/chat/ChatHeader";
-import ChatInput from "@/components/chat/ChatInput";
+
+import { ChatBody, ChatHeader, ChatInput } from "@/components/chat";
 
 export default function Page({ params }: { params: { id: string } }) {
 
   return (
     <>
       <ChatHeader type="pm" name={params.id} />
-      <div className="body">
-        <ul className="messages"></ul>
-      </div>
+      <ChatBody />
       <ChatInput placeholder={`Message @${params.id}`} />
     </>
   );

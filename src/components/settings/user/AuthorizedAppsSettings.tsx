@@ -1,13 +1,5 @@
-import React, { Component } from 'react'
-
-class AuthorizedAppsSettings extends Component {
- render() {
+export function AuthorizedAppsSettings() {
    return (
-     <div>
-        <h1 className="title">Authorized Apps</h1>
-     </div>
+      <h1 className="title">Authorized Apps</h1>
    )
- }
 }
-
-export default AuthorizedAppsSettings;

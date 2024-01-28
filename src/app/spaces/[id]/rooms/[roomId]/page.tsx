@@ -1,5 +1,6 @@
 "use client";
-import ChatHeader from "@/components/chat/ChatHeader";
+
+import { ChatHeader } from "@/components/chat";
 
 export default function Page({ params }: { params: { id: string, roomId: string } }) {
 

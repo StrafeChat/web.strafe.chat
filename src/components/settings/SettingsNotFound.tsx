@@ -1,4 +1,4 @@
-export default function SettingsNotFound() {
+export function SettingsNotFound() {
     return (
         <div></div>
     )

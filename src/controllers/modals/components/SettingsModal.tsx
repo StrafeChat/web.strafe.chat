@@ -1,7 +1,4 @@
-import SettingsNotFound from "@/components/settings/SettingsNotFound";
-import DesktopSettings from "@/components/settings/app/DesktopSettings";
-import AccountSettings from "@/components/settings/user/AccountSettings";
-import NotificationSettings from "@/components/settings/user/NotificationSettings";
+import { AccountSettings, AuthorizedAppsSettings, DesktopSettings, NotificationSettings, ProfileSettings, SettingsNotFound } from "@/components/settings";
 import { AnimatePresence, motion } from "framer-motion";
 import cookie from "js-cookie";
 import {
@@ -64,10 +61,10 @@ class SettingsModal extends Modal<{}, {}> {
                   switch (this.state.currentTab) {
                     case "account":
                       return <AccountSettings />
-                    // case "profile":
-                    //   return <ProfileSettings />
-                    // case "authorized-apps":
-                    //   return <AuthorizedApps />
+                    case "profile":
+                      return <ProfileSettings />
+                    case "authorized-apps":
+                      return <AuthorizedAppsSettings />
                     case "notifications":
                       return <NotificationSettings />
                     case "desktop":

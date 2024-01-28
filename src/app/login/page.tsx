@@ -1,5 +1,5 @@
 "use client";
-import ElectronTitleBar from "@/components/desktop/ElectronTitleBar";
+import { ElectronTitleBar } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";

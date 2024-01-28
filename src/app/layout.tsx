@@ -1,5 +1,5 @@
 "use client";
-import AppLayout from '@/components/app/AppLayout';
+import { AppLayout } from '@/components/shared';
 import { Toaster } from '@/components/ui/toaster';
 import ClientController from '@/controllers/client/ClientController';
 import ModalController from '@/controllers/modals/ModalController';

@@ -3,13 +3,12 @@ import { MOBILE_REGEX_CHECK } from "@/constants";
 import { useUI } from "@/providers/UIProvider";
 import { usePathname } from "next/navigation";
 import { ReactNode, useEffect } from "react";
+import { AppView, ElectronTitleBar } from ".";
 import "../../styles/app.scss";
-import ElectronTitleBar from "../desktop/ElectronTitleBar";
-import AppView from "./AppView";
-import RoomList from "./RoomList";
-import SpaceList from "./SpaceList";
+import SpaceList from "../spaces/SpaceList";
+import RoomList from "../rooms/RoomList";
 
-export default function AppLayout({
+export function AppLayout({
   children,
 }: {
   children: JSX.Element | ReactNode;

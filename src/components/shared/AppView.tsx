@@ -1,7 +1,7 @@
 import { useUI } from "@/providers/UIProvider";
 import { ReactNode } from "react";
 
-export default function AppView({ children }: { children: JSX.Element | ReactNode }) {
+export function AppView({ children }: { children: JSX.Element | ReactNode }) {
 
    const { hideRoomList } = useUI();
 

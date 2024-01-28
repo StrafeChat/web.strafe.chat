@@ -3,7 +3,7 @@ import { formatDiscrim } from "@/helpers/formatter";
 import { useClient, useForceUpdate, useModal } from "@/hooks";
 import { useState } from "react";
 
-export default function AccountSettings() {
+export function AccountSettings() {
 
     const { client } = useClient();
     const { openModal } = useModal();
@@ -14,14 +14,14 @@ export default function AccountSettings() {
         email: client?.user?.email!,
         phone_number: client?.user?.phone_number,
         discriminator: client?.user?.discriminator!,
-        locale: client?.user?.locale!,
+        // locale: client?.user?.locale!,
     });
 
     const [data, setData] = useState(savedData);
 
     const saveData = () => {
         console.log(data);
-        client?.user?.edit(data).catch((err) => console.error(err)).then(() => setSavedData(data));
+        client?.user?.edit(data).then(() => setSavedData(data));
         forceUpdate();
     }
 

@@ -1,12 +1,12 @@
 "use client";
-import EmailVerifcation from "@/components/app/EmailVerifcation";
-import LoadingScreen from "@/components/app/Loading";
+import EmailVerifcation from "@/components/auth/EmailVerifcation";
 import { useToast } from "@/components/ui/use-toast";
 import { Client } from "@strafechat/strafe.js";
 import cookie from "js-cookie";
 import { usePathname } from "next/navigation";
-import { Dispatch, SetStateAction, createContext, useCallback, useEffect, useRef, useState } from 'react';
+import { createContext, useCallback, useEffect, useRef, useState } from 'react';
 import { useForceUpdate } from "../../hooks";
+import { LoadingScreen } from "@/components/shared";
 
 export const ClientControllerContext = createContext<{ client: Client | null }>({
   client: null,

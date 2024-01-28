@@ -1,11 +1,9 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 
-export default function ChatInput({ placeholder }: { placeholder: string }) {
+export function ChatInput({ placeholder }: { placeholder: string }) {
 
     const ref = useRef<HTMLDivElement>(null);
-
-
 
     useEffect(() => {
     }, [ref.current]);

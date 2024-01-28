@@ -2,7 +2,7 @@ import { useUI } from "@/providers/UIProvider";
 import { ChatHeaderProps } from "@/types";
 import { FaArrowLeft, FaArrowRight, FaAt, FaHashtag, FaMagnifyingGlass, FaPhoneVolume } from 'react-icons/fa6';
 
-export default function ChatHeader({ type, name, icon }: ChatHeaderProps) {
+export function ChatHeader({ type, name, icon }: ChatHeaderProps) {
 
     const { hideRoomList, setHideRoomList } = useUI();
 

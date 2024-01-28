@@ -1,10 +1,10 @@
-import { useEffect } from "react";
-import { motion, useAnimation } from "framer-motion";
 import { useUI } from "@/providers/UIProvider";
-import PrivateMessages from "../rooms/PrivateMessages";
-import { usePathname } from "next/navigation";
+import { motion, useAnimation } from "framer-motion";
 import localForage from "localforage";
-import RoomsNav from "../spaces/RoomsNav";
+import { usePathname } from "next/navigation";
+import { useEffect } from "react";
+import PrivateMessages from "./PrivateMessageRoomList";
+import RoomsNav from "./SpaceRoomList";
 
 export default function RoomList() {
   const controls = useAnimation();
@@ -43,7 +43,7 @@ export default function RoomList() {
                 if (path.startsWith("/rooms")) return <PrivateMessages />;
                 if (path.startsWith("/spaces")) return <RoomsNav params={{
                   spaceId: paths[0],
-                  rooms: [{ id: "general", name: "general" }, { id: "off-topic", name: "off-topic"}]
+                  rooms: [{ id: "general", name: "general" }, { id: "off-topic", name: "off-topic" }]
                 }} />;
                 break;
             }

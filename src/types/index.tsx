@@ -40,6 +40,13 @@ export interface UI {
     setIsMobile: Dispatch<SetStateAction<boolean>>;
 }
 
+export interface IRoomContext {
+    room: string;
+    rooms: string[];
+    setRoom: Dispatch<SetStateAction<string>>;
+    setRooms: Dispatch<SetStateAction<string[]>>;
+}
+
 export interface ModalControllerState {
     openModals: {
         name: string;
