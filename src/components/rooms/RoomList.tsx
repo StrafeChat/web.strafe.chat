@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import PrivateMessages from "./PrivateMessageRoomList";
 import RoomsNav from "./SpaceRoomList";
-
+let isMoible = typeof window !== "undefined" && window.innerWidth < 768;
 export default function RoomList() {
   const controls = useAnimation();
   const { hideRoomList, setHideRoomList } = useUI();
@@ -14,22 +14,26 @@ export default function RoomList() {
   useEffect(() => {
     localForage.getItem<boolean>("hide_room_list").then((hidden) => {
       setHideRoomList(!!hidden);
+      console.log("hide_room_list", hidden);
+      
     })
-  }, []);
+  }, [setHideRoomList]);
 
   useEffect(() => {
     controls.start({ width: hideRoomList ? 0 : "auto" });
     localForage.setItem("hide_room_list", hideRoomList);
+    typeof window !== "undefined" && window.dispatchEvent(new Event("hide-sidebar"))
   }, [hideRoomList, controls]);
 
   const paths = path.trim().split("/").filter((x) => x !== "" && x !== "spaces" && x !== "rooms");
+
 
   return (
     <>
       <motion.div
         style={{ width: "100%", overflow: "hidden" }}
         initial={false}
-        animate={{ width: hideRoomList ? 0 : "auto" }}
+        animate={{ width: hideRoomList ? 0 : "auto"}}
         transition={{ duration: 0.5, ease: "easeIn" }}
       >
         <div className="room-list">

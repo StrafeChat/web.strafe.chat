@@ -1,25 +1,35 @@
 import { useClient, useModal } from "@/hooks";
 import Link from "next/link";
+import { useState } from "react";
 import { FaCompass, FaGear, FaPenToSquare, FaPlus } from "react-icons/fa6";
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "../ui/context-menu";
 import { NavLink } from "../shared";
-
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "../ui/context-menu";
+let isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+typeof window !== "undefined" && window.addEventListener("resize", () => {
+   isMobile = window.innerWidth < 768;
+});
 export default function SpaceList() {
-
+   let [hide, setHide] = useState(false);
    const { openModal } = useModal();
    const { client } = useClient();
 
+   if (typeof window !== "undefined" && isMobile) {
+      window.addEventListener("hide-sidebar", () => {
+         setHide(!hide);
+      });
+   }
+   console.log(`mobile user: ${isMobile}`);
    return (
-      <div className="space-list">
+      <div className="space-list"  >
          <ContextMenu>
             <ContextMenuTrigger>
-               <Link href="/">
+               <NavLink href="/">
                   <button>
                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                     <img src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${client?.user?.id}/${client?.user?.avatar}`} alt="Avatar"></img>
+                     <img src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${client?.user?.id}/${client?.user?.avatar}`} className="avatar" alt="Avatar"></img>
                      <div className={`avatar-status ${client?.user?.presence.status}`}></div>
                   </button>
-               </Link>
+               </NavLink>
             </ContextMenuTrigger>
             <ContextMenuContent>
                <ContextMenuItem onClick={() => openModal("settings")} className="flex gap-2 items-center"><FaGear className="w-3 h-3 rounded-full" /> Settings</ContextMenuItem>
@@ -36,7 +46,7 @@ export default function SpaceList() {
          <div className="seperator" />
          <div className="spaces">
             <div>
-               <NavLink href="/spaces/strafe">
+               <NavLink href="/spaces/Strafe">
                   <button className="space">
                      {/* eslint-disable-next-line @next/next/no-img-element */}
                      <img className="space" src="https://cdn.discordapp.com/icons/1125943618876735500/03625cebd9f4304c834c07625f2a4f1e.webp?size=4096" alt=""></img>
@@ -55,7 +65,7 @@ export default function SpaceList() {
 
          <div className="seperator" />
 
-         <button className="primary disabled">
+         <button className="primary" onClick={() => openModal("create-space")}>
             <FaPlus />
          </button>
          <button className="primary disabled">
