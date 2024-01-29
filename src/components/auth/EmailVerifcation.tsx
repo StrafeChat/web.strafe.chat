@@ -1,3 +1,4 @@
+"use client"
 import { ElectronTitleBar } from "@/components/shared";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
@@ -5,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/use-toast";
 import { validateVerify } from "@/helpers/validator";
-import { useClient } from "@/hooks";
+import { useClient, useForceUpdate } from "@/hooks";
 import { useUI } from "@/providers/UIProvider";
 import { Verify } from "@/types";
 import cookie from "js-cookie";
@@ -21,6 +22,7 @@ export default function EmailVerifcation() {
     });
     const { client } = useClient();
     const { electron } = useUI();
+    const forceUpdate = useForceUpdate();
 
     const handleSubmit = async (event: FormEvent) => {
         event.preventDefault();
@@ -55,7 +57,14 @@ export default function EmailVerifcation() {
 
         // @ts-ignore
         client.user = { ...client.user, verified: true };
-        Router.reload();
+        forceUpdate();
+        
+        toast({
+            title: "Email Verified",
+            description: "You have successfully verified your email.",
+        });
+        
+        // Router.reload();
     }
 
     return (
