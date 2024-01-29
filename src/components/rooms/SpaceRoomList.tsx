@@ -7,6 +7,7 @@ interface Room {
 }
 
 export default function SpaceRoomList({ params }: { params: { spaceId: string, rooms: Room[] } }) {
+    
     return (
         <>
             <div className="header">
