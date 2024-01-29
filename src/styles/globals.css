@@ -8,7 +8,7 @@
     --background: 0 0% 8%;
     --foreground: 0 0% 98%;
 
-    --card: 194 , 19%, 14%;
+    --card: 194, 19%, 14%;
     --card-foreground: 0 0% 98%;
 
     --popover: 0 0% 3.9%;
@@ -77,4 +77,8 @@
 *.disabled {
   cursor: not-allowed;
   opacity: 0.25;
+}
+
+a.link {
+  color: hsl(var(--link))
 }
