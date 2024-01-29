@@ -7,6 +7,7 @@ import DeleteAccountModal from "./components/DeleteAccountModal";
 import EditDataModal from "./components/EditDataModal";
 import SettingsModal from "./components/SettingsModal";
 import StatusModal from "./components/StatusModal";
+import CreateSpaceModal from "./components/CreateSpaceModal";
 
 export const ModalControllerContext = createContext({
     openModal: (_name: string, _data?: any) => { },
@@ -77,6 +78,13 @@ export default class ModalController extends Component<{ children: JSX.Element }
                                         <DeleteAccountModal name="delete-account" closeModal={this.closeModal} />
                                     </AnimatePresence>
                                 )
+                            case "create-space":
+                                return (
+                                    <AnimatePresence key={key}>
+                                        <CreateSpaceModal name="create-space" closeModal={this.closeModal} />
+                                    </AnimatePresence>
+                                )
+
                         }
                     })}
                 </>
