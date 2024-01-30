@@ -1,94 +1,143 @@
 "use client";
-import "./styles.scss";
-import { FormEvent, useState } from "react";
+import { ElectronTitleBar } from "@/components/shared";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/use-toast";
+import { validateReigster } from "@/helpers/validator";
+import { useUI } from "@/providers/UIProvider";
+import type { Register } from "@/types";
 import cookie from "js-cookie";
-import ElectronTitleBar from "@/components/ElectronTitleBar";
+import Image from "next/image";
+import Link from "next/link";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import "../../styles/auth.css";
 
 export default function Register() {
 
-  const date = new Date();
+    const date = new Date();
+    const { electron } = useUI();
+    const { toast } = useToast()
+    const [captchaImage, setCaptchaImage] = useState<string | null>(null)
 
-  const [register, setRegister] = useState({
-    email: "",
-    username: "",
-    discriminator: "9999",
-    password: "",
-    dob: `${date.getFullYear()}-${date.getMonth() + 1}-${date.getDate()}`,
-  })
+    const [register, setRegister] = useState<Register>({
+        email: "",
+        global_name: undefined,
+        username: "",
+        discriminator: (Math.floor(Math.random() * 9999) + 1).toString().padStart(4, '0'),
+        password: "",
+        dob: `${date.getFullYear()}-${(date.getMonth() + 1).toString().padStart(2, '0')}-${date.getDate().toString().padStart(2, '0')}`,
+        captcha: "",
+    });
 
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [electron, _setElectron] = useState(false);
+    const fetchCaptcha = useCallback(async () => {
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API}/auth/captcha`, {
+            credentials: "include",
+        });
+
+        if (!res.ok) return console.error("Failed to load captcha");
+        const data: { image: string } = await res.json();
+        setCaptchaImage(data.image);
+    }, []);
+
+    const fetchCaptchaCalled = useRef(false);
+
+    useEffect(() => {
+        if (!fetchCaptchaCalled.current) {
+            fetchCaptcha();
+            fetchCaptchaCalled.current = true;
+        }
+    }, [fetchCaptcha]);
 
 
-  const handleSubmit = async (event: FormEvent) => {
-    event.preventDefault();
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API}/auth/register`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          ...register,
-          discriminator: parseInt(register.discriminator),
-          locale: navigator.language,
-        }),
-      });
+    const handleSubmit = async (event: FormEvent) => {
+        event.preventDefault();
+        event.stopPropagation();
 
-      const data = await res.json();
+        const parsedDiscrim = parseInt(register.discriminator.toString());
 
-      if (!res.ok) return setErrorMessage(data.message);
-      
-      cookie.set("token", data.token);
-      window.location.href = '/';
-    } catch (err) {
+        const { status, message } = validateReigster({ ...register, discriminator: parsedDiscrim });
 
+        if (status == 0) return toast({
+            title: "Registration Failed",
+            description: message,
+            className: "bg-destructive"
+        })
+
+
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API}/auth/register`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            credentials: "include",
+            body: JSON.stringify({ ...register, discriminator: parseInt(register.discriminator.toString()), locale: navigator.language }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) return toast({
+            title: "Registration Failed",
+            description: data.message,
+            className: "bg-destructive"
+        });
+
+        cookie.set("token", data.token);
+        window.location.href = "/";
     }
-  };
 
-  return (
-    <>
-    { electron && <ElectronTitleBar /> }
-    <main>
-      <form onSubmit={handleSubmit}>
-        <h1>Register</h1>
-        <ul>
-          <li>
-            <Label htmlFor="email">Email</Label>
-            <Input autoComplete="email" id="email" placeholder="username@strafe.chat" value={register.email} onChange={(event) => setRegister({ ...register, email: event.target.value })} />
-          </li>
-          <li className="flex flex-row gap-4">
-            <div className="w-full">
-              <Label htmlFor="username">Username</Label>
-              <Input autoComplete="username" id="username" placeholder="strafe" value={register.username} onChange={(event) => setRegister({ ...register, username: event.target.value })} />
+    return !captchaImage ? <div className="align-center">Loading...</div> : (
+        <div className="flex flex-col w-full h-full">
+            {electron && <ElectronTitleBar />}
+            <div className="backdrop align-center">
+                <div className="watermark"><Link target="_blank" href={"https://stocksnap.io/author/alteredreality"}> Altered Reality • stocksnap.io</Link></div>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Sign Up</CardTitle>
+                        <CardDescription>Create an account to get started with Strafe!</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={handleSubmit}>
+                            <div className="field">
+                                <Label htmlFor="email">Email</Label>
+                                <Input value={register.email} onChange={(event) => setRegister({ ...register, email: event.target.value })} autoComplete="email" id="email" type="email" />
+                            </div>
+                            <div className="field">
+                                <Label htmlFor="displayname">Display Name</Label>
+                                <Input value={register.global_name} onChange={(event) => setRegister({ ...register, global_name: event.target.value })} autoComplete="displayname" id="displayname" type="text" />
+                            </div>
+                            <div className="field-wrapper">
+                                <div className="field-full">
+                                    <Label htmlFor="username" aria-required={"true"}>Username</Label>
+                                    <Input value={register.username} onChange={(event) => setRegister({ ...register, username: event.target.value })} autoComplete="username" id="username" type="text" />
+                                </div>
+                                <div className="field">
+                                    <Label htmlFor="discriminator">Tag</Label>
+                                    <Input value={register.discriminator} onChange={(event) => setRegister({ ...register, discriminator: event.target.value })} autoComplete="off" id="discriminator" type="text" />
+                                </div>
+                            </div>
+                            <div className="field">
+                                <Label htmlFor="password">Password</Label>
+                                <Input value={register.password} onChange={(event) => setRegister({ ...register, password: event.target.value })} autoComplete="current-password" id="password" type="password" />
+                            </div>
+                            <div className="field">
+                                <Label>Date of Birth</Label>
+                                <Input value={register.dob} onChange={(event) => setRegister({ ...register, dob: event.target.value })} type="date" />
+                            </div>
+                            <div className="field">
+                                <Label>Captcha</Label>
+                                <Image src={captchaImage} width={250} height={150} className="w-full rounded-md" alt="captcha" />
+                                <Input className="mt-2" onChange={(event) => setRegister({ ...register, captcha: event.target.value })} />
+                            </div>
+                            <Button>Register</Button>
+                        </form>
+                    </CardContent>
+                    <CardFooter>
+                        <Link href={"/login"}>Already have an account?</Link>
+                    </CardFooter>
+                </Card>
             </div>
-            <div className="w-fit">
-              <Label htmlFor="discriminator">Tag</Label>
-              <Input id="discriminator" placeholder="0001" maxLength={4} value={register.discriminator} onChange={(event) => setRegister({ ...register, discriminator: event.target.value })} />
-            </div>
-          </li>
-          <li>
-            <Label htmlFor="password">Password</Label>
-            <Input id="password" type="password" placeholder="********" value={register.password} onChange={(event) => setRegister({ ...register, password: event.target.value })} />
-          </li>
-          <li>
-            <Label htmlFor="dob">Date of Birth</Label>
-            <Input type="date" id="dob" value={register.dob} onChange={(event) => setRegister({ ...register, dob: event.target.value })} />
-          </li>
-        </ul>
-        {errorMessage && (
-          <div className="error-message">
-            <p><span className="font-bold">ERROR</span> • <span className="error-message-content">{errorMessage}</span></p>
-          </div>
-        )}
-        <div className="submit">
-          <Button>Register</Button>
         </div>
-      </form>
-    </main>
-    </>
-  );
+    )
 }

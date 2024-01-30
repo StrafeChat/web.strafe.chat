@@ -1,16 +1,29 @@
 "use client";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import {
-  faStickyNote,
-} from "@fortawesome/free-solid-svg-icons";
+import { useUI } from "@/providers/UIProvider";
+import { FaNoteSticky, FaArrowRight, FaArrowLeft } from "react-icons/fa6";
 
 export default function Notes() {
 
-  return (
-    <div className="friends">
+   const { hideRoomList, setHideRoomList } = useUI();
+
+   return (
+    <>
       <div className="header">
-        <h1><FontAwesomeIcon icon={faStickyNote}/>&nbsp;&nbsp;<b>Notes</b></h1>
+        <span className="flex items-center gap-[3px]">
+          {hideRoomList ? (
+            <>
+              <FaNoteSticky onClick={(event: MouseEvent) => setHideRoomList(!hideRoomList)} />
+              <FaArrowRight className="!w-[12px] !h-[12px]" onClick={() => setHideRoomList(!hideRoomList)} />
+            </>
+          ) : (
+            <>
+              <FaArrowLeft className="!w-[13px] !h-[13px]" onClick={() => setHideRoomList(!hideRoomList)} />
+              <FaNoteSticky onClick={(event: MouseEvent) => setHideRoomList(!hideRoomList)} />
+            </>
+          )}
+        </span>
+        <span><b>Notes</b></span>
       </div>
-    </div>
-  );
+    </>
+   )
 }

@@ -1,39 +1,34 @@
-
-import type { Metadata } from "next";
-import "./globals.scss";
-import { Roboto } from "next/font/google";
-import { AuthProvider } from "@/context/AuthContext";
-import Layout from "@/components/Layout";
-
-export const metadata: Metadata = {
-  title: "StrafeChat",
-  description: "A chatting application",
-};
-
-const roboto = Roboto({
-  weight: "400",
-  subsets: ["latin"],
-});
+"use client";
+import { AppLayout } from '@/components/shared';
+import { Toaster } from '@/components/ui/toaster';
+import ClientController from '@/controllers/client/ClientController';
+import ModalController from '@/controllers/modals/ModalController';
+import UIProvider from '@/providers/UIProvider';
+import '../styles/globals.css';
+import "../styles/shadcn.css";
 
 export default function RootLayout({
   children,
 }: {
-  children: React.ReactNode;
+  children: React.ReactNode
 }) {
 
   return (
-    <html lang="en" className={roboto.className}>
+    <html lang="en">
+      <head>
+        <title>Strafe Chat</title>
+        <meta name='description' content='Make your censorship worries go down the drain with Straf Chat' />
+      </head>
       <body>
-        <AuthProvider>
-          <div id="app-root" className="overflow-hidden">
-            <Layout>
-              <>
-              {children}
-              </>
-            </Layout>
-          </div>
-        </AuthProvider>
+        <ClientController>
+          <ModalController>
+            <UIProvider>
+              <AppLayout>{children}</AppLayout>
+            </UIProvider>
+          </ModalController>
+        </ClientController>
+        <Toaster />
       </body>
     </html>
-  );
+  )
 }

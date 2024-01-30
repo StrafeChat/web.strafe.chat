@@ -1,96 +1,29 @@
 "use client";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faUserGroup } from "@fortawesome/free-solid-svg-icons";
-import { useState } from "react";
-import AddFriendModal from "@/components/modals/AddFriendModal";
-import { User, useAuth } from "@/context/AuthContext";
-import PendingFriends from "@/components/friends/PendingFriends";
-import AllFriends from "@/components/friends/AllFriends";
-import OnlineFriends from "@/components/friends/OnlineFriends";
-import BlockedUsers from "@/components/friends/BlockedUsers";
+import { useUI } from "@/providers/UIProvider";
+import { FaUserGroup, FaArrowRight, FaArrowLeft } from "react-icons/fa6";
 
 export default function Friends() {
-  const [tab, setTab] = useState("online");
-  const [showAddFriend, setShowAddFriend] = useState(false);
 
-  const { user, relationships } = useAuth();
+   const { setHideRoomList, hideRoomList } = useUI();
 
-  return (
+   return (
     <>
       <div className="header">
-        <h1 className="title">
-          <FontAwesomeIcon icon={faUserGroup} />
-          &nbsp;&nbsp;<b>Friends</b>
-        </h1>
-        <div className="tabs">
-          <button
-            className={tab == "online" ? "active" : ""}
-            onClick={() => setTab("online")}
-          >
-            Online
-          </button>
-          <button
-            className={tab == "all" ? "active" : ""}
-            onClick={() => setTab("all")}
-          >
-            All
-          </button>
-          <button
-            className={tab == "pending" ? "active" : ""}
-            onClick={() => setTab("pending")}
-          >
-            Pending
-          </button>
-          <button
-            className={tab == "blocked" ? "active" : ""}
-            onClick={() => setTab("blocked")}
-          >
-            Blocked
-          </button>
-          <button className="add-friend" onClick={() => setShowAddFriend(true)}>
-            Add Friend
-          </button>
-        </div>
+        <span className="flex items-center gap-[3px]">
+          {hideRoomList ? (
+            <>
+              <FaUserGroup onClick={() => setHideRoomList(!hideRoomList)} />
+              <FaArrowRight className="!w-[12px] !h-[12px]" onClick={() => setHideRoomList(!hideRoomList)} />
+            </>
+          ) : (
+            <>
+              <FaArrowLeft className="!w-[13px] !h-[13px]" onClick={() => setHideRoomList(!hideRoomList)} />
+              <FaUserGroup onClick={() => setHideRoomList(!hideRoomList)} />
+            </>
+          )}
+        </span>
+        <span><b>Friends</b></span>
       </div>
-      <div className="body">
-        {tab == "online" && (
-          <OnlineFriends
-            relationships={relationships.filter((relationship) => {
-              const currentUser: User =
-                relationship.receiver_id != user.id
-                  ? relationship.receiver
-                  : relationship.sender;
-
-              return (
-                relationship.status == "accepted" &&
-                (currentUser.presence.online && currentUser.presence.status != "offline")
-              );
-            })}
-          />
-        )}
-        {tab == "all" && (
-          <AllFriends
-            relationships={relationships.filter(
-              (relationship) => relationship.status == "accepted"
-            )}
-          />
-        )}
-        {tab == "pending" && (
-          <PendingFriends
-            relationships={relationships.filter(
-              (relationship) => relationship.status == "pending"
-            )}
-          />
-        )}
-        {tab == "blocked" && (
-          <BlockedUsers
-            relationships={relationships.filter(
-              (relationship) => relationship.status == "blocked"
-            )}
-          />
-        )}
-      </div>
-      {showAddFriend && <AddFriendModal show={showAddFriend} set={setShowAddFriend} />}
     </>
-  );
+   )
 }

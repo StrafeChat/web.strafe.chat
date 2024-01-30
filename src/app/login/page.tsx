@@ -1,74 +1,90 @@
 "use client";
-import "./styles.scss";
-import { FormEvent, useState } from "react";
+import { ElectronTitleBar } from "@/components/shared";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/use-toast";
+import { validateLogin } from "@/helpers/validator";
+import { useUI } from "@/providers/UIProvider";
+import { Login } from "@/types";
 import cookie from "js-cookie";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
-import ElectronTitleBar from "@/components/ElectronTitleBar";
+import { FormEvent, useState } from "react";
+import "../../styles/auth.css";
 
-export default function Login() {
-  const [register, setRegister] = useState({
-    email: "",
-    password: ""
-  });
+export default function Page() {
 
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
-  const [electron, _setElectron] = useState(false);
+    const { toast } = useToast();
+    const { electron } = useUI();
+    const [login, setLogin] = useState<Login>({
+        email: "",
+        password: "",
+    });
 
-  const handleSubmit = async (event: FormEvent) => {
-    event.preventDefault();
+    const handleSubmit = async (event: FormEvent) => {
+        event.preventDefault();
+        event.stopPropagation();
 
-    try {
-      const res = await fetch(`${process.env.NEXT_PUBLIC_API}/auth/login`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json"
-        },
-        body: JSON.stringify(register)
-      });
+        const { status, message } = validateLogin({ ...login });
 
-      const data = await res.json();
+        if (status == 0) return toast({
+            title: "Registration Failed",
+            description: message,
+            className: "bg-destructive"
+        })
 
-      if (!res.ok) return setErrorMessage(data.message);
 
-      cookie.set("token", data.token);
-      window.location.href = '/';
-    } catch (err) {
-      console.error(err);
-      setErrorMessage("An unexpected error occurred");
+        const res = await fetch(`${process.env.NEXT_PUBLIC_API}/auth/login`, {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            credentials: "include",
+            body: JSON.stringify({ ...login }),
+        });
+
+        const data = await res.json();
+
+        if (!res.ok) return toast({
+            title: "Login Failed",
+            description: data.message,
+            className: "bg-destructive"
+        });
+
+        cookie.set("token", data.token);
+        window.location.href = "/";
     }
-  };
 
-  return (
-    <>
-   { electron && <ElectronTitleBar /> }
-    <main>
-      <form onSubmit={handleSubmit}>
-        <h1>Login</h1>
-        <ul>
-          <li>
-            <Label>Email</Label>
-            <Input type="email" autoComplete={"email"} value={register.email} onChange={(event) => setRegister({ ...register, email: event.target.value })} placeholder="username@strafe.chat" />
-          </li>
-          <li>
-            <Label>Password</Label>
-            <Input type="password" autoComplete={"current-password"} value={register.password} onChange={(event) => setRegister({ ...register, password: event.target.value })} placeholder="********" />
-          </li>
-        </ul>
-        {errorMessage && (
-          <div className="error-message">
-            <p><span className="font-bold">ERROR</span> • <span className="error-message-content">{errorMessage}</span></p>
-          </div>
-        )}
-        <div className="submit">
-          <Button>Login</Button>
+    return (
+        <div className="flex flex-col w-full h-full">
+            {electron && <ElectronTitleBar />}
+            <div className="backdrop align-center">
+                <div className="watermark"><Link target="_blank" href={"https://stocksnap.io/author/alteredreality"}> Altered Reality • stocksnap.io</Link></div>
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Login</CardTitle>
+                        <CardDescription>Login to your Strafe account to procced!</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <form onSubmit={handleSubmit}>
+                            <div className="field">
+                                <Label htmlFor="email">Email</Label>
+                                <Input value={login.email} onChange={(event) => setLogin({ ...login, email: event.target.value })} autoComplete="email" id="email" type="email" />
+                            </div>
+                            <div className="field">
+                                <Label htmlFor="password">Password</Label>
+                                <Input value={login.password} onChange={(event) => setLogin({ ...login, password: event.target.value })} autoComplete="current-password" id="password" type="password" />
+                            </div>
+                            <Button>Login</Button>
+                        </form>
+                    </CardContent>
+                    <CardFooter>
+                        <Link href={"/register"}>Need an account?</Link>
+                    </CardFooter>
+                </Card>
+
+            </div>
         </div>
-        <Link href={"/register"}>Need an account?</Link>
-      </form>
-    </main>
-    </>
-  );
+    )
 }

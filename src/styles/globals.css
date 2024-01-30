@@ -1,0 +1,84 @@
+@import url('https://fonts.googleapis.com/css2?family=Cairo:wght@200;300;400;425;600;700;800;900;1000&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 0 0% 8%;
+    --foreground: 0 0% 98%;
+
+    --card: 194, 19%, 14%;
+    --card-foreground: 0 0% 98%;
+
+    --popover: 0 0% 3.9%;
+    --popover-foreground: 0 0% 98%;
+
+    --primary: 142 71% 45%;
+    --primary-foreground: 0 0% 9%;
+
+    --secondary: 0 0% 14.9%;
+    --secondary-foreground: 0 0% 98%;
+
+    --muted: 0 0% 14.9%;
+    --muted-foreground: 0 0% 54%;
+
+    --accent: 0 0% 14.9%;
+    --accent-foreground: 0 0% 98%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 98%;
+
+    --server-list: var(--background);
+    --room-list: 0 0% 12%;
+    --app-view: 0 0% 15%;
+    --seperator: 0 0% 15%;
+    --chat-input: 0 0% 22%;
+    --modal-sidebar: 0 0% 10%;
+    --modal-sidebar-tab: 0 0% 15%;
+    --modal-sidebar-foreground: 0 0% 20%;
+    --modal: 0 0% 12%;
+    --modal-window: 0 0% 5%;
+
+    --link: 173 80% 40%;
+    --border: 0 0% 9%;
+    --input: 0 0% 14.9%;
+    --ring: 0 0% 83.1%;
+
+    --radius: 0.5rem;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+    font-family: 'Cairo', sans-serif;
+  }
+
+  body {
+    @apply bg-background text-foreground m-0;
+    height: 100vh;
+    width: 100vw;
+  }
+}
+
+*.align-center {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  justify-content: center;
+  align-items: center;
+}
+
+* {
+  user-select: none;
+}
+
+*.disabled {
+  cursor: not-allowed;
+  opacity: 0.25;
+}
+
+a.link {
+  color: hsl(var(--link))
+}
