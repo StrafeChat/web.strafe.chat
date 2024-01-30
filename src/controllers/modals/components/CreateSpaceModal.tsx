@@ -38,7 +38,7 @@ class CreateSpaceModal extends Modal<{}, {}> {
                                             <Button type='submit' className='w-full'>Create</Button>
                                             <Button type='button' className='w-full' onClick={() => this.close()}>Cancel</Button>
                                         </div>
-                                        <Link href={"javascript:void(0)"} className='link' onClick={() => this.setState({ type: "join" })}>Join a space instead?</Link>
+                                        <Link href={""} className='link' onClick={() => this.setState({ type: "join" })}>Join a space instead?</Link>
                                     </form>
                                 )
                             case 'join':
@@ -55,7 +55,7 @@ class CreateSpaceModal extends Modal<{}, {}> {
                                                 <Button type='submit' className='w-full'>Join</Button>
                                                 <Button type='button' className='w-full' onClick={() => this.close()}>Cancel</Button>
                                             </div>
-                                            <Link href={"javascript:void(0)"} className='link' onClick={() => this.setState({ type: "create" })}>Create a space instead?</Link>
+                                            <Link href={""} className='link' onClick={() => this.setState({ type: "create" })}>Create a space instead?</Link>
                                     </form>
                                 )
                             default:
