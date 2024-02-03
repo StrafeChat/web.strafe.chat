@@ -1,7 +1,7 @@
+import { useState } from "react";
 import { FaHouseChimney, FaNoteSticky, FaUserGroup } from "react-icons/fa6";
 import { NavLink } from "../shared";
-
-export default function PrivateMessageRoomList() {
+function Room(){
     return (
         <>
             <div className="header">
@@ -46,4 +46,20 @@ export default function PrivateMessageRoomList() {
             </ul>
         </>
     )
+}
+export default function PrivateMessageRoomList() {
+    let [hide, setHidden] = useState(false)
+    let isMobile = window.innerWidth < 768
+    window.addEventListener("hide-sidebar", () => setHidden(!hide))
+    switch (isMobile) {
+      case true:
+      if(!hide) return null;
+      return (
+        <Room />
+     )
+     default:
+        return (
+            <Room />
+        )
+    }
 }

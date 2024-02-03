@@ -1,12 +1,12 @@
 "use client";
 import { useUI } from "@/providers/UIProvider";
-import { FaArrowRight, FaArrowLeft, FaHouseChimney } from "react-icons/fa6";
+import { FaArrowLeft, FaArrowRight, FaHouseChimney } from "react-icons/fa6";
 
 export default function Page({ params }: { params: { id: string, roomId: string } }) {
 
-   const { hideRoomList, setHideRoomList } = useUI();
+  const { hideRoomList, setHideRoomList } = useUI();
 
-   return (
+  return (
     <>
       <div className="header">
         <span className="flex items-center gap-[3px]">
@@ -25,5 +25,5 @@ export default function Page({ params }: { params: { id: string, roomId: string 
         <span><b>{params.id}</b></span>
       </div>
     </>
-   )
+  )
 }

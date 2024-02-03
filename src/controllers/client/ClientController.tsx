@@ -57,15 +57,14 @@ export default function ClientController({ children }: { children: JSX.Element }
         window.location.href = "/login";
       } else {
         setClientError(true);
-        setTimeout(() => {
-          toast({
-            title: "Something went wrong!",
-            description: err.message,
-            duration: 5000,
-            className: "bg-destructive"
-          });
-        }, 1000);
-      }
+          // toast({
+          //   title: "Something went wrong!",
+          //   description: err.message,
+          //   duration: 1000,
+          //   className: "bg-destructive"
+          // });
+          console.error("ERROR:", err.message)
+     }
     });
 
     connected.current = true;
