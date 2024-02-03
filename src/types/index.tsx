@@ -4,6 +4,7 @@ import { IconType } from "react-icons";
 
 export interface NavLinkProps extends LinkProps {
     children: JSX.Element | JSX.Element[] | string;
+    activate?: string[];
 }
 
 export interface ChatHeaderProps {
