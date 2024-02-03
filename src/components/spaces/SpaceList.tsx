@@ -20,10 +20,12 @@ export default function SpaceList() {
    }
    console.log(`mobile user: ${isMobile}`);
    return (
-      <div className="space-list"  >
+      <div className="space-list"
+         style={{ display: hide && isMobile ? "none" : "" }}
+      >
          <ContextMenu>
             <ContextMenuTrigger>
-               <NavLink href="/">
+               <NavLink href="/" activate={["/friends", "/notes", "/rooms"]}>
                   <button>
                      {/* eslint-disable-next-line @next/next/no-img-element */}
                      <img src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${client?.user?.id}/${client?.user?.avatar}`} className="avatar" alt="Avatar"></img>

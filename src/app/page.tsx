@@ -11,12 +11,16 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useEffect, useState } from "react";
 import { FaArrowLeft, FaArrowRight, FaHouseChimney } from 'react-icons/fa6';
-
+let isOnMobile = window.innerWidth < 768
 export default function Home() {
 
   const { hideRoomList, setHideRoomList } = useUI();
   const [greeting, setGreeting] = useState("");
   const { client } = useClient();
+  let [hidden, setHiden] = useState(false)
+  typeof window !== "undefined" && window.addEventListener('hide-sidebar', (e) => {
+    setHiden(!hidden)
+  })
 
   useEffect(() => {
     const getTimeBasedGreeting = () => {
@@ -39,7 +43,9 @@ export default function Home() {
 
   return (
     <>
-      <div className="header">
+      <div className="header"
+
+      >
         <span className="flex items-center gap-[3px]">
           {hideRoomList ? (
             <>
@@ -55,7 +61,10 @@ export default function Home() {
         </span>
         <span><b>Home</b></span>
       </div>
-      <div className="home overflow-auto">
+      <div className="home overflow-auto"
+       
+        style={hidden && isOnMobile ? { visibility: 'hidden' } : {visibility: 'visible'}}
+      >
         <div className="w-full container flex flex-col items-center justify-center h-full py-[100px] text-white">
           <h1 className={`text-5xl font-bold text-[#323C31]-primaryText`}>
             {greeting}, {client?.user?.global_name || client?.user?.username}.
