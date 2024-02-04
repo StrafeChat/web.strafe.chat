@@ -1,0 +1,168 @@
+{
+    "home_page": {
+        "header": "Startpagina",
+        "greeting": {
+            "morning": "Goedemorgen, {display_name}.",
+            "afternoon": "Goedendag, {display_name}.",
+            "evening": "Goedeavond, {display_name}. ",
+            "night": "Goede nacht: {display_name}.",
+            "welcome": "Welcome to Strafe, let's get started."
+        },
+        "nav_buttons": {
+            "create_space": {
+                "title": "Maak een ruimte",
+                "description": "Bouw en pas JOUW gemeenschap, JOUW manier."
+            },
+            "discover": {
+                "title": "Ontdekken Strafe",
+                "description": "Vind belangen! Ontdek bots, ruimtes en meer!"
+            },
+            "settings": {
+                "title": "Instellingen verkennen",
+                "description": "Gebruik JOUW manier om je ervaring aan te passen."
+            },
+            "updated": {
+                "title": "Blijf geüpdatet",
+                "description": "Kom bij de officiële Strafe Space om op de hoogte te blijven!"
+            }
+        },
+        "latest_updates": {
+            "title": "Laatste updates"
+        }
+    },
+    "friends_page": {
+        "header": "Vrienden"
+    },
+    "notes_page": {
+        "header": "Aantekeningen"
+    },
+    "pm_page": {
+        "message_placeholder": "Bericht @{display_name}"
+    },
+    "space": {
+        "room": {
+            "message_placeholder": "Bericht #{channel_name}"
+        }
+    },
+    "modals": {
+        "create_space": {
+            "title": "Voeg een space toe",
+            "input": {
+                "title": "Ruimtenaam",
+                "placeholder": "Mijn fantastische ruimte"
+            },
+            "buttons": {
+                "create": "Creëren",
+                "cancel": "Terug"
+            },
+            "switch": "Heb je al een uitnodiging?"
+        },
+        "join_space": {
+            "title": "Aan space deelnemen",
+            "input": {
+                "title": "Uitnodigingslink",
+                "placeholder": "1a2b3c"
+            },
+            "buttons": {
+                "join": "Word lid van space",
+                "cancel": "Terug"
+            },
+            "switch": "Zelf één creëren?"
+        },
+        "custom_status": {
+            "title": "Gepersonaliseerde status instellen",
+            "buttons": {
+                "save": "Opslaan",
+                "cancel": "Terug"
+            }
+        },
+        "settings": {
+            "navbar": {
+                "user_settings": {
+                    "header": "Gebruikersinstellingen",
+                    "my_account": "Mijn Account",
+                    "profile": "Profielen",
+                    "authorized_apps": "Goedgekeurde apps"
+                },
+                "app_settings": {
+                    "header": "App Instellingen",
+                    "notifications": "Meldingen",
+                    "desktop": "Windows-instellingen"
+                },
+                "others": {
+                    "logout": "Afmelden"
+                }
+            },
+            "my_account": {
+                "header": "Mijn Account",
+                "edit_data_01": {
+                    "username": {
+                        "title": "Weergavenaam",
+                        "buttons": {
+                            "edit": "Bewerken"
+                        }
+                    },
+                    "discriminator": {
+                        "title": "Onderscheidingsteken",
+                        "buttons": {
+                            "edit": "Bewerken"
+                        }
+                    },
+                    "email": {
+                        "title": "Email",
+                        "buttons": {
+                            "edit": "Bewerken"
+                        }
+                    },
+                    "password": {
+                        "title": "Wachtwoord",
+                        "buttons": {
+                            "edit": "Bewerken"
+                        }
+                    },
+                    "phone_number": {
+                        "title": "Telefoonnummer",
+                        "placeholder": "Geen telefoonnummer ingesteld",
+                        "buttons": {
+                            "edit": "Bewerken"
+                        }
+                    }
+                },
+                "edit-data-02": {
+                    "2fa": {
+                        "enabled": "Ingeschakeld",
+                        "disabled": "Uitgeschakeld"
+                    },
+                    "buttons": {
+                        "delete_account": {
+                            "title": "Verwijder account"
+                        }
+                    }
+                }
+            },
+            "profile": {
+                "header": "Profielen"
+            },
+            "authorized_apps": {
+                "header": "Goedgekeurde apps"
+            },
+            "notifications": {
+                "header": "Meldingen"
+            },
+            "desktop": {
+                "header": "Windows-instellingen"
+            }
+        }
+    },
+    "context_menus": {
+        "user_avatar": {
+            "settings": "Instellingen",
+            "online": "Beschikbaar",
+            "idle": "Inactief",
+            "coding": "Coding",
+            "do_not_disturb": "Niet storen",
+            "invisible": "Onzichtbaar",
+            "custom_status": "Gepersonaliseerde status instellen"
+        }
+    }
+}
