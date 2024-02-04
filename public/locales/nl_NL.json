@@ -6,7 +6,7 @@
             "afternoon": "Goedendag, {display_name}.",
             "evening": "Goedeavond, {display_name}. ",
             "night": "Goede nacht: {display_name}.",
-            "welcome": "Welcome to Strafe, let's get started."
+            "welcome": "Welkom bij Strafe, laten we beginnen."
         },
         "nav_buttons": {
             "create_space": {

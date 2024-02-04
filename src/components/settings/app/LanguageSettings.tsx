@@ -21,13 +21,23 @@ export function LanguageSettings() {
     return (
         <>
             <h1 className="title">Language</h1>
+            <p>Select your language below.</p>
 
             <div className="card-wrapper">
-                <div className={`card hoverable ${client?.user?.locale == "en-US" ? "!bg-red-500" : ""}`}>
-                    <button onClick={() => changeLanguage('en_US')}>English (US)</button>
+                <div onClick={() => changeLanguage('en_US')} className={`card hoverable ${client?.user?.locale == "en-US" ? "!bg-[#21c45d]" : ""}`}>
+                    <p className='text-center'>English (US)</p>
                 </div>
-                <div className={`card hoverable ${client?.user?.locale == "fr-FR" ? "!bg-red-500" : ""}`}>
-                    <button onClick={() => changeLanguage('fr_FR')}>French</button>
+                <div onClick={() => changeLanguage('fr_FR')} className={`card hoverable ${client?.user?.locale == "fr-FR" ? "!bg-[#21c45d]" : ""}`}>
+                    <p className='text-center'>French</p>
+                </div>
+                <div onClick={() => changeLanguage('nl_NL')} className={`card hoverable ${client?.user?.locale == "nl-NL" ? "!bg-[#21c45d]" : ""}`}>
+                    <p className='text-center'>Dutch</p>
+                </div>
+                <div onClick={() => changeLanguage('af_ZA')} className={`card hoverable ${client?.user?.locale == "af-ZA" ? "!bg-[#21c45d]" : ""}`}>
+                    <p className='text-center'>Afrikaans</p>
+                </div>
+                <div onClick={() => changeLanguage('bn_BD')} className={`card hoverable ${client?.user?.locale == "bn-BD" ? "!bg-[#21c45d]" : ""}`}>
+                    <p className='text-center'>Bengali</p>
                 </div>
             </div>
         </>

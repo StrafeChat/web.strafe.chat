@@ -2,6 +2,7 @@ import { ClientControllerContext } from "@/controllers/client/ClientController";
 import { Client } from "@strafechat/strafe.js";
 import { AnimatePresence, motion } from "framer-motion";
 import { FormEvent } from "react";
+import { useTranslation } from 'react-i18next';
 import Modal from './Modal';
 
 const modalVariants = {
@@ -11,12 +12,9 @@ const modalVariants = {
 
 class StatusModal extends Modal<{ statusText: string }, {}> {
 
-    constructor(props: any) {
-        super(props);
-        this.state = { statusText: "" };
-    }
-
     static contextType = ClientControllerContext;
+
+    state = { statusText: "" }; 
 
     render() {
         const { client } = this.context as { client: Client };
@@ -41,7 +39,10 @@ class StatusModal extends Modal<{ statusText: string }, {}> {
                             <div className="modal-window" style={{ width: "300px" }}>
                                 <form onSubmit={handleSubmit}>
                                     <h1>Set a custom status</h1>
-                                    <input defaultValue={client.user?.presence.status_text} onChange={(event) => this.setState({ statusText: event.target.value })} />
+                                    <input 
+                                        defaultValue={client.user?.presence.status_text} 
+                                        onChange={(event) => this.setState({ statusText: event.target.value })}
+                                    />
                                     <div className="flex justify-end gap-4 mt-2">
                                         <button type="button" onClick={() => this.close()}>Cancel</button>
                                         <button type="submit">Save</button>

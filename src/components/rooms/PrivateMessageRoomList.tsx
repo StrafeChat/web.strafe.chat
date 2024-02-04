@@ -1,7 +1,9 @@
 import { useState } from "react";
 import { FaHouseChimney, FaNoteSticky, FaUserGroup } from "react-icons/fa6";
+import { useTranslation } from 'react-i18next';
 import { NavLink } from "../shared";
 function Room(){
+    const { t } = useTranslation();
     return (
         <>
             <div className="header">
@@ -10,15 +12,15 @@ function Room(){
             <div className="tab-list">
                 <NavLink href={"/"}>
                     <FaHouseChimney />
-                    <span>Home</span>
+                    <span>{t('home_page.header')}</span>
                 </NavLink>
                 <NavLink href={"/friends"}>
                     <FaUserGroup />
-                    <span>Friends</span>
+                    <span>{t('friends_page.header')}</span>
                 </NavLink>
                 <NavLink href={"/notes"}>
                     <FaNoteSticky />
-                    <span>Notes</span>
+                    <span>{t('notes_page.header')}</span>
                 </NavLink>
             </div>
 

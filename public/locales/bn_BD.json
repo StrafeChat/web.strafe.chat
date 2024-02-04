@@ -1,43 +1,43 @@
 {
     "home_page": {
-        "header": "Acceuil",
+        "header": "Home",
         "greeting": {
-            "morning": "Good Morning, {display_name}.",
-            "afternoon": "Good Afternoon, {display_name}.",
-            "evening": "Good Evening, {display_name}. ",
-            "night": "Good Night, {display_name}.",
-            "welcome": " Bienvenue sur Strafe, tout d'abord, préparons-nous."
+            "morning": "সুপ্রভাত, {display_name}.",
+            "afternoon": "শুভ অপরাহ্ন, {display_name}.",
+            "evening": "শুভ সন্ধ্যা, {display_name}. ",
+            "night": "শুভ রাত্রি, {display_name}.",
+            "welcome": " Welcome to Strafe, let's get started."
         },
         "nav_buttons": {
             "create_space": {
-                "title": "Créer un espace",
-                "description": "Construisez et personnalisez VOTRE communauté par VOTRE chemin."
+                "title": "একটি স্থান তৈরি করুন",
+                "description": "আপনার সম্প্রদায়, আপনার উপায় তৈরি করুন এবং কাস্টমাইজ করুন."
             },
             "discover": {
-                "title": "Découvrez Strafe",
-                "description": "Trouvez des centres d'intérêt! Découvrez des bots, des espaces et bien plus encore!"
+                "title": "Strafe আবিষ্কার করুন",
+                "description": "Find interests! Discover bots, spaces, and more!"
             },
             "settings": {
-                "title": "Explorez les paramètres",
-                "description": "Utilisez Strafe par VOTRE chemin et personnalisez votre expérience."
+                "title": "Explore Settings",
+                "description": "Use Strafe YOUR way, customize your experience."
             },
             "updated": {
-                "title": "Restez à jour",
-                "description": "Rejoignez l'espace officiel de Strafe pour rester à jour!"
+                "title": "Stay Updated",
+                "description": "Join the official Strafe Space to stay updated!"
             }
         },
         "latest_updates": {
-            "title": "Dernières mises à jour"
+            "title": "Latest Updates"
         }
     },
     "friends_page": {
-        "header": "Amis"
+        "header": "Friends"
     },
     "notes_page": {
         "header": "Notes"
     },
     "pm_page": {
-        "message_placeholder": "Envoyez un message à @{display_name}"
+        "message_placeholder": "Message @{display_name}"
     },
     "space": {
         "room": {
@@ -46,31 +46,31 @@
     },
     "modals": {
         "create_space": {
-            "title": "Créer un espace",
+            "title": "Create Space",
             "input": {
-                "title": "Nom de l'espace",
-                "placeholder": "Mon espace extraordinaire"
+                "title": "Space Name",
+                "placeholder": "My Awesome Space"
             },
             "buttons": {
-                "create": "Créez",
-                "cancel": "Annulez"
+                "create": "Create",
+                "cancel": "Cancel"
             },
-            "switch": "Plutôt rejoindre un espace?"
+            "switch": "Join a Space instead?"
         },
         "join_space": {
-            "title": "Rejoindre un espace",
+            "title": "Join a space",
             "input": {
-                "title": "Code d'invitation",
+                "title": "Invite Code",
                 "placeholder": "1a2b3c"
             },
             "buttons": {
-                "join": "Rejoignez",
-                "cancel": "Annulez"
+                "join": "Join",
+                "cancel": "Cancel"
             },
-            "switch": "Plutôt créer un espace?"
+            "switch": "Create a space instead?"
         },
         "custom_status": {
-            "title": "Définir un statut personnalisé",
+            "title": "Set a custom status",
             "buttons": {
                 "save": "Save",
                 "cancel": "Cancel"

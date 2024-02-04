@@ -133,7 +133,7 @@ export default function Home() {
           </div>
           <hr className="w-full my-4 opacity-15" />
           <div className="latest-updates mt-6 w-full px-6">
-            <h1 className="text-2xl font-bold text-[#323C31]-primaryText"><FontAwesomeIcon icon={faClock} /> Latest Updates</h1>
+            <h1 className="text-2xl font-bold text-[#323C31]-primaryText"><FontAwesomeIcon icon={faClock} /> {t("home_page.latest_updates.title")}</h1>
             {/* <hr className="w-full my-2 opacity-15" /> */}
             <ul className="updates gap-4 mt-4">
               <li className="update my-2 bg-[#141414] rounded-[0.5rem] p-2.5 items-center cursor-pointer">

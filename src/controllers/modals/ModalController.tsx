@@ -8,6 +8,7 @@ import EditDataModal from "./components/EditDataModal";
 import SettingsModal from "./components/SettingsModal";
 import StatusModal from "./components/StatusModal";
 import CreateSpaceModal from "./components/CreateSpaceModal";
+import { useTranslation } from "react-i18next";
 
 export const ModalControllerContext = createContext({
     openModal: (_name: string, _data?: any) => { },
@@ -51,7 +52,7 @@ export default class ModalController extends Component<{ children: JSX.Element }
     render() {
         return (
             <ModalControllerContext.Provider value={{ modals: this.state.openModals, openModal: this.openModal, closeModal: this.closeModal }}>
-                <>
+                <> 
                     {this.state.openModals.map((modal, key) => {
                         switch (modal.name) {
                             case "settings":

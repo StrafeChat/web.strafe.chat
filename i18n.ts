@@ -6,11 +6,8 @@ i18n
   .use(initReactI18next)
   .use(HttpApi)
   .init({
-    supportedLngs: ['en_US', 'fr_FR'],
+    supportedLngs: ['af_ZA', 'en_US', 'fr_FR', 'nl_NL', 'bn_BD'],
     fallbackLng: 'en_US',
-    detection: {
-      order: ['localStorage', 'navigator'],
-    },
     backend: {
       loadPath: '/locales/{{lng}}.json',
     },
