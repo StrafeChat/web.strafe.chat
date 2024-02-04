@@ -34,7 +34,7 @@ export function AccountSettings() {
                 </div>
             }
             <h1 className="title">My Account</h1>
-            <div className="account">
+            <div className="card-wrapper">
                 <div className="card">
 
                     <div className="item">
@@ -86,25 +86,6 @@ export function AccountSettings() {
                                     }
                                 }]
                             })}>Edit</Button>
-                        </div>
-                    </div>
-
-                    <div className="item">
-                        <div className="first">
-                            <label>Password</label>
-                            <span>********</span>
-                        </div>
-                        <div className="final">
-                            <Button className="disabled" onClick={() => {
-                                return;
-                                openModal("edit-data", {
-                                    title: "Edit Password", inputs: [{
-                                        placeholder: "Current Password", label: "Current Password", set: (password: string) => console.log("Current Password", password)
-                                    }, {
-                                        placeholder: "New Password", label: "New Password", set: (password: string) => console.log("New Password", password)
-                                    }]
-                                })
-                            }}>Edit</Button>
                         </div>
                     </div>
 

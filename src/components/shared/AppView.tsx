@@ -1,6 +1,7 @@
+"use client"
 import { useUI } from "@/providers/UIProvider";
 import { ReactNode, useState } from "react";
-let isMobile = window.innerWidth < 768
+let isMobile = typeof window !== "undefined" ?  window.innerWidth < 768 : false
 export function AppView({ children }: { children: JSX.Element | ReactNode }) {
    let [hidden, setHidden] = useState(false)
    const { hideRoomList } = useUI();

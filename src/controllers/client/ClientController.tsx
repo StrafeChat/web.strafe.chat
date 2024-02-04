@@ -6,6 +6,7 @@ import cookie from "js-cookie";
 import { usePathname } from "next/navigation";
 import { createContext, useCallback, useEffect, useRef, useState } from 'react';
 import { useForceUpdate } from "../../hooks";
+import { useTranslation } from 'react-i18next';
 import { LoadingScreen } from "@/components/shared";
 
 export const ClientControllerContext = createContext<{ client: Client | null }>({
@@ -15,7 +16,7 @@ export const ClientControllerContext = createContext<{ client: Client | null }>(
 export default function ClientController({ children }: { children: JSX.Element }) {
 
   const pathname = usePathname();
-
+  const { i18n } = useTranslation();
   const [client, setClient] = useState<Client | null>(null);
   const [ready, setReady] = useState(false);
   const [clientError, setClientError] = useState(false);
@@ -28,7 +29,8 @@ export default function ClientController({ children }: { children: JSX.Element }
   const handleReady = useCallback(() => {
     setReady(true);
     setClientError(false);
-  }, [])
+    i18n.changeLanguage(client?.user?.locale.replace("-", "_"))
+  }, [i18n, client])
 
   const handlePresenceUpdate = useCallback((data: any) => {
     if (client!.user && data.user.id == client!.user.id) {
@@ -57,14 +59,14 @@ export default function ClientController({ children }: { children: JSX.Element }
         window.location.href = "/login";
       } else {
         setClientError(true);
-          // toast({
-          //   title: "Something went wrong!",
-          //   description: err.message,
-          //   duration: 1000,
-          //   className: "bg-destructive"
-          // });
-          console.error("ERROR:", err.message)
-     }
+        // toast({
+        //   title: "Something went wrong!",
+        //   description: err.message,
+        //   duration: 1000,
+        //   className: "bg-destructive"
+        // });
+        console.error("ERROR:", err.message)
+      }
     });
 
     connected.current = true;

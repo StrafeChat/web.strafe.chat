@@ -151,7 +151,7 @@ div.modal-full {
     }
 }
 
-div.account {
+div.card-wrapper {
     width: 100%;
 
     div.card {
@@ -162,6 +162,16 @@ div.account {
         margin-top: 0.75rem;
         flex-direction: column;
         gap: 1rem;
+
+        &.hoverable {
+            transition-duration: 250ms;
+            &:hover {
+                cursor: pointer;
+                background: hsl(var(--card));
+                filter: brightness(1.25);
+                transition-duration: 250ms;
+            }
+        }
 
         div.item {
             display: flex;
@@ -192,6 +202,4 @@ div.account {
             // }
         }
     }
-
-    div.card-2 {}
 }

@@ -1,5 +1,6 @@
 "use client";
 import { useClient } from "@/hooks";
+import { useTranslation } from 'react-i18next';
 import { useUI } from "@/providers/UIProvider";
 import {
   faClock,
@@ -8,15 +9,17 @@ import {
   faNewspaper,
   faPlus,
 } from "@fortawesome/free-solid-svg-icons";
+
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useEffect, useState } from "react";
 import { FaArrowLeft, FaArrowRight, FaHouseChimney } from 'react-icons/fa6';
-let isOnMobile = window.innerWidth < 768
+let isMobile = typeof window !== "undefined" ? window.innerWidth < 768 : false
 export default function Home() {
 
   const { hideRoomList, setHideRoomList } = useUI();
   const [greeting, setGreeting] = useState("");
   const { client } = useClient();
+  const { t } = useTranslation();
   let [hidden, setHiden] = useState(false)
   typeof window !== "undefined" && window.addEventListener('hide-sidebar', (e) => {
     setHiden(!hidden)
@@ -28,18 +31,18 @@ export default function Home() {
       const hour = date.getHours();
 
       if (hour >= 5 && hour < 12) {
-        setGreeting("Good Morning");
+        setGreeting(`${t("home_page.greeting.morning")}`);
       } else if (hour >= 12 && hour < 18) {
-        setGreeting("Good Afternoon");
+        setGreeting(`${t("home_page.greeting.afternoon")}`);
       } else if (hour >= 18 && hour < 22) {
-        setGreeting("Good Evening");
+        setGreeting(`${t("home_page.greeting.evening")}`);
       } else {
-        setGreeting("Good Night");
+        setGreeting(`${t("home_page.greeting.night")}`);
       }
     };
 
     getTimeBasedGreeting();
-  }, []);
+  }, [t]);
 
   return (
     <>
@@ -59,18 +62,18 @@ export default function Home() {
             </>
           )}
         </span>
-        <span><b>Home</b></span>
+        <span><b>{t('home_page.header')}</b></span>
       </div>
       <div className="home overflow-auto"
-       
-        style={hidden && isOnMobile ? { visibility: 'hidden' } : {visibility: 'visible'}}
+
+        style={hidden && isMobile ? { visibility: 'hidden' } : { visibility: 'visible' }}
       >
         <div className="w-full container flex flex-col items-center justify-center h-full py-[100px] text-white">
           <h1 className={`text-5xl font-bold text-[#323C31]-primaryText`}>
-            {greeting}, {client?.user?.global_name || client?.user?.username}.
+            {greeting.replace("{display_name}", `${client?.user?.global_name ?? client?.user?.username}`)}
           </h1>
           <p className={`font-md text-xl text-white -secondaryText`}>
-            Welcome to Strafe, let&apos;s get started.
+            {t('home_page.greeting.welcome')}
           </p>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 my-4">
             <div
@@ -81,9 +84,9 @@ export default function Home() {
                 <FontAwesomeIcon icon={faPlus} className="text-4xl" />
               </div>
               <div className="ml-4">
-                <h2 className="text-lg font-semibold">Create a Space</h2>
+                <h2 className="text-lg font-semibold">{t('home_page.nav_buttons.create_space.title')}</h2>
                 <p className="text-gray-300">
-                  Build and customize your community YOUR way.
+                  {t('home_page.nav_buttons.create_space.description')}
                 </p>
               </div>
             </div>
@@ -94,9 +97,9 @@ export default function Home() {
                 <FontAwesomeIcon icon={faCompass} className="text-4xl" />
               </div>
               <div className="ml-4">
-                <h2 className="text-lg font-semibold">Discover Strafe</h2>
+                <h2 className="text-lg font-semibold">{t('home_page.nav_buttons.discover.title')}</h2>
                 <p className="text-gray-300">
-                  Find interests! Discover bots, spaces, and more.
+                  {t('home_page.nav_buttons.discover.description')}
                 </p>
               </div>
             </div>
@@ -108,9 +111,9 @@ export default function Home() {
                 <FontAwesomeIcon icon={faGear} className="text-4xl" />
               </div>
               <div className="ml-4">
-                <h2 className="text-lg font-semibold">Explore Settings</h2>
+                <h2 className="text-lg font-semibold">{t('home_page.nav_buttons.settings.title')}</h2>
                 <p className="text-gray-300">
-                  Use Strafe YOUR way, customize your experience.
+                  {t('home_page.nav_buttons.settings.description')}
                 </p>
               </div>
             </div>
@@ -121,9 +124,9 @@ export default function Home() {
                 <FontAwesomeIcon icon={faNewspaper} className="text-4xl" />
               </div>
               <div className="ml-4">
-                <h2 className="text-lg font-semibold">Stay Updated</h2>
+                <h2 className="text-lg font-semibold">{t('home_page.nav_buttons.updated.title')}</h2>
                 <p className="text-gray-300">
-                  Join the official Strafe server to stay updated.
+                  {t('home_page.nav_buttons.updated.description')}
                 </p>
               </div>
             </div>
