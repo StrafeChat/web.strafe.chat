@@ -17,7 +17,7 @@
     "@radix-ui/react-label": "^2.0.2",
     "@radix-ui/react-slot": "^1.0.2",
     "@radix-ui/react-toast": "^1.1.5",
-    "@strafechat/strafe.js": "^1.0.6",
+    "@strafechat/strafe.js": "^1.0.7",
     "@types/react-i18next": "^8.1.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.0.0",
