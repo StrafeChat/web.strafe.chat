@@ -13,6 +13,7 @@ const modalVariants = {
 class StatusModal extends Modal<{ statusText: string }, {}> {
 
     static contextType = ClientControllerContext;
+    context!: React.ContextType<typeof ClientControllerContext>;
 
     state = { statusText: "" }; 
 

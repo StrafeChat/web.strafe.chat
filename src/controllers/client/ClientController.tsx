@@ -30,6 +30,7 @@ export default function ClientController({ children }: { children: JSX.Element }
     setReady(true);
     setClientError(false);
     i18n.changeLanguage(client?.user?.locale.replace("-", "_"))
+    console.log(client?.spaces)
   }, [i18n, client])
 
   const handlePresenceUpdate = useCallback((data: any) => {
