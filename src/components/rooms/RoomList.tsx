@@ -47,7 +47,6 @@ export default function RoomList() {
                 if (path.startsWith("/rooms")) return <PrivateMessages />;
                 if (path.startsWith("/spaces")) return <RoomsNav params={{
                   spaceId: paths[0],
-                  rooms: [{ id: "general", name: "general" }, { id: "off-topic", name: "off-topic" }]
                 }} />;
                 break;
             }

@@ -17,7 +17,7 @@ export default function SpaceList() {
       window.addEventListener("hide-sidebar", () => {
          setHide(!hide);
       });
-   }
+   } 
    console.log(`mobile user: ${isMobile}`);
    return (
       <div className="space-list"
@@ -63,6 +63,16 @@ export default function SpaceList() {
                   </button>
                </NavLink>
             </div>
+            {client?.spaces.map((space) => (
+                <div>
+                   <NavLink href={`/spaces/${space.id}`}>
+                  <button className="space">
+                       {/* eslint-disable-next-line @next/next/no-img-element */}
+                     {space.name_acronym}
+                 </button>
+               </NavLink>
+            </div>
+           ))}
          </div>
 
          <div className="seperator" />
