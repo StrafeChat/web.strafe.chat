@@ -25,6 +25,6 @@ export function NavLink(props: NavLinkProps) {
     }, [pathname, props.activate, props.href]);
 
     return (
-        <Link {...props} {...{ "active": `${active}` }}>{props.children}</Link>
+        <Link {...props} {...{ "active": `${active}` }} draggable={false}>{props.children}</Link>
     )
 }

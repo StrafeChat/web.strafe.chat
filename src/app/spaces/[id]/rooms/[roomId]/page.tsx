@@ -16,7 +16,8 @@ export default function Page({ params }: { params: { id: string, roomId: string 
 
   const space = client?.spaces.get(params.id);
   if (!space) return <h1>Space not found</h1>
-  console.log(space)
+
+  space.rooms[0]
 
   return (
     <>

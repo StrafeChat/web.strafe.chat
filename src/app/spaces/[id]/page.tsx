@@ -1,10 +1,12 @@
 "use client";
+import { useClient } from "@/hooks";
 import { useUI } from "@/providers/UIProvider";
 import { FaArrowLeft, FaArrowRight, FaHouseChimney } from "react-icons/fa6";
 
 export default function Page({ params }: { params: { id: string, roomId: string } }) {
 
   const { hideRoomList, setHideRoomList } = useUI();
+  const { client } = useClient();
 
   return (
     <>
@@ -22,7 +24,7 @@ export default function Page({ params }: { params: { id: string, roomId: string 
             </>
           )}
         </span>
-        <span><b>{params.id}</b></span>
+        <span><b>Home</b></span>
       </div>
     </>
   )

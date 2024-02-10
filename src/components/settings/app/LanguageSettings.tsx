@@ -4,12 +4,10 @@ import { useTranslation } from 'react-i18next';
 export function LanguageSettings() {
 
     const { client } = useClient();
-    const { i18n } = useTranslation();
+    const { i18n, t } = useTranslation();
     const forceUpdate = useForceUpdate();
 
     const availableLanguages = i18n.options?.supportedLngs || [];
-
-    console.log(availableLanguages);
 
     const changeLanguage = async (language: string) => {
         i18n.changeLanguage(language);
