@@ -12,7 +12,7 @@
     "@fortawesome/free-solid-svg-icons": "^6.5.1",
     "@fortawesome/react-fontawesome": "^0.2.0",
     "@hookform/resolvers": "^3.3.4",
-    "@mui/material": "^5.14.20",
+    "@mui/material": "^5.15.9",
     "@radix-ui/react-context-menu": "^2.1.5",
     "@radix-ui/react-label": "^2.0.2",
     "@radix-ui/react-slot": "^1.0.2",
