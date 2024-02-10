@@ -1,0 +1,168 @@
+{
+    "home_page": {
+        "header": "Home",
+        "greeting": {
+            "morning": "সুপ্রভাত, {display_name}.",
+            "afternoon": "শুভ অপরাহ্ন, {display_name}.",
+            "evening": "শুভ সন্ধ্যা, {display_name}. ",
+            "night": "শুভ রাত্রি, {display_name}.",
+            "welcome": " Welcome to Strafe, let's get started."
+        },
+        "nav_buttons": {
+            "create_space": {
+                "title": "একটি স্থান তৈরি করুন",
+                "description": "আপনার সম্প্রদায়, আপনার উপায় তৈরি করুন এবং কাস্টমাইজ করুন."
+            },
+            "discover": {
+                "title": "Strafe আবিষ্কার করুন",
+                "description": "Find interests! Discover bots, spaces, and more!"
+            },
+            "settings": {
+                "title": "Explore Settings",
+                "description": "Use Strafe YOUR way, customize your experience."
+            },
+            "updated": {
+                "title": "Stay Updated",
+                "description": "Join the official Strafe Space to stay updated!"
+            }
+        },
+        "latest_updates": {
+            "title": "Latest Updates"
+        }
+    },
+    "friends_page": {
+        "header": "Friends"
+    },
+    "notes_page": {
+        "header": "Notes"
+    },
+    "pm_page": {
+        "message_placeholder": "Message @{display_name}"
+    },
+    "space": {
+        "room": {
+            "message_placeholder": "Message #{channel_name}"
+        }
+    },
+    "modals": {
+        "create_space": {
+            "title": "Create Space",
+            "input": {
+                "title": "Space Name",
+                "placeholder": "My Awesome Space"
+            },
+            "buttons": {
+                "create": "Create",
+                "cancel": "Cancel"
+            },
+            "switch": "Join a Space instead?"
+        },
+        "join_space": {
+            "title": "Join a space",
+            "input": {
+                "title": "Invite Code",
+                "placeholder": "1a2b3c"
+            },
+            "buttons": {
+                "join": "Join",
+                "cancel": "Cancel"
+            },
+            "switch": "Create a space instead?"
+        },
+        "custom_status": {
+            "title": "Set a custom status",
+            "buttons": {
+                "save": "Save",
+                "cancel": "Cancel"
+            }
+        },
+        "settings": {
+            "navbar": {
+                "user_settings": {
+                    "header": "User Settings",
+                    "my_account": "My Account",
+                    "profile": "Profile",
+                    "authorized_apps": "Authorized Apps"
+                },
+                "app_settings": {
+                    "header": "App Settings",
+                    "notifications": "Notifications",
+                    "desktop": "Desktop"
+                },
+                "others": {
+                    "logout": "Logout"
+                }
+            },
+            "my_account": {
+                "header": "My Account",
+                "edit_data_01": {
+                    "username": {
+                        "title": "Username",
+                        "buttons": {
+                            "edit": "Edit"
+                        }
+                    },
+                    "discriminator": {
+                        "title": "Discriminator",
+                        "buttons": {
+                            "edit": "Edit"
+                        }
+                    },
+                    "email": {
+                        "title": "Email",
+                        "buttons": {
+                            "edit": "Edit"
+                        }
+                    },
+                    "password": {
+                        "title": "Password",
+                        "buttons": {
+                            "edit": "Edit"
+                        }
+                    },
+                    "phone_number": {
+                        "title": "Phone Number",
+                        "placeholder": "No Phone Number Set",
+                        "buttons": {
+                            "edit": "Edit"
+                        }
+                    }
+                },
+                "edit-data-02": {
+                    "2fa": {
+                        "enabled": "Enabled",
+                        "disabled": "Disabled"
+                    },
+                    "buttons": {
+                        "delete_account": {
+                            "title": "Delete Account"
+                        }
+                    }
+                }
+            },
+            "profile": {
+                "header": "Profile"
+            },
+            "authorized_apps": {
+                "header": "Authorized Apps"
+            },
+            "notifications": {
+                "header": "Notifications"
+            },
+            "desktop": {
+                "header": "Desktop"
+            }
+        }
+    },
+    "context_menus": {
+        "user_avatar": {
+            "settings": "Settings",
+            "online": "Online",
+            "idle": "Idle",
+            "coding": "Coding",
+            "do_not_disturb": "Do Not Disturb",
+            "invisible": "Invisible",
+            "custom_status": "Custom Status"
+        }
+    }
+}

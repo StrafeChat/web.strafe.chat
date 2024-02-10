@@ -1,10 +1,12 @@
 "use client";
 import { useUI } from "@/providers/UIProvider";
 import { FaUserGroup, FaArrowRight, FaArrowLeft } from "react-icons/fa6";
+import { useTranslation } from 'react-i18next';
 
 export default function Friends() {
 
    const { setHideRoomList, hideRoomList } = useUI();
+   const { t } = useTranslation();
 
    return (
     <>
@@ -22,7 +24,7 @@ export default function Friends() {
             </>
           )}
         </span>
-        <span><b>Friends</b></span>
+        <span><b>{t('friends_page.header')}</b></span>
       </div>
     </>
    )

@@ -2,11 +2,13 @@ import { Button } from "@/components/ui/button";
 import { formatDiscrim } from "@/helpers/formatter";
 import { useClient, useForceUpdate, useModal } from "@/hooks";
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 
 export function AccountSettings() {
 
     const { client } = useClient();
     const { openModal } = useModal();
+    const { t } = useTranslation() ;
     const forceUpdate = useForceUpdate();
 
     const [savedData, setSavedData] = useState({
@@ -33,13 +35,13 @@ export function AccountSettings() {
                     <Button onClick={saveData}>Save</Button>
                 </div>
             }
-            <h1 className="title">My Account</h1>
-            <div className="account">
+            <h1 className="title">{t("modals.settings.my_account.header")}</h1>
+            <div className="card-wrapper">
                 <div className="card">
 
                     <div className="item">
                         <div className="first">
-                            <label>Username</label>
+                            <label>{t("modals.settings.my_account.edit_data_01.username.title")}</label>
                             <span>{data.username}</span>
                         </div>
                         <div className="final">
@@ -49,13 +51,13 @@ export function AccountSettings() {
                                         setData({ ...data, username: username || data.username });
                                     }
                                 }]
-                            })}>Edit</Button>
+                            })}>{t("modals.settings.my_account.edit_data_01.username.buttons.edit")}</Button>
                         </div>
                     </div>
 
                     <div className="item">
                         <div className="first">
-                            <label>Discriminator</label>
+                            <label>{t("modals.settings.my_account.edit_data_01.discriminator.title")}</label>
                             <span>{formatDiscrim(data.discriminator)}</span>
                         </div>
                         <div className="final">
@@ -66,13 +68,13 @@ export function AccountSettings() {
                                         setData({ ...data, discriminator: parseInt(discriminator) || data.discriminator });
                                     }
                                 }]
-                            })}>Edit</Button>
+                            })}>{t("modals.settings.my_account.edit_data_01.discriminator.buttons.edit")}</Button>
                         </div>
                     </div>
 
                     <div className="item">
                         <div className="first">
-                            <label>Email</label>
+                            <label>{t("modals.settings.my_account.edit_data_01.email.title")}</label>
                             <span>{(() => {
                                 const splitArr = data.email?.split('@')!;
                                 return `${'*'.repeat(splitArr[0].length)}@${splitArr[1]}`
@@ -85,34 +87,15 @@ export function AccountSettings() {
                                         setData({ ...data, email: email || data.email });
                                     }
                                 }]
-                            })}>Edit</Button>
+                            })}>{t("modals.settings.my_account.edit_data_01.email.buttons.edit")}</Button>
                         </div>
                     </div>
 
                     <div className="item">
                         <div className="first">
-                            <label>Password</label>
-                            <span>********</span>
-                        </div>
-                        <div className="final">
-                            <Button className="disabled" onClick={() => {
-                                return;
-                                openModal("edit-data", {
-                                    title: "Edit Password", inputs: [{
-                                        placeholder: "Current Password", label: "Current Password", set: (password: string) => console.log("Current Password", password)
-                                    }, {
-                                        placeholder: "New Password", label: "New Password", set: (password: string) => console.log("New Password", password)
-                                    }]
-                                })
-                            }}>Edit</Button>
-                        </div>
-                    </div>
-
-                    <div className="item">
-                        <div className="first">
-                            <label>Phone Number</label>
+                            <label>{t("modals.settings.my_account.edit_data_01.phone_number.title")}</label>
                             <span>{(() => {
-                                return data.phone_number ? <span>{'*'.repeat(data.phone_number.length - 4) + data.phone_number.slice(-4)}</span> : <span className="text-muted-foreground">No Phone Number Set</span>
+                                return data.phone_number ? <span>{'*'.repeat(data.phone_number.length - 4) + data.phone_number.slice(-4)}</span> : <span className="text-muted-foreground">{t("modals.settings.my_account.edit_data_01.phone_number.placeholder")}</span>
                             })()}</span>
                         </div>
                         <div className="final">
@@ -125,7 +108,7 @@ export function AccountSettings() {
                                                 setData({ ...data, phone_number: phone_number || data.phone_number });
                                             }
                                         }]
-                                    })}>Edit</Button>
+                                    })}>{t("modals.settings.my_account.edit_data_01.phone_number.buttons.edit")}</Button>
                                 </>
                             ) : <Button className="disabled">Add</Button>}
                         </div>
@@ -136,10 +119,10 @@ export function AccountSettings() {
                     <div className="item">
                         <div className="first">
                             <label>2FA</label>
-                            <span>{false ? "Enabled" : "Disabled"}</span>
+                            <span>{false ? `${t("modals.settings.my_account.edit-data-02.2fa.enabled")}` : `${t("modals.settings.my_account.edit-data-02.2fa.disabled")}`}</span>
                         </div>
                         <div className="final">
-                            <Button className="disabled">Edit</Button>
+                            <Button className="disabled">{t("modals.settings.my_account.edit_data_01.phone_number.buttons.edit")}</Button>
                         </div>
                     </div>
 
@@ -158,7 +141,7 @@ export function AccountSettings() {
                             <Button className="bg-destructive hover:bg-destructive disabled" onClick={() => {
                                 return;
                                 openModal("delete-account")
-                            }}>Delete Account</Button>
+                            }}>{t("modals.settings.my_account.edit-data-02.buttons.delete_account.title")}</Button>
                         </div>
                     </div>
                 </div>

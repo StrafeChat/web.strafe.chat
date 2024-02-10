@@ -5,7 +5,9 @@ import { usePathname } from "next/navigation";
 import { useEffect } from "react";
 import PrivateMessages from "./PrivateMessageRoomList";
 import RoomsNav from "./SpaceRoomList";
-let isMoible = typeof window !== "undefined" && window.innerWidth < 768;
+
+// let isMoible = typeof window !== "undefined" && window.innerWidth < 768;
+
 export default function RoomList() {
   const controls = useAnimation();
   const { hideRoomList, setHideRoomList } = useUI();
@@ -13,9 +15,7 @@ export default function RoomList() {
 
   useEffect(() => {
     localForage.getItem<boolean>("hide_room_list").then((hidden) => {
-      setHideRoomList(!!hidden);
-      console.log("hide_room_list", hidden);
-      
+      setHideRoomList(!!hidden);      
     })
   }, [setHideRoomList]);
 
@@ -47,7 +47,6 @@ export default function RoomList() {
                 if (path.startsWith("/rooms")) return <PrivateMessages />;
                 if (path.startsWith("/spaces")) return <RoomsNav params={{
                   spaceId: paths[0],
-                  rooms: [{ id: "general", name: "general" }, { id: "off-topic", name: "off-topic" }]
                 }} />;
                 break;
             }
