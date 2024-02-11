@@ -530,7 +530,7 @@ div.memberlist {
       div.avatar-status {
         position: absolute;
         bottom: 0.005rem;
-        right: 0.005rem;
+        right: 0.010rem;
         width: 1rem;
         height: 1rem;
         border: 0.155rem solid hsl(var(--background));
@@ -559,14 +559,17 @@ div.memberlist {
 
       span.username {
         line-height: 1.375;
-        font-size: small;
+        font-size: 15px;
         font-weight: 700;
+        margin-top: -1.5px;
+        margin-left: 3px;
       }
 
       span.status {
         font-size: small;
         color: hsl(var(--muted-foreground));
         line-height: 1.250;
+        margin-left: 3px;
        }
      }
    }
@@ -605,6 +608,10 @@ div.app-view {
     display: flex;
     flex-direction: column;
     flex-grow: 1;
+
+    div.g {
+
+    }
   }
 }
 
@@ -618,10 +625,9 @@ ul.messages {
 div.chat-input-container {
   max-height: 50vh;
   overflow-y: auto;
-  padding-left: 10px;
-  padding-right: 10px;
-  // padding-top: 5px;
-  margin-bottom: 10px;
+  padding-left: 20px;
+  padding-right: 20px;
+  margin-bottom: 20px;
 
   div.chat-input {
     width: 100%;

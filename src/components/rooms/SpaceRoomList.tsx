@@ -52,9 +52,10 @@ export default function SpaceRoomList({ params }: { params: { spaceId: string} }
                 <ul className="space-rooms">
                 {
                   space?.rooms
-                  ?.filter(room => room.type ===  0)
-                  .sort((a, b) => a.position - b.position)
-                  .map((section: Room) => (
+                  ?.toArray()
+                  .filter((room: { type: number; }) => room.type ===  0)
+                  .sort((a: { position: number; }, b: { position: number; }) => a.position - b.position)
+                  .map((section) => (
                       <div key={section.id} className="mb-2">
                           <button onClick={() => toggleSection(section.id)}>
                             {
@@ -72,9 +73,10 @@ export default function SpaceRoomList({ params }: { params: { spaceId: string} }
                         {
                           isSectionExpanded[section.id] &&
                             space?.rooms
-                            ?.filter(room => [1,  2].includes(room.type) && room.parent_id == section.id)
+                            ?.toArray()
+                            .filter(room => [1,  2].includes(room.type) && room.parent_id == section.id)
                             .sort((a, b) => a.position - b.position)
-                            .map((room: Room) => (
+                            .map((room) => (
                                 <NavLink key={room.id} href={`/spaces/${space.id}/rooms/${room.id}`}>
                                     <li key={room.id} className="space-room">
                                     <span style={{ display: 'inline-flex', alignItems: 'center' }}>

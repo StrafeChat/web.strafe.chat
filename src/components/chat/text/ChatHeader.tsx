@@ -1,6 +1,6 @@
 import { useUI } from "@/providers/UIProvider";
 import { ChatHeaderProps } from "@/types";
-import { FaArrowLeft, FaArrowRight, FaAt, FaHashtag, FaMagnifyingGlass, FaPhoneVolume } from 'react-icons/fa6';
+import { FaArrowLeft, FaArrowRight, FaAt, FaHashtag, FaMagnifyingGlass, FaThumbtack } from 'react-icons/fa6';
 
 export function ChatHeader({ type, name, icon }: ChatHeaderProps) {
 
@@ -26,7 +26,7 @@ export function ChatHeader({ type, name, icon }: ChatHeaderProps) {
                 <b className="pl-2">{name}</b>
             </span>
             <span className="flex gap-3 items-center text-2xl ml-1">
-                <FaPhoneVolume />
+                <FaThumbtack/>
                 <FaMagnifyingGlass />
             </span>
         </div>

@@ -27,7 +27,6 @@ export default function SpaceList() {
             <ContextMenuTrigger>
                <NavLink href="/" activate={["/friends", "/notes", "/rooms"]}>
                   <button>
-                     {/* eslint-disable-next-line @next/next/no-img-element */}
                      <img src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${client?.user?.id}/${client?.user?.avatar}`} className="avatar" alt="Avatar"></img>
                      <div className={`avatar-status ${client?.user?.presence.status}`}></div>
                   </button>

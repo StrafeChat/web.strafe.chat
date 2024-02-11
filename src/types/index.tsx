@@ -13,6 +13,12 @@ export interface ChatHeaderProps {
     type: "pm" | "server"
 }
 
+export interface VoiceHeaderProps {
+    name: string;
+    icon?: IconType,
+    type: "pm" | "server"
+}
+
 export interface Register {
     email: string;
     global_name?: string;
