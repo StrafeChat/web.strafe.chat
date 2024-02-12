@@ -18,7 +18,7 @@ export default function SpaceList() {
          setHide(!hide);
       });
    } 
-   console.log(`mobile user: ${isMobile}`);
+
    return (
       <div className="space-list"
          style={{ display: hide && isMobile ? "none" : "" }}

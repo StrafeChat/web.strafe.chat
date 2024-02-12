@@ -28,9 +28,9 @@ export default function MemberList(props: { hidden: boolean, members: any, space
              <ul className="members">
                 {members?.toArray()
                  .filter((member: any) => member.user.presence.online == true && member.user.presence.status !== "offline")
-                 .sort((a: any, b: any) => a.user.username.localeCompare(b.user.username))
+                 .sort((a: any, b: any) => a.user.global_name ?? a.user.username.localeCompare(b.user.global_name ?? b.user.username))
                  .map((member: any) => (
-                    <li className="member online">
+                    <li key={member.id} className="member online">
                     <div className="relative">
                         <img draggable={false} src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${member?.user.id}/${member?.user.avatar}`} alt="Avatar" className="avatar" />
                         <div className={`avatar-status ${member?.user.presence!.status}`} />
@@ -54,7 +54,7 @@ export default function MemberList(props: { hidden: boolean, members: any, space
                  .filter((member: any) => member.user.presence.online == false || member.user.presence.status == "offline")
                  .sort((a: any, b: any) => a.user.username.localeCompare(b.user.username))
                  .map((member: any) => (
-                    <li className="member offline">
+                    <li key={member.id} className="member offline">
                     <div className="relative">
                         <img draggable={false} src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${member?.user.id}/${member?.user.avatar}`} alt="Avatar" className="avatar" />
                     </div>

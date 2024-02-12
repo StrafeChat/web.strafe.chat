@@ -30,7 +30,6 @@ export default function ClientController({ children }: { children: JSX.Element }
     setReady(true);
     setClientError(false);
     i18n.changeLanguage(client?.user?.locale.replace("-", "_"))
-    console.log(client?.spaces)
   }, [i18n, client])
 
   const handlePresenceUpdate = useCallback((data: any) => {
@@ -38,8 +37,11 @@ export default function ClientController({ children }: { children: JSX.Element }
       client!.user.presence = data.presence;
     }
     forceUpdate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client]);
 
-    console.log(data);
+  const handleMessageCreate = useCallback((data: any) => {
+    forceUpdate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client]);
 
@@ -77,6 +79,7 @@ export default function ClientController({ children }: { children: JSX.Element }
   useEffect(() => {
     client?.on("ready", handleReady);
     client?.on("presenceUpdate", handlePresenceUpdate);
+    client?.on("messageCreate", handleMessageCreate)
 
     return () => {
       client?.off("ready", handleReady);

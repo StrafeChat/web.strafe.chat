@@ -6,6 +6,9 @@ import { ClientControllerContext } from '@/controllers/client/ClientController';
 import Link from 'next/link';
 import React from 'react';
 import Modal from './Modal';
+import cookie from "js-cookie";
+import { ISpace } from '@strafechat/strafe.js';
+import { toast } from '@/components/ui/use-toast';
 
 class CreateSpaceModal extends Modal<{ name: string, type: string }, {}> {
 
@@ -28,8 +31,23 @@ class CreateSpaceModal extends Modal<{ name: string, type: string }, {}> {
             if (space) this.close();
         }
 
-        const handleJoin = (e: React.FormEvent<HTMLFormElement>) => {
+        const handleJoin = async (e: React.FormEvent<HTMLFormElement>) => {
             e.preventDefault();
+            const res = await fetch(`${process.env.NEXT_PUBLIC_API}/users/@me/spaces/${this.state.name}`, {
+                method: "PUT",
+                headers: {
+                    "authorization": `${cookie.get("token")!}`,
+                    "Content-Type": "application/json",
+                },
+            })
+            const data = await res.json();
+            if (!res.ok) return toast({
+                title: "Joining Space Failed",
+                description: data.message,
+                className: "bg-destructive"
+            });
+            const space: ISpace = data;
+            client?.spaces.set(space.id, space)
         }
 
         return (
@@ -57,12 +75,12 @@ class CreateSpaceModal extends Modal<{ name: string, type: string }, {}> {
                                 )
                             case 'join':
                                 return (
-                                    <form>
+                                    <form onSubmit={handleJoin}>
                                         <div className='flex flex-col gap-2'>
                                             <h1>Join a space</h1>
                                             <div>
                                                 <Label>Invite Code</Label>
-                                                <Input type='text' placeholder='1a3f41' />
+                                                <Input onChange={(e) => this.setState({ ...this.state, name: e.target.value })} type='text' placeholder='1a3f41' />
                                             </div>
                                         </div>
                                         <div className="flex gap-2 py-2 w-full">

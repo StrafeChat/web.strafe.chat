@@ -2,6 +2,7 @@ import { useState } from "react";
 import { FaHouseChimney, FaNoteSticky, FaUserGroup } from "react-icons/fa6";
 import { useTranslation } from 'react-i18next';
 import { NavLink } from "../shared";
+
 function Room(){
     const { t } = useTranslation();
     return (
@@ -32,7 +33,7 @@ function Room(){
                         <img src="https://cdn.discordapp.com/attachments/1135670060678123560/1189859177393291284/trumpshutdownraises.png?ex=659fb1b6&is=658d3cb6&hm=bef32dbb441eb1e95258d14d3bc107a5b66976fc10ec6001d96d2a90eecbac32&g" />
                         <span>
                             <h2><b>Donald J. Trump</b></h2>
-                            <p className="user-status">Make America Great Again!</p>
+                            <p className="user-status">Make America Great Again! USA USA USA</p>
                         </span>
                     </li>
                 </NavLink>
@@ -49,6 +50,7 @@ function Room(){
         </>
     )
 }
+
 export default function PrivateMessageRoomList() {
     let [hide, setHidden] = useState(false)
     let isMobile = window.innerWidth < 768

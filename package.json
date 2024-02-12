@@ -26,6 +26,7 @@
     "js-cookie": "^3.0.5",
     "localforage": "^1.10.0",
     "lucide-react": "^0.323.0",
+    "luxon": "^3.4.4",
     "next": "^14.1.0",
     "next-i18next": "^15.2.0",
     "next-intl": "^3.5.4",
@@ -34,6 +35,8 @@
     "react-dom": "^18",
     "react-i18next": "^14.0.1",
     "react-icons": "^4.12.0",
+    "react-markdown": "^9.0.1",
+    "remark-gfm": "^4.0.0",
     "tailwind-merge": "^2.2.0",
     "tailwindcss-animate": "^1.0.7"
   },

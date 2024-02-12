@@ -22,7 +22,6 @@ export function AccountSettings() {
     const [data, setData] = useState(savedData);
 
     const saveData = () => {
-        console.log(data);
         client?.user?.edit(data).then(() => setSavedData(data));
         forceUpdate();
     }

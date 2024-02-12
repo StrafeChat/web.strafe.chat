@@ -6,7 +6,6 @@ export default function TextRoom(props: { space: ISpace, room: IRoom, hidden: bo
     const members = props.space.members;
     const room = props.room;
     const { t } = useTranslation();
-    console.log(room)
 
    return (
       <>
