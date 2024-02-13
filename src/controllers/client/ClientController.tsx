@@ -1,13 +1,13 @@
 "use client";
 import EmailVerifcation from "@/components/auth/EmailVerifcation";
+import { LoadingScreen } from "@/components/shared";
 import { useToast } from "@/components/ui/use-toast";
 import { Client } from "@strafechat/strafe.js";
 import cookie from "js-cookie";
 import { usePathname } from "next/navigation";
 import { createContext, useCallback, useEffect, useRef, useState } from 'react';
-import { useForceUpdate } from "../../hooks";
 import { useTranslation } from 'react-i18next';
-import { LoadingScreen } from "@/components/shared";
+import { useForceUpdate } from "../../hooks";
 
 export const ClientControllerContext = createContext<{ client: Client | null }>({
   client: null,
@@ -33,9 +33,8 @@ export default function ClientController({ children }: { children: JSX.Element }
   }, [i18n, client])
 
   const handlePresenceUpdate = useCallback((data: any) => {
-    if (client!.user && data.user.id == client!.user.id) {
-      client!.user.presence = data.presence;
-    }
+    console.log(data);
+    if (client!.user && data.user.id == client!.user.id) client!.user.presence = data.presence;
     forceUpdate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client]);

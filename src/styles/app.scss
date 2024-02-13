@@ -1,7 +1,7 @@
 div.app {
   height: 100%;
   display: flex;
-  flex-grow: 0;
+  flex-grow: 1;
   border-top-left-radius: 20px;
 }
 
@@ -57,6 +57,7 @@ div.context-menu-item {
 div.header {
   width: 100%;
   height: 60px;
+  position: static;
   padding: 1rem;
   color: hsl(var(--muted-foreground));
   border-bottom: 1px solid hsl(var(--border));
@@ -65,7 +66,7 @@ div.header {
     color: hsl(var(--muted-foreground));
     font-weight: 500;
     font-size: 20px;
-    
+
     width: 100%;
     overflow: hidden;
     white-space: nowrap;
@@ -478,6 +479,7 @@ div.room-list {
     }
   }
 }
+
 div.memberlist {
   width: 250px;
   display: flex;
@@ -587,11 +589,12 @@ div.memberlist {
 
 
 div.app-view {
+  overflow: hidden;
   background: hsl(var(--app-view));
   display: flex;
   flex-direction: column;
   flex-grow: 1;
-  min-height: 100%;
+  height: 100%;
 
   &[room_list_hidden="true"] {
     border-top-left-radius: 20px;
@@ -618,17 +621,28 @@ div.app-view {
   div.body {
     display: flex;
     flex-direction: column;
-    flex: 1; /* Ensure the body fills the available space */
-    height: 100%; /* Ensure the body fills the available vertical space */
+    // flex-grow: 1;
+    max-width: 100%;
+    height: 100%;
+    overflow-x: hidden;
+    // overflow-y: auto;
   }
 }
 
 ul.messages {
+  overflow-x: hidden;
   overflow-y: auto;
-  max-height: calc(100% - 25px); /* Adjust the max height as needed */
-  padding: 0; /* Remove padding to maximize available space */
-  margin: 0; /* Remove margin */
-  list-style-type: none; /* Remove bullet points */
+  display: flex;
+  flex-direction: column;
+  height: fit-content;
+  padding: 0;
+  /* Remove padding to maximize available space */
+  margin: 0;
+  /* Remove margin */
+  list-style-type: none;
+  /* Remove bullet points */
+  margin-left: 20px;
+  margin-right: 20px;
 }
 
 li.message {
@@ -673,15 +687,19 @@ li.message {
 
 div.chat-input-container {
   max-height: 50vh;
+  max-width: 100%;
   overflow-y: auto;
   padding-left: 20px;
   padding-right: 20px;
   margin-bottom: 20px;
+  overflow: hidden;
 
   div.chat-input {
-    width: 100%;
+    max-width: 100%;
+    height: 100%;
     background: hsl(var(--chat-input));
     border-radius: 10px;
+    overflow: hidden;
 
     [contenteditable="true"]:empty:before {
       content: attr(placeholder);
@@ -691,9 +709,12 @@ div.chat-input-container {
 
     div.chat-input-middle {
       height: inherit;
+      max-width: inherit;
       outline: none;
       font-size: medium;
       padding: 10px;
+      white-space: pre-wrap;
+      word-break: break-word;
     }
   }
 }
