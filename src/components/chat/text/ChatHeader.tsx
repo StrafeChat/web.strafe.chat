@@ -10,6 +10,7 @@ export function ChatHeader({ type, name, icon }: ChatHeaderProps) {
     const icn = !Icon ? type == "pm" ? <FaAt onClick={() => setHideRoomList(!hideRoomList)} /> : <FaHashtag onClick={() => setHideRoomList(!hideRoomList)} /> : <Icon onClick={() => setHideRoomList(!hideRoomList)} />
 
     return (
+        <div className="header-container">
         <div className="header flex justify-between items-center">
             <span className="flex items-center gap-[3px]">
                 {hideRoomList ? (
@@ -29,6 +30,7 @@ export function ChatHeader({ type, name, icon }: ChatHeaderProps) {
                 <FaThumbtack/>
                 <FaMagnifyingGlass />
             </span>
+        </div>
         </div>
     )
 }

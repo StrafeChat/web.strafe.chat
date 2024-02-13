@@ -10,6 +10,7 @@ export function VoiceHeader({ type, name, icon }: VoiceHeaderProps) {
     const icn = !Icon ? type == "pm" ? <FaAt onClick={() => setHideRoomList(!hideRoomList)} /> : <FaVolumeHigh onClick={() => setHideRoomList(!hideRoomList)} /> : <Icon onClick={() => setHideRoomList(!hideRoomList)} />
 
     return (
+        <div className="header-container">
         <div className="header flex justify-between items-center">
             <span className="flex items-center gap-[3px]">
                 {hideRoomList ? (
@@ -28,6 +29,7 @@ export function VoiceHeader({ type, name, icon }: VoiceHeaderProps) {
             <span className="flex gap-3 items-center text-2xl ml-1">
                 <FaMagnifyingGlass />
             </span>
+        </div>
         </div>
     )
 }

@@ -1,12 +1,19 @@
-import { IMessage, Room } from "@strafechat/strafe.js";
-import { DateTime } from 'luxon';
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import ReactMarkdown from "react-markdown";
 import gfm from "remark-gfm";
+import { IMessage, Room } from "@strafechat/strafe.js";
+import { DateTime } from 'luxon';
 
 export default function ChatBody(props: { room: Room }) {
   const room = props.room;
   const scrollRef = useRef<HTMLUListElement>(null);
+
+  useEffect(() => {
+    const scrollElement = scrollRef.current;
+    if (scrollElement) {
+      scrollElement.scrollTop = scrollElement.scrollHeight;
+    }
+  }, [room.messages.size()]);
 
   function formatTimestamp(timestamp: number) {
     const now = DateTime.now();
@@ -41,7 +48,7 @@ export default function ChatBody(props: { room: Room }) {
         ref={scrollRef}
         className="messages flex min-w-[5px] overflow-scroll h-fit flex-col pt-[25px]"
       >
-        <div className="pb-6">
+        <div className="py-6">
           <h1 className="text-2xl font-bold inline-flex items-center">
             Welcome to #{room.name}
           </h1>
@@ -49,7 +56,6 @@ export default function ChatBody(props: { room: Room }) {
             This is the start of the room. {room.topic ? room.topic : ""}
           </p>
         </div>
-        {/* <hr className="pb-3 opacity-40" /> */}
         {
           room?.messages?.toArray().map((message: IMessage) => (
             <li key={message.id} className="message">
