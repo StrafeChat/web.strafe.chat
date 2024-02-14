@@ -56,7 +56,7 @@ export function ChatInput({ placeholder, room }: { placeholder: string, room: Ro
           />
           <div className="chat-input-right"></div>
         </div>
-        <span className="typing"><b>(global_name)</b> is typing...</span>
+        {/* <span className="typing"><b>(global_name)</b> is typing...</span> */}
       </div>
     </>
   )  
