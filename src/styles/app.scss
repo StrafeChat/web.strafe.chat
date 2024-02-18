@@ -544,9 +544,10 @@ div.memberlist {
 
       img.avatar {
         width: 35px;
+        min-width: 35px;
         height: 35px;
         border-radius: 50%;
-        position: fixed;
+        position: relative;
       }
 
       div.avatar-status {
@@ -584,7 +585,7 @@ div.memberlist {
         font-size: 15px;
         font-weight: 700;
         margin-top: -1.5px;
-        margin-left: 40px;
+        margin-left: 5px;
         text-overflow: ellipsis;
         position: relative;
         padding-right: 5px;
@@ -597,8 +598,7 @@ div.memberlist {
         text-overflow: ellipsis;
         overflow-x: ellipsis;
         white-space: nowrap;
-        margin-left: 40px;
-
+        margin-left: 5px;
         z-index: 1;
       }
     }
