@@ -1,6 +1,38 @@
 import { useClient, useForceUpdate } from '@/hooks';
 import { useTranslation } from 'react-i18next';
 
+const languageNames: Record<string, string> = {
+    'en_US': 'English (US)',
+    'en_GB': 'English (UK)',
+    'fr_FR': 'French',
+    'af_ZA': 'Afrikaans',
+    'bn_BD': 'Bengali',
+    'sq_AL': 'Albanian',
+    'ro_RO': 'Romanian',
+    'es_ES': 'Spanish',
+    'ar_SA': 'Arabic',
+    'bg_BG': 'Bulgarian',
+    'cs_CZ': 'Czech',
+    'da_DK': 'Danish',
+    'de_DE': 'German',
+    'el_GR': 'Greek',
+    'he_IL': 'Hebrew',
+    'it_IT': 'Italian',
+    'ja_JP': 'Japanese',
+    'nl_NL': 'Dutch',
+    'pt_PT': 'Portuguese',
+    'ru_RU': 'Russian',
+    'sv_SE': 'Swedish',
+    'uk_UA': 'Ukrainian',
+    'zh_CN': 'Chinese Simplified',
+    'zh_TW': 'Chinese Traditional',
+    'zh_HK': 'Chinese Traditional, Hong Kong',
+    'az_AZ': 'Azerbaijani',
+    'fil_PH': 'Filipino',
+    'haw_US': 'Hawaiian',
+    'en_SFN': 'Strafian',
+};
+
 export function LanguageSettings() {
 
     const { client } = useClient();
@@ -21,22 +53,18 @@ export function LanguageSettings() {
             <h1 className="title">Language</h1>
             <p>Select your language below.</p>
 
+           <div className='locale'>
             <div className="card-wrapper">
-                <div onClick={() => changeLanguage('en_US')} className={`card hoverable ${client?.user?.locale == "en-US" ? "!bg-[#21c45d]" : ""}`}>
-                    <p className='text-center'>English (US)</p>
-                </div>
-                <div onClick={() => changeLanguage('fr_FR')} className={`card hoverable ${client?.user?.locale == "fr-FR" ? "!bg-[#21c45d]" : ""}`}>
-                    <p className='text-center'>French</p>
-                </div>
-                <div onClick={() => changeLanguage('nl_NL')} className={`card hoverable ${client?.user?.locale == "nl-NL" ? "!bg-[#21c45d]" : ""}`}>
-                    <p className='text-center'>Dutch</p>
-                </div>
-                <div onClick={() => changeLanguage('af_ZA')} className={`card hoverable ${client?.user?.locale == "af-ZA" ? "!bg-[#21c45d]" : ""}`}>
-                    <p className='text-center'>Afrikaans</p>
-                </div>
-                <div onClick={() => changeLanguage('bn_BD')} className={`card hoverable ${client?.user?.locale == "bn-BD" ? "!bg-[#21c45d]" : ""}`}>
-                    <p className='text-center'>Bengali</p>
-                </div>
+                {availableLanguages.map(language => (
+                    <div
+                        key={language}
+                        onClick={() => changeLanguage(language)}
+                        className={`card hoverable ${client?.user?.locale === language.replace('_', '-') ? "!bg-[#21c45d]" : ""}`}
+                    >
+                        <p className='text-center'>{languageNames[language]}</p>
+                    </div>
+                ))}
+            </div>
             </div>
         </>
     )

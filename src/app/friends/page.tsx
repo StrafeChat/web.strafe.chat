@@ -10,6 +10,7 @@ export default function Friends() {
 
    return (
     <>
+    <div className="header-container">
       <div className="header">
         <span className="flex items-center gap-[3px]">
           {hideRoomList ? (
@@ -25,6 +26,7 @@ export default function Friends() {
           )}
         </span>
         <span><b>{t('friends_page.header')}</b></span>
+      </div>
       </div>
     </>
    )

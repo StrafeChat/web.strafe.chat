@@ -74,7 +74,7 @@ export default function SpaceRoomList({ params }: { params: { spaceId: string} }
                           isSectionExpanded[section.id] &&
                             space?.rooms
                             ?.toArray()
-                            .filter(room => [1,  2].includes(room.type) && room.parent_id == section.id)
+                            .filter(room => [1,  2].includes(room.type) && room.parentId == section.id)
                             .sort((a, b) => a.position - b.position)
                             .map((room) => (
                                 <NavLink key={room.id} href={`/spaces/${space.id}/rooms/${room.id}`}>

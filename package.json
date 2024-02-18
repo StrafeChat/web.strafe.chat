@@ -36,9 +36,14 @@
     "react-i18next": "^14.0.5",
     "react-icons": "^5.0.1",
     "react-markdown": "^9.0.1",
+    "remark-footnotes": "^4.0.1",
+    "remark-frontmatter": "^5.0.0",
     "remark-gfm": "^4.0.0",
+    "remark-math": "^6.0.0",
+    "remark-twemoji": "^0.1.1",
     "tailwind-merge": "^2.2.0",
-    "tailwindcss-animate": "^1.0.7"
+    "tailwindcss-animate": "^1.0.7",
+    "twemoji": "^14.0.2"
   },
   "devDependencies": {
     "@types/js-cookie": "^3.0.6",

@@ -16,6 +16,8 @@ export interface ChatHeaderProps {
 
 export interface MessageProps {
     message: Message;
+    key: number;
+    sameAuthor: boolean;
 }
 
 export interface VoiceHeaderProps {

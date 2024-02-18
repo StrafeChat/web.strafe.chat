@@ -2,10 +2,10 @@
     "home_page": {
         "header": "Acceuil",
         "greeting": {
-            "morning": "Good Morning, {display_name}.",
-            "afternoon": "Good Afternoon, {display_name}.",
-            "evening": "Good Evening, {display_name}. ",
-            "night": "Good Night, {display_name}.",
+            "morning": "Bonjour, {display_name}.",
+            "afternoon": "Bon après-midi, {display_name}.",
+            "evening": "Bonne soirée, {display_name}. ",
+            "night": "Bonne Nuit, {display_name}.",
             "welcome": " Bienvenue sur Strafe, tout d'abord, préparons-nous."
         },
         "nav_buttons": {
@@ -41,7 +41,7 @@
     },
     "space": {
         "room": {
-            "message_placeholder": "Message #{channel_name}"
+            "message_placeholder": "Envoyez un message à #{channel_name}"
         }
     },
     "modals": {
@@ -72,97 +72,97 @@
         "custom_status": {
             "title": "Définir un statut personnalisé",
             "buttons": {
-                "save": "Save",
-                "cancel": "Cancel"
+                "save": "Sauvegarder",
+                "cancel": "Annuler"
             }
         },
         "settings": {
             "navbar": {
                 "user_settings": {
-                    "header": "User Settings",
-                    "my_account": "My Account",
-                    "profile": "Profile",
-                    "authorized_apps": "Authorized Apps"
+                    "header": "Paramètres d'utilisateur",
+                    "my_account": "Mon compte",
+                    "profile": "Profil",
+                    "authorized_apps": "Applications autorisées"
                 },
                 "app_settings": {
-                    "header": "App Settings",
+                    "header": "Paramètres de l'application",
                     "notifications": "Notifications",
-                    "desktop": "Desktop"
+                    "desktop": "Bureau"
                 },
                 "others": {
-                    "logout": "Logout"
+                    "logout": "Se déconnecter"
                 }
             },
             "my_account": {
-                "header": "My Account",
+                "header": "Mon compte",
                 "edit_data_01": {
                     "username": {
-                        "title": "Username",
+                        "title": "Nom d'utilisateur",
                         "buttons": {
-                            "edit": "Edit"
+                            "edit": "Modifier"
                         }
                     },
                     "discriminator": {
-                        "title": "Discriminator",
+                        "title": "Discriminateur",
                         "buttons": {
-                            "edit": "Edit"
+                            "edit": "Modifier"
                         }
                     },
                     "email": {
-                        "title": "Email",
+                        "title": "E-mail",
                         "buttons": {
-                            "edit": "Edit"
+                            "edit": "Modifier"
                         }
                     },
                     "password": {
-                        "title": "Password",
+                        "title": "Mot de passe",
                         "buttons": {
-                            "edit": "Edit"
+                            "edit": "Modifier"
                         }
                     },
                     "phone_number": {
-                        "title": "Phone Number",
-                        "placeholder": "No Phone Number Set",
+                        "title": "Numéro de téléphone",
+                        "placeholder": "Aucun numéro de téléphone n'est défini",
                         "buttons": {
-                            "edit": "Edit"
+                            "edit": "Modifier"
                         }
                     }
                 },
                 "edit-data-02": {
                     "2fa": {
-                        "enabled": "Enabled",
-                        "disabled": "Disabled"
+                        "enabled": "Activé",
+                        "disabled": "Désactivé"
                     },
                     "buttons": {
                         "delete_account": {
-                            "title": "Delete Account"
+                            "title": "Supprimer le compte"
                         }
                     }
                 }
             },
             "profile": {
-                "header": "Profile"
+                "header": "Profil"
             },
             "authorized_apps": {
-                "header": "Authorized Apps"
+                "header": "Applications autorisées"
             },
             "notifications": {
                 "header": "Notifications"
             },
             "desktop": {
-                "header": "Desktop"
+                "header": "Bureau"
             }
         }
     },
     "context_menus": {
         "user_avatar": {
-            "settings": "Settings",
-            "online": "Online",
-            "idle": "Idle",
-            "coding": "Coding",
-            "do_not_disturb": "Do Not Disturb",
-            "invisible": "Invisible",
-            "custom_status": "Custom Status"
+            "settings": "Paramètres",
+            "online": "En ligne",
+            "idle": "Inactif",
+            "coding": "En train de coder",
+            "do_not_disturb": "Ne pas déranger",
+            "invisible": "Invisible 🕶️",
+            "custom_status": "Définir le statut personnalisé"
         }
     }
 }

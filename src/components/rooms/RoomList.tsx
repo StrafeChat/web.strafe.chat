@@ -20,7 +20,7 @@ export default function RoomList() {
   }, [setHideRoomList]);
 
   useEffect(() => {
-    controls.start({ width: hideRoomList ? 0 : "auto" });
+    controls.start({ width: hideRoomList ? 0 : "290px", minWidth: hideRoomList ? 0 : "290px" });
     localForage.setItem("hide_room_list", hideRoomList);
     typeof window !== "undefined" && window.dispatchEvent(new Event("hide-sidebar"))
   }, [hideRoomList, controls]);
@@ -31,9 +31,9 @@ export default function RoomList() {
   return (
     <>
       <motion.div
-        style={{ width: "100%", overflow: "hidden" }}
+        style={{ width: "290px", overflow: "hidden" }}
         initial={false}
-        animate={{ width: hideRoomList ? 0 : "auto"}}
+        animate={{ width: hideRoomList ? 0 : "290px", minWidth: hideRoomList ? 0 : "290px" }}
         transition={{ duration: 0.5, ease: "easeIn" }}
       >
         <div className="room-list">

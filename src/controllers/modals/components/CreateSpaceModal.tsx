@@ -7,7 +7,7 @@ import Link from 'next/link';
 import React from 'react';
 import Modal from './Modal';
 import cookie from "js-cookie";
-import { ISpace } from '@strafechat/strafe.js';
+import { ISpace, Space } from '@strafechat/strafe.js';
 import { toast } from '@/components/ui/use-toast';
 
 class CreateSpaceModal extends Modal<{ name: string, type: string }, {}> {
@@ -46,8 +46,13 @@ class CreateSpaceModal extends Modal<{ name: string, type: string }, {}> {
                 description: data.message,
                 className: "bg-destructive"
             });
-            const space: ISpace = data;
-            client?.spaces.set(space.id, space)
+
+            let spaceData = data.space;
+            spaceData.rooms = data.rooms?? [];
+            const space = new Space(spaceData as ISpace);
+            client?.spaces.set(space.id, space);
+
+            this.close();
         }
 
         return (

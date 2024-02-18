@@ -1,23 +1,22 @@
-"use client";
 import { Room } from "@strafechat/strafe.js";
-import { FaFileCirclePlus } from "react-icons/fa6";
-import { useClient } from "@/hooks";
 import { useEffect, useRef, useState, useCallback } from "react";
 
-export function ChatInput({ placeholder, room }: { placeholder: string, room: Room },) {
+export function ChatInput({ placeholder, room }: { placeholder: string, room: Room }) {
 
   const ref = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLDivElement>(null);
   const [content, setContent] = useState("");
-  const { client } = useClient();
+  const maxCharacters = 2000; // Set your desired maximum character count
+  const [characterCount, setCharacterCount] = useState(0);
 
   useEffect(() => {
-  }, [ref.current]);
+  }, []);
 
   const handleInput = useCallback((event: Event) => {
     if (inputRef.current) {
-      const text = inputRef.current.innerHTML;
-      setContent(inputRef.current.innerText);
+      const text = inputRef.current.innerText;
+      setContent(text);
+      setCharacterCount(text.length);
     }
   }, []);
 
@@ -37,27 +36,31 @@ export function ChatInput({ placeholder, room }: { placeholder: string, room: Ro
 
   return (
     <>
-      <div className="chat-input-container">
-        <div className="chat-input">
-          <div className="chat-input-left">
-
-          </div>
-          <div ref={inputRef} className="chat-input-middle" contentEditable={true} suppressContentEditableWarning {...{ placeholder }}
-            id="textbox"
-            role={"textbox"}
-            onKeyDown={async (event) => {
-              if (event.key == "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                await room.send({ content });
-                setContent("");
-                (event.target as HTMLElement).innerText = "";
-              }
-            }}
-          />
-          <div className="chat-input-right"></div>
-        </div>
-        {/* <span className="typing"><b>(global_name)</b> is typing...</span> */}
+    <div className="chat-input-container">
+      <div className="chat-input">
+        <div className="chat-input-left"></div>
+        <div
+          ref={inputRef}
+          className="chat-input-middle"
+          contentEditable={true}
+          suppressContentEditableWarning
+          {...{ placeholder }}
+          id="textbox"
+          role={"textbox"}
+          onKeyDown={async (event) => {
+            if (event.key == "Enter" && !event.shiftKey) {
+              event.preventDefault();
+              await room.send({ content });
+              setContent("");
+              (event.target as HTMLElement).innerText = "";
+            }
+          }}
+        />
+        <div className="chat-input-right">{characterCount}/{maxCharacters}</div>
       </div>
-    </>
-  )  
+      {/* <span className="typing"><b>(global_name)</b> is typing...</span> */}
+    </div>
+  </>
+  
+  )
 }

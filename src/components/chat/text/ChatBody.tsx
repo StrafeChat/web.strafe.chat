@@ -2,7 +2,7 @@ import { useEffect, useRef } from "react";
 import { IMessage, Room } from "@strafechat/strafe.js";
 import { Message } from "./Message";
 
-export default function ChatBody(props: { room: Room }) {
+export default function ChatBody(props: { room: any }) {
   const room = props.room;
   const scrollRef = useRef<HTMLUListElement>(null);
 
@@ -13,6 +13,7 @@ export default function ChatBody(props: { room: Room }) {
     }
   }, [room.messages.size()]);
 
+// console.log(room?.messages?.toArray()[key - 1])
 
   return (
     <div className="body flex-col justify-end">
@@ -30,10 +31,17 @@ export default function ChatBody(props: { room: Room }) {
         </div>
         {
           room?.messages?.toArray()
-          .sort((a, b) => a.created_at - b.created_at)
-          .map((message: IMessage) => (
-             <Message message={message} />
-          ))
+          .sort((a: any, b: any) => a.createdAt - b.createdAt)
+          .map((message: any, key: number) => {
+            console.log(key > 0 && message.authorId === room?.messages?.toArray()[key - 1].au)
+             return <Message message={message} key={key} sameAuthor={
+              key > 0 && message.authorId === room?.messages?.toArray()[key - 1].authorId && (() => {
+                const messageDate = new Date(message.createdAt);
+                const lastMessageDate = new Date(room?.messages?.toArray()[key - 1].createdAt);
+                return `${messageDate.getMonth()}/${messageDate.getDate()}/${messageDate.getFullYear()}` === `${lastMessageDate.getMonth()}/${lastMessageDate.getDate()}/${lastMessageDate.getFullYear()}`;
+              })()
+            } />
+})
         }
       </ul>
     </div>

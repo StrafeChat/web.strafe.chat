@@ -1,12 +1,12 @@
 import { formatStatusText } from "@/helpers/formatter";
 import { useClient } from "@/hooks";
-import { ISpace } from "@strafechat/strafe.js";
+import { Space } from "@strafechat/strafe.js";
 import { useState } from "react";
 let isMobile = typeof window !== "undefined" && window.innerWidth < 768;
 window.addEventListener("resize", () => {
     isMobile = typeof window !== "undefined" && window.innerWidth < 768;
 });
-export default function MemberList(props: { hidden: boolean, members: any, space: ISpace }) {
+export default function MemberList(props: { hidden: boolean, members: any, space: Space }) {
     let [hidden, setHidden] = useState(props.hidden || false);
     let members = props.members;
     if (typeof window !== "undefined") {
@@ -20,12 +20,11 @@ export default function MemberList(props: { hidden: boolean, members: any, space
         <div className="memberlist"
             style={{ ...(isMobile && hidden ? { display: "none" } : {}) }}
         >
-
+     <ul className="members">
 {
    members?.toArray().filter((member: any) => member.user.presence.online == true && member.user.presence.status !== "offline").length > 0 && 
       <>
         <label className="role">Online - {members?.toArray().filter((member: any) => member.user.presence.online == true && member.user.presence.status !== "offline").length}</label>
-             <ul className="members">
                 {members?.toArray()
                  .filter((member: any) => member.user.presence.online == true && member.user.presence.status !== "offline")
                  .sort((a: any, b: any) => a.user.global_name ?? a.user.username.localeCompare(b.user.global_name ?? b.user.username))
@@ -42,14 +41,12 @@ export default function MemberList(props: { hidden: boolean, members: any, space
                 </li>
                  ))
                 }
-            </ul>
       </>
 }
 {
    members?.toArray().filter((member: any) => member.user.presence.online == false || member.user.presence.status == "offline").length > 0 && 
       <>
         <label className="role">Offline - {members?.toArray().filter((member: any) => member.user.presence.online == false || member.user.presence.status == "offline").length}</label>
-             <ul className="members">
                 {members?.toArray()
                  .filter((member: any) => member.user.presence.online == false || member.user.presence.status == "offline")
                  .sort((a: any, b: any) => a.user.username.localeCompare(b.user.username))
@@ -64,10 +61,9 @@ export default function MemberList(props: { hidden: boolean, members: any, space
                 </li>
                  ))
                 }
-            </ul>
       </>
 }
-
+          </ul>
         </div>
     )
 }

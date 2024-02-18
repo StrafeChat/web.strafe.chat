@@ -54,7 +54,7 @@ export default function SpaceList() {
                       space.icon ? (
                          <img className="space" src={space.icon} alt="Space Icon" />
                       ) : (
-                         <>{space.name_acronym}</>
+                         <>{space.nameAcronym}</>
                       )
                     }
                  </button>

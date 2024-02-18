@@ -1,20 +1,20 @@
 {
     "home_page": {
-        "header": "গৃহ",
+        "header": "Home",
         "greeting": {
-            "morning": "সুপ্রভাত, {display_name}.",
-            "afternoon": "শুভ অপরাহ্ন, {display_name}.",
-            "evening": "শুভ সন্ধ্যা, {display_name}. ",
-            "night": "শুভ রাত্রি, {display_name}.",
+            "morning": "Good Morning, {display_name}.",
+            "afternoon": "Good Afternoon, {display_name}.",
+            "evening": "Good Evening, {display_name}. ",
+            "night": "Good Night, {display_name}.",
             "welcome": " Welcome to Strafe, let's get started."
         },
         "nav_buttons": {
             "create_space": {
-                "title": "একটি স্থান তৈরি করুন",
-                "description": "আপনার সম্প্রদায়, আপনার উপায় তৈরি করুন এবং কাস্টমাইজ করুন."
+                "title": "Create a Space",
+                "description": "Build and customize YOUR comunity, YOUR way."
             },
             "discover": {
-                "title": "Strafe আবিষ্কার করুন",
+                "title": "Discover Strafe",
                 "description": "Find interests! Discover bots, spaces, and more!"
             },
             "settings": {

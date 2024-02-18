@@ -46,9 +46,8 @@ export default function Home() {
 
   return (
     <>
-      <div className="header"
-
-      >
+     <div className="header-container">
+      <div className="header">
         <span className="flex items-center gap-[3px]">
           {hideRoomList ? (
             <>
@@ -63,6 +62,7 @@ export default function Home() {
           )}
         </span>
         <span><b>{t('home_page.header')}</b></span>
+       </div>
       </div>
       <div className="home overflow-auto"
 
@@ -70,7 +70,7 @@ export default function Home() {
       >
         <div className="w-full container flex flex-col items-center justify-center h-full py-[100px] text-white">
           <h1 className={`text-5xl font-bold text-[#323C31]-primaryText`}>
-            {greeting.replace("{display_name}", `${client?.user?.global_name ?? client?.user?.username}`)}
+            {greeting.replace("{display_name}", `${client?.user?.globalName ?? client?.user?.username}`)}
           </h1>
           <p className={`font-md text-xl text-white -secondaryText`}>
             {t('home_page.greeting.welcome')}
