@@ -14,7 +14,7 @@ export function AccountSettings() {
     const [savedData, setSavedData] = useState({
         username: client?.user?.username!,
         email: client?.user?.email!,
-        phone_number: client?.user?.phone_number,
+        phone_number: client?.user?.phoneNumber,
         discriminator: client?.user?.discriminator!,
         // locale: client?.user?.locale!,
     });
