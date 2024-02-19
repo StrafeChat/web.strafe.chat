@@ -28,7 +28,7 @@ export function ChatInput({ placeholder, room }: { placeholder: string, room: Ro
       clearTimeout(typingTimeout);
       typingTimeout = setTimeout(() => {
         setTypingUsers(prevUsers => prevUsers.filter(userName => userName !== name));
-      }, 5000);
+      }, 10000);
     };
 
     client?.on("typingStart", handleTypingStart);
@@ -56,7 +56,7 @@ export function ChatInput({ placeholder, room }: { placeholder: string, room: Ro
         room.sendTyping();
         setTimeout(() => {
           setCurrentlyTyping(false);
-        }, 5000)
+        }, 10000)
       }
     }
   }, [room, currentlyTyping]);
