@@ -10,7 +10,8 @@ export function ChatInput({ placeholder, room }: { placeholder: string, room: Ro
   const maxCharacters = 2000;
   const [characterCount, setCharacterCount] = useState(0);
   const [typingUsers, setTypingUsers] = useState<string[]>([]);
-
+  const [currentlyTyping, setCurrentlyTyping] = useState<boolean>(false);
+ 
   useEffect(() => {
     let typingTimeout: NodeJS.Timeout;
 
@@ -49,9 +50,16 @@ export function ChatInput({ placeholder, room }: { placeholder: string, room: Ro
       const text = inputRef.current.innerText;
       setContent(text);
       setCharacterCount(text.length);
-      room.sendTyping();
+      console.log(currentlyTyping)
+      if (!currentlyTyping) {
+        setCurrentlyTyping(true);
+        room.sendTyping();
+        setTimeout(() => {
+          setCurrentlyTyping(false);
+        }, 5000)
+      }
     }
-  }, [room]);
+  }, [room, currentlyTyping]);
 
   useEffect(() => {
     const input = inputRef.current;
@@ -86,6 +94,7 @@ export function ChatInput({ placeholder, room }: { placeholder: string, room: Ro
               await room.send({ content });
               setContent("");
               setCharacterCount(0);
+              setCurrentlyTyping(false);
               (event.target as HTMLElement).innerText = "";
             }
           }}
