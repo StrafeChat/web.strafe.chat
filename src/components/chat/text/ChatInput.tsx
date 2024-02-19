@@ -16,6 +16,7 @@ export function ChatInput({ placeholder, room }: { placeholder: string, room: Ro
     let typingTimeout: NodeJS.Timeout;
 
     const handleTypingStart = (data: any) => {
+      if (data.room_id !== room.id) return;
       const { global_name, username } = data.user;
       const name = global_name || username;
       if (data.user.id == client?.user?.id) return;
