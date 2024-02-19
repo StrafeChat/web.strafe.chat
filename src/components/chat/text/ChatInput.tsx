@@ -1,24 +1,57 @@
 import { Room } from "@strafechat/strafe.js";
 import { useEffect, useRef, useState, useCallback } from "react";
+import { useClient } from "@/hooks";
 
 export function ChatInput({ placeholder, room }: { placeholder: string, room: Room }) {
 
-  const ref = useRef<HTMLDivElement>(null);
+  const { client } = useClient();
   const inputRef = useRef<HTMLDivElement>(null);
   const [content, setContent] = useState("");
-  const maxCharacters = 2000; // Set your desired maximum character count
+  const maxCharacters = 2000;
   const [characterCount, setCharacterCount] = useState(0);
+  const [typingUsers, setTypingUsers] = useState<string[]>([]);
 
   useEffect(() => {
-  }, []);
+    let typingTimeout: NodeJS.Timeout;
 
-  const handleInput = useCallback((event: Event) => {
+    const handleTypingStart = (data: any) => {
+      const { global_name, username } = data.user;
+      const name = global_name || username;
+      if (data.user.id == client?.user?.id) return;
+      setTypingUsers(prevUsers => {
+        if (!prevUsers.includes(name)) {
+          return [...prevUsers, name];
+        }
+        return prevUsers;
+      });
+      clearTimeout(typingTimeout);
+      typingTimeout = setTimeout(() => {
+        setTypingUsers(prevUsers => prevUsers.filter(userName => userName !== name));
+      }, 5000);
+    };
+
+    client?.on("typingStart", handleTypingStart);
+    client?.on("messageCreate", (message) => {
+        setTypingUsers(prevUsers => prevUsers.filter(userName => userName !== message.author.global_name ?? message.author.username))
+  })
+
+    return () => {
+      client?.off("typingStart", handleTypingStart);
+      client?.off("messageCreate", (message) => {
+          setTypingUsers(prevUsers => prevUsers.filter(userName => userName !== message.author.global_name ?? message.author.username));
+      })
+      clearTimeout(typingTimeout);
+    };
+  }, [client]);
+
+  const handleInput = useCallback(() => {
     if (inputRef.current) {
       const text = inputRef.current.innerText;
       setContent(text);
       setCharacterCount(text.length);
+      room.sendTyping();
     }
-  }, []);
+  }, [room]);
 
   useEffect(() => {
     const input = inputRef.current;
@@ -52,13 +85,23 @@ export function ChatInput({ placeholder, room }: { placeholder: string, room: Ro
               event.preventDefault();
               await room.send({ content });
               setContent("");
+              setCharacterCount(0);
               (event.target as HTMLElement).innerText = "";
             }
           }}
         />
         <div className="chat-input-right">{characterCount}/{maxCharacters}</div>
       </div>
-      {/* <span className="typing"><b>(global_name)</b> is typing...</span> */}
+        <span className="typing">
+        {typingUsers.length > 0 && (
+          <>
+          {typingUsers.length > 4 ? "Multiple people are typing..." : typingUsers.map((userName, index) => (
+            <>{index > 0 && ', '}{typingUsers.length === 2 && index === typingUsers.length - 1 && ' and '}<b>{userName}</b></>
+          ))}
+          {typingUsers.length <= 4 && typingUsers.length > 1 ? " are typing..." : typingUsers.length === 1 ? " is typing..." : ""}
+          </>
+         )}
+      </span>
     </div>
   </>
   

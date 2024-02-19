@@ -30,7 +30,7 @@ const languageNames: Record<string, string> = {
     'az_AZ': 'Azerbaijani',
     'fil_PH': 'Filipino',
     'haw_US': 'Hawaiian',
-    'en_SFN': 'Strafian',
+    'en_SF': 'Strafian',
 };
 
 export function LanguageSettings() {
