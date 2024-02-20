@@ -33,7 +33,6 @@ export default function ClientController({ children }: { children: JSX.Element }
   }, [i18n, client])
 
   const handlePresenceUpdate = useCallback((data: any) => {
-    console.log(data);
     if (client!.user && data.user.id == client!.user.id) client!.user.presence = data.presence;
     forceUpdate();
     // eslint-disable-next-line react-hooks/exhaustive-deps

@@ -669,8 +669,10 @@ li.message {
   display: flex;
   gap: 0.5rem;
   position: relative;
-  padding: 5px;
-  padding-bottom: 17px;
+}
+
+li.full {
+  padding-top: 23px;
 }
 
 img.avatar {
@@ -714,6 +716,7 @@ div.chat-input-container {
   max-width: 100%;
   padding-left: 20px;
   padding-right: 20px;
+  padding-top: 25px;
   margin-bottom: 5px;
 }
 

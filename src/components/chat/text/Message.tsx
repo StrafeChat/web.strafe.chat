@@ -9,7 +9,7 @@ import remarkMath from 'remark-math';
 import remarkFrontmatter from 'remark-frontmatter';
 import remarkParse from 'remark-parse';
 
-export function Message({ message }: MessageProps) {
+export function Message({ message, key, sameAuthor }: MessageProps) {
   const contentRef = useRef<HTMLSpanElement>(null);
 
   useEffect(() => {
@@ -71,8 +71,10 @@ export function Message({ message }: MessageProps) {
   };
 
   return (
-    <li key={message.id} className="message">
-      <img
+    <>
+      {!sameAuthor ? (
+        <li key={key} className="message full">
+        <img
         src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${message.author.id}/${message.author.avatar}`}
         style={{ objectFit: "cover" }}
         className="avatar"
@@ -95,6 +97,21 @@ export function Message({ message }: MessageProps) {
           </ReactMarkdown>
         </span>
       </div>
+      </li>
+     ): (      
+      <li key={key} className="message">
+     <div className="flex flex-col">
+      <span className="content pl-[48px]" ref={contentRef}>
+      <ReactMarkdown
+        components={{ a: CustomLink }}
+        remarkPlugins={[gfm, remarkMath, remarkFrontmatter, remarkParse]}
+      >
+        {transformMessage(message.content!)}
+      </ReactMarkdown>
+    </span>
+    </div>
     </li>
+     )} 
+   </>
   );
 }

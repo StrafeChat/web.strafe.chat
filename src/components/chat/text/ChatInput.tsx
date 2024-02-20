@@ -104,8 +104,8 @@ export function ChatInput({ placeholder, room }: { placeholder: string, room: Ro
         <span className="typing">
         {typingUsers.length > 0 && (
           <>
-          {typingUsers.length > 4 ? "Multiple people are typing..." : typingUsers.map((userName, index) => (
-            <>{index > 0 && ', '}{typingUsers.length === 2 && index === typingUsers.length - 1 && ' and '}<b>{userName}</b></>
+          {typingUsers.length > 4 ? "Several people are typing..." : typingUsers.map((userName, index) => (
+            <>{index > 0 && ', '}{typingUsers.length === 3 && index === typingUsers.length - 1 && ' and '}<b>{userName}</b></>
           ))}
           {typingUsers.length <= 4 && typingUsers.length > 1 ? " are typing..." : typingUsers.length === 1 ? " is typing..." : ""}
           </>

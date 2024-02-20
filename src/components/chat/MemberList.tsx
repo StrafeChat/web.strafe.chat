@@ -49,7 +49,7 @@ export default function MemberList(props: { hidden: boolean, members: any, space
         <label className="role">Offline - {members?.toArray().filter((member: any) => member.user.presence.online == false || member.user.presence.status == "offline").length}</label>
                 {members?.toArray()
                  .filter((member: any) => member.user.presence.online == false || member.user.presence.status == "offline")
-                 .sort((a: any, b: any) => a.user.username.localeCompare(b.user.username))
+                 .sort((a: any, b: any) => a.user.global_name ?? a.user.username.localeCompare(b.user.global_name ?? b.user.username))
                  .map((member: any) => (
                     <li key={member.id} className="member offline">
                     <div className="relative">
