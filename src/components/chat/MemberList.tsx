@@ -20,10 +20,10 @@ export default function MemberList(props: { hidden: boolean, members: any, space
         <div className="memberlist"
             style={{ ...(isMobile && hidden ? { display: "none" } : {}) }}
         >
-     <ul className="members">
+    <ul className="members">
 {
    members?.toArray().filter((member: any) => member.user.presence.online == true && member.user.presence.status !== "offline").length > 0 && 
-      <>
+   <>
         <label className="role">Online - {members?.toArray().filter((member: any) => member.user.presence.online == true && member.user.presence.status !== "offline").length}</label>
                 {members?.toArray()
                  .filter((member: any) => member.user.presence.online == true && member.user.presence.status !== "offline")
@@ -41,11 +41,11 @@ export default function MemberList(props: { hidden: boolean, members: any, space
                 </li>
                  ))
                 }
-      </>
+    </>
 }
 {
    members?.toArray().filter((member: any) => member.user.presence.online == false || member.user.presence.status == "offline").length > 0 && 
-      <>
+    <>
         <label className="role">Offline - {members?.toArray().filter((member: any) => member.user.presence.online == false || member.user.presence.status == "offline").length}</label>
                 {members?.toArray()
                  .filter((member: any) => member.user.presence.online == false || member.user.presence.status == "offline")
@@ -63,7 +63,7 @@ export default function MemberList(props: { hidden: boolean, members: any, space
                 }
       </>
 }
-          </ul>
+        </ul>
         </div>
     )
 }

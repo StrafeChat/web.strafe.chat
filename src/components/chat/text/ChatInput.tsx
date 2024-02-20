@@ -51,7 +51,6 @@ export function ChatInput({ placeholder, room }: { placeholder: string, room: Ro
       const text = inputRef.current.innerText;
       setContent(text);
       setCharacterCount(text.length);
-      console.log(currentlyTyping)
       if (!currentlyTyping) {
         setCurrentlyTyping(true);
         room.sendTyping();
