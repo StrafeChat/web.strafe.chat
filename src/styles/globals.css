@@ -44,8 +44,12 @@
     --border: 0 0% 9%;
     --input: 0 0% 14.9%;
     --ring: 0 0% 83.1%;
+    --danger: hsl(0, 78%, 50%);
 
     --radius: 0.5rem;
+
+    --ui-context-menu: hsl(0, 0%, 8%);
+    --ui-context-menu-hover: hsl(0, 0%, 10%);
   }
 }
 

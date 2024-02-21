@@ -46,14 +46,14 @@ export function ChatInput({ placeholder, room }: { placeholder: string, room: Ro
     };
   }, [client]);
 
-  const handleInput = useCallback(() => {
+  const handleInput = useCallback(async () => {
     if (inputRef.current) {
       const text = inputRef.current.innerText;
       setContent(text);
       setCharacterCount(text.length);
       if (!currentlyTyping) {
         setCurrentlyTyping(true);
-        room.sendTyping();
+        await room.sendTyping();
         setTimeout(() => {
           setCurrentlyTyping(false);
         }, 10000)

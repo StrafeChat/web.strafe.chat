@@ -18,6 +18,7 @@ export interface MessageProps {
     message: Message;
     key: number;
     sameAuthor: boolean;
+    showMoreOptions: boolean;
 }
 
 export interface VoiceHeaderProps {

@@ -512,7 +512,7 @@ div.memberlist {
     display: flex;
     flex-direction: column;
     gap: 0.25rem;
-    margin-bottom: 15px;
+    padding-bottom: 15px;
     overflow-y: auto;
     overflow-x: hidden;
 
@@ -649,30 +649,132 @@ div.body {
   max-width: 100%;
   height: 100%;
   overflow-x: hidden;
-}
+ }
 }
 
 ul.messages {
-  overflow-x: hidden;
+  overflow-x: hdden;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
+  width: 100%;
+  position: relative;
   height: fit-content;  
-  list-style-type: none;
   padding-left: 20px;
   padding-right: 20px;
-  padding-bottom: 5px;
+  padding-bottom: 25px;
   word-break: break-all;
+
+  &::-webkit-scrollbar { 
+    width: 0.5rem;
+  }
+
+  &::-webkit-scrollbar-thumb { 
+    background: var(--scrollbar-thumb);
+    border-radius: 5rem;
+  }
+
+  &::-webkit-scrollbar-track { 
+    background: var(--scrollbar-track);
+    border-radius: 5rem;
+  } 
+
+  &::-moz-scrollbar {
+    width: 0.5rem;
+  }
+
+  &::-moz-scrollbar-thumb { 
+    background: var(--scrollbar-thumb);
+    border-radius: 5rem;
+  }
+
+  &::-moz-scrollbar-track { 
+    background: var(--scrollbar-track);
+    border-radius: 5rem;
+  } 
+  
+  &::-ms-scrollbar {
+    width: 0.5rem;
+  }
+
+  &::-ms-scrollbar-thumb { 
+    background: var(--scrollbar-thumb);
+    border-radius: 5rem;
+  }
+
+  &::-ms-scrollbar-track { 
+    background: var(--scrollbar-track);
+    border-radius: 5rem;
+  } 
 }
 
 li.message {
   display: flex;
   gap: 0.5rem;
+  width: 100%;
   position: relative;
+  padding: 2px;
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.1);
+  }
+
+  div.options {
+    display: none;
+    position: absolute;
+    background: var(--ui-context-menu);
+    right: 1.25rem;
+    transform: translateY(-1.25rem);
+    border-radius: 1rem;
+    z-index: 999;
+
+    div.icon {
+      width: inherit;
+      height: inherit;
+      display: flex;
+      align-items: center;
+    }
+
+    & > :first-child {
+      span.icon {
+        border-top-left-radius: 1rem;
+        border-bottom-left-radius: 1rem;
+      }
+    }
+
+    & > :last-child {
+      span.icon {
+        border-top-right-radius: 1rem;
+        border-bottom-right-radius: 1rem;
+      }
+    }
+
+    span.icon {
+      width: 32px;
+      height: 32px;
+      display: flex;
+      align-items: center;
+      cursor: pointer;
+      position: relative;
+
+      &:hover {
+        background: var(--ui-context-menu-hover);
+      }
+
+      svg {
+        color: var(--text-primary);
+        padding: 0.5rem;
+
+        &.danger {
+          color: var(--danger);
+        }
+      }
+    }
+  }
 }
 
 li.full {
-  padding-top: 23px;
+  margin-top: 23px;
 }
 
 img.avatar {
@@ -716,7 +818,6 @@ div.chat-input-container {
   max-width: 100%;
   padding-left: 20px;
   padding-right: 20px;
-  padding-top: 25px;
   margin-bottom: 5px;
 }
 
