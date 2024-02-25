@@ -533,6 +533,7 @@ div.memberlist {
 
         span.username {
           margin-top: 6px;
+          padding-left: 40px
         }
       }
 
@@ -584,7 +585,7 @@ div.memberlist {
         font-size: 15px;
         font-weight: 700;
         margin-top: -1.5px;
-        margin-left: 5px;
+        margin-left: -35px;
         text-overflow: ellipsis;
         position: relative;
         padding-right: 5px;
@@ -660,8 +661,6 @@ ul.messages {
   width: 100%;
   position: relative;
   height: fit-content;  
-  padding-left: 20px;
-  padding-right: 20px;
   padding-bottom: 25px;
   word-break: break-all;
 
@@ -708,12 +707,15 @@ ul.messages {
   } 
 }
 
+li.full {
+  margin-top: 17px;
+}
+
 li.message {
   display: flex;
-  gap: 0.5rem;
   width: 100%;
   position: relative;
-  padding: 2px;
+  padding: 3px;
 
   &:hover {
     background: rgba(0, 0, 0, 0.1);
@@ -771,45 +773,44 @@ li.message {
       }
     }
   }
-}
-
-li.full {
-  margin-top: 23px;
-}
-
-img.avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 100%;
-}
-
-span.username {
-  font-size: 16px;
-  font-weight: 700;
-  margin-top: -4px;
-  margin-left: 5px;
-  z-index: 2;
-}
-
-span.timestamp {
-  font-size: 12px;
-  color: #9e9e9e;
-  font-weight: 400;
-  white-space: nowrap;
-  margin-left: 7px;
-  margin-top: -6px;
-  z-index: 2;
-}
-
-span.content {
-  font-size: 15px;
-  overflow: hidden;
-  white-space: pre-wrap;
-  margin-left: 5px;
-  z-index: 1;
-  overflow-wrap: break-word;
-  img {
-    display: inline-block;
+  
+  img.avatar {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    margin-left: 20px;
+    border-radius: 100%;
+  }
+  
+  span.username {
+    font-size: 16px;
+    font-weight: 700;
+    margin-top: -4px;
+    margin-left: 15px;
+    z-index: 2;
+  }
+  
+  span.timestamp {
+    font-size: 11px;
+    color: #9e9e9e;
+    font-weight: 400;
+    white-space: nowrap;
+    margin-left: 7px;
+    margin-top: -7px;
+    z-index: 2;
+  }
+  
+  span.content {
+    font-size: 15px;
+    overflow: hidden;
+    white-space: pre-wrap;
+    margin-left: 15px;
+    padding-right: 20px;
+    z-index: 1;
+    overflow-wrap: break-word;
+    img {
+      display: inline-block;
+    }
   }
 }
 
@@ -862,4 +863,10 @@ div.titlebar {
   justify-content: space-between;
   align-items: center;
   background-color: transparent;
+}
+
+img.avatar_modal {
+  border-radius: 50%;
+  aspect-ratio: 1/1;
+  border: #1f1f1f 0.4rem solid;
 }

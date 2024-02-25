@@ -30,11 +30,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "../../ui/tooltip";
+import { User } from "@strafechat/strafe.js";
 
 export function Message({ message, key, sameAuthor, showMoreOptions }: MessageProps) {
   const contentRef = useRef<HTMLSpanElement>(null);
   const replyRef = useRef<HTMLSpanElement>(null);
   const [editable, setEditable] = useState(false);
+  const [isHovered, setIsHovered] = useState(false);
   const { client } = useClient();
 
   useEffect(() => {
@@ -57,7 +59,7 @@ export function Message({ message, key, sameAuthor, showMoreOptions }: MessagePr
       case date.plus({ days: 1 }).hasSame(now, 'day'):
         return `Yesterday at ${date.toLocaleString(DateTime.TIME_SIMPLE)}`;
       case date.hasSame(now, 'week'):
-        return date.toFormat('EEEE') + ` at ${date.toLocaleString(DateTime.TIME_SIMPLE)}`;
+        return "Last " + date.toFormat('EEEE') + ` at ${date.toLocaleString(DateTime.TIME_SIMPLE)}`;
       default:
         return date.toLocaleString(DateTime.DATETIME_SHORT);
     }
@@ -95,11 +97,13 @@ export function Message({ message, key, sameAuthor, showMoreOptions }: MessagePr
     return text;
   };
 
+  const messageDate = DateTime.fromMillis(message.createdAt);
+
   return (
     <>
       {!sameAuthor ? (
         <li key={key} className="group message full">
-             <div className="options group-hover:flex">
+        <div className="options group-hover:flex">
           <div className="icon">
             <TooltipProvider>
               <Tooltip>
@@ -127,7 +131,7 @@ export function Message({ message, key, sameAuthor, showMoreOptions }: MessagePr
               </Tooltip>
             </TooltipProvider>
           </div>
-          {client?.user!.id == message.authorId && (
+          {client?.user!.id == message.author.id && (
             <>
               <div className="icon">
                 <TooltipProvider>
@@ -140,7 +144,7 @@ export function Message({ message, key, sameAuthor, showMoreOptions }: MessagePr
                         />
                       </span>
                     </TooltipTrigger>
-                    <TooltipContent>Edit Message</TooltipContent>
+                    <TooltipContent>Edit</TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               </div>
@@ -153,21 +157,12 @@ export function Message({ message, key, sameAuthor, showMoreOptions }: MessagePr
                           className="danger"
                           icon={faTrashCan}
                           onClick={async () => {
-                            // await fetch(
-                            //   `${process.env.NEXT_PUBLIC_API}/rooms/${message.roomId}/messages/${message.id}`,
-                            //   {
-                            //     method: "DELETE",
-                            //     headers: {
-                            //       "Content-Type": "application/json",
-                            //       Authorization: cookie.get("token")!,
-                            //     },
-                            //   }
-                            // );
+                            await message.delete();
                           }}
                         />
                       </span>
                     </TooltipTrigger>
-                    <TooltipContent>Delete Message</TooltipContent>
+                    <TooltipContent>Delete</TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               </div>
@@ -184,18 +179,21 @@ export function Message({ message, key, sameAuthor, showMoreOptions }: MessagePr
             </>
           )}
           </div>
-        <img
-        src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${message.author.id}/${message.author.avatar}`}
-        style={{ objectFit: "cover" }}
-        className="avatar"
-        draggable={false}
-        width={40}
-        height={40}
-        alt=""
+          <div className="flex flex-col">
+          <ProfilePopup user={message.author}>
+            <img
+                 src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${message.author.id}/${message.author.avatar}`}
+                 className="avatar"
+                 draggable={false}
+                 alt="Avatar"
       />
+      </ProfilePopup>
+      </div>
       <div className="flex flex-col">
         <span className="username">
-          {message.author.global_name ?? message.author.username}
+        <ProfilePopup user={message.author}>
+          <p>{message.author.display_name!}</p>
+          </ProfilePopup>
           <span className="timestamp">{formatTimestamp(message.createdAt)}</span>
         </span>
         <span className="content" ref={contentRef}>
@@ -209,8 +207,8 @@ export function Message({ message, key, sameAuthor, showMoreOptions }: MessagePr
       </div>
       </li>
      ): (      
-    <li key={key} className="group message">
-                   <div className="options group-hover:flex">
+    <li key={key} className="group message" onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
+      <div className="options group-hover:flex">
           <div className="icon">
             <TooltipProvider>
               <Tooltip>
@@ -238,7 +236,7 @@ export function Message({ message, key, sameAuthor, showMoreOptions }: MessagePr
               </Tooltip>
             </TooltipProvider>
           </div>
-          {client?.user!.id == message.authorId && (
+          {client?.user!.id == message.author.id && (
             <>
               <div className="icon">
                 <TooltipProvider>
@@ -251,7 +249,7 @@ export function Message({ message, key, sameAuthor, showMoreOptions }: MessagePr
                         />
                       </span>
                     </TooltipTrigger>
-                    <TooltipContent>Edit Message</TooltipContent>
+                    <TooltipContent>Edit</TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               </div>
@@ -264,21 +262,12 @@ export function Message({ message, key, sameAuthor, showMoreOptions }: MessagePr
                           className="danger"
                           icon={faTrashCan}
                           onClick={async () => {
-                            // await fetch(
-                            //   `${process.env.NEXT_PUBLIC_API}/rooms/${message.roomId}/messages/${message.id}`,
-                            //   {
-                            //     method: "DELETE",
-                            //     headers: {
-                            //       "Content-Type": "application/json",
-                            //       Authorization: cookie.get("token")!,
-                            //     },
-                            //   }
-                            // );
+                            await message.delete();
                           }}
                         />
                       </span>
                     </TooltipTrigger>
-                    <TooltipContent>Delete Message</TooltipContent>
+                    <TooltipContent>Delete</TooltipContent>
                   </Tooltip>
                 </TooltipProvider>
               </div>
@@ -295,16 +284,19 @@ export function Message({ message, key, sameAuthor, showMoreOptions }: MessagePr
             </>
           )}
           </div>
-     <div className="flex flex-col">
-      <span className="content pl-[48px]" ref={contentRef}>
-      <ReactMarkdown
-        components={{ a: CustomLink }}
-        remarkPlugins={[gfm, remarkMath, remarkFrontmatter, remarkParse]}
-      >
-        {transformMessage(message.content!)}
-      </ReactMarkdown>
-    </span>
-    </div>
+          <div className="relative">
+          <div className="flex flex-col">
+          <span className="timestamp absolute text-center text-[11px] pt-2.5 px-3">{ isHovered && messageDate.toLocaleString(DateTime.TIME_SIMPLE)}</span>
+            <span className={`content pl-[60px]`} ref={contentRef}>
+              <ReactMarkdown
+                components={{ a: CustomLink }}
+                remarkPlugins={[gfm, remarkMath, remarkFrontmatter, remarkParse]}
+              >
+                {transformMessage(message.content!)}
+              </ReactMarkdown>
+            </span>
+          </div>
+        </div>
     </li>
      )} 
    </>

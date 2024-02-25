@@ -21,7 +21,7 @@ export default function SpaceList() {
 
    return (
       <div className="space-list"
-         style={{ display: hide && isMobile ? "none" : "" }}
+         style={{ display: hide && isMobile ? "" : "" }}
       >
          <ContextMenu>
             <ContextMenuTrigger>

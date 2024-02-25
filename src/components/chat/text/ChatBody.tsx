@@ -45,7 +45,7 @@ useEffect(() => {
         ref={scrollRef}
         className="messages flex min-w-[5px] overflow-scroll h-fit flex-col pt-[25px]"
       >
-        <div className="py-6">
+        <div className="pt-6 px-[20px]">
           <h1 className="text-2xl font-bold inline-flex items-center">
             Welcome to #{room.name}
           </h1>
@@ -54,19 +54,22 @@ useEffect(() => {
           </p>
         </div>
         {(() => {
-                  if (room?.messages?.toArray()[0])
-                    return (
-                      <div className="flex mt-6 mb-6 relative left-auto right-auto h-0 z-1 border-[0.1px] border-gray-500 items-center justify-center box-border">
-                        <time className="bg-[#262626] px-4 text-sm text-gray-400 select-none font-bold uppercase">
-                          {Intl.DateTimeFormat(client?.user!.locale, {
-                            day: "numeric",
-                            month: "long",
-                            year: "numeric",
-                          }).format(new Date(room?.messages?.toArray()[0].createdAt))}
-                        </time>
-                      </div>
-                    );
-                })()}
+            const lastMessage = room?.messages?.toArray().slice(-1)[0];
+              if (lastMessage) {
+                return (
+                    <div className="flex mt-6 mb-3 mx-4 relative left-auto right-auto h-0 z-1 border-[0.1px] border-gray-500 items-center justify-center box-border">
+                      <time className="bg-[#262626] px-4 text-sm text-gray-400 select-none font-bold uppercase">
+                        {Intl.DateTimeFormat(client?.user!.locale, {
+                         day: "numeric",
+                         month: "long",
+                         year: "numeric",
+                   }).format(new Date(lastMessage.createdAt))}
+              </time>
+             </div>
+           );
+          }
+        return null;
+      })()}
         {
           room?.messages?.toArray()
             .sort((a: any, b: any) => a.createdAt - b.createdAt)
@@ -87,7 +90,7 @@ useEffect(() => {
                       return (
                         <div
                           key={key}
-                          className="flex mt-8 mb-3 relative left-auto right-auto h-0 z-1 border-[0.1px] border-gray-500 items-center justify-center box-border"
+                          className="flex mt-4 mb-1 mx-4 relative left-auto right-auto h-0 z-1 border-[0.1px] border-gray-500 items-center justify-center box-border"
                         >
                           <time className="bg-[#262626] px-4 text-sm text-gray-400 select-none font-bold uppercase">
                             {Intl.DateTimeFormat(client?.user!.locale, {
@@ -106,14 +109,17 @@ useEffect(() => {
                 message={message}
                 key={key}
                 showMoreOptions={showMoreOptionsForMessages}
-                sameAuthor={
-                  key > 0 && message.authorId === messages[key - 1].authorId &&
+                sameAuthor = {
+                  key > 0 && 
+                  message.author.id === messages[key - 1].author.id &&
                   (() => {
                     const messageDate = new Date(message.createdAt);
                     const lastMessageDate = new Date(messages[key - 1].createdAt);
-                    return `${messageDate.getMonth()}/${messageDate.getDate()}/${messageDate.getFullYear()}` === `${lastMessageDate.getMonth()}/${lastMessageDate.getDate()}/${lastMessageDate.getFullYear()}`;
+                    return (
+                      messageDate.getTime() - lastMessageDate.getTime() < 5 * 60 * 1000
+                    );
                   })()
-                }
+                }                
               />
             </>
           ))

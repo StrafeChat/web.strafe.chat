@@ -13,6 +13,7 @@ export function NavLink(props: NavLinkProps) {
         if (props.activate?.includes('/' + pathname.split('/')[1])) setActive(true);
         else switch (true) {
             case props.href.toString().trim() === '/':
+                console.log(pathname.toString().trim() === '/');
                 setActive(pathname.toString().trim() === '/');
                 break;
             case pathname.slice(1).includes(props.href.toString().slice(1)):
