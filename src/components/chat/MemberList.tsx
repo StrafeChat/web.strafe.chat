@@ -11,7 +11,7 @@ window.addEventListener("resize", () => {
 export default function MemberList(props: { hidden: boolean, members: any, space: Space }) {
     let [hidden, setHidden] = useState(props.hidden || false);
     let members = props.members;
-
+console.log(members)
     if (typeof window !== "undefined") {
         window.addEventListener("hide-sidebar", () => {
             setHidden(!hidden);
@@ -29,9 +29,10 @@ export default function MemberList(props: { hidden: boolean, members: any, space
         <label className="role">Online - {members?.toArray().filter((member: any) => member.user.presence.online == true && member.user.presence.status !== "offline").length}</label>
                 {members?.toArray()
                  .filter((member: any) => member.user.presence.online == true && member.user.presence.status !== "offline")
-                 .sort((a: any, b: any) => a.user.global_name ?? a.user.username.localeCompare(b.user.global_name ?? b.user.username))
+                 .sort((a: any, b: any) => a.user.display_name.localeCompare(b.user.display_name))
                  .map((member: any) => (
-                    <ProfilePopup user={member?.user as unknown as User}>
+                    <div className="flex flex-col relative">
+                    <ProfilePopup user={member?.user}>
                     <li key={member.id} className="member online">
                     <div className="relative">
                         <img draggable={false} src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${member?.user.id}/${member?.user.avatar}`} alt="Avatar" className="avatar" />
@@ -43,6 +44,7 @@ export default function MemberList(props: { hidden: boolean, members: any, space
                     </div>
                  </li>
                 </ProfilePopup>
+                </div>
                  ))
                 }
     </>
@@ -55,16 +57,16 @@ export default function MemberList(props: { hidden: boolean, members: any, space
                  .filter((member: any) => member.user.presence.online == false || member.user.presence.status == "offline")
                  .sort((a: any, b: any) => a.user.display_name.localeCompare(b.user.display_name))
                  .map((member: any) => (
+                    <div className="flex flex-col">
                     <ProfilePopup user={member?.user}>
                     <li key={member.userId} className="member offline">
                     <div className="relative">
                         <img draggable={false} src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${member?.user.id}/${member?.user.avatar}`} alt="Avatar" className="avatar" />
                     </div>
-                    <div className="flex flex-col">
                         <span className="username">{member?.user.display_name}</span>
-                    </div>
                  </li>
                 </ProfilePopup>
+                </div>
                  ))
                 }
       </>

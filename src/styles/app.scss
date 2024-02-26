@@ -517,6 +517,7 @@ div.memberlist {
     overflow-x: hidden;
 
     li.member {
+      overflow-x: hidden;
       display: flex;
       gap: 0.5rem;
       position: relative;
@@ -533,7 +534,7 @@ div.memberlist {
 
         span.username {
           margin-top: 6px;
-          padding-left: 40px
+          margin-left: 44px;
         }
       }
 
@@ -552,7 +553,8 @@ div.memberlist {
 
       div.avatar-status {
         position: absolute;
-        bottom: 0.005rem;
+        margin-bottom: -.5px;
+        bottom: 0.001rem;
         left: 1.25rem;
         width: 1rem;
         height: 1rem;
@@ -584,10 +586,11 @@ div.memberlist {
         line-height: 1.375;
         font-size: 15px;
         font-weight: 700;
-        margin-top: -1.5px;
-        margin-left: -35px;
+        margin-top: -2px;
+        padding-left: 5px;
         text-overflow: ellipsis;
-        position: relative;
+        overflow-x: hidden;
+        position: fixed;
         padding-right: 5px;
         z-index: 2;
       }
@@ -596,9 +599,12 @@ div.memberlist {
         font-size: small;
         overflow: hidden;
         text-overflow: ellipsis;
-        overflow-x: ellipsis;
+        overflow-x: hidden;
+        position: relative;
+        margin-top: 19px;
         white-space: nowrap;
-        margin-left: 5px;
+        padding-left: 5px;
+        padding-right: 5px;
         z-index: 1;
       }
     }
@@ -715,7 +721,7 @@ li.message {
   display: flex;
   width: 100%;
   position: relative;
-  padding: 3px;
+  padding: 2.5px;
 
   &:hover {
     background: rgba(0, 0, 0, 0.1);

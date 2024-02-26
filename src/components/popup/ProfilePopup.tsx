@@ -1,6 +1,7 @@
 import { useClient } from "@/hooks";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import Badges from "../Badges";
+const { DateTime } = require('luxon');
 
 export default function ProfilePopup({
   children,
@@ -9,13 +10,19 @@ export default function ProfilePopup({
   children: JSX.Element;
   user: any;
 }) {
+
+function formatDate(timpstamp: number) {
+    const dt = DateTime.fromISO(timpstamp);
+    return dt.toFormat('LLL d\'th\', yyyy');
+}
+
   return (
     <Popover>
       <PopoverTrigger>{children}</PopoverTrigger>
       <PopoverContent side="right">
-        <div className="w-full h-fit flex flex-col relative rounded-t-xl">
+        <div className="h-fit rounded-t-xl">
           <div
-            className="w-full h-[60px] rounded-t-xl"
+            className="h-[60px] rounded-t-xl"
             style={{
               backgroundColor: `gray`, // accentColor
             }}
@@ -59,12 +66,14 @@ export default function ProfilePopup({
               </span>
               <span className="text-gray-400">{user.presence.status_text}</span>
               <div className="w-full h-0.5 bg-gray-500 rounded-full my-2" />
-              <span className="text-md font-bold block">ABOUT</span>
+              <span className="text-sm font-bold block mt-1">ABOUT</span>
                {user.about ? (
                 <span>{user.about}</span>
               ) : (
                 <span className="text-gray-400">No About Provided</span>
               )} 
+              <span className="text-sm font-bold block mt-2">MEMBER SINCE</span>
+                <span className="text-gray-400">{formatDate(user.created_at)}</span>
             </div>
           </div>
         </div>
