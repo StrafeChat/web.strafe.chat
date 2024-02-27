@@ -31,20 +31,18 @@ console.log(members)
                  .filter((member: any) => member.user.presence.online == true && member.user.presence.status !== "offline")
                  .sort((a: any, b: any) => a.user.display_name.localeCompare(b.user.display_name))
                  .map((member: any) => (
-                    <div className="flex flex-col relative">
                     <ProfilePopup user={member?.user}>
                     <li key={member.id} className="member online">
-                    <div className="relative">
+                    <div className="flex flex-col">
+                        <div className="relative">
                         <img draggable={false} src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${member?.user.id}/${member?.user.avatar}`} alt="Avatar" className="avatar" />
                         <div className={`avatar-status ${member?.user.presence!.status}`} />
-                    </div>
-                    <div className="flex flex-col">
+                        </div>
                         <span className="username">{member?.user.global_name ?? member?.user.username}</span>
                         <span className="status">{formatStatusText(member?.user.presence!)}</span>
-                    </div>
+                        </div>
                  </li>
-                </ProfilePopup>
-                </div>
+                 </ProfilePopup>
                  ))
                 }
     </>

@@ -520,6 +520,7 @@ div.memberlist {
       overflow-x: hidden;
       display: flex;
       gap: 0.5rem;
+      overflow-y: hidden;
       position: relative;
       padding: 5px;
 
@@ -533,8 +534,7 @@ div.memberlist {
         opacity: 0.5;
 
         span.username {
-          margin-top: 6px;
-          margin-left: 44px;
+          margin-top: 8px;
         }
       }
 
@@ -553,7 +553,7 @@ div.memberlist {
 
       div.avatar-status {
         position: absolute;
-        margin-bottom: -.5px;
+        margin-bottom: -4px;
         bottom: 0.001rem;
         left: 1.25rem;
         width: 1rem;
@@ -581,32 +581,32 @@ div.memberlist {
           background-color: rgb(107 114 128);
         }
       }
-
       span.username {
         line-height: 1.375;
         font-size: 15px;
         font-weight: 700;
-        margin-top: -2px;
-        padding-left: 5px;
         text-overflow: ellipsis;
         overflow-x: hidden;
-        position: fixed;
+        position: absolute; /* Changed position to absolute */
+        top: 3px; /* Adjusted top value with units */
+        left: 53px; /* Adjusted left value with units */
         padding-right: 5px;
         z-index: 2;
-      }
-
-      span.status {
+    }
+    
+    span.status {
         font-size: small;
         overflow: hidden;
         text-overflow: ellipsis;
         overflow-x: hidden;
-        position: relative;
-        margin-top: 19px;
+        position: absolute; /* Changed position to absolute */
         white-space: nowrap;
-        padding-left: 5px;
-        padding-right: 5px;
+        top: 24px; /* Adjusted top value with units */
+        left: 53px; /* Adjusted left value with units */
         z-index: 1;
-      }
+    }
+    
+    
     }
   }
 }

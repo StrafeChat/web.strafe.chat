@@ -54,7 +54,7 @@ useEffect(() => {
           </p>
         </div>
         {(() => {
-            const lastMessage = room?.messages?.toArray().slice(-1)[0];
+            const lastMessage = room?.messages?.toArray()[0];
               if (lastMessage) {
                 return (
                     <div className="flex mt-6 mb-3 mx-4 relative left-auto right-auto h-0 z-1 border-[0.1px] border-gray-500 items-center justify-center box-border">
