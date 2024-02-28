@@ -78,6 +78,7 @@ export default function ClientController({ children }: { children: JSX.Element }
     client?.on("ready", handleReady);
     client?.on("presenceUpdate", handlePresenceUpdate);
     client?.on("messageCreate", handleMessageCreate)
+    client?.on("messageUpdate", handleMessageCreate)
 
     return () => {
       client?.off("ready", handleReady);

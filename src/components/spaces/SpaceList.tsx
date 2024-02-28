@@ -47,7 +47,7 @@ export default function SpaceList() {
          <div className="seperator" />
          <div className="spaces">
             {client?.spaces.map((space) => (
-                <div>
+                <div key={space.id}>
                    <NavLink href={`/spaces/${space.id}`}>
                   <button className="space" draggable={true}>
                     {

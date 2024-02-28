@@ -39,6 +39,13 @@ export function Message({ message, key, sameAuthor, showMoreOptions }: MessagePr
   const [isHovered, setIsHovered] = useState(false);
   const { client } = useClient();
 
+  
+  useEffect(() => {
+    if (editable && contentRef.current) {
+      contentRef.current.focus();
+    }
+  }, [editable]);
+
   useEffect(() => {
     if (contentRef.current) {
       twemoji.parse(contentRef.current, {
@@ -75,6 +82,20 @@ export function Message({ message, key, sameAuthor, showMoreOptions }: MessagePr
       {children}
     </a>
   );
+
+  const handleInput = async (event: React.KeyboardEvent<HTMLSpanElement>) => {
+    if (event.key == "Escape") {
+      contentRef.current?.blur();
+      setEditable(false);
+    } else if (event.key == "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      contentRef.current?.blur();
+      setEditable(false);
+
+     await message.edit({ content: contentRef.current?.innerText });
+    }
+  };
+
 
   const transformMessage = (content: string) => {
     const patterns: Record<
@@ -196,13 +217,14 @@ export function Message({ message, key, sameAuthor, showMoreOptions }: MessagePr
           </ProfilePopup>
           <span className="timestamp">{formatTimestamp(message.createdAt)}</span>
         </span>
-        <span className="content" ref={contentRef}>
+        <span className={`content select-text inline-flex ${editable && "message-edtitable"}`} ref={contentRef} contentEditable={editable} onKeyDown={(event) => handleInput(event)}>
           <ReactMarkdown
             components={{ a: CustomLink }}
             remarkPlugins={[gfm, remarkMath, remarkFrontmatter, remarkParse]}
           >
             {transformMessage(message.content!)}
           </ReactMarkdown>
+          {message.editedAt && !editable && (<span className="edited pt-[5px]">(edited)</span>)}
         </span>
       </div>
       </li>
@@ -287,13 +309,14 @@ export function Message({ message, key, sameAuthor, showMoreOptions }: MessagePr
           <div className="relative">
           <div className="flex flex-col">
           <span className="timestamp absolute text-center text-[11px] pt-2.5 px-3">{ isHovered && messageDate.toLocaleString(DateTime.TIME_SIMPLE)}</span>
-            <span className={`content pl-[60px]`} ref={contentRef}>
+            <span className={`content pl-[60px] select-text inline-flex ${editable && "message-edtitable"}`} ref={contentRef}  style={{ minHeight: editable ? "4vh" : "fit-content" }} contentEditable={editable} onKeyDown={(event) => handleInput(event)}>
               <ReactMarkdown
                 components={{ a: CustomLink }}
                 remarkPlugins={[gfm, remarkMath, remarkFrontmatter, remarkParse]}
               >
                 {transformMessage(message.content!)}
               </ReactMarkdown>
+              {message.editedAt && !editable && (<span className="edited pt-[2px]">(edited)</span>)}
             </span>
           </div>
         </div>

@@ -11,7 +11,7 @@ window.addEventListener("resize", () => {
 export default function MemberList(props: { hidden: boolean, members: any, space: Space }) {
     let [hidden, setHidden] = useState(props.hidden || false);
     let members = props.members;
-console.log(members)
+
     if (typeof window !== "undefined") {
         window.addEventListener("hide-sidebar", () => {
             setHidden(!hidden);
@@ -31,8 +31,8 @@ console.log(members)
                  .filter((member: any) => member.user.presence.online == true && member.user.presence.status !== "offline")
                  .sort((a: any, b: any) => a.user.display_name.localeCompare(b.user.display_name))
                  .map((member: any) => (
-                    <ProfilePopup user={member?.user}>
-                    <li key={member.id} className="member online">
+                    <ProfilePopup key={member.userId} user={member?.user}>
+                    <li key={member.userId} className="member online">
                     <div className="flex flex-col">
                         <div className="relative">
                         <img draggable={false} src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${member?.user.id}/${member?.user.avatar}`} alt="Avatar" className="avatar" />
@@ -55,16 +55,16 @@ console.log(members)
                  .filter((member: any) => member.user.presence.online == false || member.user.presence.status == "offline")
                  .sort((a: any, b: any) => a.user.display_name.localeCompare(b.user.display_name))
                  .map((member: any) => (
-                    <div className="flex flex-col">
-                    <ProfilePopup user={member?.user}>
+                    <ProfilePopup key={member.userId} user={member?.user}>
                     <li key={member.userId} className="member offline">
+                    <div className="flex flex-col">
                     <div className="relative">
                         <img draggable={false} src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${member?.user.id}/${member?.user.avatar}`} alt="Avatar" className="avatar" />
                     </div>
                         <span className="username">{member?.user.display_name}</span>
-                 </li>
+                    </div>
+                    </li>
                 </ProfilePopup>
-                </div>
                  ))
                 }
       </>

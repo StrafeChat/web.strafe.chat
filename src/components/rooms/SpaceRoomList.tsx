@@ -1,7 +1,7 @@
-    import { FaHashtag, FaVolumeHigh, FaXmark, FaRightFromBracket, FaFlag, FaChevronRight, FaChevronDown, FaGear, FaUserPlus } from "react-icons/fa6";
+    import { FaHashtag, FaVolumeHigh, FaXmark, FaCirclePlus, FaFolderPlus, FaRightFromBracket, FaFlag, FaChevronRight, FaChevronDown, FaGear, FaUserPlus } from "react-icons/fa6";
     import { NavLink } from "../shared/NavLink";
     import { useEffect, useState } from "react";
-    import { useClient } from "@/hooks"
+    import { useClient, useModal } from "@/hooks"
 
     interface DropdownOption {
         label: string;
@@ -19,6 +19,7 @@
 
     export default function SpaceRoomList({ params }: SpaceRoomListProps) {
         const { client } = useClient();
+        const { openModal } = useModal();
         const space = client?.spaces.get(params.spaceId);
         const [dropdownVisible, setDropdownVisible] = useState(false);
         const [isSectionExpanded, setIsSectionExpanded] = useState<SectionState>({});
@@ -49,6 +50,9 @@
         const handleDropdownOptionClick = (optionValue: string) => {
             if (optionValue === "leave_space") {
 
+             } else if (optionValue === "create_room") {
+                setDropdownVisible(false);
+                openModal("create-room");
              }
         };
     
@@ -68,6 +72,14 @@
                         <div key="space_settings" className={`flex items-center pl-2 p-1.5 hover:bg-background hover:text-white rounded cursor-pointer text-gray-300`} onClick={() => handleDropdownOptionClick("space_settings")}>
                             <FaGear />
                             <span className="ml-2">Space Settings</span>
+                        </div>
+                        <div key="create_room" className={`flex items-center pl-2 p-1.5 hover:bg-background hover:text-white rounded cursor-pointer text-gray-300`} onClick={() => handleDropdownOptionClick("create_room")}>
+                            <FaCirclePlus />
+                            <span className="ml-2">Create Room</span>
+                        </div>
+                        <div key="create_section" className={`flex items-center pl-2 p-1.5 hover:bg-background hover:text-white rounded cursor-pointer text-gray-300`} onClick={() => handleDropdownOptionClick("create_section")}>
+                            <FaFolderPlus />
+                            <span className="ml-2">Create Section</span>
                         </div>
                         <hr className="my-2"/>
                         <div key="report_space" className={`flex items-center pl-2 p-1.5 hover:bg-red-500 hover:text-white rounded cursor-pointer text-red-500`} onClick={() => handleDropdownOptionClick("leave_server")}>
