@@ -217,7 +217,7 @@ export function Message({ message, key, sameAuthor, showMoreOptions }: MessagePr
           </ProfilePopup>
           <span className="timestamp">{formatTimestamp(message.createdAt)}</span>
         </span>
-        <span className={`content select-text inline-flex ${editable && "message-edtitable"}`} ref={contentRef} contentEditable={editable} onKeyDown={(event) => handleInput(event)}>
+        <span className={`content inline-flex ${editable && "message-edtitable"}`} ref={contentRef} contentEditable={editable} onKeyDown={(event) => handleInput(event)}>
           <ReactMarkdown
             components={{ a: CustomLink }}
             remarkPlugins={[gfm, remarkMath, remarkFrontmatter, remarkParse]}

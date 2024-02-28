@@ -811,7 +811,9 @@ li.message {
     border-radius: 0.75rem;
     margin-top: 5px;
     overflow-y: auto;
+    overflow: hidden;
     margin-left: 20px;
+    margin-right: 20px;
     width: 100%;
     background: hsl(var(--chat-input));
     outline: none;
@@ -819,11 +821,10 @@ li.message {
   
   span.content {
     font-size: 15px;
+    overflow: hidden;
     white-space: pre-wrap;
     margin-left: 15px;
-    margin-right: 20px;
     padding-right: 20px;
-    width: 100%;
     z-index: 1;
     overflow-wrap: break-word;
     img {
