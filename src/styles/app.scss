@@ -719,8 +719,8 @@ li.full {
 
 li.message {
   display: flex;
-  width: 100%;
   position: relative;
+  width: 100%;
   padding: 2.5px;
 
   &:hover {
@@ -812,9 +812,8 @@ li.message {
     margin-top: 5px;
     overflow-y: auto;
     overflow: hidden;
-    margin-left: 20px;
+    margin-left: 60px;
     margin-right: 20px;
-    width: 100%;
     background: hsl(var(--chat-input));
     outline: none;
   }

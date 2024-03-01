@@ -224,7 +224,7 @@ export function Message({ message, key, sameAuthor, showMoreOptions }: MessagePr
           >
             {transformMessage(message.content!)}
           </ReactMarkdown>
-          {message.editedAt && !editable && (<span className="edited pt-[5px]">(edited)</span>)}
+          {message.editedAt && !editable && (<span className="edited pt-[3px]">(edited)</span>)}
         </span>
       </div>
       </li>
@@ -309,7 +309,7 @@ export function Message({ message, key, sameAuthor, showMoreOptions }: MessagePr
           <div className="relative">
           <div className="flex flex-col">
           <span className="timestamp absolute text-center text-[11px] pt-2.5 px-3">{ isHovered && messageDate.toLocaleString(DateTime.TIME_SIMPLE)}</span>
-            <span className={`content pl-[60px] select-text inline-flex ${editable && "message-edtitable"}`} ref={contentRef}  style={{ minHeight: editable ? "4vh" : "fit-content" }} contentEditable={editable} onKeyDown={(event) => handleInput(event)}>
+            <span className={`content pl-[60px] ml-[60px] select-text inline-flex ${editable && "message-edtitable"}`} ref={contentRef}  style={{ minHeight: editable ? "4vh" : "fit-content" }} contentEditable={editable} onKeyDown={(event) => handleInput(event)}>
               <ReactMarkdown
                 components={{ a: CustomLink }}
                 remarkPlugins={[gfm, remarkMath, remarkFrontmatter, remarkParse]}

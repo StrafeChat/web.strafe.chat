@@ -13,7 +13,7 @@ import { useTranslation } from "react-i18next";
 import { Space } from "@strafechat/strafe.js";
 
 export const ModalControllerContext = createContext({
-    openModal: (_name: string, _data?: any) => { },
+    openModal: (_name: string, _data?: any,) => { },
     closeModal: (_name: string) => { },
     modals: [] as {
         name: string;
@@ -24,12 +24,11 @@ export const ModalControllerContext = createContext({
 export default class ModalController extends Component<{ children: JSX.Element }, ModalControllerState> {
 
     state = {
-        openModals: [] as { name: string, data?: any, spaceId?: string }[]
+        openModals: [] as { name: string, data?: any, }[]
     }
 
     static contextType = ClientControllerContext;
-
-    openModal = (name: string, data?: any) => {
+    openModal = (name: string, data?: any,) => {
         this.setState((prevState) => ({
             openModals: [...prevState.openModals, { name, data }]
         }));
@@ -90,7 +89,7 @@ export default class ModalController extends Component<{ children: JSX.Element }
                             case "create-room":
                                 return (
                                     <AnimatePresence key={key}>
-                                        <CreateRoomModal name="create-room" closeModal={this.closeModal} spaceId={modal.spaceId!}/>
+                                        <CreateRoomModal name="create-room" closeModal={this.closeModal} data={modal.data!}/>
                                     </AnimatePresence>
                                 )                        
 

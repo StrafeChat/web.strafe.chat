@@ -10,7 +10,7 @@ const modalVariants = {
     closed: { opacity: 0, transition: { ease: "backOut", duration: 0.3, x: { duration: 1 } } },
 };
 
-class CreateRoomModal extends Modal<{ roomName: string, roomType: number }, { spaceId: string }> {
+class CreateRoomModal extends Modal<{ roomName: string, roomType: number }, { data: { spaceId: string } }> {
 
     static contextType = ClientControllerContext;
     context!: React.ContextType<typeof ClientControllerContext>;
@@ -20,10 +20,11 @@ class CreateRoomModal extends Modal<{ roomName: string, roomType: number }, { sp
     render() {
         const { client } = this.context as { client: Client };
 
-        const handleSubmit = (event: FormEvent) => {
+        const handleSubmit = async (event: FormEvent) => {
             event.preventDefault();
-            const space = client.spaces.get(this.props.spaceId);
-            console.log(space);
+            console.log(this.props.data.spaceId)
+            const space = client.spaces.get(this.props.data.spaceId);
+            await space!.rooms.create({ name: this.state.roomName, type: this.state.roomType, space_id: space?.id, });
             this.close();
         }
 

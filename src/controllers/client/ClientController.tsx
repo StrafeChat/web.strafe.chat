@@ -77,12 +77,14 @@ export default function ClientController({ children }: { children: JSX.Element }
   useEffect(() => {
     client?.on("ready", handleReady);
     client?.on("presenceUpdate", handlePresenceUpdate);
-    client?.on("messageCreate", handleMessageCreate)
-    client?.on("messageUpdate", handleMessageCreate)
+    client?.on("messageCreate", handleMessageCreate);
+    client?.on("messageUpdate", handleMessageCreate);
 
     return () => {
       client?.off("ready", handleReady);
       client?.off("presenceUpdate", handlePresenceUpdate);
+      client?.on("messageCreate", handleMessageCreate);
+      client?.on("messageUpdate", handleMessageCreate);
     }
   }, [client, handlePresenceUpdate, handleReady]);
 
