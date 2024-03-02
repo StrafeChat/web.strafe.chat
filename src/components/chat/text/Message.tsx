@@ -2,6 +2,7 @@ import { MessageProps } from "@/types";
 import ReactMarkdown from "react-markdown";
 import gfm from "remark-gfm";
 import { emojis } from "@/assets/emojjs";
+import { MessageEmbed } from './MessageEmbed';
 import twemoji from "twemoji";
 import { DateTime } from 'luxon';
 import {
@@ -32,12 +33,13 @@ import {
 } from "../../ui/tooltip";
 import { User } from "@strafechat/strafe.js";
 
-export function Message({ message, key, sameAuthor, showMoreOptions }: MessageProps) {
+export function Message({ message, key, sameAuthor, showMoreOptions, ghost }: MessageProps) {
   const contentRef = useRef<HTMLSpanElement>(null);
   const replyRef = useRef<HTMLSpanElement>(null);
   const [editable, setEditable] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const { client } = useClient();
+  ghost ||= false;
 
   
   useEffect(() => {
@@ -51,7 +53,7 @@ export function Message({ message, key, sameAuthor, showMoreOptions }: MessagePr
       twemoji.parse(contentRef.current, {
         folder: "svg",
         ext: ".svg",
-        className: "w-7 h-7",
+        className: "w-5 h-5",
       });
     }
   }, []);
@@ -218,12 +220,19 @@ export function Message({ message, key, sameAuthor, showMoreOptions }: MessagePr
           <span className="timestamp">{formatTimestamp(message.createdAt)}</span>
         </span>
         <span className={`content inline-flex ${editable && "message-edtitable"}`} ref={contentRef} contentEditable={editable} onKeyDown={(event) => handleInput(event)}>
-          <ReactMarkdown
+         {message.content && (
+            <>
+            <ReactMarkdown
             components={{ a: CustomLink }}
             remarkPlugins={[gfm, remarkMath, remarkFrontmatter, remarkParse]}
           >
             {transformMessage(message.content!)}
           </ReactMarkdown>
+          </>
+         )}   
+          {message.embeds && message.embeds.map((embed, index) => (
+               <MessageEmbed key={index} embed={embed} />
+            ))}
           {message.editedAt && !editable && (<span className="edited pt-[3px]">(edited)</span>)}
         </span>
       </div>
@@ -310,12 +319,19 @@ export function Message({ message, key, sameAuthor, showMoreOptions }: MessagePr
           <div className="flex flex-col">
           <span className="timestamp absolute text-center text-[11px] pt-2.5 px-3">{ isHovered && messageDate.toLocaleString(DateTime.TIME_SIMPLE)}</span>
             <span className={`content pl-[60px] ml-[60px] select-text inline-flex ${editable && "message-edtitable"}`} ref={contentRef}  style={{ minHeight: editable ? "4vh" : "fit-content" }} contentEditable={editable} onKeyDown={(event) => handleInput(event)}>
-              <ReactMarkdown
+             {message.content && (
+               <>
+               <ReactMarkdown
                 components={{ a: CustomLink }}
                 remarkPlugins={[gfm, remarkMath, remarkFrontmatter, remarkParse]}
               >
                 {transformMessage(message.content!)}
               </ReactMarkdown>
+              </>
+             )}             
+              {message.embeds && message.embeds.map((embed, index) => (
+               <MessageEmbed key={index} embed={embed} />
+            ))}
               {message.editedAt && !editable && (<span className="edited pt-[2px]">(edited)</span>)}
             </span>
           </div>

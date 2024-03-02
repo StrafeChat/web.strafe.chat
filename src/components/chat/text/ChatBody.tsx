@@ -10,6 +10,8 @@ export default function ChatBody(props: { room: any }) {
   const [showMoreOptionsForMessages, setShowMoreOptionsForMessages] = useState(false);
   const [referenceMessage, setReferenceMessage] = useState<any | null>(null);
 
+  const [ghostMessages, setGhostMessages] = useState([]);
+
 useEffect(() => {
   const handleKeyDown = (event: KeyboardEvent) => {
     if (event.shiftKey) {
@@ -54,7 +56,7 @@ useEffect(() => {
           </p>
         </div>
         {(() => {
-            const lastMessage = room?.messages?.toArray()[0];
+            const lastMessage = room?.messages?.toArray().sort((a: any, b: any) => a.createdAt - b.createdAt)[0];
               if (lastMessage) {
                 return (
                     <div className="flex mt-6 mb-3 mx-4 relative left-auto right-auto h-0 z-1 border-[0.1px] border-gray-500 items-center justify-center box-border">
@@ -63,7 +65,7 @@ useEffect(() => {
                          day: "numeric",
                          month: "long",
                          year: "numeric",
-                   }).format(new Date(lastMessage.createdAt))}
+                   }).format(lastMessage.createdAt)}
               </time>
              </div>
            );
@@ -97,14 +99,13 @@ useEffect(() => {
                               day: "numeric",
                               month: "long",
                               year: "numeric",
-                            }).format(new Date(message.createdAt))}
+                            }).format(message.createdAt)}
                           </time>
                         </div>
                       );
                   })()}
                 </>
               )}
-              
               <Message
                 message={message}
                 key={key}
@@ -122,6 +123,17 @@ useEffect(() => {
                 }                
               />
             </>
+          ))
+        }
+        {
+          ghostMessages.map((message: any) => (
+            <Message
+              message={message}
+              key={message.id}
+              showMoreOptions={showMoreOptionsForMessages}
+              sameAuthor={true}
+              ghost={true}
+            />
           ))
         }
       </ul>

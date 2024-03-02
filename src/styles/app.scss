@@ -837,6 +837,87 @@ li.message {
     margin-top: 0.15rem;
     margin-left: 0.25rem;
   }
+
+  /* Styles for message embeds */
+  .message-embed {
+    background-color: #363636;
+    border-radius: 5px;
+    padding: 10px;
+    margin-top: 3px;
+  }
+  
+  /* Title of the embed */
+  .embed-title {
+    font-weight: bold;
+    font-size: large;
+    color: #ffffff;
+    margin-bottom: 5px;
+  }
+  
+  /* Description of the embed */
+  .embed-description {
+    color: #dddddd;
+    margin-bottom: 5px;
+  }
+  
+  /* Author section of the embed */
+  .embed-author {
+    display: flex;
+    align-items: center;
+    margin-bottom: 5px;
+  }
+  
+  /* Name of the author */
+  .author-name {
+    font-weight: 600;
+    color: white;
+    margin-right: 5px;
+  }
+  
+  /* Icon of the author */
+  .author-icon {
+    width: 25px;
+    height: 25px;
+    border-radius: 50%;
+    margin-right: 5px;
+  }
+  
+  /* Individual field in the embed */
+  .embed-field {
+    margin-bottom: 5px; /* Increase the margin */
+  }
+  
+  /* Name of the field */
+  .field-name {
+    font-weight: bold;
+    color: #dddddd;
+  }
+  
+  /* Value of the field */
+  .field-value {
+    color: #dddddd;
+  }
+  
+  /* Footer section of the embed */
+  .embed-footer {
+    margin-top: 5px;
+  }
+  
+  /* Text in the footer */
+  .footer-text { 
+    font-size: small;
+  }  
+
+  .footer-icon {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    margin-right: 5px;
+  }
+
+  .embed-timestamp {
+    font-size: small;
+  }
 }
 
 
@@ -895,3 +976,4 @@ img.avatar_modal {
   aspect-ratio: 1/1;
   border: #1f1f1f 0.4rem solid;
 }
+

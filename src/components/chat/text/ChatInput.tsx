@@ -91,6 +91,7 @@ export function ChatInput({ placeholder, room }: { placeholder: string, room: Ro
           onKeyDown={async (event) => {
             if (event.key == "Enter" && !event.shiftKey) {
               event.preventDefault();
+              
               await room.send({ content });
               setContent("");
               setCharacterCount(0);
