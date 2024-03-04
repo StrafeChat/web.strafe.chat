@@ -125,17 +125,6 @@ useEffect(() => {
             </>
           ))
         }
-        {
-          ghostMessages.map((message: any) => (
-            <Message
-              message={message}
-              key={message.id}
-              showMoreOptions={showMoreOptionsForMessages}
-              sameAuthor={true}
-              ghost={true}
-            />
-          ))
-        }
       </ul>
     </div>
   );
