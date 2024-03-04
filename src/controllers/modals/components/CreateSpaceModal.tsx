@@ -27,7 +27,7 @@ class CreateSpaceModal extends Modal<{ name: string, type: string }, {}> {
 
         const handleCreate = async (e: React.FormEvent<HTMLFormElement>) => {
             e.preventDefault();
-            const space = await client?.createSpace(this.state.name);
+            const space = await client?.spaces.create(this.state.name);
             if (space) this.close();
         }
 

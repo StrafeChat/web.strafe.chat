@@ -111,7 +111,8 @@ div.space-list {
     height: 40px;
     width: 4px;
     background-color: hsl(var(--primary));
-    left: 0px;
+    left: 0px;  
+    // margin-left: -10px;
     position: absolute;
     border-top-right-radius: 5px;
     border-bottom-right-radius: 5px;
@@ -199,7 +200,6 @@ div.space-list {
     flex-direction: column;
     row-gap: 10px;
     overflow-y: auto;
-    flex-grow: 1;
     scroll-behavior: auto;
 
     -ms-overflow-style: none;
@@ -498,7 +498,6 @@ div.memberlist {
   background: hsl(var(--room-list));
   overflow-y: auto;
   overflow-x: hidden;
-  padding: 1rem;
 
   label.role {
     text-transform: uppercase;
@@ -515,6 +514,7 @@ div.memberlist {
     padding-bottom: 15px;
     overflow-y: auto;
     overflow-x: hidden;
+    padding: 1rem;
 
     li.member {
       overflow-x: hidden;

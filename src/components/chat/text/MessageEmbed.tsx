@@ -11,7 +11,7 @@ import remarkFrontmatter from 'remark-frontmatter';
 import remarkParse from 'remark-parse';
 
 export function MessageEmbed({ embed }: {embed: MessageEmbed }) {
-  const borderColor = embed.color ? embed.color : "--primary";
+  const borderColor = embed.color ? embed.color : "gray";
 
   function formatTimestamp(timestamp: number) {
     const now = DateTime.now();

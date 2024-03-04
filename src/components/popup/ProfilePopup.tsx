@@ -1,6 +1,6 @@
 import { useClient } from "@/hooks";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
-import Badges from "../Badges";
+import Badges from "../shared/Badges";
 const { DateTime } = require('luxon');
 
 export default function ProfilePopup({

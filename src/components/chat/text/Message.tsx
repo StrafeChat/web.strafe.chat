@@ -32,6 +32,7 @@ import {
   TooltipTrigger,
 } from "../../ui/tooltip";
 import { User } from "@strafechat/strafe.js";
+import { ContextMenuTrigger, ContextMenu, ContextMenuContent, ContextMenuItem } from "@/components/ui/context-menu";
 
 export function Message({ message, key, sameAuthor, showMoreOptions, ghost }: MessageProps) {
   const contentRef = useRef<HTMLSpanElement>(null);
@@ -125,6 +126,8 @@ export function Message({ message, key, sameAuthor, showMoreOptions, ghost }: Me
   return (
     <>
       {!sameAuthor ? (
+        <ContextMenu>
+          <ContextMenuTrigger>
         <li key={key} className="group message full">
         <div className="options group-hover:flex">
           <div className="icon">
@@ -237,6 +240,19 @@ export function Message({ message, key, sameAuthor, showMoreOptions, ghost }: Me
         </span>
       </div>
       </li>
+      </ContextMenuTrigger>
+       <ContextMenuContent>
+       <ContextMenuItem onClick={() => openModal("settings")} className="flex gap-2 items-center"><FaGear className="w-3 h-3 rounded-full" /> Settings</ContextMenuItem>
+       <hr />
+       <ContextMenuItem onClick={() => client?.user?.setPresence({ status: "online" })}><div className="user-status online" /> Online</ContextMenuItem>
+       <ContextMenuItem onClick={() => client?.user?.setPresence({ status: "idle" })}><div className="user-status idle" />Idle</ContextMenuItem>
+       <ContextMenuItem onClick={() => client?.user?.setPresence({ status: "coding" })}><div className="user-status coding" />Coding</ContextMenuItem>
+       <ContextMenuItem onClick={() => client?.user?.setPresence({ status: "dnd" })}><div className="user-status dnd" />Do Not Disturb</ContextMenuItem>
+       <ContextMenuItem onClick={() => client?.user?.setPresence({ status: "offline" })}><div className="user-status offline" />Invisible</ContextMenuItem>
+       <hr />
+       <ContextMenuItem onClick={() => openModal("status")}><FaPenToSquare className="w-3 h-3" /> Custom Status</ContextMenuItem>
+    </ContextMenuContent>
+ </ContextMenu>
      ): (      
     <li key={key} className="group message" onMouseEnter={() => setIsHovered(true)} onMouseLeave={() => setIsHovered(false)}>
       <div className="options group-hover:flex">
