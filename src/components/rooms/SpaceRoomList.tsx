@@ -55,6 +55,11 @@ export default function SpaceRoomList({ params }: SpaceRoomListProps) {
             openModal("create-room", {
                 spaceId: space?.id
             });
+        } else if (optionValue === "space_settings") {
+            setDropdownVisible(false);
+            openModal("space-settings", {
+                spaceId: space?.id
+            });
         }
     };
     

@@ -1,6 +1,7 @@
 import { Room } from "@strafechat/strafe.js";
 import { useEffect, useRef, useState, useCallback } from "react";
 import { useClient } from "@/hooks";
+import { FaFaceSmile, FaPlus } from "react-icons/fa6";
 
 export function ChatInput({ placeholder, room }: { placeholder: string, room: Room }) {
 
@@ -79,7 +80,7 @@ export function ChatInput({ placeholder, room }: { placeholder: string, room: Ro
     <>
     <div className="chat-input-container">
       <div className="chat-input">
-        <div className="chat-input-left"></div>
+        <div className="chat-input-left"><FaPlus className="w-6 h-6"/></div>
         <div
           ref={inputRef}
           className="chat-input-middle"
@@ -100,13 +101,13 @@ export function ChatInput({ placeholder, room }: { placeholder: string, room: Ro
             }
           }}
         />
-        <div className="chat-input-right">{characterCount}/{maxCharacters}</div>
+        <div className="chat-input-right"><FaFaceSmile className="w-6 h-6"/></div>
       </div>
         <span className="typing">
         {typingUsers.length > 0 && (
           <>
           {typingUsers.length > 4 ? "Several people are typing..." : typingUsers.map((userName, index) => (
-            <>{index > 0 && ', '}{typingUsers.length === 3 && index === typingUsers.length - 1 && ' and '}<b>{userName}</b></>
+            <>{index > 0 && ', '}{typingUsers.length === 3 && index === typingUsers.length - 2 && ' and '}<b>{userName}</b></>
           ))}
           {typingUsers.length <= 4 && typingUsers.length > 1 ? " are typing..." : typingUsers.length === 1 ? " is typing..." : ""}
           </>

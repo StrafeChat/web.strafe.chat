@@ -24,7 +24,7 @@ function formatDate(timpstamp: number) {
           <div
             className="h-[60px] rounded-t-xl"
             style={{
-              backgroundColor: `gray`, // accentColor
+              backgroundColor: user.accentColor ?? "gray"
             }}
           />
           <div className="absolute top-[1.5rem] px-4">
@@ -37,6 +37,13 @@ function formatDate(timpstamp: number) {
               className="avatar_modal"
               alt="avatar"
             />
+            {
+              user.presence.online ? (
+                <div className={`avatar-status-popup ${user.presence!.status}`} />
+              ) : (
+                <div className={`avatar-status-popup offline`} />
+              )
+            }
           </div>
           <div className="flex justify-end py-4 px-1.5">
             {user.flags > 0 ? (

@@ -9,8 +9,7 @@ import SettingsModal from "./components/SettingsModal";
 import StatusModal from "./components/StatusModal";
 import CreateSpaceModal from "./components/CreateSpaceModal";
 import CreateRoomModal from "./components/CreateRoomModal";
-import { useTranslation } from "react-i18next";
-import { Space } from "@strafechat/strafe.js";
+import SpaceSettingsModal from "./components/SpaceSettingsModal";
 
 export const ModalControllerContext = createContext({
     openModal: (_name: string, _data?: any,) => { },
@@ -42,6 +41,12 @@ export default class ModalController extends Component<{ children: JSX.Element }
                     openModals: prevState.openModals.filter((modal) => modal.name !== name)
                 }));
                 break;
+                case "space-settings":
+                if (this.state.openModals.find((modal) => modal.name == "edit-data")) return;
+                else this.setState((prevState) => ({
+                    openModals: prevState.openModals.filter((modal) => modal.name !== name)
+                }));
+                break;
             default:
                 this.setState((prevState) => ({
                     openModals: prevState.openModals.filter((modal) => modal.name !== name)
@@ -62,6 +67,12 @@ export default class ModalController extends Component<{ children: JSX.Element }
                                         <SettingsModal name="settings" closeModal={this.closeModal} />
                                     </AnimatePresence>
                                 );
+                            case "space-settings":
+                                return (
+                                    <AnimatePresence key={key}>
+                                        <SpaceSettingsModal name="space-setings" closeModal={this.closeModal} data={modal.data!} />
+                                    </AnimatePresence>
+                                );
                             case "status":
                                 return (
                                     <AnimatePresence key={key}>
@@ -73,26 +84,25 @@ export default class ModalController extends Component<{ children: JSX.Element }
                                     <AnimatePresence key={key}>
                                         <EditDataModal name="edit-data" closeModal={this.closeModal} data={modal.data} />
                                     </AnimatePresence>
-                                )
+                                );
                             case "delete-account":
                                 return (
                                     <AnimatePresence key={key}>
                                         <DeleteAccountModal name="delete-account" closeModal={this.closeModal} />
                                     </AnimatePresence>
-                                )
+                                );
                             case "create-space":
                                 return (
                                     <AnimatePresence key={key}>
                                         <CreateSpaceModal name="create-space" closeModal={this.closeModal} />
                                     </AnimatePresence>
-                                )
+                                );
                             case "create-room":
                                 return (
                                     <AnimatePresence key={key}>
                                         <CreateRoomModal name="create-room" closeModal={this.closeModal} data={modal.data!}/>
                                     </AnimatePresence>
-                                )                        
-
+                                );                        
                         }
                     })}
                 </>

@@ -59,7 +59,7 @@ useEffect(() => {
             const lastMessage = room?.messages?.toArray().sort((a: any, b: any) => a.createdAt - b.createdAt)[0];
               if (lastMessage) {
                 return (
-                    <div className="flex mt-6 mb-3 mx-4 relative left-auto right-auto h-0 z-1 border-[0.1px] border-gray-500 items-center justify-center box-border">
+                    <div className="flex mt-6 mb-1 mx-4 relative left-auto right-auto h-0 z-1 border-[0.1px] border-gray-500 items-center justify-center box-border">
                       <time className="bg-[#262626] px-4 text-sm text-gray-400 select-none font-bold uppercase">
                         {Intl.DateTimeFormat(client?.user!.locale, {
                          day: "numeric",
@@ -114,8 +114,13 @@ useEffect(() => {
                   key > 0 && 
                   message.author.id === messages[key - 1].author.id &&
                   (() => {
+                    const lastMessage = messages[key - 1];
                     const messageDate = new Date(message.createdAt);
-                    const lastMessageDate = new Date(messages[key - 1].createdAt);
+                    const lastMessageDate = new Date(lastMessage.createdAt);
+                    if (message.sudo) {
+                      if (!lastMessage.sudo) return false;
+                      if (message.sudo.name !== lastMessage.sudo!.name) return false;
+                    } else if (lastMessage.sudo) return false;
                     return (
                       messageDate.getTime() - lastMessageDate.getTime() < 5 * 60 * 1000
                     );

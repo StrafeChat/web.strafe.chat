@@ -208,7 +208,7 @@ export function Message({ message, key, sameAuthor, showMoreOptions, ghost }: Me
           <div className="flex flex-col">
           <ProfilePopup user={message.author}>
             <img
-                 src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${message.author.id}/${message.author.avatar}`}
+                 src={`${message.sudo ? message.sudo.avatar_url : `${process.env.NEXT_PUBLIC_CDN}/avatars/${message.author.id}/${message.author.avatar}`}`}
                  className="avatar"
                  draggable={false}
                  alt="Avatar"
@@ -216,12 +216,16 @@ export function Message({ message, key, sameAuthor, showMoreOptions, ghost }: Me
       </ProfilePopup>
       </div>
       <div className="flex flex-col">
-        <span className="username">
-        <ProfilePopup user={message.author}>
-          <p>{message.author.display_name!}</p>
-          </ProfilePopup>
-          <span className="timestamp">{formatTimestamp(message.createdAt)}</span>
-        </span>
+      <span className="username">
+       <ProfilePopup user={message.author}>
+        <p>
+          {message.sudo ? message.sudo.name! : message.author.display_name!}
+          {message.sudo && <span className="bot-tag">SUDO</span>}
+          {message.author.bot && !message.sudo && <span className="bot-tag">BOT</span>}
+        </p>
+      </ProfilePopup>
+      <span className="timestamp">{formatTimestamp(message.createdAt)}</span>
+      </span>
         <span className={`content inline-flex ${editable && "message-edtitable"}`} ref={contentRef} contentEditable={editable} onKeyDown={(event) => handleInput(event)}>
          {message.content && (
             <>
