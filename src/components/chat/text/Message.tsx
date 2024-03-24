@@ -110,16 +110,31 @@ export function Message({ message, key, sameAuthor, showMoreOptions, ghost }: Me
         return emojiValue ?? match;
       },
     };
-
+  
     let text = content;
-
+  
     for (const pattern in patterns) {
       const regex = new RegExp(pattern, "g");
       text = text.replace(regex, patterns[pattern]);
     }
-
+  
+    // Regex to identify image URLs
+    const imageUrlRegex = /https?:\/\/[^\s]+?\.(jpg|jpeg|png|gif)/gi;
+  
+    // Replace image URLs with img elements
+    text = text.replace(imageUrlRegex, (url) => {
+      // Check if the URL ends with .gif to determine if it's a GIF
+      const isGif = url.toLowerCase().endsWith('.gif');
+      if (isGif) {
+        return `<img src="${url}" alt="GIF" />`;
+      } else {
+        return `<img src="${url}" alt="Image" />`;
+      }
+    });
+  
     return text;
   };
+  
 
   const messageDate = DateTime.fromMillis(message.createdAt);
 
@@ -229,12 +244,12 @@ export function Message({ message, key, sameAuthor, showMoreOptions, ghost }: Me
         <span className={`content inline-flex ${editable && "message-edtitable"}`} ref={contentRef} contentEditable={editable} onKeyDown={(event) => handleInput(event)}>
          {message.content && (
             <>
-            <ReactMarkdown
+            {/* <ReactMarkdown
             components={{ a: CustomLink }}
             remarkPlugins={[gfm, remarkMath, remarkFrontmatter, remarkParse]}
-          >
+          > */}
             {transformMessage(message.content!)}
-          </ReactMarkdown>
+          {/* </ReactMarkdown> */}
           </>
          )}   
           {message.embeds && message.embeds.map((embed, index) => (

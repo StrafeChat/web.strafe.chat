@@ -1,6 +1,8 @@
 import { FaHashtag, FaVolumeHigh, FaXmark, FaCirclePlus, FaFolderPlus, FaRightFromBracket, FaFlag, FaChevronRight, FaChevronDown, FaGear, FaUserPlus } from "react-icons/fa6";
 import { NavLink } from "../shared/NavLink";
 import { useEffect, useState } from "react";
+
+import Draggable from 'react-draggable'; 
 import { useClient, useModal } from "@/hooks"
 
 interface DropdownOption {
@@ -11,19 +13,22 @@ interface DropdownOption {
 
 interface SpaceRoomListProps {
     params: { spaceId: string };
+    userPermissions: { canDragRooms: boolean }; // Add userPermissions prop
 }
 
 type SectionState = {
     [key: string]: boolean;
 };
 
-export default function SpaceRoomList({ params }: SpaceRoomListProps) {
+export default function SpaceRoomList({ params, userPermissions }: SpaceRoomListProps) {
     const { client } = useClient();
     const { openModal } = useModal();
     const space = client?.spaces.get(params.spaceId);
     const [dropdownVisible, setDropdownVisible] = useState(false);
     const [isSectionExpanded, setIsSectionExpanded] = useState<SectionState>({});
-    
+    const [draggedRoom, setDraggedRoom] = useState<string | null>(null);
+    const [targetPosition, setTargetPosition] = useState<number | null>(null);
+
     useEffect(() => {
         if (!space) return;
         const initialState: SectionState = {};
@@ -34,7 +39,7 @@ export default function SpaceRoomList({ params }: SpaceRoomListProps) {
         });
         setIsSectionExpanded(initialState);
     }, [params.spaceId]);
-    
+
     const toggleDropdown = () => {
         setDropdownVisible(!dropdownVisible);
     };
@@ -42,7 +47,7 @@ export default function SpaceRoomList({ params }: SpaceRoomListProps) {
     useEffect(() => {
         setDropdownVisible(false);
     }, [params.spaceId])
-    
+
     const toggleSection = (sectionId: string) => {
         setIsSectionExpanded(prevState => ({ ...prevState, [sectionId]: !prevState[sectionId] }));
     };
@@ -62,7 +67,55 @@ export default function SpaceRoomList({ params }: SpaceRoomListProps) {
             });
         }
     };
-    
+
+    const handleDragStart = (roomId: string) => {
+        // if (!userPermissions.canDragRooms) return; // Check if user has permission to drag rooms
+        setDraggedRoom(roomId);
+    };
+
+    const handleDragEnter = (position: number) => {
+        // if (!userPermissions.canDragRooms || draggedRoom === null) return;
+        setTargetPosition(position);
+    };
+
+    const handleDragEnd = () => {
+        if (draggedRoom === null || targetPosition === null) return;
+        // Make a POST request to update the room position in the backend
+        // fetch(`/api/spaces/${space?.id}/rooms/${draggedRoom}/position`, {
+        //     method: 'POST',
+        //     headers: {
+        //         'Content-Type': 'application/json',
+        //     },
+        //     body: JSON.stringify({ newPosition: targetPosition }),
+        // })
+        // .then(response => {
+        //     if (response.ok) {
+        //         // Update the frontend state accordingly
+        //         console.log(`Room ${draggedRoom} moved to position ${targetPosition}`);
+        //     } else {
+        //         // Handle errors
+        //         console.error('Error:', response.statusText);
+        //     }
+        // })
+        // .catch(error => {
+        //     console.error('Error:', error);
+        // });
+        console.log(targetPosition)
+        const oldRoom = space?.rooms.get(draggedRoom)!;
+        space!.rooms.forEach(room => {
+            if (room.id !== draggedRoom) {
+                if (oldRoom.position! < targetPosition && room.position > oldRoom.position! && room.position <= targetPosition) {
+                    room.position -= 1;
+                } else if (oldRoom.position! > targetPosition && room.position >= targetPosition && room.position < oldRoom.position!) {
+                    room.position += 1;
+                }
+            }
+        });
+        space!.rooms.get(draggedRoom)!.position! = targetPosition;
+        setDraggedRoom(null);
+        setTargetPosition(null);
+    };
+
     return (
         <div className="relative">
             <div className="header" onClick={toggleDropdown} style={{ display: 'inline-flex', alignItems: 'center', cursor: 'pointer'}}>
@@ -105,57 +158,73 @@ export default function SpaceRoomList({ params }: SpaceRoomListProps) {
                     ?.toArray()
                     .filter(room => [1,  2].includes(room.type) && !room.parentId)
                     .sort((a, b) => a.position - b.position)
-                    .map((room) => (
+                    .map((room, index) => (
                         <NavLink key={room.id} href={`/spaces/${space.id}/rooms/${room.id}`}>
-                            <li key={room.id} className="space-room">
-                                <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                                    {room.type ===  1 && <FaHashtag />}
-                                    {room.type ===  2 && <FaVolumeHigh />}
-                                    &nbsp;&nbsp;
-                                    <h2>{room.name}</h2>
+    <li
+        key={room.id}
+        className="space-room"
+        draggable={true} // Set draggable attribute based on user permissions
+        onDragStart={() => handleDragStart(room.id)}
+        onDragEnter={() => handleDragEnter(index)}
+        onDragEnd={handleDragEnd}
+    >
+        <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+            {room.type === 1 && <FaHashtag />}
+            {room.type === 2 && <FaVolumeHigh />}
+            &nbsp;&nbsp;
+            <h2>{room.name}</h2>
+        </span>
+    </li>
+</NavLink>
+
+                ))}
+             </div>
+            {space?.rooms
+                ?.toArray()
+                .filter((room: { type: number; }) => room.type ===  0)
+                .sort((a: { position: number; }, b: { position: number; }) => a.position - b.position)
+                .map((section) => (
+                    <div key={section.id} className="mb-2">
+                        <button onClick={() => toggleSection(section.id)}>
+                            {isSectionExpanded[section.id] ? (
+                                <span style={{ display: 'inline-flex', alignItems: 'center', marginBottom: '3px' }}>
+                                    <FaChevronDown className="w-2.5 h-2.5" />&nbsp;{section.name}
                                 </span>
-                            </li>
-                        </NavLink>
-                    ))}
-                 </div>
-                {space?.rooms
-                    ?.toArray()
-                    .filter((room: { type: number; }) => room.type ===  0)
-                    .sort((a: { position: number; }, b: { position: number; }) => a.position - b.position)
-                    .map((section) => (
-                        <div key={section.id} className="mb-2">
-                            <button onClick={() => toggleSection(section.id)}>
-                                {isSectionExpanded[section.id] ? (
-                                    <span style={{ display: 'inline-flex', alignItems: 'center', marginBottom: '3px' }}>
-                                        <FaChevronDown className="w-2.5 h-2.5" />&nbsp;{section.name}
-                                    </span>
-                                ) : (
-                                    <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                                        <FaChevronRight className="w-2.5 h-2.5"/>&nbsp;{section.name}
-                                    </span>
-                                )}
-                            </button>
-                            {isSectionExpanded[section.id] &&
-                                space?.rooms
-                                    ?.toArray()
-                                    .filter(room => [1,  2].includes(room.type) && room.parentId == section.id)
-                                    .sort((a, b) => a.position - b.position)
-                                    .map((room) => (
-                                        <NavLink key={room.id} href={`/spaces/${space.id}/rooms/${room.id}`}>
-                                            <li key={room.id} className="space-room">
-                                                <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-                                                    {room.type ===  1 && <FaHashtag />}
-                                                    {room.type ===  2 && <FaVolumeHigh />}
-                                                    &nbsp;&nbsp;
-                                                    <h2>{room.name}</h2>
-                                                </span>
-                                            </li>
-                                        </NavLink>
-                                    ))
-                            }
-                        </div>
-                    ))}
-            </ul>  
-        </div>
-    );
+                            ) : (
+                                <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+                                    <FaChevronRight className="w-2.5 h-2.5"/>&nbsp;{section.name}
+                                </span>
+                            )}
+                        </button>
+                        {isSectionExpanded[section.id] &&
+                            space?.rooms
+                                ?.toArray()
+                                .filter(room => [1,  2].includes(room.type) && room.parentId == section.id)
+                                .sort((a, b) => a.position - b.position)
+                                .map((room, index) => (
+                                    <NavLink key={room.id} href={`/spaces/${space.id}/rooms/${room.id}`}>
+    <li
+        key={room.id}
+        className="space-room"
+        draggable={true} // Set draggable attribute based on user permissions
+        onDragStart={() => handleDragStart(room.id)}
+        onDragEnter={() => handleDragEnter(index)}
+        onDragEnd={handleDragEnd}
+    >
+        <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+            {room.type === 1 && <FaHashtag />}
+            {room.type === 2 && <FaVolumeHigh />}
+            &nbsp;&nbsp;
+            <h2>{room.name}</h2>
+        </span>
+    </li>
+</NavLink>
+
+                                ))
+                        }
+                    </div>
+                ))}
+        </ul>  
+    </div>
+);
 }
