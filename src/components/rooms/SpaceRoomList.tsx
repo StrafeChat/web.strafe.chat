@@ -13,14 +13,13 @@ interface DropdownOption {
 
 interface SpaceRoomListProps {
     params: { spaceId: string };
-    userPermissions: { canDragRooms: boolean }; // Add userPermissions prop
 }
 
 type SectionState = {
     [key: string]: boolean;
 };
 
-export default function SpaceRoomList({ params, userPermissions }: SpaceRoomListProps) {
+export default function SpaceRoomList({ params }: SpaceRoomListProps) {
     const { client } = useClient();
     const { openModal } = useModal();
     const space = client?.spaces.get(params.spaceId);
