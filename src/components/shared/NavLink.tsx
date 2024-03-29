@@ -10,12 +10,12 @@ export function NavLink(props: NavLinkProps) {
     const [active, setActive] = useState(false);
 
     useEffect(() => {
-        if (props.activate?.includes('/' + pathname.split('/')[1])) setActive(true);
+        if (props.activate?.includes('/' + pathname!.split('/')[1])) setActive(true);
         else switch (true) {
             case props.href.toString().trim() === '/':
-                setActive(pathname.toString().trim() === '/');
+                setActive(pathname!.toString().trim() === '/');
                 break;
-            case pathname.slice(1).includes(props.href.toString().slice(1)):
+            case pathname!.slice(1).includes(props.href.toString().slice(1)):
                 setActive(true);
                 break;
             default:

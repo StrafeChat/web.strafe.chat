@@ -43,8 +43,8 @@ export default function RoomList() {
               case "/notes":
                 return <PrivateMessages />;
               default:
-                if (path.startsWith("/rooms")) return <PrivateMessages />;
-                if (path.startsWith("/spaces")) return <RoomsNav params={{
+                if (path!.startsWith("/rooms")) return <PrivateMessages />;
+                if (path!.startsWith("/spaces")) return <RoomsNav params={{
                   spaceId: paths[0],
                 }} />;
                 break;

@@ -104,13 +104,13 @@ export default function SpaceRoomList({ params }: SpaceRoomListProps) {
         space!.rooms.forEach(room => {
             if (room.id !== draggedRoom) {
                 if (oldRoom.position! < targetPosition && room.position > oldRoom.position! && room.position <= targetPosition) {
-                    room.position -= 1;
+                    (room as any).position -= 1;
                 } else if (oldRoom.position! > targetPosition && room.position >= targetPosition && room.position < oldRoom.position!) {
-                    room.position += 1;
+                    (room as any).position += 1;
                 }
             }
         });
-        space!.rooms.get(draggedRoom)!.position! = targetPosition;
+        ( space!.rooms.get(draggedRoom) as any).position! = targetPosition;
         setDraggedRoom(null);
         setTargetPosition(null);
     };

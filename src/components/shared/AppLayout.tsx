@@ -32,7 +32,7 @@ export function AppLayout({
 
   const override = ["/login", "/register", "/forgot-password"];
 
-  return override.includes(pathname) ? (
+  return override.includes(pathname!) ? (
     <>{children}</>
   ) : (
     <div className="flex flex-col w-full h-full">

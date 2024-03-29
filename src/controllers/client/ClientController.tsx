@@ -89,8 +89,8 @@ export default function ClientController({ children }: { children: JSX.Element }
   }, [client, handlePresenceUpdate, handleReady]);
 
   useEffect(() => {
-    if (!cookie.get("token")! && !["/login", "/register"].includes(pathname)) window.location.href = "/login";
-    else if (!connected.current && !["/login", "/register"].includes(pathname)) init();
+    if (!cookie.get("token")! && !["/login", "/register"].includes(pathname!)) window.location.href = "/login";
+    else if (!connected.current && !["/login", "/register"].includes(pathname!)) init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, client]);
 
