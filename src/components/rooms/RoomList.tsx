@@ -25,8 +25,7 @@ export default function RoomList() {
     typeof window !== "undefined" && window.dispatchEvent(new Event("hide-sidebar"))
   }, [hideRoomList, controls]);
 
-  const paths = path.trim().split("/").filter((x) => x !== "" && x !== "spaces" && x !== "rooms");
-
+  const paths = path!.trim().split("/").filter((x) => x !== "" && x !== "spaces" && x !== "rooms");
 
   return (
     <>
