@@ -1,4 +1,4 @@
-import { formatStatusText } from "@/helpers/formatter";
+import { formatStatusText, Formatting } from "@/helpers/formatter";
 import { useClient } from "@/hooks";
 import { Member, Space, User } from "@strafechat/strafe.js";
 import { Popover, PopoverTrigger } from "../ui/popover";
@@ -35,7 +35,7 @@ export default function MemberList(props: { hidden: boolean, members: any, space
                     <li key={member.userId} className="member online">
                     <div className="flex flex-col">
                         <div className="relative">
-                        <img draggable={false} src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${member?.user.id}/${member?.user.avatar}`} alt="Avatar" className="avatar" />
+                        <img draggable={false} src={`${Formatting.formatAvatar(member?.user.id, member?.user.avatar)}`} alt="Avatar" className="avatar" />
                         <div className={`avatar-status ${member?.user.presence!.status}`} />
                         </div>
                         <span className="username">{member?.user.global_name ?? member?.user.username}</span>
@@ -59,7 +59,7 @@ export default function MemberList(props: { hidden: boolean, members: any, space
                     <li key={member.userId} className="member offline">
                     <div className="flex flex-col">
                     <div className="relative">
-                        <img draggable={false} src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${member?.user.id}/${member?.user.avatar}`} alt="Avatar" className="avatar" />
+                        <img draggable={false} src={`${Formatting.formatAvatar(member?.user.id, member?.user.avatar)}`} alt="Avatar" className="avatar" />
                     </div>
                         <span className="username">{member?.user.display_name}</span>
                     </div>

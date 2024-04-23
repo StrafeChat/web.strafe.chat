@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { useTranslation } from "react-i18next";
 import { useState } from "react";
 import Badges from "@/components/shared/Badges";
+import { Formatting } from "@/helpers/formatter";
 const { DateTime } = require('luxon');
  
 export function ProfileSettings() {
@@ -70,7 +71,7 @@ function formatDate(timpstamp: number) {
             <div className="group">
             <img
               draggable={false}
-              src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${client?.user?.id}/${client?.user?.avatar}`}
+              src={`${Formatting.formatAvatar(client?.user?.id, client?.user?.avatar)}`}
               width={80}
               height={80}
               className="avatar_modal z-[1000]"

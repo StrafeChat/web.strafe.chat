@@ -33,6 +33,7 @@ import {
 } from "../../ui/tooltip";
 import { User } from "@strafechat/strafe.js";
 import { ContextMenuTrigger, ContextMenu, ContextMenuContent, ContextMenuItem } from "@/components/ui/context-menu";
+import { Formatting } from "@/helpers/formatter";
 
 export function Message({ message, key, sameAuthor, showMoreOptions, ghost }: MessageProps) {
   const contentRef = useRef<HTMLSpanElement>(null);
@@ -223,7 +224,7 @@ export function Message({ message, key, sameAuthor, showMoreOptions, ghost }: Me
           <div className="flex flex-col">
           <ProfilePopup user={message.author}>
             <img
-                 src={`${message.sudo ? message.sudo.avatar_url : `${process.env.NEXT_PUBLIC_CDN}/avatars/${message.author.id}/${message.author.avatar}`}`}
+                 src={`${message.sudo ? message.sudo.avatar_url : `${Formatting.formatAvatar(message?.author.id, message?.author.avatar)}`}`}
                  className="avatar"
                  draggable={false}
                  alt="Avatar"

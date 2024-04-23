@@ -28,7 +28,7 @@ function Room(){
             <div className="seperator" />
 
             <ul className="private-messages">
-                <NavLink href={"/rooms/DJT"}>
+                {/* <NavLink href={"/rooms/DJT"}>
                     <li className="private-message">
                         <img src="https://cdn.discordapp.com/attachments/1135670060678123560/1189859177393291284/trumpshutdownraises.png?ex=659fb1b6&is=658d3cb6&hm=bef32dbb441eb1e95258d14d3bc107a5b66976fc10ec6001d96d2a90eecbac32&g" />
                         <span>
@@ -45,7 +45,12 @@ function Room(){
                             <p className="user-status">Offline</p>
                         </span>
                     </li>
-                </NavLink>
+                </NavLink> */}
+
+                <div className="bg-background text-white p-2 rounded-md">
+                    <h2 className="font-bold">No PMs yet!</h2>
+                    <p>Maybe make some friends loser. :)</p>
+                </div>
             </ul>
         </>
     )

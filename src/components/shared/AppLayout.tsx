@@ -30,18 +30,18 @@ export function AppLayout({
       );
   }, [setElectron, setIsMobile]);
 
-  const override = ["/login", "/register", "/forgot-password"];
+  const override = ["/login", "/register", "/forgot-password", "/invites"];
 
-  return override.includes(pathname!) ? (
-    <>{children}</>
-  ) : (
-    <div className="flex flex-col w-full h-full">
-      {electron && <ElectronTitleBar />}
-      <div className="app">
-        <SpaceList />
-        <RoomList />
-        <AppView>{children}</AppView>
-      </div>
+return override.some(overridePath => pathname!.startsWith(overridePath)) ? (
+  <>{children}</>
+) : (
+  <div className="flex flex-col w-full h-full">
+    {electron && <ElectronTitleBar />}
+    <div className="app">
+      <SpaceList />
+      <RoomList />
+      <AppView>{children}</AppView>
     </div>
-  );
+  </div>
+);
 }

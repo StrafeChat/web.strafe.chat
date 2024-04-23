@@ -59,8 +59,8 @@ useEffect(() => {
             const lastMessage = room?.messages?.toArray().sort((a: any, b: any) => a.createdAt - b.createdAt)[0];
               if (lastMessage) {
                 return (
-                    <div className="flex mt-6 mb-1 mx-4 relative left-auto right-auto h-0 z-1 border-[0.1px] border-gray-500 items-center justify-center box-border">
-                      <time className="bg-[#262626] px-4 text-sm text-gray-400 select-none font-bold uppercase">
+                    <div className="flex mt-4 mb-1 mx-4 relative left-auto right-auto h-0 z-1 border-[0.05px] border-gray-500 items-center justify-center box-border">
+                      <time className="bg-[#262626] px-1.5 text-xs text-gray-400 select-none font-bold uppercase">
                         {Intl.DateTimeFormat(client?.user!.locale, {
                          day: "numeric",
                          month: "long",
@@ -92,9 +92,9 @@ useEffect(() => {
                       return (
                         <div
                           key={key}
-                          className="flex mt-4 mb-1 mx-4 relative left-auto right-auto h-0 z-1 border-[0.1px] border-gray-500 items-center justify-center box-border"
+                          className="flex mt-4 mb-1 mx-4 relative left-auto right-auto h-0 z-1 border-[0.05px] border-gray-500 items-center justify-center box-border"
                         >
-                          <time className="bg-[#262626] px-4 text-sm text-gray-400 select-none font-bold uppercase">
+                          <time className="bg-[#262626] px-1.5 text-xs text-gray-400 select-none font-bold uppercase">
                             {Intl.DateTimeFormat(client?.user!.locale, {
                               day: "numeric",
                               month: "long",

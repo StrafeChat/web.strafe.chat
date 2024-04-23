@@ -212,13 +212,15 @@ div.space-list {
 }
 
 div.room-list {
-  width: 290px;
-  min-width: 290px;
+  width: 260px;
+  min-width: 260px;
   min-height: 100%;
   background: hsl(var(--room-list));
   border-top-left-radius: 20px;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
 
   &[electron="true"] {
     div.header {
@@ -240,9 +242,11 @@ div.room-list {
     display: flex;
     flex-direction: column;
     row-gap: 3px;
-    width: 290px;
-    min-width: 290px;
+    width: 260px;
+    min-width: 260px;
     padding: .5rem;
+    overflow-y: auto;
+    overflow-x: hidden;
 
     a {
       width: 100%;
@@ -299,13 +303,15 @@ div.room-list {
 }
 
 div.room-list {
-  width: 290px;
-  min-width: 290px;
+  width: 260px;
+  min-width: 260px;
   min-height: 100%;
   background: hsl(var(--room-list));
   border-top-left-radius: 20px;
   display: flex;
   flex-direction: column;
+  overflow-y: auto;
+  overflow-x: hidden;
 
   &[electron="true"] {
     div.header {
@@ -324,12 +330,14 @@ div.room-list {
   }
 
   div.tab-list {
-    width: 290px;
-    min-width: 290px;
+    width: 260px;
+    min-width: 260px;
     display: flex;
     flex-direction: column;
     row-gap: 3px;
     padding: .5rem;
+    overflow-y: auto;
+    overflow-x: hidden;
 
     a {
       width: 100%;
@@ -425,12 +433,13 @@ div.room-list {
   }
 
   ul.space-rooms {
-    width: 290px;
-    min-width: 290px;
+    width: 260px;
+    min-width: 260px;
     display: flex;
     flex-direction: column;
     flex-grow: 1;
-    padding: 1rem;
+    padding: .5rem;
+    padding-top: 1rem;
     overflow-y: auto;
     overflow-x: hidden;
     color: hsl(var(--muted-foreground));
@@ -462,7 +471,6 @@ div.room-list {
       overflow-x: hidden;
       text-overflow: ellipsis;
       cursor: pointer;
-      
 
       img {
         width: 43px;

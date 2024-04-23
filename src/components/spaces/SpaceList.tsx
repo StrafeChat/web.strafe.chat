@@ -4,6 +4,7 @@ import { useState } from "react";
 import { FaCompass, FaGear, FaPenToSquare, FaPlus } from "react-icons/fa6";
 import { NavLink } from "../shared";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "../ui/context-menu";
+import { Formatting } from "@/helpers/formatter";
 let isMobile = typeof window !== "undefined" && window.innerWidth < 768;
 typeof window !== "undefined" && window.addEventListener("resize", () => {
    isMobile = window.innerWidth < 768;
@@ -19,6 +20,7 @@ export default function SpaceList() {
       });
    } 
 
+
    return (
       <div className="space-list"
          style={{ display: hide && isMobile ? "" : "" }}
@@ -27,7 +29,11 @@ export default function SpaceList() {
             <ContextMenuTrigger>
                <NavLink href="/" activate={["/friends", "/notes", "/rooms"]}>
                   <button>
-                     <img src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${client?.user?.id}/${client?.user?.avatar}`} className="avatar" alt="Avatar"></img>
+                  <img
+                    src={`${Formatting.formatAvatar(client?.user?.id, client?.user?.avatar)}`}
+                    onError={() => console.log("Error fetching avatar.")}
+                    className="avatar"
+                    alt="Avatar"                  />
                      <div className={`avatar-status ${client?.user?.presence.status}`}></div>
                   </button>
                </NavLink>
@@ -75,5 +81,5 @@ export default function SpaceList() {
             <FaGear />
          </button>
       </div>
-   )
+   );
 }

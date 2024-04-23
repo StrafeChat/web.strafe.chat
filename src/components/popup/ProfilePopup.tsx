@@ -1,6 +1,7 @@
 import { useClient } from "@/hooks";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import Badges from "../shared/Badges";
+import { Formatting } from "@/helpers/formatter";
 const { DateTime } = require('luxon');
 
 export default function ProfilePopup({
@@ -31,7 +32,7 @@ function formatDate(timpstamp: number) {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               draggable={false}
-              src={`${process.env.NEXT_PUBLIC_CDN}/avatars/${user.id}/${user.avatar}`}
+              src={`${Formatting.formatAvatar(user.id, user.avatar)}`}
               width={80}
               height={80}
               className="avatar_modal"

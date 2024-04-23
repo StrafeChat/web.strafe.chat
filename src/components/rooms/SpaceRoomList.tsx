@@ -1,15 +1,18 @@
-import { FaHashtag, FaVolumeHigh, FaXmark, FaCirclePlus, FaFolderPlus, FaRightFromBracket, FaFlag, FaChevronRight, FaChevronDown, FaGear, FaUserPlus } from "react-icons/fa6";
+import { 
+    FaHashtag, 
+    FaVolumeHigh, 
+    FaXmark, 
+    FaCirclePlus, 
+    FaFolderPlus, 
+    FaRightFromBracket, 
+    FaFlag, FaChevronRight, 
+    FaChevronDown, 
+    FaGear, 
+    FaUserPlus
+} from "react-icons/fa6";
 import { NavLink } from "../shared/NavLink";
 import { useEffect, useState } from "react";
-
-import Draggable from 'react-draggable'; 
 import { useClient, useModal } from "@/hooks"
-
-interface DropdownOption {
-    label: string;
-    value: string;
-    icon: JSX.Element;
-}
 
 interface SpaceRoomListProps {
     params: { spaceId: string };
@@ -122,9 +125,9 @@ export default function SpaceRoomList({ params }: SpaceRoomListProps) {
                 {dropdownVisible ? <FaXmark className="w-5 h-5 ml-2" /> : <FaChevronDown className="w-4 h-4 ml-2" />}
             </div>
             {dropdownVisible && space && (
-                <div className="absolute bg-black rounded mt-2 mx-4 w-64 p-1.5">
+                <div className="absolute bg-black rounded mt-2 mx-4 w-[228px] p-1.5">
                     <div key="invite_people" className={`flex items-center pl-2 p-1.5 hover:bg-background hover:text-white rounded cursor-pointer text-gray-300`} onClick={() => handleDropdownOptionClick("invite_people")}>
-                        <FaUserPlus className="w-5 h-5" />
+                        <FaUserPlus className="w-4 h-4" />
                         <span className="ml-2">Invite People</span>
                     </div>
                     <hr className="my-2"/>
@@ -145,10 +148,12 @@ export default function SpaceRoomList({ params }: SpaceRoomListProps) {
                         <FaFlag />
                         <span className="ml-2">Report Space</span>
                     </div>
-                    <div key="leave_space" className={`flex items-center pl-2 p-1.5 hover:bg-red-500 hover:text-white rounded cursor-pointer text-red-500`} onClick={() => handleDropdownOptionClick("report_space")}>
-                        <FaRightFromBracket />
-                        <span className="ml-2">Leave Space</span>
+                    {space.ownerId !== client?.user?.id && (
+                     <div key="leave_space" className={`flex items-center pl-2 p-1.5 hover:bg-red-500 hover:text-white rounded cursor-pointer text-red-500`} onClick={() => handleDropdownOptionClick("leave_space")}>
+                       <FaRightFromBracket />
+                       <span className="ml-2">Leave Space</span>
                     </div>
+                    )}
                 </div>
             )}
             <ul className="space-rooms">
