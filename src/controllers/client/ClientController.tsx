@@ -43,6 +43,11 @@ export default function ClientController({ children }: { children: JSX.Element }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client]);
 
+  const handleMessageDelete = useCallback((data: any) => {
+    forceUpdate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client]);
+
   const init = () => {
 
     const clt = new Client({
@@ -78,13 +83,15 @@ export default function ClientController({ children }: { children: JSX.Element }
     client?.on("ready", handleReady);
     client?.on("presenceUpdate", handlePresenceUpdate);
     client?.on("messageCreate", handleMessageCreate);
+    client?.on("messageDelete", handleMessageDelete);
     client?.on("messageUpdate", handleMessageCreate);
 
     return () => {
       client?.off("ready", handleReady);
       client?.off("presenceUpdate", handlePresenceUpdate);
-      client?.on("messageCreate", handleMessageCreate);
-      client?.on("messageUpdate", handleMessageCreate);
+      client?.off("messageCreate", handleMessageCreate);
+      client?.off("messageDelete", handleMessageDelete);
+      client?.off("messageUpdate", handleMessageCreate);
     }
   }, [client, handlePresenceUpdate, handleReady]);
 

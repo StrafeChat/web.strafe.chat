@@ -13,6 +13,7 @@ import {
 import { NavLink } from "../shared/NavLink";
 import { useEffect, useState } from "react";
 import { useClient, useModal } from "@/hooks"
+import { ContextMenu, ContextMenuContent, ContextMenuTrigger } from "@radix-ui/react-context-menu";
 
 interface SpaceRoomListProps {
     params: { spaceId: string };
@@ -56,10 +57,18 @@ export default function SpaceRoomList({ params }: SpaceRoomListProps) {
 
     const handleDropdownOptionClick = (optionValue: string) => {
         if (optionValue === "leave_space") {
-            // handle leave space action
+            setDropdownVisible(false);
+            openModal("leave-space", {
+                spaceId: space?.id
+            });
         } else if (optionValue === "create_room") {
             setDropdownVisible(false);
             openModal("create-room", {
+                spaceId: space?.id
+            });
+        } else if (optionValue === "create_section") {
+            setDropdownVisible(false);
+            openModal("create-section", {
                 spaceId: space?.id
             });
         } else if (optionValue === "space_settings") {
@@ -67,7 +76,13 @@ export default function SpaceRoomList({ params }: SpaceRoomListProps) {
             openModal("space-settings", {
                 spaceId: space?.id
             });
+        } else if (optionValue === "invite_people") {
+            setDropdownVisible(false);
+            openModal("create-invite", {
+                spaceId: space?.id
+            });
         }
+
     };
 
     const handleDragStart = (roomId: string) => {
@@ -207,24 +222,30 @@ export default function SpaceRoomList({ params }: SpaceRoomListProps) {
                                 .sort((a, b) => a.position - b.position)
                                 .map((room, index) => (
                                     <NavLink key={room.id} href={`/spaces/${space.id}/rooms/${room.id}`}>
-    <li
-        key={room.id}
-        className="space-room"
-        draggable={true} // Set draggable attribute based on user permissions
-        onDragStart={() => handleDragStart(room.id)}
-        onDragEnter={() => handleDragEnter(index)}
-        onDragEnd={handleDragEnd}
-    >
-        <span style={{ display: 'inline-flex', alignItems: 'center' }}>
-            {room.type === 1 && <FaHashtag />}
-            {room.type === 2 && <FaVolumeHigh />}
-            &nbsp;&nbsp;
-            <h2>{room.name}</h2>
-        </span>
-    </li>
-</NavLink>
-
-                                ))
+                                <ContextMenu>
+                                <ContextMenuTrigger>
+                                <li
+                                  key={room.id}
+                                  className="space-room"
+                                  draggable={true} // Set draggable attribute based on user permissions
+                                  onDragStart={() => handleDragStart(room.id)}
+                                  onDragEnter={() => handleDragEnter(index)}
+                                  onDragEnd={handleDragEnd}
+                                >
+                                <span style={{ display: 'inline-flex', alignItems: 'center' }}>
+                                  {room.type === 1 && <FaHashtag />}
+                                  {room.type === 2 && <FaVolumeHigh />}
+                                  &nbsp;&nbsp;
+                                <h2>{room.name}</h2>
+                              </span>
+                             </li>
+                            </ContextMenuTrigger>
+                            <ContextMenuContent>
+                                <p>g</p>
+                            </ContextMenuContent>
+                            </ContextMenu>
+                            </NavLink>
+                           ))
                         }
                     </div>
                 ))}

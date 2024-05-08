@@ -1,8 +1,8 @@
 import { ClientControllerContext } from "@/controllers/client/ClientController";
 import { Client } from "@strafechat/strafe.js";
 import { AnimatePresence, motion } from "framer-motion";
-import { FormEvent } from "react";
-import { useTranslation } from 'react-i18next';
+import { FormEvent } from "react"; 
+
 import Modal from './Modal';
 import { Button } from "@/components/ui/button";
 
@@ -11,19 +11,21 @@ const modalVariants = {
     closed: { opacity: 0, transition: { ease: "backOut", duration: 0.3, x: { duration: 1 } } },
 };
 
-class StatusModal extends Modal<{ statusText: string }, {}> {
+class CreateSectionModal extends Modal<{ sectionName: string }, { data: { spaceId: string } }> {
 
     static contextType = ClientControllerContext;
     context!: React.ContextType<typeof ClientControllerContext>;
 
-    state = { statusText: "" }; 
+    state = { sectionName: "" };
 
     render() {
         const { client } = this.context as { client: Client };
 
-        const handleSubmit = (event: FormEvent) => {
+        const handleSubmit = async (event: FormEvent) => {
             event.preventDefault();
-            client.user?.setPresence({ status_text: this.state.statusText });
+            console.log(this.props.data.spaceId)
+            const space = client.spaces.get(this.props.data.spaceId);
+            await space!.rooms.create({ name: this.state.sectionName, type: 0, space_id: space?.id, });
             this.close();
         }
 
@@ -41,19 +43,18 @@ class StatusModal extends Modal<{ statusText: string }, {}> {
                           <div className='modal-backdrop' onClick={() => this.close()}>
                             <div className="modal-window" onClick={(e) => e.stopPropagation()} style={{ width: "350px" }}>
                                 <form onSubmit={handleSubmit}>
-                                    <h1>Set a custom status</h1>
-                                    <p className="text-xs pt-4 pb-2 uppercase text-gray-300 font-bold">Custom Status</p>
-                                    <input 
-                                        defaultValue={client.user?.presence.status_text} 
-                                        placeholder="Strafe.chat is so cool"
-                                        onChange={(event) => this.setState({ statusText: event.target.value })}
+                                    <h1>Create Section</h1>
+                                    <p className="text-xs pt-4 pb-2 uppercase text-gray-300 font-bold">Section Name</p>
+                                    <input
+                                        placeholder="Information"
+                                        onChange={(event) => this.setState({ sectionName: event.target.value })}
                                     />
-                                   <div className="flex gap-2 py-2 w-full">
-                                        <Button type="submit" className="w-full bg-primary">Save</Button>
+                                     <div className="flex gap-2 py-2 w-full pt-4 rounded-[20px]">
+                                       <Button type='submit' className='w-full bg-primary font-bold hover:opacity-55'>Create</Button>
                                     </div>
                                 </form>
-                            </div>
-                          </div>
+                             </div>
+                           </div>
                         </div>
                     </motion.div>
                 </AnimatePresence>
@@ -62,4 +63,4 @@ class StatusModal extends Modal<{ statusText: string }, {}> {
     }
 }
 
-export default StatusModal;
+export default CreateSectionModal;

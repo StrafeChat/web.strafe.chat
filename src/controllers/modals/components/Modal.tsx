@@ -13,6 +13,13 @@ export default class Modal<Props, State> extends Component<ModalState & State, P
         if (event.key.toLowerCase() == "escape") this.close();
     }
 
+    handleClickOutside = (event: MouseEvent) => {
+        const modalContent = document.querySelector(".modal-content");
+        if (modalContent) {
+            this.close();
+        }
+    }
+
     componentDidMount(): void {
         window.addEventListener("keydown", this.handleKeyDown);
     }

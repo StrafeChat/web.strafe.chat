@@ -45,7 +45,7 @@ useEffect(() => {
     <div className="body flex-col justify-end">
       <ul
         ref={scrollRef}
-        className="messages flex min-w-[5px] overflow-scroll h-fit flex-col pt-[25px]"
+        className="messages flex min-w-[5px] overflow-y-scroll scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-600 h-fit flex-col pt-[25px]"
       >
         <div className="pt-6 px-[20px]">
           <h1 className="text-2xl font-bold inline-flex items-center">
@@ -59,7 +59,7 @@ useEffect(() => {
             const lastMessage = room?.messages?.toArray().sort((a: any, b: any) => a.createdAt - b.createdAt)[0];
               if (lastMessage) {
                 return (
-                    <div className="flex mt-4 mb-1 mx-4 relative left-auto right-auto h-0 z-1 border-[0.05px] border-gray-500 items-center justify-center box-border">
+                    <div className="flex mt-4 mb-1 mx-4 relative left-auto right-auto h-0 border-[0.009px] border-gray-600 items-center justify-center box-border">
                       <time className="bg-[#262626] px-1.5 text-xs text-gray-400 select-none font-bold uppercase">
                         {Intl.DateTimeFormat(client?.user!.locale, {
                          day: "numeric",
@@ -92,7 +92,7 @@ useEffect(() => {
                       return (
                         <div
                           key={key}
-                          className="flex mt-4 mb-1 mx-4 relative left-auto right-auto h-0 z-1 border-[0.05px] border-gray-500 items-center justify-center box-border"
+                          className="flex mt-4 mb-1 mx-4 relative left-auto right-auto h-0 border-[0.009px] border-gray-600 items-center justify-center box-border"
                         >
                           <time className="bg-[#262626] px-1.5 text-xs text-gray-400 select-none font-bold uppercase">
                             {Intl.DateTimeFormat(client?.user!.locale, {

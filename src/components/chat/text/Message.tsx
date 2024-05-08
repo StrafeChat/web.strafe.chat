@@ -66,14 +66,14 @@ export function Message({ message, key, sameAuthor, showMoreOptions, ghost }: Me
 
     switch (true) {
       case date.hasSame(now, 'day'):
-        return `Today at ${date.toLocaleString(DateTime.TIME_SIMPLE)}`;
+        return `Today at ${date.setLocale(client?.user?.locale!).toLocaleString(DateTime.TIME_SIMPLE)}`;
       case date.plus({ days: 1 }).hasSame(now, 'day'):
-        return `Yesterday at ${date.toLocaleString(DateTime.TIME_SIMPLE)}`;
+        return `Yesterday at ${date.setLocale(client?.user?.locale!).toLocaleString(DateTime.TIME_SIMPLE)}`;
       case date.hasSame(now, 'week'):
-        return "Last " + date.toFormat('EEEE') + ` at ${date.toLocaleString(DateTime.TIME_SIMPLE)}`;
+        return "Last " + date.setLocale(client?.user?.locale!).toFormat('EEEE') + ` at ${date.setLocale(client?.user?.locale!).toLocaleString(DateTime.TIME_SIMPLE)}`;
       default:
-        return date.toLocaleString(DateTime.DATETIME_SHORT);
-    }
+        return date.setLocale(client?.user?.locale!).toLocaleString(DateTime.DATETIME_SHORT);
+    }    
   }
 
   const CustomLink = ({ href, children }: { href?: any; children?: any }) => (
@@ -222,7 +222,7 @@ export function Message({ message, key, sameAuthor, showMoreOptions, ghost }: Me
           )}
           </div>
           <div className="flex flex-col">
-          <ProfilePopup user={message.author}>
+          <ProfilePopup user={message.author} client>
             <img
                  src={`${message.sudo ? message.sudo.avatar_url : `${Formatting.formatAvatar(message?.author.id, message?.author.avatar)}`}`}
                  className="avatar"
@@ -233,7 +233,7 @@ export function Message({ message, key, sameAuthor, showMoreOptions, ghost }: Me
       </div>
       <div className="flex flex-col">
       <span className="username">
-       <ProfilePopup user={message.author}>
+       <ProfilePopup user={message.author} client>
         <p>
           {message.sudo ? message.sudo.name! : message.author.display_name!}
           {message.sudo && <span className="bot-tag">SUDO</span>}
@@ -245,12 +245,12 @@ export function Message({ message, key, sameAuthor, showMoreOptions, ghost }: Me
         <span className={`content inline-flex ${editable && "message-edtitable"}`} ref={contentRef} contentEditable={editable} onKeyDown={(event) => handleInput(event)}>
          {message.content && (
             <>
-            {/* <ReactMarkdown
+            <ReactMarkdown
             components={{ a: CustomLink }}
             remarkPlugins={[gfm, remarkMath, remarkFrontmatter, remarkParse]}
-          > */}
+          > 
             {transformMessage(message.content!)}
-          {/* </ReactMarkdown> */}
+          </ReactMarkdown> 
           </>
          )}   
           {message.embeds && message.embeds.map((embed, index) => (

@@ -9,7 +9,10 @@ import SettingsModal from "./components/SettingsModal";
 import StatusModal from "./components/StatusModal";
 import CreateSpaceModal from "./components/CreateSpaceModal";
 import CreateRoomModal from "./components/CreateRoomModal";
+import CreateSectionModal from "./components/CreateSectionModal";
 import SpaceSettingsModal from "./components/SpaceSettingsModal";
+import LeaveSpaceModal from "./components/LeaveSpaceModal";
+import CreateInviteModal from "./components/CreateInviteModal";
 
 export const ModalControllerContext = createContext({
     openModal: (_name: string, _data?: any,) => { },
@@ -101,6 +104,24 @@ export default class ModalController extends Component<{ children: JSX.Element }
                                 return (
                                     <AnimatePresence key={key}>
                                         <CreateRoomModal name="create-room" closeModal={this.closeModal} data={modal.data!}/>
+                                    </AnimatePresence>
+                                );    
+                            case "create-section":
+                                return (
+                                    <AnimatePresence key={key}>
+                                        <CreateSectionModal name="create-section" closeModal={this.closeModal} data={modal.data!}/>
+                                    </AnimatePresence>
+                                );  
+                            case "leave-space":
+                                return (
+                                    <AnimatePresence key={key}>
+                                        <LeaveSpaceModal name="leave-space" closeModal={this.closeModal} data={modal.data!}/>
+                                    </AnimatePresence>
+                                );    
+                            case "create-invite":
+                                return (
+                                    <AnimatePresence key={key}>
+                                        <CreateInviteModal name="create-invite" closeModal={this.closeModal} data={modal.data!}/>
                                     </AnimatePresence>
                                 );                        
                         }

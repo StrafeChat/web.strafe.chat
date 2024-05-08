@@ -29,7 +29,7 @@
     --destructive: 0 84% 60%;
     --destructive-foreground: 0 0% 98%;
 
-    --server-list: var(--background);
+    --space-list: var(--background);
     --room-list: 0 0% 12%;
     --app-view: 0 0% 15%;
     --seperator: 0 0% 15%;
