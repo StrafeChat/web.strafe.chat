@@ -44,7 +44,7 @@ class CreateInviteModal extends Modal<{ maxUses: number | null, expiresAt: numbe
 
     copyToClipboard = () => {
         if (this.state.invite) {
-            navigator.clipboard.writeText(`http://localhost:3000/invites/${this.state.invite.code}`);
+            navigator.clipboard.writeText(`${process.env.NEXT_PUBLIC_DOMAIN}/invites/${this.state.invite.code}`);
             return this.close();
         }
     };
@@ -70,7 +70,7 @@ class CreateInviteModal extends Modal<{ maxUses: number | null, expiresAt: numbe
                                             <p className="text-xs pt-4 pb-2 uppercase text-gray-300 font-bold">Invite Link</p>
                                               <input
                                                 type="text"
-                                                value={`http://localhost:3000/invites/${invite?.code}`}
+                                                value={`${process.env.NEXT_PUBLIC_DOMAIN}/invites/${invite?.code}`}
                                                 readOnly={true}
                                               />
                                                <div className="flex gap-2 py-2 w-full pt-5 rounded-[20px]">
