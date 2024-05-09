@@ -81,7 +81,7 @@ function formatDate(timpstamp: number) {
               ) : (
                 <span className="text-gray-400">No About Provided</span>
               )} 
-              <span className="text-sm font-bold block mt-2">MEMBER SINCE</span>
+              <span className="text-sm font-bold block mt-2 upperc">MEMBER SINCE</span>
                 <span className="text-gray-400">{formatDate(user.created_at)}</span>
             </div>
           </div>

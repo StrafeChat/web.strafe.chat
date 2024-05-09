@@ -507,6 +507,14 @@ div.room-list {
   }
 }
 
+
+
+
+
+div.invite{
+  background: hsl(var(--room-list));
+}
+
 div.memberlist {
   width: 250px;
   min-width: 250px;
@@ -827,15 +835,15 @@ li.message {
     margin-left: 0.25rem;
   }
 
-  /* Styles for message embeds */
   .message-embed {
     background-color: #363636;
     border-radius: 5px;
     padding: 10px;
     margin-top: 3px;
+    width: fit-content;
+    max-width: 85%;
   }
   
-  /* Title of the embed */
   .embed-title {
     font-weight: bold;
     font-size: large;
@@ -889,6 +897,8 @@ li.message {
   
   /* Footer section of the embed */
   .embed-footer {
+    display: flex;
+    align-items: center;
     margin-top: 5px;
   }
   

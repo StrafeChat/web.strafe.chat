@@ -43,7 +43,7 @@ useEffect(() => {
 
   return (
     <div className="body flex-col justify-end">
-      <ul
+      <ul 
         ref={scrollRef}
         className="messages flex min-w-[5px] overflow-y-scroll scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-600 h-fit flex-col pt-[25px]"
       >

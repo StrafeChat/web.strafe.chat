@@ -51,7 +51,7 @@ export default function SpaceList() {
             </ContextMenuContent>
          </ContextMenu>
          <div className="seperator" />
-         <div className="spaces">
+         <div key="spaces" className="spaces">
             {client?.spaces.map((space) => (
           <ContextMenu>
              <ContextMenuTrigger>

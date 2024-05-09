@@ -1,5 +1,5 @@
 import { Room } from "@strafechat/strafe.js";
-import { useEffect, useRef, useState, useCallback } from "react";
+import { useEffect, useRef, useState, useCallback, ClipboardEventHandler  } from "react";
 import { useClient } from "@/hooks";
 import { FaFaceSmile, FaPlus } from "react-icons/fa6";
 
@@ -62,6 +62,16 @@ export function ChatInput({ placeholder, room }: { placeholder: string, room: Ro
     }
   }, [room, currentlyTyping]);
 
+  const handlePaste: ClipboardEventHandler<HTMLDivElement> = async (event) => {
+    event.preventDefault();
+    try {
+      const text = await navigator.clipboard.readText();
+      document.execCommand('insertText', false, text);
+    } catch (error) {
+      console.error('Failed to read text from clipboard:', error);
+    }
+  };
+
   useEffect(() => {
     const input = inputRef.current;
 
@@ -78,9 +88,9 @@ export function ChatInput({ placeholder, room }: { placeholder: string, room: Ro
 
   return (
     <>
-    <div className="chat-input-container">
+     <div className="chat-input-container">
       <div className="chat-input">
-        <div className="chat-input-left"><FaPlus className="w-6 h-6"/></div>
+        <div className="chat-input-left"><FaPlus className="w-6 h-6" /></div>
         <div
           ref={inputRef}
           className="chat-input-middle"
@@ -88,9 +98,9 @@ export function ChatInput({ placeholder, room }: { placeholder: string, room: Ro
           suppressContentEditableWarning
           {...{ placeholder }}
           id="textbox"
-          role={"textbox"}
+          role="textbox"
           onKeyDown={async (event) => {
-            if (event.key == "Enter" && !event.shiftKey) {
+            if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
               
               await room.send({ content });
@@ -100,18 +110,19 @@ export function ChatInput({ placeholder, room }: { placeholder: string, room: Ro
               (event.target as HTMLElement).innerText = "";
             }
           }}
+          onPaste={handlePaste}
         />
-        <div className="chat-input-right"><FaFaceSmile className="w-6 h-6"/></div>
+        <div className="chat-input-right"><FaFaceSmile className="w-6 h-6" /></div>
       </div>
-        <span className="typing">
+      <span className="typing">
         {typingUsers.length > 0 && (
           <>
-          {typingUsers.length > 4 ? "Several people are typing..." : typingUsers.map((userName, index) => (
-            <>{index > 0 && ', '}{typingUsers.length === 3 && index === typingUsers.length - 2 && ' and '}<b>{userName}</b></>
-          ))}
-          {typingUsers.length <= 4 && typingUsers.length > 1 ? " are typing..." : typingUsers.length === 1 ? " is typing..." : ""}
+            {typingUsers.length > 4 ? "Several people are typing..." : typingUsers.map((userName, index) => (
+              <>{index > 0 && ', '}{typingUsers.length === 3 && index === typingUsers.length - 2 && ' and '}<b>{userName}</b></>
+            ))}
+            {typingUsers.length <= 4 && typingUsers.length > 1 ? " are typing..." : typingUsers.length === 1 ? " is typing..." : ""}
           </>
-         )}
+        )}
       </span>
     </div>
   </>

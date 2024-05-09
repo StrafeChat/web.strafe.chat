@@ -31,15 +31,21 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "../../ui/tooltip";
-import { User } from "@strafechat/strafe.js";
+import { Invite, User } from "@strafechat/strafe.js";
 import { ContextMenuTrigger, ContextMenu, ContextMenuContent, ContextMenuItem } from "@/components/ui/context-menu";
 import { Formatting } from "@/helpers/formatter";
+import { InviteEmbed } from "./InviteEmbed";
+import { fetchMetadata, Metadata } from "@/utils";
 
 export function Message({ message, key, sameAuthor, showMoreOptions, ghost }: MessageProps) {
   const contentRef = useRef<HTMLSpanElement>(null);
+
   const replyRef = useRef<HTMLSpanElement>(null);
   const [editable, setEditable] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
+  const [inviteDetails, setInviteDetails] = useState<Invite | null | undefined>(null);
+  const [metadataDetails, setMetadataDetails] = useState<Metadata | null>(null)
+  const metadataFetched = useRef(false);
   const { client } = useClient();
   ghost ||= false;
 
@@ -59,6 +65,16 @@ export function Message({ message, key, sameAuthor, showMoreOptions, ghost }: Me
       });
     }
   }, []);
+
+  function extractInviteCode(url: string) {
+    const regex = /(?:https?:\/\/)?(?:localhost:\d+)?\/invites\/([a-zA-Z0-9]+)/;
+    const match = url.match(regex);
+    if (match && match[1]) {
+        return match[1]; 
+    } else {
+        return null;
+    }
+}
 
   function formatTimestamp(timestamp: number) {
     const now = DateTime.now();
@@ -102,6 +118,35 @@ export function Message({ message, key, sameAuthor, showMoreOptions, ghost }: Me
 
 
   const transformMessage = (content: string) => {
+      
+    let text = content;
+    const inviteCode = extractInviteCode(text)
+    
+    if (text && inviteCode) {
+      client?.invites.fetch(inviteCode) .then((invite) => {
+        setInviteDetails(invite);
+    
+      })
+      .catch((error) => {
+        console.error("Error fetching invite details:", error);
+      });
+    }
+
+    const urlRegex = /https?:\/\/\S+|www\.\S+/;
+    const inviteRegex = /(?:https?:\/\/)?(?:localhost:\d+)?\/invites\/([a-zA-Z0-9]+)/;
+
+    if (text && urlRegex.test(text) && !inviteRegex.test(text)) {
+      if (!metadataFetched.current) {
+        const matches = text.match(urlRegex);
+        fetchMetadata(matches![0], (metadata) => {
+          if (metadata) {
+            setMetadataDetails(metadata);
+            metadataFetched.current = true;
+          }
+        });
+      }
+    };
+
     const patterns: Record<
       string,
       (match: string, ...groups: string[]) => string
@@ -112,26 +157,10 @@ export function Message({ message, key, sameAuthor, showMoreOptions, ghost }: Me
       },
     };
   
-    let text = content;
-  
     for (const pattern in patterns) {
       const regex = new RegExp(pattern, "g");
       text = text.replace(regex, patterns[pattern]);
     }
-  
-    // Regex to identify image URLs
-    const imageUrlRegex = /https?:\/\/[^\s]+?\.(jpg|jpeg|png|gif)/gi;
-  
-    // Replace image URLs with img elements
-    text = text.replace(imageUrlRegex, (url) => {
-      // Check if the URL ends with .gif to determine if it's a GIF
-      const isGif = url.toLowerCase().endsWith('.gif');
-      if (isGif) {
-        return `<img src="${url}" alt="GIF" />`;
-      } else {
-        return `<img src="${url}" alt="Image" />`;
-      }
-    });
   
     return text;
   };
@@ -231,7 +260,7 @@ export function Message({ message, key, sameAuthor, showMoreOptions, ghost }: Me
       />
       </ProfilePopup>
       </div>
-      <div className="flex flex-col">
+      <div className="flex flex-col w-full">
       <span className="username">
        <ProfilePopup user={message.author} client>
         <p>
@@ -242,22 +271,37 @@ export function Message({ message, key, sameAuthor, showMoreOptions, ghost }: Me
       </ProfilePopup>
       <span className="timestamp">{formatTimestamp(message.createdAt)}</span>
       </span>
-        <span className={`content inline-flex ${editable && "message-edtitable"}`} ref={contentRef} contentEditable={editable} onKeyDown={(event) => handleInput(event)}>
+        <span className={`content inline-flex ${editable && "message-edtitable"} ${(inviteDetails || message.embeds) ? "flex-col" : ""}`} ref={contentRef} contentEditable={editable} onKeyDown={(event) => handleInput(event)}>
          {message.content && (
             <>
             <ReactMarkdown
             components={{ a: CustomLink }}
             remarkPlugins={[gfm, remarkMath, remarkFrontmatter, remarkParse]}
           > 
-            {transformMessage(message.content!)}
+            {transformMessage(message.content as string)}
           </ReactMarkdown> 
           </>
          )}   
-          {message.embeds && message.embeds.map((embed, index) => (
+        </span>
+        <span className="ml-[15px] pr-[20px]">
+        {message.embeds && message.embeds.map((embed, index) => (
                <MessageEmbed key={index} embed={embed} />
             ))}
+            {metadataDetails && <MessageEmbed embed={{
+              title: metadataDetails.title,
+              description: metadataDetails.description,
+              color: "#ff9966"
+            }} />}
+
+          {inviteDetails && (
+             <InviteEmbed
+                   key={`invite-${inviteDetails.code}`}
+                   invite={inviteDetails}
+                   client={client!}
+             />
+          )}
           {message.editedAt && !editable && (<span className="edited pt-[3px]">(edited)</span>)}
-        </span>
+          </span>
       </div>
       </li>
       </ContextMenuTrigger>
@@ -354,7 +398,7 @@ export function Message({ message, key, sameAuthor, showMoreOptions, ghost }: Me
           <div className="relative">
           <div className="flex flex-col">
           <span className="timestamp absolute text-center text-[11px] pt-2.5 px-3">{ isHovered && messageDate.toLocaleString(DateTime.TIME_SIMPLE)}</span>
-            <span className={`content pl-[60px] ml-[60px] select-text inline-flex ${editable && "message-edtitable"}`} ref={contentRef}  style={{ minHeight: editable ? "4vh" : "fit-content" }} contentEditable={editable} onKeyDown={(event) => handleInput(event)}>
+            <span className={`content pl-[60px] ml-[60px] select-text inline-flex ${editable && "message-edtitable"} ${(inviteDetails || message.embeds) ? "flex-col" : ""}`} ref={contentRef}  style={{ minHeight: editable ? "4vh" : "fit-content" }} contentEditable={editable} onKeyDown={(event) => handleInput(event)}>
              {message.content && (
                <>
                <ReactMarkdown
@@ -368,6 +412,18 @@ export function Message({ message, key, sameAuthor, showMoreOptions, ghost }: Me
               {message.embeds && message.embeds.map((embed, index) => (
                <MessageEmbed key={index} embed={embed} />
             ))}
+             {metadataDetails && <MessageEmbed embed={{
+              title: metadataDetails.title,
+              description: metadataDetails.description,
+              color: "#ff9966"
+            }} />}
+            {inviteDetails && (
+             <InviteEmbed
+                   key={`invite-${inviteDetails.code}`}
+                   invite={inviteDetails}
+                   client={client!}
+             />
+          )}
               {message.editedAt && !editable && (<span className="edited pt-[2px]">(edited)</span>)}
             </span>
           </div>
@@ -377,3 +433,4 @@ export function Message({ message, key, sameAuthor, showMoreOptions, ghost }: Me
    </>
   );
 }
+
