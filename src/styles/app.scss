@@ -687,7 +687,7 @@ div.body {
 }
 
 ul.messages {
-  overflow-x: hdden;
+  overflow-x: hidden;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -695,6 +695,7 @@ ul.messages {
   position: relative;
   height: fit-content;  
   padding-bottom: 25px;
+  white-space: pre-wrap;
   word-break: break-all;
 }
 
@@ -802,14 +803,23 @@ li.message {
     z-index: 2;
   }
 
-  span.message-edtitable {
+
+  .full {
+    padding-left: 1rem;
     padding: 0.5rem;
+  }
+  
+  .notfull {
+    padding-top: 0.5rem;
+    padding-bottom: 0.5rem;
+  }
+
+  span.message-edtitable {
+    margin-right: 20px;
     border-radius: 0.75rem;
     margin-top: 5px;
     overflow-y: auto;
     overflow: hidden;
-    margin-left: 60px;
-    margin-right: 20px;
     background: hsl(var(--chat-input));
     outline: none;
   }
@@ -817,16 +827,14 @@ li.message {
   span.content {
     font-size: 15px;
     overflow: hidden;
-    white-space: pre-wrap;
     margin-left: 15px;
     padding-right: 20px;
     z-index: 1;
-    overflow-wrap: break-word;
+    white-space: pre-wrap;
     img {
       display: inline-block;
     }
-  }
-
+}
 
   span.edited {
     color: gray;

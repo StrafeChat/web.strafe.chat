@@ -12,13 +12,14 @@ export interface Metadata {
 }
 
 export function fetchMetadata(url: string, callback: (metadata: Metadata | null) => void): void {
-  fetch(url, { method: 'HEAD' })
+  fetch(`https://jan.revolt.chat/embed?url=${url}`)
     .then(response => {
-      const headers = response.headers;
+      const body: any = response.body;
+      console.log(body)
       const metadata: Metadata = {
-        title: headers.get('x-metadata-title') || null,
-        description: headers.get('x-metadata-description') || null,
-        image: headers.get('x-metadata-image') || null,
+        title: body?.title || null,
+        description: body?.description || null,
+        image: body?.image.url || null,
       };
       if (metadata.title || metadata.description || metadata.image) { callback(metadata); } else callback(null);
     })

@@ -271,7 +271,7 @@ export function Message({ message, key, sameAuthor, showMoreOptions, ghost }: Me
       </ProfilePopup>
       <span className="timestamp">{formatTimestamp(message.createdAt)}</span>
       </span>
-        <span className={`content inline-flex ${editable && "message-edtitable"} ${(inviteDetails || message.embeds) ? "flex-col" : ""}`} ref={contentRef} contentEditable={editable} onKeyDown={(event) => handleInput(event)}>
+        <span className={`content inline-flex ${editable && "message-edtitable full"} ${(inviteDetails || message.embeds) ? "flex-col" : ""}`} ref={contentRef} contentEditable={editable} onKeyDown={(event) => handleInput(event)}>
          {message.content && (
             <>
             <ReactMarkdown
@@ -395,10 +395,9 @@ export function Message({ message, key, sameAuthor, showMoreOptions, ghost }: Me
             </>
           )}
           </div>
-          <div className="relative">
-          <div className="flex flex-col">
+          <div className="flex flex-col w-full">
           <span className="timestamp absolute text-center text-[11px] pt-2.5 px-3">{ isHovered && messageDate.toLocaleString(DateTime.TIME_SIMPLE)}</span>
-            <span className={`content pl-[60px] ml-[60px] select-text inline-flex ${editable && "message-edtitable"} ${(inviteDetails || message.embeds) ? "flex-col" : ""}`} ref={contentRef}  style={{ minHeight: editable ? "4vh" : "fit-content" }} contentEditable={editable} onKeyDown={(event) => handleInput(event)}>
+            <span className={`content pl-[60px] select-text inline-flex ${editable && "message-edtitable notfull"} ${(inviteDetails || message.embeds) ? "flex-col" : ""}`} ref={contentRef}  style={{ minHeight: editable ? "4vh" : "fit-content" }} contentEditable={editable} onKeyDown={(event) => handleInput(event)}>
              {message.content && (
                <>
                <ReactMarkdown
@@ -427,7 +426,6 @@ export function Message({ message, key, sameAuthor, showMoreOptions, ghost }: Me
               {message.editedAt && !editable && (<span className="edited pt-[2px]">(edited)</span>)}
             </span>
           </div>
-        </div>
     </li>
      )} 
    </>
