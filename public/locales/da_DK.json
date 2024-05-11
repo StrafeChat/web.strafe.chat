@@ -1,0 +1,168 @@
+{
+    "home_page": {
+        "header": "Hjem",
+        "greeting": {
+            "morning": "God Morgen, {display_name}.",
+            "afternoon": "God Eftermiddag, {display_name}.",
+            "evening": "God Aften {display_name}. ",
+            "night": "God Nat, {display_name}.",
+            "welcome": " Welcome to Strafe, let's get started."
+        },
+        "nav_buttons": {
+            "create_space": {
+                "title": "Opret et mellemrum",
+                "description": "Byg og tilpas din comunity, din måde."
+            },
+            "discover": {
+                "title": "Discover Strafe",
+                "description": "Find interesser! Opdag bots, rum og meget mere!"
+            },
+            "settings": {
+                "title": "Udforsk Indstillinger",
+                "description": "Brug Strafe DIN måde, tilpasse din oplevelse."
+            },
+            "updated": {
+                "title": "Bliv Opdateret",
+                "description": "Deltag i den officielle Strafe Space for at forblive opdateret!"
+            }
+        },
+        "latest_updates": {
+            "title": "Seneste Opdateringer"
+        }
+    },
+    "friends_page": {
+        "header": "Venner"
+    },
+    "notes_page": {
+        "header": "Noter"
+    },
+    "pm_page": {
+        "message_placeholder": "Besked @{display_name}"
+    },
+    "space": {
+        "room": {
+            "message_placeholder": "Besked #{channel_name}"
+        }
+    },
+    "modals": {
+        "create_space": {
+            "title": "Opret et mellemrum",
+            "input": {
+                "title": "Mellemrum Navn",
+                "placeholder": "Mit Fantastiske Mellemrum"
+            },
+            "buttons": {
+                "create": "Opret",
+                "cancel": "Annuller"
+            },
+            "switch": "Deltag i et område i stedet?"
+        },
+        "join_space": {
+            "title": "Tilslut et sted",
+            "input": {
+                "title": "Invitér Kode",
+                "placeholder": "1a2b3c"
+            },
+            "buttons": {
+                "join": "Deltag",
+                "cancel": "Annuller"
+            },
+            "switch": "Opret et sted i stedet?"
+        },
+        "custom_status": {
+            "title": "Angiv en brugerdefineret status",
+            "buttons": {
+                "save": "Gem",
+                "cancel": "Annuller"
+            }
+        },
+        "settings": {
+            "navbar": {
+                "user_settings": {
+                    "header": "Bruger Indstillinger",
+                    "my_account": "Min Konto",
+                    "profile": "Profil",
+                    "authorized_apps": "Autoriserede Apps"
+                },
+                "app_settings": {
+                    "header": "Indstillinger For App",
+                    "notifications": "Notifikationer",
+                    "desktop": "Skrivebord"
+                },
+                "others": {
+                    "logout": "Log Ud"
+                }
+            },
+            "my_account": {
+                "header": "Min Konto",
+                "edit_data_01": {
+                    "username": {
+                        "title": "Brugernavn",
+                        "buttons": {
+                            "edit": "Rediger"
+                        }
+                    },
+                    "discriminator": {
+                        "title": "Diskriminator",
+                        "buttons": {
+                            "edit": "Rediger"
+                        }
+                    },
+                    "email": {
+                        "title": "E-mail",
+                        "buttons": {
+                            "edit": "Rediger"
+                        }
+                    },
+                    "password": {
+                        "title": "Adgangskode",
+                        "buttons": {
+                            "edit": "Rediger"
+                        }
+                    },
+                    "phone_number": {
+                        "title": "Telefonnummer",
+                        "placeholder": "Intet Telefonnummer Sat",
+                        "buttons": {
+                            "edit": "Rediger"
+                        }
+                    }
+                },
+                "edit-data-02": {
+                    "2fa": {
+                        "enabled": "Aktiveret",
+                        "disabled": "Deaktiveret"
+                    },
+                    "buttons": {
+                        "delete_account": {
+                            "title": "Slet Konto"
+                        }
+                    }
+                }
+            },
+            "profile": {
+                "header": "Profil"
+            },
+            "authorized_apps": {
+                "header": "Autoriserede Apps"
+            },
+            "notifications": {
+                "header": "Notifikationer"
+            },
+            "desktop": {
+                "header": "Skrivebord"
+            }
+        }
+    },
+    "context_menus": {
+        "user_avatar": {
+            "settings": "Indstillinger",
+            "online": "Online",
+            "idle": "Tomgang",
+            "coding": "Coding",
+            "do_not_disturb": "Forstyr Ikke",
+            "invisible": "Usynlig",
+            "custom_status": "Tilpasset Status"
+        }
+    }
+}

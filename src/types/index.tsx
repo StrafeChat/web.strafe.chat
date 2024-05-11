@@ -1,5 +1,6 @@
 import { LinkProps } from "next/link";
 import { Dispatch, SetStateAction } from "react";
+import { Message } from "@strafechat/strafe.js";
 import { IconType } from "react-icons";
 
 export interface NavLinkProps extends LinkProps {
@@ -8,6 +9,20 @@ export interface NavLinkProps extends LinkProps {
 }
 
 export interface ChatHeaderProps {
+    name: string;
+    icon?: IconType,
+    type: "pm" | "server"
+}
+
+export interface MessageProps {
+    message: Message;
+    key: number;
+    sameAuthor: boolean;
+    showMoreOptions: boolean;
+    ghost?: boolean;
+}
+
+export interface VoiceHeaderProps {
     name: string;
     icon?: IconType,
     type: "pm" | "server"

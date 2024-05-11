@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { FormEvent } from "react";
 import { useTranslation } from 'react-i18next';
 import Modal from './Modal';
+import { Button } from "@/components/ui/button";
 
 const modalVariants = {
     open: { opacity: 1, transition: { ease: "backIn", duration: 0.3, x: { duration: 1 } } },
@@ -37,19 +38,22 @@ class StatusModal extends Modal<{ statusText: string }, {}> {
                         variants={modalVariants}
                     >
                         <div className='modal-window-wrapper'>
-                            <div className="modal-window" style={{ width: "300px" }}>
+                          <div className='modal-backdrop' onClick={() => this.close()}>
+                            <div className="modal-window" onClick={(e) => e.stopPropagation()} style={{ width: "350px" }}>
                                 <form onSubmit={handleSubmit}>
                                     <h1>Set a custom status</h1>
+                                    <p className="text-xs pt-4 pb-2 uppercase text-gray-300 font-bold">Custom Status</p>
                                     <input 
                                         defaultValue={client.user?.presence.status_text} 
+                                        placeholder="Strafe.chat is so cool"
                                         onChange={(event) => this.setState({ statusText: event.target.value })}
                                     />
-                                    <div className="flex justify-end gap-4 mt-2">
-                                        <button type="button" onClick={() => this.close()}>Cancel</button>
-                                        <button type="submit">Save</button>
+                                   <div className="flex gap-2 py-2 w-full">
+                                        <Button type="submit" className="w-full bg-primary">Save</Button>
                                     </div>
                                 </form>
                             </div>
+                          </div>
                         </div>
                     </motion.div>
                 </AnimatePresence>

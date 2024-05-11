@@ -10,6 +10,7 @@ export default function Notes() {
 
    return (
     <>
+    <div className="header-container">
       <div className="header">
         <span className="flex items-center gap-[3px]">
           {hideRoomList ? (
@@ -25,6 +26,7 @@ export default function Notes() {
           )}
         </span>
         <span><b>{t('notes_page.header')}</b></span>
+      </div>
       </div>
     </>
    )

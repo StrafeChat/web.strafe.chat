@@ -1,6 +1,6 @@
 {
     "home_page": {
-        "header": "Home",
+        "header": "গৃহ",
         "greeting": {
             "morning": "সুপ্রভাত, {display_name}.",
             "afternoon": "শুভ অপরাহ্ন, {display_name}.",

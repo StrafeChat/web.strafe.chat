@@ -14,7 +14,7 @@ export function AccountSettings() {
     const [savedData, setSavedData] = useState({
         username: client?.user?.username!,
         email: client?.user?.email!,
-        phone_number: client?.user?.phone_number,
+        phone_number: client?.user?.phoneNumber,
         discriminator: client?.user?.discriminator!,
         // locale: client?.user?.locale!,
     });
@@ -22,7 +22,6 @@ export function AccountSettings() {
     const [data, setData] = useState(savedData);
 
     const saveData = () => {
-        console.log(data);
         client?.user?.edit(data).then(() => setSavedData(data));
         forceUpdate();
     }

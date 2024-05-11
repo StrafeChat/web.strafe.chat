@@ -1,13 +1,13 @@
 "use client";
 import EmailVerifcation from "@/components/auth/EmailVerifcation";
+import { LoadingScreen } from "@/components/shared";
 import { useToast } from "@/components/ui/use-toast";
 import { Client } from "@strafechat/strafe.js";
 import cookie from "js-cookie";
 import { usePathname } from "next/navigation";
 import { createContext, useCallback, useEffect, useRef, useState } from 'react';
-import { useForceUpdate } from "../../hooks";
 import { useTranslation } from 'react-i18next';
-import { LoadingScreen } from "@/components/shared";
+import { useForceUpdate } from "../../hooks";
 
 export const ClientControllerContext = createContext<{ client: Client | null }>({
   client: null,
@@ -30,15 +30,21 @@ export default function ClientController({ children }: { children: JSX.Element }
     setReady(true);
     setClientError(false);
     i18n.changeLanguage(client?.user?.locale.replace("-", "_"))
-    console.log(client?.spaces)
   }, [i18n, client])
 
   const handlePresenceUpdate = useCallback((data: any) => {
-    if (client!.user && data.user.id == client!.user.id) {
-      client!.user.presence = data.presence;
-      forceUpdate();
-    }
+    if (client!.user && data.user.id == client!.user.id) client!.user.presence = data.presence;
+    forceUpdate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client]);
 
+  const handleMessageCreate = useCallback((data: any) => {
+    forceUpdate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client]);
+
+  const handleMessageDelete = useCallback((data: any) => {
+    forceUpdate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client]);
 
@@ -76,16 +82,22 @@ export default function ClientController({ children }: { children: JSX.Element }
   useEffect(() => {
     client?.on("ready", handleReady);
     client?.on("presenceUpdate", handlePresenceUpdate);
+    client?.on("messageCreate", handleMessageCreate);
+    client?.on("messageDelete", handleMessageDelete);
+    client?.on("messageUpdate", handleMessageCreate);
 
     return () => {
       client?.off("ready", handleReady);
       client?.off("presenceUpdate", handlePresenceUpdate);
+      client?.off("messageCreate", handleMessageCreate);
+      client?.off("messageDelete", handleMessageDelete);
+      client?.off("messageUpdate", handleMessageCreate);
     }
   }, [client, handlePresenceUpdate, handleReady]);
 
   useEffect(() => {
-    if (!cookie.get("token")! && !["/login", "/register"].includes(pathname)) window.location.href = "/login";
-    else if (!connected.current && !["/login", "/register"].includes(pathname)) init();
+    if (!cookie.get("token")! && !["/login", "/register"].includes(pathname!)) window.location.href = "/login";
+    else if (!connected.current && !["/login", "/register"].includes(pathname!)) init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, client]);
 

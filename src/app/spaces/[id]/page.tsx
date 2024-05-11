@@ -10,8 +10,9 @@ export default function Page({ params }: { params: { id: string, roomId: string 
 
   return (
     <>
+      <div className="header-container">
       <div className="header">
-        <span className="flex items-center gap-[3px]">
+        <span className="flex items-center justify-between gap-[3px]">
           {hideRoomList ? (
             <>
               <FaHouseChimney onClick={() => setHideRoomList(!hideRoomList)} />
@@ -25,6 +26,7 @@ export default function Page({ params }: { params: { id: string, roomId: string 
           )}
         </span>
         <span><b>Home</b></span>
+        </div>
       </div>
     </>
   )

@@ -8,10 +8,14 @@ import EditDataModal from "./components/EditDataModal";
 import SettingsModal from "./components/SettingsModal";
 import StatusModal from "./components/StatusModal";
 import CreateSpaceModal from "./components/CreateSpaceModal";
-import { useTranslation } from "react-i18next";
+import CreateRoomModal from "./components/CreateRoomModal";
+import CreateSectionModal from "./components/CreateSectionModal";
+import SpaceSettingsModal from "./components/SpaceSettingsModal";
+import LeaveSpaceModal from "./components/LeaveSpaceModal";
+import CreateInviteModal from "./components/CreateInviteModal";
 
 export const ModalControllerContext = createContext({
-    openModal: (_name: string, _data?: any) => { },
+    openModal: (_name: string, _data?: any,) => { },
     closeModal: (_name: string) => { },
     modals: [] as {
         name: string;
@@ -22,12 +26,11 @@ export const ModalControllerContext = createContext({
 export default class ModalController extends Component<{ children: JSX.Element }, ModalControllerState> {
 
     state = {
-        openModals: [] as { name: string, data?: any }[]
+        openModals: [] as { name: string, data?: any, }[]
     }
 
     static contextType = ClientControllerContext;
-
-    openModal = (name: string, data?: any) => {
+    openModal = (name: string, data?: any,) => {
         this.setState((prevState) => ({
             openModals: [...prevState.openModals, { name, data }]
         }));
@@ -36,6 +39,12 @@ export default class ModalController extends Component<{ children: JSX.Element }
     closeModal = (name: string) => {
         switch (name) {
             case "settings":
+                if (this.state.openModals.find((modal) => modal.name == "edit-data")) return;
+                else this.setState((prevState) => ({
+                    openModals: prevState.openModals.filter((modal) => modal.name !== name)
+                }));
+                break;
+                case "space-settings":
                 if (this.state.openModals.find((modal) => modal.name == "edit-data")) return;
                 else this.setState((prevState) => ({
                     openModals: prevState.openModals.filter((modal) => modal.name !== name)
@@ -61,6 +70,12 @@ export default class ModalController extends Component<{ children: JSX.Element }
                                         <SettingsModal name="settings" closeModal={this.closeModal} />
                                     </AnimatePresence>
                                 );
+                            case "space-settings":
+                                return (
+                                    <AnimatePresence key={key}>
+                                        <SpaceSettingsModal name="space-setings" closeModal={this.closeModal} data={modal.data!} />
+                                    </AnimatePresence>
+                                );
                             case "status":
                                 return (
                                     <AnimatePresence key={key}>
@@ -72,20 +87,43 @@ export default class ModalController extends Component<{ children: JSX.Element }
                                     <AnimatePresence key={key}>
                                         <EditDataModal name="edit-data" closeModal={this.closeModal} data={modal.data} />
                                     </AnimatePresence>
-                                )
+                                );
                             case "delete-account":
                                 return (
                                     <AnimatePresence key={key}>
                                         <DeleteAccountModal name="delete-account" closeModal={this.closeModal} />
                                     </AnimatePresence>
-                                )
+                                );
                             case "create-space":
                                 return (
                                     <AnimatePresence key={key}>
                                         <CreateSpaceModal name="create-space" closeModal={this.closeModal} />
                                     </AnimatePresence>
-                                )
-
+                                );
+                            case "create-room":
+                                return (
+                                    <AnimatePresence key={key}>
+                                        <CreateRoomModal name="create-room" closeModal={this.closeModal} data={modal.data!}/>
+                                    </AnimatePresence>
+                                );    
+                            case "create-section":
+                                return (
+                                    <AnimatePresence key={key}>
+                                        <CreateSectionModal name="create-section" closeModal={this.closeModal} data={modal.data!}/>
+                                    </AnimatePresence>
+                                );  
+                            case "leave-space":
+                                return (
+                                    <AnimatePresence key={key}>
+                                        <LeaveSpaceModal name="leave-space" closeModal={this.closeModal} data={modal.data!}/>
+                                    </AnimatePresence>
+                                );    
+                            case "create-invite":
+                                return (
+                                    <AnimatePresence key={key}>
+                                        <CreateInviteModal name="create-invite" closeModal={this.closeModal} data={modal.data!}/>
+                                    </AnimatePresence>
+                                );                        
                         }
                     })}
                 </>

@@ -1,5 +1,6 @@
 "use client";
-import { ChatBody, ChatHeader, ChatInput } from "@/components/chat";
+import { ChatHeader } from "@/components/chat";
+import ChatBody from "@/components/chat/text/ChatBody";
 import { useTranslation } from 'react-i18next';
 
 export default function Page({ params }: { params: { id: string } }) {
@@ -8,8 +9,8 @@ export default function Page({ params }: { params: { id: string } }) {
   return (
     <>
       <ChatHeader type="pm" name={params.id} />
-      <ChatBody />
-      <ChatInput placeholder={t("pm_page.message_placeholder").replace(`{display_name}`, params.id)} />
+      {/* <ChatBody room={params.id} /> */}
+      {/* <ChatInput placeholder={t("pm_page.message_placeholder").replace(`{display_name}`, params.id)} /> */}
     </>
   );
 }

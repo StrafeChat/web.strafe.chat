@@ -20,20 +20,19 @@ export default function RoomList() {
   }, [setHideRoomList]);
 
   useEffect(() => {
-    controls.start({ width: hideRoomList ? 0 : "auto" });
+    controls.start({ width: hideRoomList ? 0 : "260px", minWidth: hideRoomList ? 0 : "260px" });
     localForage.setItem("hide_room_list", hideRoomList);
     typeof window !== "undefined" && window.dispatchEvent(new Event("hide-sidebar"))
   }, [hideRoomList, controls]);
 
-  const paths = path.trim().split("/").filter((x) => x !== "" && x !== "spaces" && x !== "rooms");
-
+  const paths = path!.trim().split("/").filter((x) => x !== "" && x !== "spaces" && x !== "rooms");
 
   return (
     <>
       <motion.div
-        style={{ width: "100%", overflow: "hidden" }}
+        style={{ width: "260px", overflow: "hidden" }}
         initial={false}
-        animate={{ width: hideRoomList ? 0 : "auto"}}
+        animate={{ width: hideRoomList ? 0 : "260px", minWidth: hideRoomList ? 0 : "260px" }}
         transition={{ duration: 0.5, ease: "easeIn" }}
       >
         <div className="room-list">
@@ -44,8 +43,8 @@ export default function RoomList() {
               case "/notes":
                 return <PrivateMessages />;
               default:
-                if (path.startsWith("/rooms")) return <PrivateMessages />;
-                if (path.startsWith("/spaces")) return <RoomsNav params={{
+                if (path!.startsWith("/rooms")) return <PrivateMessages />;
+                if (path!.startsWith("/spaces")) return <RoomsNav params={{
                   spaceId: paths[0],
                 }} />;
                 break;
