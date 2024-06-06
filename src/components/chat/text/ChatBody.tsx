@@ -7,11 +7,14 @@ export default function ChatBody(props: { room: Room }) {
   const { room } = props;
   const scrollRef = useRef<HTMLUListElement>(null);
   const { client } = useClient();
-  const [showMoreOptionsForMessages, setShowMoreOptionsForMessages] = useState(false);
+  const [showMoreOptionsForMessages, setShowMoreOptionsForMessages] =
+    useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [messages, setMessages] = useState(
-    room?.messages?.toArray().sort((a: any, b: any) => a.createdAt - b.createdAt) || []
+    room?.messages
+      ?.toArray()
+      .sort((a: any, b: any) => a.createdAt - b.createdAt) || []
   );
 
   useEffect(() => {
@@ -30,7 +33,9 @@ export default function ChatBody(props: { room: Room }) {
     };
 
     const handleDeleteMessage = (message: Message) => {
-      setMessages((prevMessages) => prevMessages.filter((msg) => msg.id !== message.id));
+      setMessages((prevMessages) =>
+        prevMessages.filter((msg) => msg.id !== message.id)
+      );
     };
 
     client?.on("messageCreate", handleNewMessage);
@@ -57,23 +62,29 @@ export default function ChatBody(props: { room: Room }) {
     setLoadingMore(true);
 
     try {
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API}/rooms/${room.id}/messages?before=${lastMessage.id}`, {
-        method: 'GET',
-        headers: {
-          'Content-Type': 'application/json',
-          'authorization': `${localStorage.getItem("token")!}`
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API}/rooms/${room.id}/messages?before=${lastMessage.id}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            authorization: `${localStorage.getItem("token")!}`,
+          },
         }
-      });
+      );
       const resData = await response.json();
       const newMessages: any[] = resData.messages;
 
       if (newMessages.length < 50) setHasMore(false);
 
       if (newMessages.length > 0) {
-        const updatedMessages = [...newMessages.map((messageData) => {
-          messageData.client = client;
-          return new Message(messageData as IMessage);
-        }), ...messages];
+        const updatedMessages = [
+          ...newMessages.map((messageData) => {
+            messageData.client = client;
+            return new Message(messageData as IMessage);
+          }),
+          ...messages,
+        ];
 
         setMessages(updatedMessages);
 
@@ -83,7 +94,6 @@ export default function ChatBody(props: { room: Room }) {
           scrollElement.scrollTop = previousScrollTop + scrollHeightDifference;
         });
       }
-
     } catch (error) {
       console.error("Failed to fetch more messages:", error);
     } finally {
@@ -143,10 +153,10 @@ export default function ChatBody(props: { room: Room }) {
         className="messages flex min-w-[5px] overflow-y-scroll scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-600 h-fit flex-col pt-[25px]"
       >
         {loadingMore && (
-  <div className="flex justify-center py-2">
-    <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
-  </div>
-)}
+          <div className="flex justify-center py-2">
+            <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin"></div>
+          </div>
+        )}
 
         {!hasMore && (
           <div className="pt-6 px-[20px]">
@@ -177,44 +187,58 @@ export default function ChatBody(props: { room: Room }) {
         })()}
         {messages.map((message, key) => (
           <div key={message.id}>
-            {key > 0 && (() => {
-              const messageDate = new Date(message.createdAt);
-              const lastMessageDate = new Date(messages.sort((a: any, b: any) => a.createdAt - b.createdAt)[key - 1].createdAt!);
-
-              if (
-                `${messageDate.getMonth()}/${messageDate.getDate()}/${messageDate.getFullYear()}` !==
-                `${lastMessageDate.getMonth()}/${lastMessageDate.getDate()}/${lastMessageDate.getFullYear()}`
-              ) {
-                return (
-                  <div
-                    className="flex mt-4 mb-1 mx-4 relative left-auto right-auto h-0 border-[0.009px] border-gray-600 items-center justify-center box-border"
-                  >
-                    <time className="bg-[#262626] px-1.5 text-xs text-gray-400 select-none font-bold uppercase">
-                      {Intl.DateTimeFormat(client?.user!.locale, {
-                        day: "numeric",
-                        month: "long",
-                        year: "numeric",
-                      }).format(message.createdAt)}
-                    </time>
-                  </div>
+            {key > 0 &&
+              (() => {
+                const messageDate = new Date(message.createdAt);
+                const lastMessageDate = new Date(
+                  messages.sort((a: any, b: any) => a.createdAt - b.createdAt)[
+                    key - 1
+                  ].createdAt!
                 );
-              }
-              return null;
-            })()}
+
+                if (
+                  `${messageDate.getMonth()}/${messageDate.getDate()}/${messageDate.getFullYear()}` !==
+                  `${lastMessageDate.getMonth()}/${lastMessageDate.getDate()}/${lastMessageDate.getFullYear()}`
+                ) {
+                  return (
+                    <div className="flex mt-4 mb-1 mx-4 relative left-auto right-auto h-0 border-[0.009px] border-gray-600 items-center justify-center box-border">
+                      <time className="bg-[#262626] px-1.5 text-xs text-gray-400 select-none font-bold uppercase">
+                        {Intl.DateTimeFormat(client?.user!.locale, {
+                          day: "numeric",
+                          month: "long",
+                          year: "numeric",
+                        }).format(message.createdAt)}
+                      </time>
+                    </div>
+                  );
+                }
+                return null;
+              })()}
             <MessageComponent
               message={message}
               key={key}
               showMoreOptions={showMoreOptionsForMessages}
-              sameAuthor={key > 0 && message.author.id === messages.sort((a: any, b: any) => a.createdAt - b.createdAt)[key - 1].author.id &&
+              sameAuthor={
+                key > 0 &&
+                message.author.id ===
+                  messages.sort((a: any, b: any) => a.createdAt - b.createdAt)[
+                    key - 1
+                  ].author.id &&
                 (() => {
-                  const lastMessage = messages.sort((a: any, b: any) => a.createdAt - b.createdAt)[key - 1];
+                  const lastMessage = messages.sort(
+                    (a: any, b: any) => a.createdAt - b.createdAt
+                  )[key - 1];
                   const messageDate = new Date(message.createdAt);
                   const lastMessageDate = new Date(lastMessage.createdAt);
                   if (message.sudo) {
                     if (!lastMessage.sudo) return false;
-                    if (message.sudo.name !== lastMessage.sudo!.name) return false;
+                    if (message.sudo.name !== lastMessage.sudo!.name)
+                      return false;
                   } else if (lastMessage.sudo) return false;
-                  return (messageDate.getTime() - lastMessageDate.getTime() < 5 * 60 * 1000);
+                  return (
+                    messageDate.getTime() - lastMessageDate.getTime() <
+                    5 * 60 * 1000
+                  );
                 })()
               }
             />
