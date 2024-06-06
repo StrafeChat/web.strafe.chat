@@ -79,7 +79,8 @@ export default function ChatBody(props: { room: Room }) {
 
       if (newMessages.length > 0) {
         const updatedMessages = [
-          ...newMessages.map((messageData) => {
+          ...newMessages.sort((a: any, b: any) => a.createdAt - b.createdAt)
+          .map((messageData) => {
             messageData.client = client;
             return new Message(messageData as IMessage);
           }),
