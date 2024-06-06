@@ -56,7 +56,7 @@ export default function SpaceList() {
           <ContextMenu>
              <ContextMenuTrigger>
                 <div key={space.id}>
-                   <NavLink href={`/spaces/${space.id}`}>
+                <NavLink href={`/spaces/${space.id}`}> 
                   <button className="space" draggable={true}>
                     {
                       space.icon ? (
@@ -97,9 +97,6 @@ export default function SpaceList() {
          </button>
          <button className="primary disabled">
             <FaCompass />
-         </button>
-         <button className="primary" onClick={() => openModal("settings")}>
-            <FaGear />
          </button>
       </div>
    );

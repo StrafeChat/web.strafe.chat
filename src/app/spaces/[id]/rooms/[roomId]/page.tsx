@@ -17,6 +17,7 @@ export default function Page({ params }: { params: { id: string, roomId: string 
   const room = space.rooms.get(params.roomId);
   if (!room) return <h1>Room not found.</h1>
   let component;
+  
   switch(room.type) {
     case 1:
       component = <TextRoom space={space} room={room} hidden={hideSidebar} />;

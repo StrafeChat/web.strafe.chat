@@ -1,6 +1,6 @@
 import { useUI } from "@/providers/UIProvider";
 import { VoiceHeaderProps } from "@/types";
-import { FaArrowLeft, FaArrowRight, FaAt, FaHashtag, FaMagnifyingGlass, FaVolumeHigh } from 'react-icons/fa6';
+import { FaArrowLeft, FaArrowRight, FaAt, FaMagnifyingGlass, FaVolumeHigh } from 'react-icons/fa6';
 
 export function VoiceHeader({ type, name, icon }: VoiceHeaderProps) {
 

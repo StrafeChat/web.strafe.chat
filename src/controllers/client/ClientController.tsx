@@ -3,7 +3,6 @@ import EmailVerifcation from "@/components/auth/EmailVerifcation";
 import { LoadingScreen } from "@/components/shared";
 import { useToast } from "@/components/ui/use-toast";
 import { Client } from "@strafechat/strafe.js";
-import cookie from "js-cookie";
 import { usePathname } from "next/navigation";
 import { createContext, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -48,7 +47,7 @@ export default function ClientController({ children }: { children: JSX.Element }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client]);
 
-  const init = () => {
+  const init = async () => {
 
     const clt = new Client({
       config: {
@@ -58,11 +57,11 @@ export default function ClientController({ children }: { children: JSX.Element }
 
     setClient(clt);
 
-    clt.login(cookie.get("token")!);
+    clt.login(localStorage.getItem("token")!);
 
     clt.on("error", (err) => {
       if (err.code == 4004) {
-        cookie.remove("token");
+        localStorage.removeItem("token");
         window.location.href = "/login";
       } else {
         setClientError(true);
@@ -96,7 +95,7 @@ export default function ClientController({ children }: { children: JSX.Element }
   }, [client, handlePresenceUpdate, handleReady]);
 
   useEffect(() => {
-    if (!cookie.get("token")! && !["/login", "/register"].includes(pathname!)) window.location.href = "/login";
+    if (!localStorage.getItem("token")! && !["/login", "/register"].includes(pathname!)) window.location.href = "/login";
     else if (!connected.current && !["/login", "/register"].includes(pathname!)) init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, client]);

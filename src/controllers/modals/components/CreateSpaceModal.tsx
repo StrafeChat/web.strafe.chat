@@ -36,7 +36,7 @@ class CreateSpaceModal extends Modal<{ name: string, type: string }, {}> {
             const res = await fetch(`${process.env.NEXT_PUBLIC_API}/users/@me/spaces/${this.state.name}`, {
                 method: "PUT",
                 headers: {
-                    "authorization": `${cookie.get("token")!}`,
+                    "authorization": `${localStorage.getItem("token")!}`,
                     "Content-Type": "application/json",
                 },
             })

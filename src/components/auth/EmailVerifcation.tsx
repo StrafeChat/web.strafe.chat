@@ -9,9 +9,7 @@ import { validateVerify } from "@/helpers/validator";
 import { useClient, useForceUpdate } from "@/hooks";
 import { useUI } from "@/providers/UIProvider";
 import { Verify } from "@/types";
-import cookie from "js-cookie";
 import Link from "next/link";
-import Router from "next/router";
 import { FormEvent, useState } from "react";
 
 export default function EmailVerifcation() {
@@ -40,7 +38,7 @@ export default function EmailVerifcation() {
         const res = await fetch(`${process.env.NEXT_PUBLIC_API}/auth/verify`, {
             method: "POST",
             headers: {
-                "authorization": `${cookie.get("token")!}`,
+                "authorization": `${localStorage.getItem("token")!}`,
                 "Content-Type": "application/json",
             },
             credentials: "include",

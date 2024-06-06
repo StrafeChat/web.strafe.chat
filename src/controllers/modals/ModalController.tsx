@@ -13,6 +13,7 @@ import CreateSectionModal from "./components/CreateSectionModal";
 import SpaceSettingsModal from "./components/SpaceSettingsModal";
 import LeaveSpaceModal from "./components/LeaveSpaceModal";
 import CreateInviteModal from "./components/CreateInviteModal";
+import DeleteMessageModal from "./components/DeleteMessageModal";
 
 export const ModalControllerContext = createContext({
     openModal: (_name: string, _data?: any,) => { },
@@ -123,7 +124,13 @@ export default class ModalController extends Component<{ children: JSX.Element }
                                     <AnimatePresence key={key}>
                                         <CreateInviteModal name="create-invite" closeModal={this.closeModal} data={modal.data!}/>
                                     </AnimatePresence>
-                                );                        
+                                );      
+                            case "delete-message":
+                                return (
+                                    <AnimatePresence key={key}>
+                                        <DeleteMessageModal name="delete-message" closeModal={this.closeModal} data={modal.data!}/>
+                                    </AnimatePresence>
+                                );                     
                         }
                     })}
                 </>

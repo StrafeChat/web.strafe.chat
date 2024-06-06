@@ -8,7 +8,6 @@ import { useToast } from "@/components/ui/use-toast";
 import { validateReigster } from "@/helpers/validator";
 import { useUI } from "@/providers/UIProvider";
 import type { Register } from "@/types";
-import cookie from "js-cookie";
 import Image from "next/image";
 import Link from "next/link";
 import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
@@ -83,7 +82,7 @@ export default function Register() {
             className: "bg-destructive"
         });
 
-        cookie.set("token", data.token);
+        localStorage.setItem("token", data.token);
         window.location.href = "/";
     }
 
