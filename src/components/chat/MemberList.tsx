@@ -9,7 +9,7 @@ export default function MemberList(props: { hidden: boolean, members: any, space
 
     return (
         <div className="memberlist"
-            style={{ ...(props.hidden ? { display: "none" } : {}) }}
+            // style={{ ...(props.hidden ? { display: "none" } : {}) }}
         >
     <ul className="members">
 {
