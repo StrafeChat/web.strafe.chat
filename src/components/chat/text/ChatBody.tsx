@@ -87,7 +87,7 @@ export default function ChatBody(props: { room: Room }) {
           ...messages,
         ];
 
-        setMessages(updatedMessages);
+        setMessages(updatedMessages.sort((a: any, b: any) => a.createdAt - b.createdAt));
 
         requestAnimationFrame(() => {
           const newScrollHeight = scrollElement.scrollHeight;
