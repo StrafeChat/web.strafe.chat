@@ -129,7 +129,7 @@ export function MessageComponent({
   }, []);
 
   function extractInviteCode(url: string) {
-    const regex = /(?:https?:\/\/)?(?:localhost:\d+)?\/invites\/([a-zA-Z0-9]+)/;
+    const regex = /(?:https?:\/\/)?(?:alpha\.strafechat\.dev)?\/invites\/([a-zA-Z0-9]+)/;
     const match = url.match(regex);
     if (match && match[1]) {
       return match[1];
@@ -206,6 +206,12 @@ export function MessageComponent({
   const transformMessage = (content: string) => {
     let text = content;
     const inviteCode = extractInviteCode(text);
+   const urlRegex =
+      /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/g;
+    const spotifyUrlRegex =
+      /(?:https?:\/\/)?(?:open\.spotify\.com\/|spotify:(track|episode|album|playlist|artist):)(track|episode|album|playlist|artist)[\/:]([a-zA-Z0-9]{22})(?:\S+)?/;
+
+
 
     if (text && inviteCode) {
       client?.invites
@@ -216,27 +222,7 @@ export function MessageComponent({
         .catch((error) => {
           console.error("Error fetching invite details:", error);
         });
-    }
-
-    const spotifyUrlRegex =
-      /(?:https?:\/\/)?(?:open\.spotify\.com\/|spotify:(track|episode|album|playlist|artist):)(track|episode|album|playlist|artist)[\/:]([a-zA-Z0-9]{22})(?:\S+)?/;
-
-    if (text && spotifyUrlRegex.test(text)) {
-      if (!spotifyEmbedFetched.current) {
-        const matches = text.match(spotifyUrlRegex);
-        fetchSpotifyEmbed(matches![0], (spotifyEmbed) => {
-          if (spotifyEmbed) {
-            setSpotifyEmbed(spotifyEmbed);
-            spotifyEmbedFetched.current = true;
-          }
-        });
-      }
-    }
-
-    const urlRegex =
-      /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/g;
-    const inviteRegex =
-      /(?:https?:\/\/)?(?:localhost:\d+)?\/invites\/([a-zA-Z0-9]+)/;
+    } else {
     if (text && urlRegex.test(text)) {
       if (!spotifyUrlRegex.test(text)) {
         if (!metadataFetched.current) {
@@ -248,6 +234,19 @@ export function MessageComponent({
             }
           });
         }
+      }
+    }
+  }
+
+    if (text && spotifyUrlRegex.test(text)) {
+      if (!spotifyEmbedFetched.current) {
+        const matches = text.match(spotifyUrlRegex);
+        fetchSpotifyEmbed(matches![0], (spotifyEmbed) => {
+          if (spotifyEmbed) {
+            setSpotifyEmbed(spotifyEmbed);
+            spotifyEmbedFetched.current = true;
+          }
+        });
       }
     }
 
