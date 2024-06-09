@@ -21,10 +21,6 @@ export default function ChatBody(props: { room: Room }) {
       ?.toArray()
       .sort((a: any, b: any) => a.createdAt - b.createdAt) || []
   );
-  const [cache, setCache] = useState<Cache>({
-    firstMessageId: null,
-    lastMessageId: null,
-  });
 
   useEffect(() => {
     if (messages.length < 50) setHasMore(false);
@@ -35,6 +31,7 @@ export default function ChatBody(props: { room: Room }) {
     }
 
     const handleNewMessage = (message: Message) => {
+      if (message.roomId !== room.id) return;
       setMessages((prevMessages) => [...prevMessages, message]);
       if (scrollElement) {
         scrollElement.scrollTop = scrollElement.scrollHeight;
@@ -97,11 +94,7 @@ export default function ChatBody(props: { room: Room }) {
         ];
 
         if (updatedMessages.length > 100) {
-          setCache({
-            firstMessageId: updatedMessages[50].id,
-            lastMessageId: updatedMessages[updatedMessages.length - 1].id,
-          });
-          setMessages(updatedMessages.slice(0, 100));
+          setMessages(updatedMessages.sort((a: any, b: any) => a.createdAt - b.createdAt).slice(0, 100));
         } else {
           setMessages(updatedMessages.sort((a: any, b: any) => a.createdAt - b.createdAt));
         }
@@ -154,11 +147,7 @@ export default function ChatBody(props: { room: Room }) {
         ];
 
         if (updatedMessages.length > 100) {
-          setCache({
-            firstMessageId: updatedMessages[0].id,
-            lastMessageId: updatedMessages[updatedMessages.length - 51].id,
-          });
-          setMessages(updatedMessages.slice(-100));
+          setMessages(updatedMessages.sort((a: any, b: any) => a.createdAt - b.createdAt).slice(-100));
         } else {
           setMessages(updatedMessages.sort((a: any, b: any) => a.createdAt - b.createdAt));
         }
