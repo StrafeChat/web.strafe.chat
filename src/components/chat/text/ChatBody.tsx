@@ -3,19 +3,28 @@ import { IMessage, Message, Room } from "@strafechat/strafe.js";
 import { useClient } from "@/hooks";
 import { MessageComponent } from "./messages/Message";
 
+interface Cache {
+  firstMessageId: string | null;
+  lastMessageId: string | null;
+}
+
 export default function ChatBody(props: { room: Room }) {
   const { room } = props;
   const scrollRef = useRef<HTMLUListElement>(null);
   const { client } = useClient();
-  const [showMoreOptionsForMessages, setShowMoreOptionsForMessages] =
-    useState(false);
+  const [showMoreOptionsForMessages, setShowMoreOptionsForMessages] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
+  const [fetchingLatest, setFetchingLatest] = useState(false);
   const [messages, setMessages] = useState(
     room?.messages
       ?.toArray()
       .sort((a: any, b: any) => a.createdAt - b.createdAt) || []
   );
+  const [cache, setCache] = useState<Cache>({
+    firstMessageId: null,
+    lastMessageId: null,
+  });
 
   useEffect(() => {
     if (messages.length < 50) setHasMore(false);
@@ -45,7 +54,7 @@ export default function ChatBody(props: { room: Room }) {
       client?.off("messageCreate", handleNewMessage);
       client?.off("messageDelete", handleDeleteMessage);
     };
-  }, [client]);
+  }, []);
 
   const fetchMoreMessages = useCallback(async () => {
     if (!hasMore || loadingMore) return;
@@ -87,7 +96,15 @@ export default function ChatBody(props: { room: Room }) {
           ...messages,
         ];
 
-        setMessages(updatedMessages.sort((a: any, b: any) => a.createdAt - b.createdAt));
+        if (updatedMessages.length > 100) {
+          setCache({
+            firstMessageId: updatedMessages[50].id,
+            lastMessageId: updatedMessages[updatedMessages.length - 1].id,
+          });
+          setMessages(updatedMessages.slice(0, 100));
+        } else {
+          setMessages(updatedMessages.sort((a: any, b: any) => a.createdAt - b.createdAt));
+        }
 
         requestAnimationFrame(() => {
           const newScrollHeight = scrollElement.scrollHeight;
@@ -101,6 +118,57 @@ export default function ChatBody(props: { room: Room }) {
       setLoadingMore(false);
     }
   }, [messages, hasMore, client, room, loadingMore]);
+
+  const fetchLatestMessages = useCallback(async () => {
+    if (fetchingLatest) return;
+
+    setFetchingLatest(true);
+    const scrollElement = scrollRef.current;
+    if (!scrollElement) return;
+
+    const firstMessage = messages[messages.length - 1];
+    if (!firstMessage) return;
+
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API}/rooms/${room.id}/messages?after=${firstMessage.id}`,
+        {
+          method: "GET",
+          headers: {
+            "Content-Type": "application/json",
+            authorization: `${localStorage.getItem("token")!}`,
+          },
+        }
+      );
+      const resData = await response.json();
+      const newMessages: any[] = resData.messages;
+
+      if (newMessages.length > 0) {
+        const updatedMessages = [
+          ...messages,
+          ...newMessages.sort((a: any, b: any) => a.createdAt - b.createdAt)
+            .map((messageData) => {
+              messageData.client = client;
+              return new Message(messageData as IMessage);
+            }),
+        ];
+
+        if (updatedMessages.length > 100) {
+          setCache({
+            firstMessageId: updatedMessages[0].id,
+            lastMessageId: updatedMessages[updatedMessages.length - 51].id,
+          });
+          setMessages(updatedMessages.slice(-100));
+        } else {
+          setMessages(updatedMessages.sort((a: any, b: any) => a.createdAt - b.createdAt));
+        }
+      }
+    } catch (error) {
+      console.error("Failed to fetch latest messages:", error);
+    } finally {
+      setFetchingLatest(false);
+    }
+  }, [messages, client, room, fetchingLatest]);
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
@@ -129,9 +197,13 @@ export default function ChatBody(props: { room: Room }) {
       const scrollableDiv = scrollRef.current;
       if (!scrollableDiv) return;
       const scrollTop = scrollableDiv.scrollTop;
+      const scrollHeight = scrollableDiv.scrollHeight;
+      const clientHeight = scrollableDiv.clientHeight;
 
       if (scrollTop === 0 && hasMore && !loadingMore) {
         fetchMoreMessages();
+      } else if (scrollTop + clientHeight >= scrollHeight && !fetchingLatest) {
+        fetchLatestMessages();
       }
     };
 
@@ -145,7 +217,7 @@ export default function ChatBody(props: { room: Room }) {
         scrollableDiv.removeEventListener("scroll", handleScroll);
       }
     };
-  }, [fetchMoreMessages, hasMore, loadingMore]);
+  }, [fetchMoreMessages, fetchLatestMessages, hasMore, loadingMore, fetchingLatest]);
 
   return (
     <div className="body flex-col justify-end z-10 relative">

@@ -43,7 +43,7 @@ export default function ClientController({ children }: { children: JSX.Element }
   }, [client]);
 
   const handleMessageDelete = useCallback((data: any) => {
-    forceUpdate();
+    // forceUpdate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client]);
 
