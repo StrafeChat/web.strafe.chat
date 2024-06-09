@@ -112,7 +112,7 @@ export default function ChatBody({ room }: { room: Room }) {
     const scrollElement = scrollRef.current;
     if (!scrollElement) return;
 
-    const firstMessage = messages.sort((a, b) => a.createdAt - b.createdAt)[0];
+    const firstMessage = messages.sort((a, b) => a.createdAt - b.createdAt)[messages.sort((a, b) => a.createdAt - b.createdAt).length - 1];
     if (!firstMessage) return;
 
     setHasMore(true);
