@@ -120,6 +120,8 @@ export default function ChatBody({ room }: { room: Room }) {
     const firstMessage = messages[messages.length - 1];
     if (!firstMessage) return;
 
+    setHasMore(true);
+
     try {
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API}/rooms/${room.id}/messages?after=${firstMessage.id}`,
