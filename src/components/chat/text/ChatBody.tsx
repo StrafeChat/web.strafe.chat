@@ -3,11 +3,6 @@ import { IMessage, Message, Room } from "@strafechat/strafe.js";
 import { useClient } from "@/hooks";
 import { MessageComponent } from "./messages/Message";
 
-interface Cache {
-  firstMessageId: string | null;
-  lastMessageId: string | null;
-}
-
 export default function ChatBody({ room }: { room: Room }) {
   const scrollRef = useRef<HTMLUListElement>(null);
   const { client } = useClient();
@@ -49,7 +44,7 @@ export default function ChatBody({ room }: { room: Room }) {
       client?.off("messageCreate", handleNewMessage);
       client?.off("messageDelete", handleDeleteMessage);
     };
-  }, []);
+  }, [client]);
 
   const fetchMoreMessages = useCallback(async () => {
     if (!hasMore || loadingMore) return;
@@ -117,7 +112,7 @@ export default function ChatBody({ room }: { room: Room }) {
     const scrollElement = scrollRef.current;
     if (!scrollElement) return;
 
-    const firstMessage = messages[messages.length - 1];
+    const firstMessage = messages.sort((a, b) => a.createdAt - b.createdAt)[messages.sort((a, b) => a.createdAt - b.createdAt).length - 1];
     if (!firstMessage) return;
 
     setHasMore(true);
