@@ -187,16 +187,18 @@ export default function ChatBody({ room }: { room: Room }) {
       const scrollHeight = scrollableDiv.scrollHeight;
       const clientHeight = scrollableDiv.clientHeight;
 
+      const scrollPosition = scrollHeight - clientHeight - scrollTop;
+
       if (scrollTop === 0 && hasMore && !loadingMore) {
         fetchMoreMessages();
-      } else if (scrollTop + clientHeight >= scrollHeight && !fetchingLatest) {
+      } else if (scrollPosition < 20 && !fetchingLatest) {
         fetchLatestMessages();
       }
     };
 
     const scrollableDiv = scrollRef.current;
     if (scrollableDiv) {
-      scrollableDiv.addEventListener("scroll", handleScroll, { passive: true });
+      scrollableDiv.addEventListener("scroll", handleScroll, { passive: true }); // Use passive option for smoother scrolling
     }
 
     return () => {
