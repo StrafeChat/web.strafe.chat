@@ -8,26 +8,24 @@ interface Cache {
   lastMessageId: string | null;
 }
 
-export default function ChatBody(props: { room: Room }) {
-  const { room } = props;
+export default function ChatBody({ room }: { room: Room }) {
   const scrollRef = useRef<HTMLUListElement>(null);
   const { client } = useClient();
   const [showMoreOptionsForMessages, setShowMoreOptionsForMessages] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [fetchingLatest, setFetchingLatest] = useState(false);
-  const [messages, setMessages] = useState(
-    room?.messages
-      ?.toArray()
-      .sort((a: any, b: any) => a.createdAt - b.createdAt) || []
-  );
+  const [messages, setMessages] = useState<Message[]>(room?.messages
+    ?.toArray()
+    .sort((a, b) => a.createdAt - b.createdAt) || []);
+  const [scrollPosition, setScrollPosition] = useState(0);
 
   useEffect(() => {
     if (messages.length < 50) setHasMore(false);
 
     const scrollElement = scrollRef.current;
     if (scrollElement) {
-      scrollElement.scrollTop = scrollElement.scrollHeight;
+      scrollElement.scrollTop = scrollPosition;
     }
 
     const handleNewMessage = (message: Message) => {
@@ -85,18 +83,18 @@ export default function ChatBody(props: { room: Room }) {
 
       if (newMessages.length > 0) {
         const updatedMessages = [
-          ...newMessages.sort((a: any, b: any) => a.createdAt - b.createdAt)
+          ...newMessages.sort((a, b) => a.createdAt - b.createdAt)
           .map((messageData) => {
             messageData.client = client;
-            return new Message(messageData as IMessage);
+            return new Message(messageData);
           }),
           ...messages,
         ];
 
         if (updatedMessages.length > 100) {
-          setMessages(updatedMessages.sort((a: any, b: any) => a.createdAt - b.createdAt).slice(0, 100));
+          setMessages(updatedMessages.sort((a, b) => a.createdAt - b.createdAt).slice(0, 100));
         } else {
-          setMessages(updatedMessages.sort((a: any, b: any) => a.createdAt - b.createdAt));
+          setMessages(updatedMessages.sort((a, b) => a.createdAt - b.createdAt));
         }
 
         requestAnimationFrame(() => {
@@ -139,17 +137,17 @@ export default function ChatBody(props: { room: Room }) {
       if (newMessages.length > 0) {
         const updatedMessages = [
           ...messages,
-          ...newMessages.sort((a: any, b: any) => a.createdAt - b.createdAt)
+          ...newMessages.sort((a, b) => a.createdAt - b.createdAt)
             .map((messageData) => {
               messageData.client = client;
-              return new Message(messageData as IMessage);
+              return new Message(messageData);
             }),
         ];
 
         if (updatedMessages.length > 100) {
-          setMessages(updatedMessages.sort((a: any, b: any) => a.createdAt - b.createdAt).slice(-100));
+          setMessages(updatedMessages.sort((a, b) => a.createdAt - b.createdAt).slice(-100));
         } else {
-          setMessages(updatedMessages.sort((a: any, b: any) => a.createdAt - b.createdAt));
+          setMessages(updatedMessages.sort((a, b) => a.createdAt - b.createdAt));
         }
       }
     } catch (error) {
@@ -190,8 +188,10 @@ export default function ChatBody(props: { room: Room }) {
       const clientHeight = scrollableDiv.clientHeight;
 
       if (scrollTop === 0 && hasMore && !loadingMore) {
+        setScrollPosition(scrollTop);
         fetchMoreMessages();
       } else if (scrollTop + clientHeight >= scrollHeight && !fetchingLatest) {
+        setScrollPosition(scrollTop);
         fetchLatestMessages();
       }
     };
