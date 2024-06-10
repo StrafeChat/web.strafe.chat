@@ -13,14 +13,14 @@ export default function ChatBody({ room }: { room: Room }) {
   const [messages, setMessages] = useState<Message[]>(room?.messages
     ?.toArray()
     .sort((a, b) => a.createdAt - b.createdAt) || []);
-  const [scrollPosition, setScrollPosition] = useState(0);
+  const [scrollFraction, setScrollFraction] = useState(1);
 
   useEffect(() => {
     if (messages.length < 100) setHasMore(false);
 
     const scrollElement = scrollRef.current;
     if (scrollElement) {
-      scrollElement.scrollTop = scrollPosition;
+      scrollElement.scrollTop = scrollElement.scrollHeight * scrollFraction;
     }
 
     const handleNewMessage = (message: Message) => {
@@ -54,6 +54,7 @@ export default function ChatBody({ room }: { room: Room }) {
 
     const previousScrollHeight = scrollElement.scrollHeight;
     const previousScrollTop = scrollElement.scrollTop;
+    const previousScrollFraction = previousScrollTop / previousScrollHeight;
 
     const lastMessage = messages[0];
     if (!lastMessage) return;
@@ -89,9 +90,7 @@ export default function ChatBody({ room }: { room: Room }) {
         setMessages(updatedMessages.sort((a, b) => a.createdAt - b.createdAt).slice(0, 100));
 
         requestAnimationFrame(() => {
-          const newScrollHeight = scrollElement.scrollHeight;
-          const scrollHeightDifference = newScrollHeight - previousScrollHeight;
-          scrollElement.scrollTop = previousScrollTop + scrollHeightDifference;
+          scrollElement.scrollTop = scrollElement.scrollHeight * previousScrollFraction;
         });
       }
     } catch (error) {
@@ -107,6 +106,10 @@ export default function ChatBody({ room }: { room: Room }) {
     setFetchingLatest(true);
     const scrollElement = scrollRef.current;
     if (!scrollElement) return;
+
+    const previousScrollHeight = scrollElement.scrollHeight;
+    const previousScrollTop = scrollElement.scrollTop;
+    const previousScrollFraction = previousScrollTop / previousScrollHeight;
 
     const firstMessage = messages[messages.length - 1];
     if (!firstMessage) return;
@@ -140,6 +143,10 @@ export default function ChatBody({ room }: { room: Room }) {
         } else {
           setMessages(updatedMessages.sort((a, b) => a.createdAt - b.createdAt));
         }
+
+        requestAnimationFrame(() => {
+          scrollElement.scrollTop = scrollElement.scrollHeight * previousScrollFraction;
+        });
       }
     } catch (error) {
       console.error("Failed to fetch latest messages:", error);
@@ -177,6 +184,8 @@ export default function ChatBody({ room }: { room: Room }) {
       const scrollTop = scrollableDiv.scrollTop;
       const scrollHeight = scrollableDiv.scrollHeight;
       const clientHeight = scrollableDiv.clientHeight;
+
+      setScrollFraction(scrollTop / scrollHeight);
 
       const scrollPosition = scrollHeight - clientHeight - scrollTop;
 
@@ -274,12 +283,12 @@ export default function ChatBody({ room }: { room: Room }) {
               sameAuthor={
                 key > 0 &&
                 message.author.id ===
-                  messages.sort((a: any, b: any) => a.createdAt - b.createdAt)[
+                  messages.sort((a, b) => a.createdAt - b.createdAt)[
                     key - 1
                   ].author.id &&
                 (() => {
                   const lastMessage = messages.sort(
-                    (a: any, b: any) => a.createdAt - b.createdAt
+                    (a, b) => a.createdAt - b.createdAt
                   )[key - 1];
                   const messageDate = new Date(message.createdAt);
                   const lastMessageDate = new Date(lastMessage.createdAt);
