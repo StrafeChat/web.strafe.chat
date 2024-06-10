@@ -16,7 +16,7 @@ export default function ChatBody({ room }: { room: Room }) {
   const [scrollPosition, setScrollPosition] = useState(0);
 
   useEffect(() => {
-    if (messages.length < 50) setHasMore(false);
+    if (messages.length < 100) setHasMore(false);
 
     const scrollElement = scrollRef.current;
     if (scrollElement) {
@@ -86,7 +86,7 @@ export default function ChatBody({ room }: { room: Room }) {
           ...messages,
         ];
 
-          setMessages(updatedMessages.sort((a, b) => a.createdAt - b.createdAt).slice(0, 100));
+        setMessages(updatedMessages.sort((a, b) => a.createdAt - b.createdAt).slice(0, 100));
 
         requestAnimationFrame(() => {
           const newScrollHeight = scrollElement.scrollHeight;
@@ -108,10 +108,8 @@ export default function ChatBody({ room }: { room: Room }) {
     const scrollElement = scrollRef.current;
     if (!scrollElement) return;
 
-    const firstMessage = messages.sort((a, b) => a.createdAt - b.createdAt)[messages.sort((a, b) => a.createdAt - b.createdAt).length - 1];
+    const firstMessage = messages[messages.length - 1];
     if (!firstMessage) return;
-
-    setHasMore(true);
 
     try {
       const response = await fetch(
@@ -246,7 +244,7 @@ export default function ChatBody({ room }: { room: Room }) {
               (() => {
                 const messageDate = new Date(message.createdAt);
                 const lastMessageDate = new Date(
-                  messages.sort((a: any, b: any) => a.createdAt - b.createdAt)[
+                  messages.sort((a, b) => a.createdAt - b.createdAt)[
                     key - 1
                   ].createdAt!
                 );
