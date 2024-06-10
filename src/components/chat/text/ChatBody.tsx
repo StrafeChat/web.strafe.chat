@@ -3,8 +3,9 @@ import { IMessage, Message, Room } from "@strafechat/strafe.js";
 import { useClient } from "@/hooks";
 import { MessageComponent } from "./messages/Message";
 
-export default function ChatBody({ room }: { room: Room }) {
+export default function ChatBody({ room, scrollToMessageId }: { room: Room, scrollToMessageId?: string }) {
   const scrollRef = useRef<HTMLUListElement>(null);
+  const messageRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const { client } = useClient();
   const [showMoreOptionsForMessages, setShowMoreOptionsForMessages] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -138,6 +139,8 @@ export default function ChatBody({ room }: { room: Room }) {
             }),
         ];
 
+        setHasMore(true);
+
         if (updatedMessages.length > 100) {
           setMessages(updatedMessages.sort((a, b) => a.createdAt - b.createdAt).slice(-100));
         } else {
@@ -208,6 +211,12 @@ export default function ChatBody({ room }: { room: Room }) {
     };
   }, [fetchMoreMessages, fetchLatestMessages, hasMore, loadingMore, fetchingLatest]);
 
+  useEffect(() => {
+    if (scrollToMessageId && messageRefs.current[scrollToMessageId]) {
+      messageRefs.current[scrollToMessageId]?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [scrollToMessageId, messages]);
+
   return (
     <div className="body flex-col justify-end z-10 relative">
       <ul
@@ -248,7 +257,7 @@ export default function ChatBody({ room }: { room: Room }) {
           return null;
         })()}
         {messages.map((message, key) => (
-          <div key={message.id}>
+          <div key={message.id} ref={el => messageRefs.current[message.id] = el}>
             {key > 0 &&
               (() => {
                 const messageDate = new Date(message.createdAt);
