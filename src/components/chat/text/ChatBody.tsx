@@ -74,7 +74,7 @@ export default function ChatBody({ room }: { room: Room }) {
       const resData = await response.json();
       const newMessages: any[] = resData.messages;
 
-      if (newMessages.length < 50) setHasMore(false);
+      if (newMessages.length < 100) setHasMore(false);
 
       if (newMessages.length > 0) {
         const updatedMessages = [
@@ -86,11 +86,7 @@ export default function ChatBody({ room }: { room: Room }) {
           ...messages,
         ];
 
-        if (updatedMessages.length > 100) {
           setMessages(updatedMessages.sort((a, b) => a.createdAt - b.createdAt).slice(0, 100));
-        } else {
-          setMessages(updatedMessages.sort((a, b) => a.createdAt - b.createdAt));
-        }
 
         requestAnimationFrame(() => {
           const newScrollHeight = scrollElement.scrollHeight;
