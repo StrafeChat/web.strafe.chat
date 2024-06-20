@@ -831,14 +831,50 @@ div.chat-input-container {
 	max-width: 100%;
 	padding-left: 20px;
 	padding-right: 20px;
-	margin-bottom: 5px;
 }
 
 span.typing {
 	color: white;
-	margin-top: 5px;
+	margin-top: -27px;
 	margin-left: 5px;
 	font-size: 15px;
+	display: flex;
+	align-items: center;
+	position: absolute;
+
+	.avatars {
+		display: flex;
+		margin-right: 8px;
+
+		.avatar {
+			height: 17px;
+			border-radius: 100%;
+			margin-left: -5px;
+			z-index: 1;
+		}
+
+		.avatar:first-child {
+			margin-left: 0;
+			z-index: 2;
+		  }
+	  }
+
+	  .more-avatars {
+		display: flex;
+		align-items: center;
+		justify-content: center;
+		height: 17px;
+		border-radius: 50%;
+		background-color: #ccc;
+		color: white;
+		font-size: 12px;
+		margin-left: -8px;
+		border: 2px solid white;
+	  }
+
+	  .user-names {
+		margin-right: 5px;
+	  }
 }
 
 div.chat-input {
@@ -846,6 +882,7 @@ div.chat-input {
 	border-radius: 10px;
 	overflow: hidden;
 	position: relative;
+	margin-bottom: 30px;
 }
 
 [contenteditable="true"]:empty:before {
@@ -1091,13 +1128,11 @@ div.avatar-status-client-user {
 	position: absolute;
 	background: hsl(var(--chat-input));
 	border-radius: 10px;
-	// border-top-right-radius: 10px;
 	max-height: 200px;
 	overflow-y: auto;
 	display: inline-block;
 	z-index: 1000;
-	min-width: 1418px;
-	max-width: 1418px;
+	width: calc(100% - 630px);
 }
 
 .typing-indicator::after {

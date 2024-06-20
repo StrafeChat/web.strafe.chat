@@ -11,9 +11,13 @@ export default function Page({ params }: { params: { id: string } }) {
    const router = useRouter();
    const space = client?.spaces.get(params.id);
 
-   if (!space) return <h1>Space not found.</h1>
+   if (!space) return <h1>Space not found.</h1>;
 
-   return router.push(`/spaces/${params.id}/rooms/${space.rooms.toArray().filter(room => [1,  2].includes(room.type))[0].id}`);
+   let last_viewed_room_id = localStorage.getItem(`last_viewed_room-${space.id}`);
+    if (!last_viewed_room_id) last_viewed_room_id = space.rooms.toArray().filter(room => [1,  2].includes(room.type))[0].id;
+     if (!last_viewed_room_id) return <h1>This space has no created rooms.</h1>
+
+   return router.push(`/spaces/${space.id}/rooms/${last_viewed_room_id}`);
    
   // return (
   //   <>

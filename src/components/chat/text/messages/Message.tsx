@@ -359,7 +359,7 @@ export function MessageComponent({
                 )}
               </div>
               <div className="flex flex-col">
-                <ProfilePopup user={message.author} client>
+                <ProfilePopup user={message.member.user} client>
                   <img
                     src={`${
                       message.sudo
@@ -377,7 +377,7 @@ export function MessageComponent({
               </div>
               <div className="flex flex-col w-full">
                 <span className="username bg-[room-list]">
-                  <ProfilePopup user={message.author} client>
+                  <ProfilePopup user={message.member.user} client>
                     <p>
                       {message.sudo
                         ? message.sudo.name!
@@ -389,7 +389,9 @@ export function MessageComponent({
                     </p>
                   </ProfilePopup>
                   <span className="timestamp">
-                    {formatTimestamp(message.createdAt)}
+                    {formatTimestamp(message.createdAt)} {message.editedAt && !editable && (
+                    <span className="edited pt-[3px]">(edited)</span>
+                  )}
                   </span>
                 </span>
                 <span
@@ -470,9 +472,6 @@ export function MessageComponent({
                         src={spotifyEmbed.iframe_url!}
                       ></iframe>
                     </div>
-                  )}
-                  {message.editedAt && !editable && (
-                    <span className="edited pt-[3px]">(edited)</span>
                   )}
                 </span>
               </div>

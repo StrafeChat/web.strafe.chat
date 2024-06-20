@@ -16,6 +16,9 @@ export default function Page({ params }: { params: { id: string, roomId: string 
   if (!space) return <h1>Space not found.</h1>
   const room = space.rooms.get(params.roomId);
   if (!room) return <h1>Room not found.</h1>
+
+   localStorage.setItem(`last_viewed_room-${space.id}`, room.id);
+
   let component;
   
   switch(room.type) {

@@ -21,15 +21,18 @@ export default function ChatBody({ room, scrollToMessageId }: { room: Room, scro
 
     const scrollElement = scrollRef.current;
     if (scrollElement) {
-      scrollElement.scrollTop = scrollElement.scrollHeight * scrollFraction;
+      scrollElement.scrollTop = scrollElement.scrollHeight;
     }
 
     const handleNewMessage = (message: Message) => {
       if (message.roomId !== room.id) return;
       setMessages((prevMessages) => [...prevMessages, message]);
-      if (scrollElement) {
-        scrollElement.scrollTop = scrollElement.scrollHeight;
-      }
+
+      setTimeout(() => {
+        if (scrollElement) {
+          scrollElement.scrollTop = scrollElement.scrollHeight;
+        }
+     })
     };
 
     const handleDeleteMessage = (message: Message) => {
