@@ -140,11 +140,6 @@ export function ChatInput({
           ext: ".svg",
           className: "w-7 h-7",
         });
-
-        const firstEmojiItem = popup.querySelector(".emoji-item");
-        if (firstEmojiItem) {
-          firstEmojiItem.focus();
-        }
       }
     }
   }, [emojiPopupVisible, filteredEmojis]);
@@ -156,8 +151,6 @@ export function ChatInput({
       inputRef.current.innerText = newText;
       setContent(newText);
       setCharacterCount(newText.length);
-      setEmojiPopupVisible(false);
-      inputRef.current.focus();
     }
   };
 
