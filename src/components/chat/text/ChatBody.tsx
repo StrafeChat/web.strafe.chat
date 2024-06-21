@@ -8,7 +8,8 @@ export default function ChatBody({ room, scrollToMessageId }: { room: Room, scro
   const messageRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const { client } = useClient();
   const [showMoreOptionsForMessages, setShowMoreOptionsForMessages] = useState(false);
-  const [hasMore, setHasMore] = useState(true);
+  const [hasMoreUp, setHasMoreUp] = useState(true);
+  const [hasMoreDown, setHasMoreDown] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
   const [fetchingLatest, setFetchingLatest] = useState(false);
   const [messages, setMessages] = useState<Message[]>(room?.messages
@@ -17,7 +18,7 @@ export default function ChatBody({ room, scrollToMessageId }: { room: Room, scro
   const [scrollFraction, setScrollFraction] = useState(1);
 
   useEffect(() => {
-    if (messages.length < 100) setHasMore(false);
+    if (messages.length < 100) setHasMoreUp(false);
 
     const scrollElement = scrollRef.current;
     if (scrollElement) {
@@ -32,7 +33,7 @@ export default function ChatBody({ room, scrollToMessageId }: { room: Room, scro
         if (scrollElement) {
           scrollElement.scrollTop = scrollElement.scrollHeight;
         }
-     })
+     }, 5)
     };
 
     const handleDeleteMessage = (message: Message) => {
@@ -51,7 +52,7 @@ export default function ChatBody({ room, scrollToMessageId }: { room: Room, scro
   }, [client]);
 
   const fetchMoreMessages = useCallback(async () => {
-    if (!hasMore || loadingMore) return;
+    if (!hasMoreUp || loadingMore) return;
 
     const scrollElement = scrollRef.current;
     if (!scrollElement) return;
@@ -79,7 +80,7 @@ export default function ChatBody({ room, scrollToMessageId }: { room: Room, scro
       const resData = await response.json();
       const newMessages: any[] = resData.messages;
 
-      if (newMessages.length < 100) setHasMore(false);
+      if (newMessages.length < 100) setHasMoreUp(false);
 
       if (newMessages.length > 0) {
         const updatedMessages = [
@@ -92,6 +93,7 @@ export default function ChatBody({ room, scrollToMessageId }: { room: Room, scro
         ];
 
         setMessages(updatedMessages.sort((a, b) => a.createdAt - b.createdAt).slice(0, 100));
+        setHasMoreDown(true);
 
         requestAnimationFrame(() => {
           scrollElement.scrollTop = scrollElement.scrollHeight * previousScrollFraction;
@@ -102,10 +104,10 @@ export default function ChatBody({ room, scrollToMessageId }: { room: Room, scro
     } finally {
       setLoadingMore(false);
     }
-  }, [messages, hasMore, client, room, loadingMore]);
+  }, [messages, hasMoreUp, client, room, loadingMore]);
 
   const fetchLatestMessages = useCallback(async () => {
-    if (fetchingLatest) return;
+    if (!hasMoreDown || fetchingLatest) return;
 
     setFetchingLatest(true);
     const scrollElement = scrollRef.current;
@@ -142,7 +144,7 @@ export default function ChatBody({ room, scrollToMessageId }: { room: Room, scro
             }),
         ];
 
-        setHasMore(true);
+        setHasMoreUp(true);
 
         if (updatedMessages.length > 100) {
           setMessages(updatedMessages.sort((a, b) => a.createdAt - b.createdAt).slice(-100));
@@ -195,9 +197,9 @@ export default function ChatBody({ room, scrollToMessageId }: { room: Room, scro
 
       const scrollPosition = scrollHeight - clientHeight - scrollTop;
 
-      if (scrollTop === 0 && hasMore && !loadingMore) {
+      if (scrollTop === 0 && hasMoreUp && !loadingMore) {
         fetchMoreMessages();
-      } else if (scrollPosition < 20 && !fetchingLatest) {
+      } else if (scrollPosition < 20 && hasMoreDown && !fetchingLatest) {
         fetchLatestMessages();
       }
     };
@@ -212,7 +214,7 @@ export default function ChatBody({ room, scrollToMessageId }: { room: Room, scro
         scrollableDiv.removeEventListener("scroll", handleScroll);
       }
     };
-  }, [fetchMoreMessages, fetchLatestMessages, hasMore, loadingMore, fetchingLatest]);
+  }, [fetchMoreMessages, fetchLatestMessages, hasMoreUp, hasMoreDown, loadingMore, fetchingLatest]);
 
   useEffect(() => {
     if (scrollToMessageId && messageRefs.current[scrollToMessageId]) {
@@ -232,7 +234,7 @@ export default function ChatBody({ room, scrollToMessageId }: { room: Room, scro
           </div>
         )}
 
-        {!hasMore && (
+        {!hasMoreUp && (
           <div className="pt-6 px-[20px]">
             <h1 className="text-2xl font-bold inline-flex items-center">
               Welcome to #{room.name}
@@ -244,7 +246,7 @@ export default function ChatBody({ room, scrollToMessageId }: { room: Room, scro
         )}
         {(() => {
           const lastMessage = messages[0];
-          if (lastMessage && !hasMore) {
+          if (lastMessage && !hasMoreUp) {
             return (
               <div className="flex mt-4 mb-1 mx-4 relative left-auto right-auto h-0 border-[0.009px] border-gray-600 items-center justify-center box-border">
                 <time className="bg-[#262626] px-1.5 text-xs text-gray-400 select-none font-bold uppercase">
