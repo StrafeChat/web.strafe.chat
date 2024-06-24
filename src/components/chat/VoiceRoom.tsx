@@ -1,8 +1,4 @@
-"use client";
-import { Room, Space } from "@strafechat/strafe.js";
-import { VoiceHeader } from "./voice/VoiceHeader";
-import { useTranslation } from "react-i18next";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from 'react';
 import {
   ControlBar,
   GridLayout,
@@ -10,30 +6,69 @@ import {
   ParticipantTile,
   RoomAudioRenderer,
   useTracks,
-} from "@livekit/components-react";
-import "@livekit/components-styles";
-import { Track } from "livekit-client";
+} from '@livekit/components-react';
+import '@livekit/components-styles';
+import { Track, Room, RoomEvent, LocalAudioTrack } from 'livekit-client';
+import { KrispNoiseFilter } from '@livekit/krisp-noise-filter';
+import { VoiceHeader } from './voice/VoiceHeader'; // Adjust path as per your project structure
+import { useTranslation } from 'react-i18next';
+import { useVoiceController } from '@/controllers/voice/VoiceController'; // Adjust path as per your project structure
 
 export default function VoiceRoom(props: {
-  space: Space;
-  room: Room;
+  space: any; // Adjust the type of space according to your application
+  room: any; // Adjust the type of room according to your application
   hidden: boolean;
 }) {
-  const [token, setToken] = useState("");
-  const members = props.space.members;
-  const room = props.room;
+  const [token, setToken] = useState('');
+  const [isKrispSupported, setIsKrispSupported] = useState(false);
+  const [voiceRoom, setVoiceRoom] = useState<Room | null>(null);
+  const { isVoiceMuted, toggleVoiceMute, muteVoice } = useVoiceController(); // Use voice controller hook
+  const [krispProcessor, setKrispProcessor] = useState<any>(null); // State for Krisp processor
+
   const { t } = useTranslation();
 
   useEffect(() => {
-    (async () => {
+    setVoiceRoom(new Room());
+    console.log(voiceRoom)
+    const loadKrispAndCheckSupport = async () => {
+      try {
+        const { KrispNoiseFilter, isKrispNoiseFilterSupported } = await import(
+          '@livekit/krisp-noise-filter'
+        );
+        setIsKrispSupported(true);
+
+        const supported = await isKrispNoiseFilterSupported();
+        if (!supported) {
+          console.warn('Enhanced noise filter is not supported on this browser.');
+          return;
+        }
+
+        const processor = await KrispNoiseFilter();
+        console.log('KrispNoiseFilter initialized successfully.');
+        setKrispProcessor(processor); // Initialize Krisp processor
+      } catch (error) {
+        console.error('Failed to load KrispNoiseFilter:', error);
+        setIsKrispSupported(false);
+      }
+    };
+
+    // voiceRoom!.on("trackMuted", () => {
+    //   muteVoice();
+    // })
+
+    loadKrispAndCheckSupport();
+  }, []);
+
+  useEffect(() => {
+    const fetchToken = async () => {
       try {
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API}/portal/rooms/${room.id}/join`,
+          `${process.env.NEXT_PUBLIC_API}/portal/rooms/${props.room.id}/join`,
           {
-            method: "POST",
+            method: 'POST',
             headers: {
-              "Content-Type": "application/json",
-              "Authorization": localStorage.getItem("token")!,
+              'Content-Type': 'application/json',
+              Authorization: localStorage.getItem('token')!,
             },
           }
         );
@@ -42,13 +77,37 @@ export default function VoiceRoom(props: {
       } catch (e) {
         console.error(e);
       }
-    })();
-  }, []);
+    };
 
-  if (token === "") {
+    fetchToken();
+  }, [props.room.id]);
+
+  const handleRoomConnect = async (liveKitRoom: Room) => {
+    console.log('Room connected');
+    
+    liveKitRoom.on(RoomEvent.LocalTrackPublished, async (trackPublication) => {
+      console.log('LocalTrackPublished event received');
+    });
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const audioTrack = stream.getAudioTracks()[0];
+      const localAudioTrack = new LocalAudioTrack(audioTrack);
+      localAudioTrack.on("muted", () =>{
+        console.log("muted")
+      })
+      if (!isVoiceMuted) {
+        await liveKitRoom.localParticipant.publishTrack(localAudioTrack);
+      }
+    } catch (e) {
+      console.error('Error accessing user media:', e);
+    }
+  };
+
+  if (!token || !isKrispSupported) {
     return (
       <>
-        <VoiceHeader type="server" name={`${room?.name}`} />
+        <VoiceHeader type="server" name={`${props.room?.name}`} />
         <h1>Loading..</h1>
       </>
     );
@@ -56,14 +115,15 @@ export default function VoiceRoom(props: {
 
   return (
     <>
-      <VoiceHeader type="server" name={`${room?.name}`} />
+      <VoiceHeader type="server" name={`${props.room?.name}`} />
       <LiveKitRoom
         video={false}
         audio={false}
         token={token}
         serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL}
         data-lk-theme="default"
-        style={{ background: "black" }}
+        onConnected={() => handleRoomConnect(voiceRoom!)}
+        style={{ background: 'black' }}
       >
         <StrafeVoiceCall />
         <RoomAudioRenderer />
@@ -79,13 +139,11 @@ function StrafeVoiceCall() {
       { source: Track.Source.Camera, withPlaceholder: true },
       { source: Track.Source.ScreenShare, withPlaceholder: false },
     ],
-    { onlySubscribed: false }
+    { onlySubscribed: true }
   );
+
   return (
-    <GridLayout
-      tracks={tracks}
-      style={{ height: "85%" }}
-    >
+    <GridLayout tracks={tracks} style={{ height: '85%' }}>
       <ParticipantTile />
     </GridLayout>
   );

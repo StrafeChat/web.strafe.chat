@@ -14,6 +14,7 @@
     "@hookform/resolvers": "^3.3.4",
     "@livekit/components-react": "^2.3.3",
     "@livekit/components-styles": "^1.0.12",
+    "@livekit/krisp-noise-filter": "^0.2.4",
     "@mui/material": "^5.15.9",
     "@radix-ui/react-context-menu": "^2.1.5",
     "@radix-ui/react-label": "^2.0.2",

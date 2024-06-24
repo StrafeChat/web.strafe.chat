@@ -5,11 +5,13 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import PrivateMessages from "./PrivateMessageRoomList";
 import RoomsNav from "./SpaceRoomList";
-import { FaGear } from "react-icons/fa6";
+import { FaGear, FaMicrophone, FaMicrophoneLinesSlash, FaMicrophoneSlash } from "react-icons/fa6";
 import { useClient, useModal } from "@/hooks";
 import { Formatting } from "@/helpers/formatter";
+import { useVoiceController } from "@/controllers/voice/VoiceController";
 
 export default function RoomList() {
+  const { isVoiceMuted, toggleVoiceMute } = useVoiceController();
   const controls = useAnimation();
   const { hideRoomList, setHideRoomList } = useUI();
   const { client } = useClient();
@@ -109,6 +111,9 @@ export default function RoomList() {
             </div>
             <div className="flex-grow"></div>
             <div className="flex items-center">
+             {isVoiceMuted ? <FaMicrophoneSlash style={{color: "#f23f42"}} onClick={() => toggleVoiceMute()} size={20}
+                className="cursor-pointer mr-2" /> : <FaMicrophone onClick={() => toggleVoiceMute()} size={20}
+                className="cursor-pointer mr-2" />}
               <FaGear
                 onClick={() => openModal("settings")}
                 size={20}

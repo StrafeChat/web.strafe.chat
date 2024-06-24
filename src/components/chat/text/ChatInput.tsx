@@ -7,10 +7,10 @@ import {
   ClipboardEventHandler,
 } from "react";
 import { useClient } from "@/hooks";
-import { FaFaceSmile, FaPlus } from "react-icons/fa6";
+import { FaFaceSmile, FaPlus, FaTrashCan, FaFile } from "react-icons/fa6";
 import { emojis } from "@/assets/emojis";
 import twemoji from "twemoji";
-import React from "react";
+import React, { Dispatch, SetStateAction } from "react";
 import { Formatting } from "@/helpers/formatter";
 
 export function ChatInput({
@@ -23,6 +23,7 @@ export function ChatInput({
   const { client } = useClient();
   const inputRef = useRef<HTMLDivElement>(null);
   const [content, setContent] = useState("");
+  const [viewImages, setViewImage] = useState<any[]>([]);
   const emojiPopupRef = useRef<HTMLDivElement>(null);
   const maxCharacters = 2000;
   const [characterCount, setCharacterCount] = useState(0);
@@ -39,6 +40,26 @@ export function ChatInput({
     [key: string]: string;
   }>({});
   const [emojiSearch, setEmojiSearch] = useState("");
+
+  useEffect(() => {
+    const handleKeyPress = (event: KeyboardEvent) => {
+      const key = event.key;
+  
+      if (key.match(/[a-zA-Z0-9]/) && !inputRef.current?.contains(document.activeElement)) {
+        if (inputRef.current) {
+          inputRef.current.focus();
+        }
+  
+        document.execCommand("insertText", false, key);
+      }
+    };
+  
+    document.addEventListener("keypress", handleKeyPress);
+  
+    return () => {
+      document.removeEventListener("keypress", handleKeyPress);
+    };
+  }, []);  
 
   useEffect(() => {
     let typingTimeout: NodeJS.Timeout;
@@ -131,6 +152,7 @@ export function ChatInput({
       }
     };
   }, [handleInput]);
+
   useEffect(() => {
     if (emojiPopupVisible) {
       const popup = emojiPopupRef.current;
@@ -151,8 +173,20 @@ export function ChatInput({
       inputRef.current.innerText = newText;
       setContent(newText);
       setCharacterCount(newText.length);
+      setEmojiPopupVisible(false);
+  
+      const range = document.createRange();
+      const selection = window.getSelection();
+      if (selection && inputRef.current) {
+        range.selectNodeContents(inputRef.current);
+        range.collapse(false);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      }
+  
+      inputRef.current.focus();
     }
-  };
+  };  
 
   const handleClearContent = () => {
     if (inputRef.current) {
@@ -193,9 +227,76 @@ export function ChatInput({
     }
   };
 
+  function isImage(value: any) {
+    const types = ["image/png", "image/gif", "image/jpeg", "image/webp"];
+    const video = ["video/mp4"];
+    if (types.find((val) => val === value)) return "image";
+    else if (video.find((val) => val === value)) return "video";
+    else return "other";
+  }
+
+  const onSelectFile = useCallback(
+    (e: any | null) => {
+      if (!e || e?.files?.length === 0 || e?.target?.files?.length === 0)
+        return;
+  
+      const selectedFiles = Array.from(e?.target?.files! || e?.files);
+  
+      const validFiles = selectedFiles.filter((file: any) => {
+        if (file.size <= 25 * 1024 * 1024) {
+          return true;
+        } else {
+          alert(`${file.name} exceeds the 25MB size limit and will not be uploaded.`);
+          return false;
+        }
+      });
+  
+      if (validFiles.length === 0) return;
+  
+      Promise.all(
+        validFiles.map((file: any) => {
+          return new Promise((resolve) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = async () => {
+              let id = Math.round(
+                +(Date.now() * file.name.length * Math.random()).toString()
+              );
+              resolve({
+                id,
+                file: reader.result,
+                name: file.name,
+                type: file.type,
+              });
+            };
+          });
+        })
+      ).then((results: any) => {
+        setViewImage([...viewImages, ...results]);
+      });
+      if (inputRef.current) {
+        inputRef.current.focus();
+      }
+    },
+    [viewImages]
+  );
+  
+  useEffect(() => {
+    function onPaste(event: ClipboardEvent) {
+      event.preventDefault();
+      let text = event.clipboardData!.getData("text/plain");
+      if (event.clipboardData!.files.length > 0)
+        onSelectFile(event.clipboardData!);
+      if (text) document.execCommand("insertText", false, text);
+    }
+
+    window.addEventListener("paste", onPaste);
+    return () => window.removeEventListener("paste", onPaste);
+  }, [onSelectFile]);
+
   return (
     <div className="chat-input-container">
-       {emojiPopupVisible && (
+      {emojiPopupVisible && (
         <div
           className="emoji-popup"
           ref={emojiPopupRef}
@@ -215,9 +316,67 @@ export function ChatInput({
           ))}
         </div>
       )}
+       {viewImages.length > 0 && (
+        <div className="relative w-full h-[10rem] bg-chatinput rounded-[15px] flex overflow-x-auto overflow-y-hidden items-center mb-2">
+          <div className="absolute justify-between flex flex-row px-4 gap-4 items-center">
+            {viewImages.map((fi) => (
+              <div
+                className="relative text-white bg-[#2B2D31] h-[8rem] w-[8rem] p-2 pb-2 items-center justify-center rounded-sm flex"
+                key={fi.id}
+              >
+                <FaTrashCan
+                  onClick={() =>
+                    setViewImage((files) =>
+                      files.filter((file) => file.id !== fi.id)
+                    )
+                  }
+                  height="20"
+                  className="cursor-pointer hover:text-red-500 rounded-sm absolute"
+                  style={{ right: -10, bottom: -9 }}
+                />
+                <div
+                  className="absolute select-none"
+                  style={{ fontSize: "9px", left: 3, bottom: 0 }}
+                >
+                  {fi.name.length > 16 ? `${fi.name.slice(0, 18)}...` : fi.name}
+                </div>
+                {isImage(fi.type) === "image" && (
+                  <img
+                    src={fi.file}
+                    alt={fi.id}
+                    className="max-h-24 max-w-max"
+                    draggable={false}
+                  />
+                )}
+
+                {isImage(fi.type) === "video" && (
+                  <video
+                    disablePictureInPicture
+                    disableRemotePlayback
+                    className="max-h-24"
+                  >
+                    <source src={fi.file} type="video/mp4" />
+                  </video>
+                )}
+
+                {isImage(fi.type) === "other" && (
+                  <FaFile className="w-[75%] h-[75%]" />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
       <div className={`chat-input !${emojiPopupVisible && "rounded-[0px]"}`}>
         <div className="chat-input-left">
-          <FaPlus className="w-6 h-6" />
+          <FaPlus className="w-6 h-6 cursor-pointer" onClick={() => document.getElementById('fileInput')?.click()} />
+          <input
+            type="file"
+            id="fileInput"
+            className="hidden"
+            multiple
+            onChange={onSelectFile}
+          />
         </div>
         <div
           ref={inputRef}
@@ -230,12 +389,17 @@ export function ChatInput({
           onKeyDown={async (event) => {
             if (event.key === "Enter" && !event.shiftKey) {
               event.preventDefault();
-              if (content.length < 1) return;
-              await room.send({ content });
+              if (content.length < 1 && viewImages.length < 1) return;
+              await room.send({ 
+                content, 
+                attachments: viewImages,
+                 });
               setContent("");
               setCharacterCount(0);
               setCurrentlyTyping(false);
               setEmojiPopupVisible(false);
+              // setReferenceMessage(null);
+              setViewImage([]);
               (event.target as HTMLElement).innerText = "";
             }
           }}

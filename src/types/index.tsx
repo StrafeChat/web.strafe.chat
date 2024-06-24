@@ -20,6 +20,7 @@ export interface MessageProps {
     sameAuthor: boolean;
     showMoreOptions: boolean;
     ghost?: boolean;
+    //setReferenceMessage: Dispatch<SetStateAction<any | null>>;
 }
 
 export interface VoiceHeaderProps {

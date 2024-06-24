@@ -42,6 +42,7 @@ import {
   fetchSpotifyEmbed,
   SpotifyEmbed,
 } from "@/utils";
+import { MessageAttachment } from "./MessageAttachment";
 
 export function MessageComponent({
   message,
@@ -49,6 +50,7 @@ export function MessageComponent({
   sameAuthor,
   showMoreOptions,
   ghost,
+  //setReferenceMessage,
 }: MessageProps) {
   const contentRef = useRef<HTMLSpanElement>(null);
 
@@ -99,7 +101,7 @@ export function MessageComponent({
           setSpotifyEmbed(null);
           setMetadataDetails(null);
           const isOnlyEmojis = /^(:\w+:)+$/.test(message.content!);
-  
+
           if (contentRef.current)
             if (isOnlyEmojis) {
               twemoji.parse(contentRef.current, {
@@ -119,7 +121,7 @@ export function MessageComponent({
     });
 
     client?.on("messageDelete", (msg) => {
-        setTimeout(() => {
+      setTimeout(() => {
         metadataFetched.current = false;
         spotifyEmbedFetched.current = false;
         setSpotifyEmbed(null);
@@ -129,7 +131,8 @@ export function MessageComponent({
   }, []);
 
   function extractInviteCode(url: string) {
-    const regex = /(?:https?:\/\/)?(?:alpha\.strafechat\.dev)?\/invites\/([a-zA-Z0-9]+)/;
+    const regex =
+      /(?:https?:\/\/)?(?:alpha\.strafechat\.dev)?\/invites\/([a-zA-Z0-9]+)/;
     const match = url.match(regex);
     if (match && match[1]) {
       return match[1];
@@ -206,12 +209,10 @@ export function MessageComponent({
   const transformMessage = (content: string) => {
     let text = content;
     const inviteCode = extractInviteCode(text);
-   const urlRegex =
+    const urlRegex =
       /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/g;
     const spotifyUrlRegex =
       /(?:https?:\/\/)?(?:open\.spotify\.com\/|spotify:(track|episode|album|playlist|artist):)(track|episode|album|playlist|artist)[\/:]([a-zA-Z0-9]{22})(?:\S+)?/;
-
-
 
     if (text && inviteCode) {
       client?.invites
@@ -223,20 +224,20 @@ export function MessageComponent({
           console.error("Error fetching invite details:", error);
         });
     } else {
-    if (text && urlRegex.test(text)) {
-      if (!spotifyUrlRegex.test(text)) {
-        if (!metadataFetched.current) {
-          const matches = text.match(urlRegex);
-          fetchMetadata(matches![0], (metadata) => {
-            if (metadata) {
-              setMetadataDetails(metadata);
-              metadataFetched.current = true;
-            }
-          });
+      if (text && urlRegex.test(text)) {
+        if (!spotifyUrlRegex.test(text)) {
+          if (!metadataFetched.current) {
+            const matches = text.match(urlRegex);
+            fetchMetadata(matches![0], (metadata) => {
+              if (metadata) {
+                setMetadataDetails(metadata);
+                metadataFetched.current = true;
+              }
+            });
+          }
         }
       }
     }
-  }
 
     if (text && spotifyUrlRegex.test(text)) {
       if (!spotifyEmbedFetched.current) {
@@ -389,9 +390,10 @@ export function MessageComponent({
                     </p>
                   </ProfilePopup>
                   <span className="timestamp">
-                    {formatTimestamp(message.createdAt)} {message.editedAt && !editable && (
-                    <span className="edited pt-[3px]">(edited)</span>
-                  )}
+                    {formatTimestamp(message.createdAt)}{" "}
+                    {message.editedAt && !editable && (
+                      <span className="edited pt-[3px]">(edited)</span>
+                    )}
                   </span>
                 </span>
                 <span
@@ -430,6 +432,10 @@ export function MessageComponent({
                   )}
                 </span>
                 <span className="ml-[15px] pr-[20px]">
+                  {message.attachments &&
+                    message.attachments.map((attachment, index) => (
+                      <MessageAttachment key={index} attachment={attachment} />
+                    ))}
                   {message.embeds &&
                     message.embeds.map((embed, index) => (
                       <MessageEmbed key={index} embed={embed} />
@@ -486,9 +492,7 @@ export function MessageComponent({
               Copy User Id
             </ContextMenuItem>
             <ContextMenuItem
-              onClick={() =>
-                navigator.clipboard.writeText(`${message.id}`)
-              }
+              onClick={() => navigator.clipboard.writeText(`${message.id}`)}
             >
               Copy Message Id
             </ContextMenuItem>
@@ -614,6 +618,10 @@ export function MessageComponent({
               )}
             </span>
             <span className="ml-[75px] pr-[20px]">
+              {message.attachments &&
+                message.attachments.map((attachment, index) => (
+                  <MessageAttachment key={index} attachment={attachment} />
+                ))}
               {message.embeds &&
                 message.embeds.map((embed, index) => (
                   <MessageEmbed key={index} embed={embed} />

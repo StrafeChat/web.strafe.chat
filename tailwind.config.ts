@@ -26,6 +26,7 @@ const config = {
         foreground: "hsl(var(--foreground))",
         clientuser: "hsl(var(--client-user))",
         uicontextmenu: "hsl(var(--ui-context-menu))",
+        chatinput: "hsl(var(--chat-input))",
         primary: {
           DEFAULT: "hsl(var(--primary))",
           foreground: "hsl(var(--primary-foreground))",
