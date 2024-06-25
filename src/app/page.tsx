@@ -13,7 +13,6 @@ import {
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useEffect, useState } from "react";
 import { FaArrowLeft, FaArrowRight, FaHouseChimney } from 'react-icons/fa6';
-let isMobile = typeof window !== "undefined" ? window.innerWidth < 768 : false
 export default function Home() {
 
   const { hideRoomList, setHideRoomList } = useUI();
@@ -65,8 +64,6 @@ export default function Home() {
        </div>
       </div>
       <div className="home overflow-auto"
-
-        style={hidden && isMobile ? { visibility: 'hidden' } : { visibility: 'visible' }}
       >
         <div className="w-full container flex flex-col items-center justify-center h-full py-[100px] text-white">
           <h1 className={`text-5xl font-bold text-[#323C31]-primaryText`}>

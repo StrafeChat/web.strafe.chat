@@ -8,9 +8,7 @@ export default function MemberList(props: { hidden: boolean, members: any, space
     let members = props.members;
 
     return (
-        <div className="memberlist"
-            // style={{ ...(props.hidden ? { display: "none" } : {}) }}
-        >
+        <div className="memberlist">
     <ul className="members">
 {
    members?.toArray().filter((member: any) => member.user.presence.online == true && member.user.presence.status !== "offline").length > 0 && 

@@ -2,8 +2,7 @@ import React, { useState, useEffect } from "react";
 import {
   FaDownload,
   FaFile,
-  FaFileArrowDown,
-  FaHeadphones,
+  FaFileAudio,
 } from "react-icons/fa6";
 
 export function MessageAttachment({ attachment }: { attachment: any }) {
@@ -68,7 +67,7 @@ export function MessageAttachment({ attachment }: { attachment: any }) {
         <div className="bg-[#1e1e1e] p-4 rounded-[5px] w-fit max-w-[400px]">
           <div className="flex items-center overflow-hidden">
             <div>
-              <FaHeadphones size={30} />
+              <FaFileAudio size={30} />
             </div>
             <div className="attachment-meta ml-3 flex-1 overflow-hidden">
               <span className="block overflow-hidden whitespace-nowrap overflow-ellipsis">

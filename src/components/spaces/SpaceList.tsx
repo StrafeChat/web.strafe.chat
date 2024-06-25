@@ -5,26 +5,14 @@ import { FaCirclePlus, FaCompass, FaFolderPlus, FaGear, FaPenToSquare, FaPlus, F
 import { NavLink } from "../shared";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "../ui/context-menu";
 import { Formatting } from "@/helpers/formatter";
-let isMobile = typeof window !== "undefined" && window.innerWidth < 768;
-typeof window !== "undefined" && window.addEventListener("resize", () => {
-   isMobile = window.innerWidth < 768;
-});
 export default function SpaceList() {
    let [hide, setHide] = useState(false);
    const { openModal } = useModal();
    const { client } = useClient();
 
-   if (typeof window !== "undefined" && isMobile) {
-      window.addEventListener("hide-sidebar", () => {
-         setHide(!hide);
-      });
-   } 
-
 
    return (
-      <div className="space-list"
-         style={{ display: hide && isMobile ? "" : "" }}
-      >
+      <div className="space-list">
          <ContextMenu>
             <ContextMenuTrigger>
                <NavLink href="/" activate={["/friends", "/notes", "/rooms"]}>

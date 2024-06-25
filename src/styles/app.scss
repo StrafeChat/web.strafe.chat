@@ -1,10 +1,17 @@
-div.app {
+.app {
 	height: 100%;
+	width: 100%;
 	display: flex;
-	overflow: hidden;
-	flex-grow: 1;
-	border-top-left-radius: 20px;
-}
+	overflow-y: hidden;
+	overflow-x: auto;
+	scroll-snap-type: x mandatory; /* Enables horizontal snapping */
+  }
+  
+  .space-list, .room-list, .app-view, .member-list {
+	flex: none;
+	scroll-snap-align: start;
+	scroll-snap-stop: always;
+  }
 
 div.context-menu-item {
 	position: relative;
@@ -92,6 +99,8 @@ div.space-list {
 	padding-top: 5px;
 	padding-bottom: 15px;
 	overflow: hidden;
+	scroll-snap-align: left;
+	scroll-snap-stop: always;
 
 	a {
 		display: flex;
@@ -434,10 +443,13 @@ div.memberlist {
 		display: flex;
 		flex-direction: column;
 		gap: 0.25rem;
+		min-width: 250px;
 		padding-bottom: 15px;
 		overflow-y: auto;
 		overflow-x: hidden;
 		padding: 1rem;
+		scroll-snap-align: end;
+		scroll-snap-stop: always;
 
 		li.member {
 			overflow-x: hidden;
@@ -545,7 +557,7 @@ div.app-view {
 	flex-direction: column;
 	flex-grow: 1;
 	height: 100%;
-	max-width: 100%;
+	min-width: 100vh;
 
 	&[room_list_hidden="true"] {
 		border-top-left-radius: 20px;
@@ -585,11 +597,13 @@ div.app-view {
 }
 
 ul.messages {
+	scroll-snap-align: center;
+	scroll-snap-stop: always;
 	overflow-x: hidden;
 	overflow-y: auto;
 	display: flex;
 	flex-direction: column;
-	width: 100%;
+    min-width: 100%;
 	position: relative;
 	height: fit-content;
 	padding-bottom: 25px;
@@ -721,6 +735,8 @@ li.message {
 		background: hsl(var(--chat-input));
 		outline: none;
 	}
+
+
 
 	span.content {
 		font-size: 15px;

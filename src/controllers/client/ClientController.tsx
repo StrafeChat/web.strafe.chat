@@ -56,7 +56,6 @@ export default function ClientController({ children }: { children: JSX.Element }
     });
 
     setClient(clt);
-
     clt.login(localStorage.getItem("token")!);
 
     clt.on("error", (err) => {
