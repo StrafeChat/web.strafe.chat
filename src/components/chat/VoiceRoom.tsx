@@ -12,7 +12,8 @@ import { Track, Room, RoomEvent, LocalAudioTrack } from 'livekit-client';
 import { KrispNoiseFilter } from '@livekit/krisp-noise-filter';
 import { VoiceHeader } from './voice/VoiceHeader'; // Adjust path as per your project structure
 import { useTranslation } from 'react-i18next';
-import { useVoiceController } from '@/controllers/voice/VoiceController'; // Adjust path as per your project structure
+
+import { useClient, useVoice } from '@/hooks/';
 
 export default function VoiceRoom(props: {
   space: any; // Adjust the type of space according to your application
@@ -20,16 +21,18 @@ export default function VoiceRoom(props: {
   hidden: boolean;
 }) {
   const [token, setToken] = useState('');
+
+  const { client } = useClient();
+  const { connection, setConnection, setRoom, isVoiceMuted } = useVoice();
+
   const [isKrispSupported, setIsKrispSupported] = useState(false);
   const [voiceRoom, setVoiceRoom] = useState<Room | null>(null);
-  const { isVoiceMuted, toggleVoiceMute, muteVoice } = useVoiceController(); // Use voice controller hook
   const [krispProcessor, setKrispProcessor] = useState<any>(null); // State for Krisp processor
 
   const { t } = useTranslation();
 
-  useEffect(() => {
+  /*useEffect(() => {
     setVoiceRoom(new Room());
-    console.log(voiceRoom)
     const loadKrispAndCheckSupport = async () => {
       try {
         const { KrispNoiseFilter, isKrispNoiseFilterSupported } = await import(
@@ -57,19 +60,22 @@ export default function VoiceRoom(props: {
     // })
 
     loadKrispAndCheckSupport();
-  }, []);
+  }, []);*/
 
-  useEffect(() => {
+  /*useEffect(() => {
     const fetchToken = async () => {
       try {
         const res = await fetch(
-          `${process.env.NEXT_PUBLIC_API}/portal/rooms/${props.room.id}/join`,
+          `${process.env.NEXT_PUBLIC_API}/portal/join`,
           {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
               Authorization: localStorage.getItem('token')!,
             },
+            body: JSON.stringify({
+              roomId: props.room.id,
+            }),
           }
         );
         const data = await res.json();
@@ -80,6 +86,16 @@ export default function VoiceRoom(props: {
     };
 
     fetchToken();
+  }, [props.room.id]);*/
+
+  useEffect(() => {
+    // TODO: close connection if channel switch
+    if (props.room.id === connection?.room.name) return;
+    
+    client!.voice.joinChannel(props.room.id).then(connection => {
+      setConnection(connection);
+      setRoom(props.room);
+    });
   }, [props.room.id]);
 
   const handleRoomConnect = async (liveKitRoom: Room) => {
@@ -91,7 +107,7 @@ export default function VoiceRoom(props: {
 
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const audioTrack = stream.getAudioTracks()[0];
+      const audioTrack = stream.getAudioTracks()[0]; // todo: device chooser
       const localAudioTrack = new LocalAudioTrack(audioTrack);
       localAudioTrack.on("muted", () =>{
         console.log("muted")
@@ -116,19 +132,7 @@ export default function VoiceRoom(props: {
   return (
     <>
       <VoiceHeader type="server" name={`${props.room?.name}`} />
-      <LiveKitRoom
-        video={false}
-        audio={false}
-        token={token}
-        serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL}
-        data-lk-theme="default"
-        onConnected={() => handleRoomConnect(voiceRoom!)}
-        style={{ background: 'black' }}
-      >
-        <StrafeVoiceCall />
-        <RoomAudioRenderer />
-        <ControlBar variation="minimal" saveUserChoices={true} />
-      </LiveKitRoom>
+      <StrafeVoiceCall></StrafeVoiceCall>
     </>
   );
 }
@@ -148,3 +152,18 @@ function StrafeVoiceCall() {
     </GridLayout>
   );
 }
+
+
+/*<LiveKitRoom
+        video={false}
+        audio={false}
+        token={token}
+        serverUrl={process.env.NEXT_PUBLIC_LIVEKIT_URL}
+        data-lk-theme="default"
+        onConnected={() => handleRoomConnect(voiceRoom!)}
+        style={{ background: 'black' }}
+      >
+        <StrafeVoiceCall />
+        <RoomAudioRenderer />
+        <ControlBar variation="minimal" saveUserChoices={true} />
+      </LiveKitRoom>*/

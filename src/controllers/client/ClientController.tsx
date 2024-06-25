@@ -51,7 +51,8 @@ export default function ClientController({ children }: { children: JSX.Element }
 
     const clt = new Client({
       config: {
-        equinox: process.env.NEXT_PUBLIC_API
+        equinox: process.env.NEXT_PUBLIC_API,
+        livekit: process.env.NEXT_PORTAL_SIGNALING
       }
     });
 

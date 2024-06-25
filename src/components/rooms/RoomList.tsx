@@ -8,10 +8,12 @@ import RoomsNav from "./SpaceRoomList";
 import { FaGear, FaMicrophone, FaMicrophoneLinesSlash, FaMicrophoneSlash } from "react-icons/fa6";
 import { useClient, useModal } from "@/hooks";
 import { Formatting } from "@/helpers/formatter";
-import { useVoiceController } from "@/controllers/voice/VoiceController";
+import { useVoice } from "@/hooks";
+import Link from "next/link";
 
 export default function RoomList() {
-  const { isVoiceMuted, toggleVoiceMute } = useVoiceController();
+  const { isVoiceMuted, toggleVoiceMute, connection, room } = useVoice();
+
   const controls = useAnimation();
   const { hideRoomList, setHideRoomList } = useUI();
   const { client } = useClient();
@@ -71,6 +73,23 @@ export default function RoomList() {
                 break;
             }
           })()}
+          {
+          (connection && room) ? (
+            <div style={{
+              display: "flex",
+              flexDirection: "column",
+              padding: "0.75rem",
+              backgroundColor: "hsl(var(--client-user))",
+              borderBottom: "1px solid hsl(var(--seperator))"
+            }}>
+              <div>
+                <Link href={`/spaces/${room.spaceId}/rooms/${room.id}`}>
+                  Connected to {room.name}
+                </Link>
+              </div>
+            </div>
+          ) : (<></>)
+          }
           <div
             className="h-[55px] bottom-0 bg-clientuser p-3 flex items-center"
             onMouseEnter={() => setHovered(true)}

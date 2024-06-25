@@ -2,6 +2,7 @@ import { LinkProps } from "next/link";
 import { Dispatch, SetStateAction } from "react";
 import { Message } from "@strafechat/strafe.js";
 import { IconType } from "react-icons";
+import type { VideoTrack } from "livekit-client";
 
 export interface NavLinkProps extends LinkProps {
     children: JSX.Element | JSX.Element[] | string;
@@ -27,6 +28,12 @@ export interface VoiceHeaderProps {
     name: string;
     icon?: IconType,
     type: "pm" | "server"
+}
+export interface ParticipantTileProps {
+  user: {
+    username: string;
+  },
+  video: VideoTrack | null
 }
 
 export interface Register {
