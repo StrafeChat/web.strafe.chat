@@ -12,6 +12,7 @@ import { Track, Room, RoomEvent, LocalAudioTrack } from 'livekit-client';
 import { KrispNoiseFilter } from '@livekit/krisp-noise-filter';
 import { VoiceHeader } from './voice/VoiceHeader'; // Adjust path as per your project structure
 import { useTranslation } from 'react-i18next';
+import { useVisualStableUpdate } from "@livekit/components-react";
 
 import { useClient, useVoice } from '@/hooks/';
 
@@ -145,9 +146,10 @@ function StrafeVoiceCall() {
     ],
     { onlySubscribed: true }
   );
+  const updated = useVisualStableUpdate(tracks, 4);
 
   return (
-    <GridLayout tracks={tracks} style={{ height: '85%' }}>
+    <GridLayout tracks={updated} style={{ height: '85%' }}>
       <ParticipantTile />
     </GridLayout>
   );
