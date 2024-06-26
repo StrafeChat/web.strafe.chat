@@ -218,7 +218,7 @@ export default function ChatBody({ room, scrollToMessageId }: { room: Room, scro
   }, [scrollToMessageId, messages]);
 
   return (
-    <div className="body flex-col justify-end z-10 relative">
+    <div className="messagebody body flex-col justify-end z-10 relative">
       <ul
         ref={scrollRef}
         className="messages flex min-w-[5px] overflow-y-scroll scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-600 h-fit flex-col pt-[25px]"

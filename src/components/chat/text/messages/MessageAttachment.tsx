@@ -64,7 +64,7 @@ export function MessageAttachment({ attachment }: { attachment: any }) {
       );
     } else if (type.startsWith("audio/") || type.startsWith("video/ogg")) {
       return (
-        <div className="bg-[#1e1e1e] p-4 rounded-[5px] w-fit max-w-[400px]">
+        <div className="bg-[#1e1e1e] p-4 rounded-[5px] w-fit max-w-[100%]">
           <div className="flex items-center overflow-hidden">
             <div>
               <FaFileAudio size={30} />
@@ -108,7 +108,7 @@ export function MessageAttachment({ attachment }: { attachment: any }) {
       }
     } else {
       return (
-        <div className="bg-[#1e1e1e] p-4 rounded-[5px] w-fit max-w-[400px] flex items-center overflow-hidden">
+        <div className="bg-[#1e1e1e] p-4 rounded-[5px] w-fit max-w-[100%] flex items-center overflow-hidden">
           <div>
             <FaFile size={30} />
           </div>

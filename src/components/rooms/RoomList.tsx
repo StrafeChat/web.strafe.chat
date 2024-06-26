@@ -76,7 +76,7 @@ export default function RoomList() {
             onMouseEnter={() => setHovered(true)}
             onMouseLeave={() => setHovered(false)}
           >
-            <div className="flex items-center">
+            <div className="flex items-center relative">
               <img
                 src={`${Formatting.formatAvatar(
                   client?.user?.id,

@@ -1,17 +1,28 @@
 .app {
 	height: 100%;
-	width: 100%;
+	width: 100vw;
 	display: flex;
 	overflow-y: hidden;
 	overflow-x: auto;
-	scroll-snap-type: x mandatory; /* Enables horizontal snapping */
+	scroll-snap-type: x mandatory;
   }
-  
-  .space-list, .room-list, .app-view, .member-list {
+
+  @media (max-width: 768px) {
+  .space-list, .app-view {
 	flex: none;
 	scroll-snap-align: start;
 	scroll-snap-stop: always;
   }
+  div.chatarea {
+	min-width: 100vw;
+  }
+  .memberlist {
+	flex: none;
+	width: 100vw;
+	scroll-snap-align: end;
+	scroll-snap-stop: always;
+  }
+}
 
 div.context-menu-item {
 	position: relative;
@@ -429,6 +440,8 @@ div.memberlist {
 	background: hsl(var(--room-list));
 	overflow-y: auto;
 	overflow-x: hidden;
+	scroll-snap-align: end;
+	scroll-snap-stop: always;
 
 	label.role {
 		text-transform: uppercase;
@@ -557,7 +570,7 @@ div.app-view {
 	flex-direction: column;
 	flex-grow: 1;
 	height: 100%;
-	min-width: 100vh;
+	width: 100%;
 
 	&[room_list_hidden="true"] {
 		border-top-left-radius: 20px;
@@ -596,14 +609,19 @@ div.app-view {
 	}
 }
 
-ul.messages {
+div.chatarea {
+	width: 100%;
 	scroll-snap-align: center;
 	scroll-snap-stop: always;
+}
+
+ul.messages {
 	overflow-x: hidden;
 	overflow-y: auto;
 	display: flex;
 	flex-direction: column;
-    min-width: 100%;
+    width: 100%;
+	min-width: 360px;
 	position: relative;
 	height: fit-content;
 	padding-bottom: 25px;
@@ -1058,8 +1076,8 @@ html {
 div.avatar-status-client-user {
 	position: absolute;
 	z-index: 0;
-	bottom: 0.50rem;
-	left: 6.85rem;
+	bottom: -0.15rem;
+	left: 1.25rem;
 	width: 1rem;
 	height: 1rem;
 	border: 0.15rem solid hsl(var(--client-user));
