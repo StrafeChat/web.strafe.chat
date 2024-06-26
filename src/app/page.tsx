@@ -63,9 +63,8 @@ export default function Home() {
         <span><b>{t('home_page.header')}</b></span>
        </div>
       </div>
-      <div className="home overflow-auto"
+      <div className="home overflow-auto w-full container flex flex-col items-center justify-center h-full py-[100px] text-white"
       >
-        <div className="w-full container flex flex-col items-center justify-center h-full py-[100px] text-white">
           <h1 className={`text-5xl font-bold text-[#323C31]-primaryText`}>
             {greeting.replace("{display_name}", `${client?.user?.globalName ?? client?.user?.username}`)}
           </h1>
@@ -144,7 +143,6 @@ export default function Home() {
             </ul>
           </div>
         </div>
-      </div>
     </>
   );
 }

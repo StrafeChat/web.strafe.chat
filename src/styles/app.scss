@@ -99,6 +99,7 @@ div.header {
 }
 
 div.space-list {
+	position: relative;
 	width: 80px;
 	min-width: 80px;
 	flex-grow: auto;
@@ -611,11 +612,13 @@ div.app-view {
 
 div.chatarea {
 	width: 100%;
-	scroll-snap-align: center;
+	scroll-snap-align: end;
 	scroll-snap-stop: always;
 }
 
 ul.messages {
+	scroll-snap-align: center;
+	scroll-snap-stop: always;
 	overflow-x: hidden;
 	overflow-y: auto;
 	display: flex;
@@ -1071,6 +1074,11 @@ html {
 		filter: blur(5px);
 		opacity: 0.2;
 	}
+}
+
+div.messagebody {
+	scroll-snap-align: end;
+	scroll-snap-stop: always;
 }
 
 div.avatar-status-client-user {
