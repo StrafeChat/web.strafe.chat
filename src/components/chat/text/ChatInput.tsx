@@ -42,6 +42,11 @@ export function ChatInput({
   const [emojiSearch, setEmojiSearch] = useState("");
 
   useEffect(() => {
+
+    if (inputRef.current) {
+      inputRef.current.focus();
+    }
+
     const handleKeyPress = (event: KeyboardEvent) => {
       const key = event.key;
   
@@ -49,8 +54,6 @@ export function ChatInput({
         if (inputRef.current) {
           inputRef.current.focus();
         }
-  
-        document.execCommand("insertText", false, key);
       }
     };
   
@@ -128,16 +131,6 @@ export function ChatInput({
       }
     }
   }, [room, currentlyTyping]);
-
-  const handlePaste: ClipboardEventHandler<HTMLDivElement> = async (event) => {
-    event.preventDefault();
-    try {
-      const text = await navigator.clipboard.readText();
-      document.execCommand("insertText", false, text);
-    } catch (error) {
-      console.error("Failed to read text from clipboard:", error);
-    }
-  };
 
   useEffect(() => {
     const input = inputRef.current;
@@ -408,7 +401,6 @@ export function ChatInput({
               handleClearContent();
             }
           }}
-          onPaste={handlePaste}
         />
         <div className="chat-input-right">
           <FaFaceSmile className="w-6 h-6" />

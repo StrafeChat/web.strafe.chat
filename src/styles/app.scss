@@ -1,9 +1,27 @@
-div.app {
+.app {
 	height: 100%;
+	width: 100vw;
 	display: flex;
 	overflow-y: hidden;
-	flex-grow: 1;
-	border-top-left-radius: 20px;
+	overflow-x: auto;
+	scroll-snap-type: x mandatory;
+  }
+
+  @media (max-width: 768px) {
+  .space-list, .app-view {
+	flex: none;
+	scroll-snap-align: start;
+	scroll-snap-stop: always;
+  }
+  div.chatarea {
+	min-width: 100vw;
+  }
+  .memberlist {
+	flex: none;
+	width: 100vw;
+	scroll-snap-align: end;
+	scroll-snap-stop: always;
+  }
 }
 
 div.context-menu-item {
@@ -81,6 +99,7 @@ div.header {
 }
 
 div.space-list {
+	position: relative;
 	width: 80px;
 	min-width: 80px;
 	flex-grow: auto;
@@ -92,6 +111,8 @@ div.space-list {
 	padding-top: 5px;
 	padding-bottom: 15px;
 	overflow: hidden;
+	scroll-snap-align: left;
+	scroll-snap-stop: always;
 
 	a {
 		display: flex;
@@ -420,6 +441,8 @@ div.memberlist {
 	background: hsl(var(--room-list));
 	overflow-y: auto;
 	overflow-x: hidden;
+	scroll-snap-align: end;
+	scroll-snap-stop: always;
 
 	label.role {
 		text-transform: uppercase;
@@ -434,10 +457,13 @@ div.memberlist {
 		display: flex;
 		flex-direction: column;
 		gap: 0.25rem;
+		min-width: 250px;
 		padding-bottom: 15px;
 		overflow-y: auto;
 		overflow-x: hidden;
 		padding: 1rem;
+		scroll-snap-align: end;
+		scroll-snap-stop: always;
 
 		li.member {
 			overflow-x: hidden;
@@ -545,7 +571,7 @@ div.app-view {
 	flex-direction: column;
 	flex-grow: 1;
 	height: 100%;
-	max-width: 100%;
+	width: 100%;
 
 	&[room_list_hidden="true"] {
 		border-top-left-radius: 20px;
@@ -584,12 +610,21 @@ div.app-view {
 	}
 }
 
+div.chatarea {
+	width: 100%;
+	scroll-snap-align: end;
+	scroll-snap-stop: always;
+}
+
 ul.messages {
+	scroll-snap-align: center;
+	scroll-snap-stop: always;
 	overflow-x: hidden;
 	overflow-y: auto;
 	display: flex;
 	flex-direction: column;
-	width: 100%;
+    width: 100%;
+	min-width: 360px;
 	position: relative;
 	height: fit-content;
 	padding-bottom: 25px;
@@ -721,6 +756,8 @@ li.message {
 		background: hsl(var(--chat-input));
 		outline: none;
 	}
+
+
 
 	span.content {
 		font-size: 15px;
@@ -1039,11 +1076,16 @@ html {
 	}
 }
 
+div.messagebody {
+	scroll-snap-align: end;
+	scroll-snap-stop: always;
+}
+
 div.avatar-status-client-user {
 	position: absolute;
 	z-index: 0;
-	bottom: 0.50rem;
-	left: 6.85rem;
+	bottom: -0.15rem;
+	left: 1.25rem;
 	width: 1rem;
 	height: 1rem;
 	border: 0.15rem solid hsl(var(--client-user));

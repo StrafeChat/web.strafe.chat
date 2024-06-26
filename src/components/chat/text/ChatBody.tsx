@@ -21,19 +21,14 @@ export default function ChatBody({ room, scrollToMessageId }: { room: Room, scro
     if (messages.length < 100) setHasMoreUp(false);
 
     const scrollElement = scrollRef.current;
-    if (scrollElement) {
-      scrollElement.scrollTop = scrollElement.scrollHeight;
-    }
+
+      if (scrollElement) {
+        scrollElement.scrollTop = scrollElement.scrollHeight;
+      }
 
     const handleNewMessage = (message: Message) => {
       if (message.roomId !== room.id) return;
       setMessages((prevMessages) => [...prevMessages, message]);
-
-      setTimeout(() => {
-        if (scrollElement) {
-          scrollElement.scrollTop = scrollElement.scrollHeight;
-        }
-     }, 5)
     };
 
     const handleDeleteMessage = (message: Message) => {
@@ -223,7 +218,7 @@ export default function ChatBody({ room, scrollToMessageId }: { room: Room, scro
   }, [scrollToMessageId, messages]);
 
   return (
-    <div className="body flex-col justify-end z-10 relative">
+    <div className="messagebody body flex-col justify-end z-10 relative">
       <ul
         ref={scrollRef}
         className="messages flex min-w-[5px] overflow-y-scroll scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-600 h-fit flex-col pt-[25px]"

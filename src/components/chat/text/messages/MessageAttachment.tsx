@@ -2,8 +2,7 @@ import React, { useState, useEffect } from "react";
 import {
   FaDownload,
   FaFile,
-  FaFileArrowDown,
-  FaHeadphones,
+  FaFileAudio,
 } from "react-icons/fa6";
 
 export function MessageAttachment({ attachment }: { attachment: any }) {
@@ -65,10 +64,10 @@ export function MessageAttachment({ attachment }: { attachment: any }) {
       );
     } else if (type.startsWith("audio/") || type.startsWith("video/ogg")) {
       return (
-        <div className="bg-[#1e1e1e] p-4 rounded-[5px] w-fit max-w-[400px]">
+        <div className="bg-[#1e1e1e] p-4 rounded-[5px] w-fit max-w-[100%]">
           <div className="flex items-center overflow-hidden">
             <div>
-              <FaHeadphones size={30} />
+              <FaFileAudio size={30} />
             </div>
             <div className="attachment-meta ml-3 flex-1 overflow-hidden">
               <span className="block overflow-hidden whitespace-nowrap overflow-ellipsis">
@@ -109,7 +108,7 @@ export function MessageAttachment({ attachment }: { attachment: any }) {
       }
     } else {
       return (
-        <div className="bg-[#1e1e1e] p-4 rounded-[5px] w-fit max-w-[400px] flex items-center overflow-hidden">
+        <div className="bg-[#1e1e1e] p-4 rounded-[5px] w-fit max-w-[100%] flex items-center overflow-hidden">
           <div>
             <FaFile size={30} />
           </div>

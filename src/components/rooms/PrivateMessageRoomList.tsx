@@ -58,17 +58,8 @@ function Room(){
 
 export default function PrivateMessageRoomList() {
     let [hide, setHidden] = useState(false)
-    let isMobile = window.innerWidth < 768
     window.addEventListener("hide-sidebar", () => setHidden(!hide))
-    switch (isMobile) {
-      case true:
-      if(!hide) return null;
-      return (
-        <Room />
-     )
-     default:
         return (
             <Room />
         )
-    }
 }
