@@ -10,7 +10,8 @@ export default function ChatArea(props: { room: Room, }) {
 
   return (
     <>
-      <div className="chatarea flex w-full h-full overflow-y-auto overflow-x-hidden">
+      <div className="chatarea flex w-full h-full overflow-y-auto overflow-x-hidden"  
+      >
         <div className="flex flex-col h-full w-full overflow-y-auto overflow-x-hidden">
           <ChatBody room={room} />
           <ChatInput placeholder={t("space.room.message_placeholder").replace(`{channel_name}`, `${room?.name}`)} room={room} />

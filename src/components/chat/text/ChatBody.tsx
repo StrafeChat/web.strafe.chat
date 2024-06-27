@@ -29,6 +29,9 @@ export default function ChatBody({ room, scrollToMessageId }: { room: Room, scro
     const handleNewMessage = (message: Message) => {
       if (message.roomId !== room.id) return;
       setMessages((prevMessages) => [...prevMessages, message]);
+        if (scrollElement) {
+          scrollElement.scrollTop = scrollElement.scrollHeight;
+        }
     };
 
     const handleDeleteMessage = (message: Message) => {
