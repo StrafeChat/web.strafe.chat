@@ -96,6 +96,15 @@ export default function VoiceRoom(props: {
     client!.voice.joinChannel(props.room.id).then(connection => {
       setConnection(connection);
       setRoom(props.room);
+
+      connection.on("connected", () => {
+        navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: false
+        }).then(stream => {
+          connection.publishTracks(stream.getTracks())
+        });
+      });
     });
   }, [props.room.id]);
 
