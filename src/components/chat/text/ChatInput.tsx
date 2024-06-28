@@ -7,7 +7,13 @@ import {
   ClipboardEventHandler,
 } from "react";
 import { useClient } from "@/hooks";
-import { FaFaceSmile, FaPlus, FaTrashCan, FaFile } from "react-icons/fa6";
+import {
+  FaFaceSmile,
+  FaPlus,
+  FaTrashCan,
+  FaFile,
+  FaPaperPlane,
+} from "react-icons/fa6";
 import { emojis } from "@/assets/emojis";
 import twemoji from "twemoji";
 import React, { Dispatch, SetStateAction } from "react";
@@ -40,29 +46,32 @@ export function ChatInput({
     [key: string]: string;
   }>({});
   const [emojiSearch, setEmojiSearch] = useState("");
+  const [messageSending, setMessageSending] = useState(false);
 
   useEffect(() => {
-
     if (inputRef.current) {
       inputRef.current.focus();
     }
 
     const handleKeyPress = (event: KeyboardEvent) => {
       const key = event.key;
-  
-      if (key.match(/[a-zA-Z0-9]/) && !inputRef.current?.contains(document.activeElement)) {
+
+      if (
+        key.match(/[a-zA-Z0-9]/) &&
+        !inputRef.current?.contains(document.activeElement)
+      ) {
         if (inputRef.current) {
           inputRef.current.focus();
         }
       }
     };
-  
+
     document.addEventListener("keypress", handleKeyPress);
-  
+
     return () => {
       document.removeEventListener("keypress", handleKeyPress);
     };
-  }, []);  
+  }, []);
 
   useEffect(() => {
     let typingTimeout: NodeJS.Timeout;
@@ -167,7 +176,7 @@ export function ChatInput({
       setContent(newText);
       setCharacterCount(newText.length);
       setEmojiPopupVisible(false);
-  
+
       const range = document.createRange();
       const selection = window.getSelection();
       if (selection && inputRef.current) {
@@ -176,10 +185,10 @@ export function ChatInput({
         selection.removeAllRanges();
         selection.addRange(range);
       }
-  
+
       inputRef.current.focus();
     }
-  };  
+  };
 
   const handleClearContent = () => {
     if (inputRef.current) {
@@ -192,7 +201,9 @@ export function ChatInput({
     }
   };
 
-  const handleEmojiPopupKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+  const handleEmojiPopupKeyDown = (
+    event: React.KeyboardEvent<HTMLDivElement>
+  ) => {
     if (event.key === "Enter") {
       // Select emoji when Enter is pressed
       const emojiName = event.currentTarget.getAttribute("data-name");
@@ -206,14 +217,16 @@ export function ChatInput({
     } else if (event.key === "Tab" && !event.shiftKey) {
       // Prevent tabbing out of emoji popup
       event.preventDefault();
-      const nextEmojiItem = event.currentTarget.nextElementSibling as HTMLElement;
+      const nextEmojiItem = event.currentTarget
+        .nextElementSibling as HTMLElement;
       if (nextEmojiItem) {
         nextEmojiItem.focus();
       }
     } else if (event.key === "Tab" && event.shiftKey) {
       // Prevent tabbing out of emoji popup (reverse direction)
       event.preventDefault();
-      const prevEmojiItem = event.currentTarget.previousElementSibling as HTMLElement;
+      const prevEmojiItem = event.currentTarget
+        .previousElementSibling as HTMLElement;
       if (prevEmojiItem) {
         prevEmojiItem.focus();
       }
@@ -232,20 +245,22 @@ export function ChatInput({
     (e: any | null) => {
       if (!e || e?.files?.length === 0 || e?.target?.files?.length === 0)
         return;
-  
+
       const selectedFiles = Array.from(e?.target?.files! || e?.files);
-  
+
       const validFiles = selectedFiles.filter((file: any) => {
         if (file.size <= 25 * 1024 * 1024) {
           return true;
         } else {
-          alert(`${file.name} exceeds the 25MB size limit and will not be uploaded.`);
+          alert(
+            `${file.name} exceeds the 25MB size limit and will not be uploaded.`
+          );
           return false;
         }
       });
-  
+
       if (validFiles.length === 0) return;
-  
+
       Promise.all(
         validFiles.map((file: any) => {
           return new Promise((resolve) => {
@@ -273,7 +288,7 @@ export function ChatInput({
     },
     [viewImages]
   );
-  
+
   useEffect(() => {
     function onPaste(event: ClipboardEvent) {
       event.preventDefault();
@@ -309,7 +324,19 @@ export function ChatInput({
           ))}
         </div>
       )}
-       {viewImages.length > 0 && (
+
+      {messageSending && (
+        <div className="relative w-full h-[2rem] bg-chatinput rounded-[10px] flex items-center mb-2">
+          <div className="flex flex-row px-4 items-center w-full">
+            <FaPaperPlane className="inline-block mr-2" />
+            <span>
+              Sending Message<span className="typing-indicator"></span>
+            </span>
+          </div>
+        </div>
+      )}
+
+      {viewImages.length > 0 && (
         <div className="relative w-full h-[10rem] bg-chatinput rounded-[15px] flex overflow-x-auto overflow-y-hidden items-center mb-2">
           <div className="absolute justify-between flex flex-row px-4 gap-4 items-center">
             {viewImages.map((fi) => (
@@ -362,7 +389,10 @@ export function ChatInput({
       )}
       <div className={`chat-input !${emojiPopupVisible && "rounded-[0px]"}`}>
         <div className="chat-input-left">
-          <FaPlus className="w-6 h-6 cursor-pointer" onClick={() => document.getElementById('fileInput')?.click()} />
+          <FaPlus
+            className="w-6 h-6 cursor-pointer"
+            onClick={() => document.getElementById("fileInput")?.click()}
+          />
           <input
             type="file"
             id="fileInput"
@@ -380,13 +410,16 @@ export function ChatInput({
           id="textbox"
           role="textbox"
           onKeyDown={async (event) => {
-            if (event.key === "Enter" && !event.shiftKey) {
+            if (event.key === "Enter" && !event.shiftKey && !messageSending) {
               event.preventDefault();
               if (content.length < 1 && viewImages.length < 1) return;
-              await room.send({ 
-                content, 
+              setMessageSending(true);
+              const message = await room.send({
+                content,
                 attachments: viewImages,
-                 });
+              });
+              console.log(message)
+              if (message.nonce === 1) setMessageSending(false);
               setContent("");
               setCharacterCount(0);
               setCurrentlyTyping(false);
