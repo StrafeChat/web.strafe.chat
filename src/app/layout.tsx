@@ -20,7 +20,7 @@ export default function RootLayout({
     <html lang="en">
       <head>
         <title>Strafe Chat</title>
-        <meta name='description' content='Make your censorship worries go down the drain with Straf Chat' />
+        <meta name='description' content='Make your censorship worries go down the drain with Strafe Chat' />
       </head>
       <body>
         <I18nextProvider i18n={i18n}>

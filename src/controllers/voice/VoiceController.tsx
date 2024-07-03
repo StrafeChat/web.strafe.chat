@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import { VoiceManager, VoiceConnection } from "@strafechat/strafe.js";
 import { useClient } from '@/hooks/';
 import { Room, Space } from "@strafechat/strafe.js";
+import { Participant } from "livekit-client";
 
 interface VoiceControllerContextType {
   isVoiceMuted: boolean;
@@ -11,9 +12,13 @@ interface VoiceControllerContextType {
 
   manager: VoiceManager | null;
   connection: VoiceConnection | null;
-  setConnection: (connection: VoiceConnection) => void;
+  setConnection: (connection: VoiceConnection | null) => void;
   room: Room | null;
   setRoom: (room: Room) => void;
+
+  users: (Participant)[];
+  localParticipant: Participant | null;
+  localUser: string;
 }
 
 export const VoiceControllerContext = createContext<VoiceControllerContextType>({
@@ -25,14 +30,19 @@ export const VoiceControllerContext = createContext<VoiceControllerContextType>(
   muteVoice: () => {},
   unmuteVoice: () => {},
   setConnection: () => {},
-  setRoom: () => {}
+  setRoom: () => {},
+  users: [],
+  localParticipant: null,
+  localUser: "",
 });
 
 export default function VoiceController({ children }: { children: JSX.Element }) {
   const [isVoiceMuted, setIsVoiceMuted] = useState(false);
   const [connection, setVoiceConnection] = useState<VoiceConnection | null>(null);
 
-  const [users, setUsers] = useState([]);
+  const [users, setUsers] = useState<Participant[]>([]);
+  const [localParticipant, setLocalParticipant] = useState<Participant | null>(null);
+  const [localUser, setLocalUser] = useState<string>("");
   const [room, setStrafeRoom] = useState<Room | null>(null);
 
   const { client } = useClient();
@@ -48,12 +58,32 @@ export default function VoiceController({ children }: { children: JSX.Element })
   const unmuteVoice = () => {
 
   }
-  const setConnection = (con: VoiceConnection) => {
+  const setConnection = (con: VoiceConnection | null) => {
     setVoiceConnection(con);
   }
   const setRoom = (r: Room) => {
     setStrafeRoom(r);
   }
+
+  useEffect(() => {
+    console.log("local participant changed", localParticipant?.identity);
+  }, [localParticipant]);
+
+  useEffect(() => {
+    if (!connection) {
+      // TODO: reset values
+      return;
+    }
+
+    setLocalUser(connection.room.localParticipant.identity);
+    setLocalParticipant(connection.room.localParticipant);
+
+    connection.on("userJoin", user => {
+      console.log("user joined", user)
+      users.push(user);
+      setUsers(users);
+    });
+  }, [connection]);
 
   return (
     <VoiceControllerContext.Provider value={{
@@ -65,7 +95,10 @@ export default function VoiceController({ children }: { children: JSX.Element })
        connection,
        setConnection,
        room,
-       setRoom
+       setRoom,
+       users,
+       localParticipant,
+       localUser
       }}>
         {children}
     </VoiceControllerContext.Provider>

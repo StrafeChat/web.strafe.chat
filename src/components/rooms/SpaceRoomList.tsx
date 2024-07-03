@@ -20,6 +20,7 @@ import {
   ContextMenuContent,
   ContextMenuTrigger,
 } from "@radix-ui/react-context-menu";
+import { UserItem } from "../shared/UserItem";
 
 interface SpaceRoomListProps {
   params: { spaceId: string };
@@ -396,71 +397,88 @@ export default function SpaceRoomList({ params }: SpaceRoomListProps) {
                   )
                   .sort((a, b) => a.position - b.position)
                   .map((room, index) => (
-                    <NavLink
-                      key={room.id}
-                      href={`/spaces/${space.id}/rooms/${room.id}`}
-                    >
-                      <ContextMenu>
-                        <ContextMenuTrigger>
-                          <li
-                            key={room.id}
-                            className="space-room relative"
-                            draggable={true} // Set draggable attribute based on user permissions
-                            onDragStart={() => handleDragStart(room.id)}
-                            onDragEnter={() => handleDragEnter(index)}
-                            onDragEnd={handleDragEnd}
-                            onMouseEnter={() => setHoveredRoom(room.id)}
-                            onMouseLeave={() => setHoveredRoom(null)}
-                          >
-                            <span
-                              style={{
-                                display: "inline-flex",
-                                alignItems: "center",
-                              }}
+                    <div>
+                      <NavLink
+                        key={room.id}
+                        href={`/spaces/${space.id}/rooms/${room.id}`}
+                      >
+                        <ContextMenu>
+                          <ContextMenuTrigger>
+                            <li
+                              key={room.id}
+                              className="space-room relative"
+                              draggable={true} // Set draggable attribute based on user permissions
+                              onDragStart={() => handleDragStart(room.id)}
+                              onDragEnter={() => handleDragEnter(index)}
+                              onDragEnd={handleDragEnd}
+                              onMouseEnter={() => setHoveredRoom(room.id)}
+                              onMouseLeave={() => setHoveredRoom(null)}
                             >
-                              {room.type === 1 && <FaHashtag />}
-                              {room.type === 2 && <FaVolumeHigh />}
-                              &nbsp;&nbsp;
-                              <h2>{room.name}</h2>
-                              {space.ownerId == client?.user?.id &&
-                                hoveredRoom === room.id && (
-                                  <>
-                                    <button className="absolute right-0 mr-7 z-50">
-                                      <FaUserPlus
-                                        size={16}
-                                        onClick={(e) => {
-                                          e.preventDefault();
-                                          e.stopPropagation();
-                                          openModal("create-invite", {
-                                            spaceId: space?.id,
-                                            roomId: room.id,
-                                          });
-                                        }}
-                                      />
-                                    </button>
-                                    <button className="absolute right-0 mr-2 z-50">
-                                      <FaGear
-                                        size={16}
-                                        onClick={(e) => {
-                                          e.preventDefault();
-                                          e.stopPropagation();
-                                          openModal("room-settings", {
-                                            spaceId: space?.id,
-                                            roomId: room.id,
-                                          });
-                                        }}
-                                      />
-                                    </button>
-                                  </>
-                                )}
-                            </span>
-                          </li>
-                        </ContextMenuTrigger>
-                        <ContextMenuContent>
-                          <p>g</p>
-                        </ContextMenuContent>
-                      </ContextMenu>
-                    </NavLink>
+                              <span
+                                style={{
+                                  display: "inline-flex",
+                                  alignItems: "center",
+                                }}
+                              >
+                                {room.type === 1 && <FaHashtag />}
+                                {room.type === 2 && <FaVolumeHigh />}
+                                &nbsp;&nbsp;
+                                <h2>{room.name}</h2>
+                                {space.ownerId == client?.user?.id &&
+                                  hoveredRoom === room.id && (
+                                    <>
+                                      <button className="absolute right-0 mr-7 z-50">
+                                        <FaUserPlus
+                                          size={16}
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            openModal("create-invite", {
+                                              spaceId: space?.id,
+                                              roomId: room.id,
+                                            });
+                                          }}
+                                        />
+                                      </button>
+                                      <button className="absolute right-0 mr-2 z-50">
+                                        <FaGear
+                                          size={16}
+                                          onClick={(e) => {
+                                            e.preventDefault();
+                                            e.stopPropagation();
+                                            openModal("room-settings", {
+                                              spaceId: space?.id,
+                                              roomId: room.id,
+                                            });
+                                          }}
+                                        />
+                                      </button>
+                                    </>
+                                  )}
+                              </span>
+                            </li>
+                          </ContextMenuTrigger>
+                          <ContextMenuContent>
+                            <p>g</p>
+                          </ContextMenuContent>
+                        </ContextMenu>
+                      </NavLink>
+                      <ul>
+                        <>
+                          {(room.type === 2) ?
+                              // TODO: remove hardcoded dummy user
+                            (room.participants || [] || [space.members.get("113727418811810816")!]).map(member =>
+                              (
+                                <UserItem
+                                  user={member.user}
+                                />
+                              )
+                            )
+                            : ([])
+                          }
+                          </>
+                        </ul>
+                      </div>
                   ))}
             </div>
           ))}

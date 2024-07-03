@@ -32,6 +32,10 @@ export default function VoiceRoom(props: {
 
   const { t } = useTranslation();
 
+  useEffect(() => {
+    console.log("mounted");
+  }, []);
+
   /*useEffect(() => {
     setVoiceRoom(new Room());
     const loadKrispAndCheckSupport = async () => {
@@ -99,13 +103,24 @@ export default function VoiceRoom(props: {
 
       connection.on("connected", () => {
         navigator.mediaDevices.getUserMedia({
-          audio: true,
-          video: false
+          audio: {
+            deviceId: "default"
+          },
+          video: false,
         }).then(stream => {
           connection.publishTracks(stream.getTracks())
         });
       });
     });
+    console.log("connecting to room", props.room.id);
+
+    return () => {
+      if (connection) {
+        console.log("disconnecting")
+        connection.disconnect();
+        setConnection(null);
+      }
+    }
   }, [props.room.id]);
 
   const handleRoomConnect = async (liveKitRoom: Room) => {
@@ -130,7 +145,7 @@ export default function VoiceRoom(props: {
     }
   };
 
-  if (!token || !isKrispSupported) {
+  if (!connection) {
     return (
       <>
         <VoiceHeader type="server" name={`${props.room?.name}`} />
@@ -147,20 +162,45 @@ export default function VoiceRoom(props: {
   );
 }
 
-function StrafeVoiceCall() {
-  const tracks = useTracks(
+function StrafeVoiceCall(props: {
+
+}) {
+  const { connection, users, localUser } = useVoice();
+
+  const [test, setTest] = useState("");
+  /*const tracks = useTracks(
     [
       { source: Track.Source.Camera, withPlaceholder: true },
       { source: Track.Source.ScreenShare, withPlaceholder: false },
     ],
     { onlySubscribed: true }
   );
-  const updated = useVisualStableUpdate(tracks, 4);
+  const updated = useVisualStableUpdate(tracks, 4);*/
+
+  useEffect(() => {
+    console.log("local user changed component", localUser);
+  }, [localUser]);
 
   return (
-    <GridLayout tracks={updated} style={{ height: '85%' }}>
-      <ParticipantTile />
-    </GridLayout>
+    <div>
+      <div>
+        {
+          localUser
+        }
+      </div>
+      <br></br>
+      <div>
+        {(users.map(user => {
+          return (
+            <div>
+              {
+                user.identity || "unknown"
+              }
+            </div>
+          )
+        }))}
+      </div>
+    </div>
   );
 }
 
