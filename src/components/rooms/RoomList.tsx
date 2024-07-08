@@ -5,14 +5,15 @@ import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import PrivateMessages from "./PrivateMessageRoomList";
 import RoomsNav from "./SpaceRoomList";
-import { FaGear, FaMicrophone, FaMicrophoneLinesSlash, FaMicrophoneSlash } from "react-icons/fa6";
+import { FaGear, FaMicrophone, FaMicrophoneLinesSlash, FaMicrophoneSlash, FaPhoneSlash } from "react-icons/fa6";
 import { useClient, useModal } from "@/hooks";
 import { Formatting } from "@/helpers/formatter";
 import { useVoice } from "@/hooks";
+import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
 export default function RoomList() {
-  const { isVoiceMuted, toggleVoiceMute, connection, room } = useVoice();
+  const { isVoiceMuted, toggleVoiceMute, connection, disconnect, roomInfo } = useVoice();
 
   const controls = useAnimation();
   const { hideRoomList, setHideRoomList } = useUI();
@@ -74,7 +75,7 @@ export default function RoomList() {
             }
           })()}
           {
-          (connection && room) ? (
+          (connection && roomInfo.room) ? (
             <div style={{
               display: "flex",
               flexDirection: "column",
@@ -82,10 +83,28 @@ export default function RoomList() {
               backgroundColor: "hsl(var(--client-user))",
               borderBottom: "1px solid hsl(var(--seperator))"
             }}>
-              <div>
-                <Link href={`/spaces/${room.spaceId}/rooms/${room.id}`}>
-                  Connected to {room.name}
+              <div style={{
+                display: "flex",
+                flexDirection: "row",
+                alignItems: "center",
+              }}>
+                <Link href={`/spaces/${roomInfo.room.spaceId}/rooms/${roomInfo.room.id}`}>
+                  Connected to {roomInfo.room.name}
                 </Link>
+                <Button variant={
+                  "secondary"
+                } style={{
+                  marginLeft: "auto",
+                  verticalAlign: "middle",
+                }} onClick={() => {
+                  disconnect();
+                }}>
+                  <FaPhoneSlash style={{
+                    //marginLeft: "auto",
+                    //verticalAlign: "middle",
+                    fontSize: "130%"
+                  }} ></FaPhoneSlash>
+                </Button>
               </div>
             </div>
           ) : (<></>)

@@ -23,7 +23,8 @@ export function UserItem(props: UserItemProps) {
 
   if (!user) return null;
 
-  console.log(user);
+  // TODO: update immediately, no just when the user hovers over the channel.
+  // TODO: investigate why this component is mounted a lot when hovered over
 
   // TODO: add loading screen
   return (

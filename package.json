@@ -22,6 +22,7 @@
     "@radix-ui/react-slot": "^1.0.2",
     "@radix-ui/react-toast": "^1.1.5",
     "@radix-ui/react-tooltip": "^1.0.7",
+    "@strafechat/strafe.js": "^1.4.51",
     "@types/react-i18next": "^8.1.0",
     "axois": "^0.0.1-security",
     "class-variance-authority": "^0.7.0",
