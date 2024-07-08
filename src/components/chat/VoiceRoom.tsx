@@ -78,10 +78,12 @@ export default function VoiceRoom(props: {
         return res("default");
       }
 
+      const s = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+
       const devices = (await navigator.mediaDevices.enumerateDevices()).filter(d => d.kind === "audioinput");
 
-      //return openModal("choose-device", { devices });
       const id = await openCallbackModal("choose-device", { devices }) as (ConstrainDOMString & "strafechat-cancel");
+      s.getTracks().forEach(t => t.stop());
       if (id === "strafechat-cancel") return rej();
 
       return res(id); // TODO: fix this
