@@ -14,7 +14,7 @@ import {
 } from "react-icons/fa6";
 import { NavLink } from "../shared/NavLink";
 import { useEffect, useState } from "react";
-import { useClient, useModal } from "@/hooks";
+import { useClient, useModal, useVoice } from "@/hooks";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -32,6 +32,7 @@ type SectionState = {
 
 export default function SpaceRoomList({ params }: SpaceRoomListProps) {
   const { client } = useClient();
+  const { voiceUserMap } = useVoice();
   const { openModal } = useModal();
   const space = client?.spaces.get(params.spaceId);
   const [dropdownVisible, setDropdownVisible] = useState(false);
@@ -397,7 +398,7 @@ export default function SpaceRoomList({ params }: SpaceRoomListProps) {
                   )
                   .sort((a, b) => a.position - b.position)
                   .map((room, index) => (
-                    <div>
+                    <div key={room.id}>
                       <NavLink
                         key={room.id}
                         href={`/spaces/${space.id}/rooms/${room.id}`}
@@ -466,14 +467,9 @@ export default function SpaceRoomList({ params }: SpaceRoomListProps) {
                       <ul>
                         <>
                           {(room.type === 2) ?
-                              // TODO: remove hardcoded dummy user
-                            (room.participants || [] || [space.members.get("113727418811810816")!]).map(member =>
-                              (
-                                <UserItem
-                                  user={member.user}
-                                />
-                              )
-                            )
+                            (voiceUserMap?.get(room.id)?.map((member) => (
+                              <UserItem key={member.userId} user={member.user} />
+                            )))
                             : ([])
                           }
                           </>

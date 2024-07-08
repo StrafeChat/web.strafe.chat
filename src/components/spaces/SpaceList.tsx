@@ -41,40 +41,42 @@ export default function SpaceList() {
          <div className="seperator" />
          <div key="spaces" className="spaces">
             {client?.spaces.map((space) => (
-          <ContextMenu>
-             <ContextMenuTrigger>
-                <div key={space.id}>
-                <NavLink href={`/spaces/${space.id}`}> 
-                  <button className="space" draggable={true}>
-                    {
-                      space.icon ? (
-                         <img className="space" src={space.icon} alt="Space Icon" />
-                      ) : (
-                         <>{space.nameAcronym}</>
-                      )
-                    }
-                 </button>
-               </NavLink>
-            </div>
-            </ContextMenuTrigger>
-            <ContextMenuContent>
-                <ContextMenuItem className="flex gap-2 items-center disabled"> Mark As Read</ContextMenuItem>
-                  <hr />
-                   <ContextMenuItem onClick={() => openModal("create-invite", { spaceId: space?.id })} className="flex gap-2 items-center"><FaUserPlus /> Invite People</ContextMenuItem>
-                   {space.ownerId == client?.user?.id && (
-                   <>
-                     <hr />
-                     <ContextMenuItem onClick={() => openModal("space-settings", { spaceId: space?.id })} className="flex gap-2 items-center"><FaGear /> Settings</ContextMenuItem>
-                     <ContextMenuItem onClick={() => openModal("create-room", { spaceId: space?.id })} className="flex gap-2 items-center"><FaCirclePlus /> Create Room</ContextMenuItem>
-                     <ContextMenuItem onClick={() => openModal("create-section", { spaceId: space?.id })} className="flex gap-2 items-center"><FaFolderPlus /> Create Section</ContextMenuItem>
-                   </>
-                   )}
-                  <hr />
-                 {space.ownerId !== client?.user?.id && (
-                   <ContextMenuItem onClick={() => openModal("leave-space", { spaceId: space?.id })} className={`flex items-center pl-2 p-1.5 hover:bg-red-500 rounded cursor-pointer text-red-500`}><FaRightFromBracket /> Leave Space</ContextMenuItem>
-                 )}
-                </ContextMenuContent>
-              </ContextMenu>
+              <div key={space.id}>
+                <ContextMenu>
+                  <ContextMenuTrigger>
+                    <div key={space.id}>
+                      <NavLink href={`/spaces/${space.id}`}>
+                        <button className="space" draggable={true}>
+                          {
+                            space.icon ? (
+                              <img className="space" src={space.icon} alt="Space Icon" />
+                            ) : (
+                              <>{space.nameAcronym}</>
+                            )
+                          }
+                        </button>
+                      </NavLink>
+                    </div>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent>
+                    <ContextMenuItem className="flex gap-2 items-center disabled"> Mark As Read</ContextMenuItem>
+                    <hr />
+                    <ContextMenuItem onClick={() => openModal("create-invite", { spaceId: space?.id })} className="flex gap-2 items-center"><FaUserPlus /> Invite People</ContextMenuItem>
+                    {space.ownerId == client?.user?.id && (
+                      <>
+                        <hr />
+                        <ContextMenuItem onClick={() => openModal("space-settings", { spaceId: space?.id })} className="flex gap-2 items-center"><FaGear /> Settings</ContextMenuItem>
+                        <ContextMenuItem onClick={() => openModal("create-room", { spaceId: space?.id })} className="flex gap-2 items-center"><FaCirclePlus /> Create Room</ContextMenuItem>
+                        <ContextMenuItem onClick={() => openModal("create-section", { spaceId: space?.id })} className="flex gap-2 items-center"><FaFolderPlus /> Create Section</ContextMenuItem>
+                      </>
+                    )}
+                    <hr />
+                    {space.ownerId !== client?.user?.id && (
+                      <ContextMenuItem onClick={() => openModal("leave-space", { spaceId: space?.id })} className={`flex items-center pl-2 p-1.5 hover:bg-red-500 rounded cursor-pointer text-red-500`}><FaRightFromBracket /> Leave Space</ContextMenuItem>
+                    )}
+                  </ContextMenuContent>
+                </ContextMenu>
+              </div>
            ))}
          </div>
 
