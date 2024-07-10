@@ -49,10 +49,12 @@ export default function ClientController({ children }: { children: JSX.Element }
 
   const init = async () => {
 
+    console.log(process.env, process.env.NEXT_PUBLIC_API);
+
     const clt = new Client({
       config: {
         equinox: process.env.NEXT_PUBLIC_API,
-        livekit: process.env.NEXT_PORTAL_SIGNALING
+        livekit: process.env.NEXT_PUBLIC_PORTAL_SIGNALING
       }
     });
 

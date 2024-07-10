@@ -2,6 +2,9 @@
 import { useUI } from "@/providers/UIProvider";
 import { FaUserGroup, FaArrowRight, FaArrowLeft } from "react-icons/fa6";
 import { useTranslation } from 'react-i18next';
+import { SendFriendRequestForm } from "@/components/friends/SendForm";
+import { FriendRequestList } from "@/components/friends/FriendRequestList";
+import { FriendList } from "@/components/friends/FriendList";
 
 export default function Friends() {
 
@@ -27,7 +30,10 @@ export default function Friends() {
         </span>
         <span><b>{t('friends_page.header')}</b></span>
       </div>
-      </div>
+      <SendFriendRequestForm />
+      <FriendRequestList></FriendRequestList>
+      <FriendList></FriendList>
+    </div>
     </>
    )
 }
