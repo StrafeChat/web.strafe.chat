@@ -13,7 +13,8 @@ export function ProfileSettings() {
   const forceUpdate = useForceUpdate();
     const [savedData, setSavedData] = useState({
         avatar: client?.user?.avatar!,
-        displayName: client?.user?.displayName!,
+        username: client?.user?.username!,
+        global_name: client?.user?.globalName!,
         aboutMe: client?.user?.aboutMe!, 
     });
 
@@ -41,49 +42,29 @@ function formatDate(timpstamp: number) {
         <h1 className="title">Profile</h1>
 
         <div className="mt-[20px]">
-             {/* <input
-                  type="file"
-                  accept="image/png, image/gif, image/jpeg"
-                  className="avatar group-hover:opacity-80 z-[1001]"
-                  onChange={(event) => {
-                    if (event.target.files) {
-                      if (event.target.files.length > 0) {
-                     let reader = new FileReader();
-                        reader.readAsDataURL(event.target.files[0]);
-                        reader.onload = (loaded) => {
-                           client?.user?.edit({
-                              avatar: loaded.target?.result?.toString()!
-                           }) // we need to change it to when you save, account settings has that just copy :)
-                        }; 
-                      }
-                    }
-                  }}
-                /> */}
           <div className="h-fit rounded-t-xl">
           <div
             className="h-[100px] rounded-t-xl"
             style={{
-              backgroundColor: `gray`, // accentColor
+              backgroundColor: `gray`,
             }}
           />
-          <div className="realtive px-7 mt-[-35px]">
+          <div className="realtive px-7 mt-[-30px]">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <div className="group">
             <img
               draggable={false}
-              src={`${Formatting.formatAvatar(client?.user?.id, client?.user?.avatar)}`}
+              src={data.avatar == client?.user?.avatar ? Formatting.formatAvatar(client?.user?.id, client?.user?.avatar) : data.avatar}
               width={80}
               height={80}
-              className="avatar_modal z-[1000]"
+              className="avatar_modal z-[1000] group-hover:grayscale h-[80px] w-[80px] object-cover cursor-pointer"
               alt="avatar"
-              style={{ objectFit: "cover", width: "80px", height: "80px" }}
               />
               
               <input
                 type="file"
                 accept="image/png, image/gif, image/jpeg"
-                style={{ width: "70px", height: "70px", marginTop: '-25px'}}
-                  className="group-hover:opacity-80 ml-1 bg-white rounded-[50%]"
+                  className="opacity-0 ml-1 bg-white rounded-[50%] absolute w-[70px] h-[70px] mt-[-75px] cursor-pointer"
                   onChange={(event) => {
                     if (event.target.files) {
                       if (event.target.files.length > 0) {
@@ -91,9 +72,6 @@ function formatDate(timpstamp: number) {
                         reader.readAsDataURL(event.target.files[0]);
                         reader.onload = (loaded) => {
                            setData({ ...data, avatar: loaded.target?.result?.toString()! })
-                           client?.user?.edit({
-                            avatar: loaded.target?.result?.toString()!
-                           })
                         }; 
                       }
                     }
@@ -101,7 +79,7 @@ function formatDate(timpstamp: number) {
                 />
           </div>
           </div> 
-          <div className="flex justify-end py-4 px-1.5">
+          <div className="flex justify-end py-4 px-1.5 mt-[-50px]">
             {client?.user?.flags! > 0 ? (
               <div className="p-2 bg-black flex gap-2 rounded-xl">
                 <Badges flags={client?.user?.flags!} />
@@ -144,4 +122,3 @@ function formatDate(timpstamp: number) {
     </>
     )
 }
-444444444444444444444444444

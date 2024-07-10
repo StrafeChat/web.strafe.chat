@@ -1,27 +1,14 @@
-import { formatStatusText, Formatting } from "@/helpers/formatter";
-import { useClient } from "@/hooks";
+import { Formatting } from "@/helpers/formatter";
 import { Member, Space, User } from "@strafechat/strafe.js";
 import { Popover, PopoverTrigger } from "../ui/popover";
 import ProfilePopup from "../popup/ProfilePopup";
 import { useState } from "react";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@radix-ui/react-context-menu";
-let isMobile = typeof window !== "undefined" && window.innerWidth < 768;
-window.addEventListener("resize", () => {
-    isMobile = typeof window !== "undefined" && window.innerWidth < 768;
-});
 export default function MemberList(props: { hidden: boolean, members: any, space: Space }) {
-    let [hidden, setHidden] = useState(props.hidden || false);
     let members = props.members;
 
-    if (typeof window !== "undefined") {
-        window.addEventListener("hide-sidebar", () => {
-            setHidden(!hidden);
-        });
-    }
-    const { client } = useClient();
     return (
-        <div className="memberlist"
-            style={{ ...(isMobile && hidden ? { display: "none" } : {}) }}
+        <div className="memberlist xl:w-full " 
         >
     <ul className="members">
 {
@@ -42,7 +29,7 @@ export default function MemberList(props: { hidden: boolean, members: any, space
                         <div className={`avatar-status ${member?.user.presence!.status}`} />
                         </div>
                         <span className="username">{member?.user.global_name ?? member?.user.username}</span>
-                        <span className="status">{formatStatusText(member?.user.presence!)}</span>
+                        <span className="status">{Formatting.formatStatusText(member?.user.presence!)}</span>
                         </div>
                  </li>
                  {/* </ContextMenuTrigger>

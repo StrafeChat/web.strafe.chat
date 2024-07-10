@@ -1,4 +1,4 @@
-import { AccountSettings, AuthorizedAppsSettings, DesktopSettings, NotificationSettings, ProfileSettings, LanguageSettings, SettingsNotFound } from "@/components/settings";
+import { AccountSettings, AuthorizedAppsSettings, DesktopSettings, NotificationSettings, ProfileSettings, LanguageSettings, AppearanceSettings, SettingsNotFound } from "@/components/settings";
 import { AnimatePresence, motion } from "framer-motion";
 import cookie from "js-cookie";
 import {
@@ -8,7 +8,8 @@ import {
   FaRightFromBracket,
   FaUser,
   FaUserLock,
-  FaGlobe
+  FaGlobe,
+  FaPalette
 } from 'react-icons/fa6';
 import Modal from './Modal';
 
@@ -50,6 +51,7 @@ class SettingsModal extends Modal<{}, {}> {
                   <li className={this.state.currentTab === "authorized-apps" ? "active" : ""} onClick={() => this.setState({ currentTab: "authorized-apps" })}><FaUserLock />&nbsp;&nbsp;Authorized Apps</li>
                   <hr />
                   <li className="title">App Settings</li>
+                  <li className={this.state.currentTab === "appearance" ? "active" : ""} onClick={() => this.setState({ currentTab: "appearance" })}><FaPalette />&nbsp;&nbsp;Appearance</li>
                   <li className={this.state.currentTab === "notifications" ? "active" : ""} onClick={() => this.setState({ currentTab: "notifications" })}><FaBell />&nbsp;&nbsp;Notifications</li>
                   <li className={this.state.currentTab === "desktop" ? "active" : ""} onClick={() => this.setState({ currentTab: "desktop" })}><FaDesktop />&nbsp;&nbsp;Desktop</li>
                   <li className={this.state.currentTab === "language" ? "active" : ""} onClick={() => this.setState({ currentTab: "language" })}><FaGlobe />&nbsp;&nbsp;Language</li>
@@ -67,6 +69,8 @@ class SettingsModal extends Modal<{}, {}> {
                       return <ProfileSettings />
                     case "authorized-apps":
                       return <AuthorizedAppsSettings />
+                    case "appearance":
+                      return <AppearanceSettings />
                     case "notifications":
                       return <NotificationSettings />
                     case "desktop":

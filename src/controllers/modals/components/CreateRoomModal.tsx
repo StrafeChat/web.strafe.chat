@@ -11,7 +11,7 @@ const modalVariants = {
     closed: { opacity: 0, transition: { ease: "backOut", duration: 0.3, x: { duration: 1 } } },
 };
 
-class CreateRoomModal extends Modal<{ roomName: string, roomType: number }, { data: { spaceId: string } }> {
+class CreateRoomModal extends Modal<{ roomName: string, roomType: number }, { data: { spaceId: string, parentId: string | null } }> {
 
     static contextType = ClientControllerContext;
     context!: React.ContextType<typeof ClientControllerContext>;
@@ -25,7 +25,7 @@ class CreateRoomModal extends Modal<{ roomName: string, roomType: number }, { da
             event.preventDefault();
             console.log(this.props.data.spaceId)
             const space = client.spaces.get(this.props.data.spaceId);
-            await space!.rooms.create({ name: this.state.roomName, type: this.state.roomType, space_id: space?.id, });
+            await space!.rooms.create({ name: this.state.roomName, type: this.state.roomType, space_id: space?.id, parent_id: this.props.data.parentId! });
             this.close();
         }
 

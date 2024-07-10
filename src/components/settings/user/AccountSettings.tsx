@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { formatDiscrim } from "@/helpers/formatter";
+import { Formatting } from "@/helpers/formatter";
 import { useClient, useForceUpdate, useModal } from "@/hooks";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
@@ -57,7 +57,7 @@ export function AccountSettings() {
                     <div className="item">
                         <div className="first">
                             <label>{t("modals.settings.my_account.edit_data_01.discriminator.title")}</label>
-                            <span>{formatDiscrim(data.discriminator)}</span>
+                            <span>{Formatting.formatDiscrim(data.discriminator)}</span>
                         </div>
                         <div className="final">
                             <Button onClick={() => openModal("edit-data", {

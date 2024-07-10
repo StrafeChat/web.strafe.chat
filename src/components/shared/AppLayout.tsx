@@ -7,6 +7,7 @@ import { AppView, ElectronTitleBar } from ".";
 import "../../styles/app.scss";
 import SpaceList from "../spaces/SpaceList";
 import RoomList from "../rooms/RoomList";
+import MemberList from "../chat/MemberList";
 
 export function AppLayout({
   children,
@@ -35,12 +36,12 @@ export function AppLayout({
 return override.some(overridePath => pathname!.startsWith(overridePath)) ? (
   <>{children}</>
 ) : (
-  <div className="flex flex-col w-full h-full">
+  <div className="h-full">
     {electron && <ElectronTitleBar />}
     <div className="app">
       <SpaceList />
       <RoomList />
-      <AppView>{children}</AppView>
+      <AppView children={children}/>
     </div>
   </div>
 );
