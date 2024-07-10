@@ -12,6 +12,7 @@ import {
 } from 'react-icons/fa6';
 import Modal from './Modal';
 import { ClientControllerContext } from "@/controllers/client/ClientController";
+import { RoleSettings } from "@/components/spaces/settings/RoleSettings";
 
 const modalVariants = {
   open: { opacity: 1, transition: { ease: "backIn", duration: 0.3, x: { duration: 1 } } },
@@ -61,8 +62,8 @@ class SpaceSettingsModal extends Modal<{}, { data: { spaceId: string } }> {
                   switch (this.state.currentTab) {
                     case "overview":
                         return <OverviewSettings />
-                    //   case "roles":
-                    //     return <RoleSettimgs />
+                      case "roles":
+                        return <RoleSettings />
                     default:
                       return <SettingsNotFound />
                   }
