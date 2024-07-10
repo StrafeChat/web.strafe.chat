@@ -3,7 +3,6 @@ import EmailVerifcation from "@/components/auth/EmailVerifcation";
 import { LoadingScreen } from "@/components/shared";
 import { useToast } from "@/components/ui/use-toast";
 import { Client } from "@strafechat/strafe.js";
-import cookie from "js-cookie";
 import { usePathname } from "next/navigation";
 import { createContext, useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -43,21 +42,28 @@ export default function ClientController({ children }: { children: JSX.Element }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client]);
 
-  const init = () => {
+  const handleMessageDelete = useCallback((data: any) => {
+    // forceUpdate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [client]);
+
+  const init = async () => {
+
+    console.log(process.env, process.env.NEXT_PUBLIC_API);
 
     const clt = new Client({
       config: {
-        equinox: process.env.NEXT_PUBLIC_API
+        equinox: process.env.NEXT_PUBLIC_API,
+        livekit: process.env.NEXT_PUBLIC_PORTAL_SIGNALING
       }
     });
 
     setClient(clt);
-
-    clt.login(cookie.get("token")!);
+    clt.login(localStorage.getItem("token")!);
 
     clt.on("error", (err) => {
       if (err.code == 4004) {
-        cookie.remove("token");
+        localStorage.removeItem("token");
         window.location.href = "/login";
       } else {
         setClientError(true);
@@ -78,18 +84,20 @@ export default function ClientController({ children }: { children: JSX.Element }
     client?.on("ready", handleReady);
     client?.on("presenceUpdate", handlePresenceUpdate);
     client?.on("messageCreate", handleMessageCreate);
+    client?.on("messageDelete", handleMessageDelete);
     client?.on("messageUpdate", handleMessageCreate);
 
     return () => {
       client?.off("ready", handleReady);
       client?.off("presenceUpdate", handlePresenceUpdate);
-      client?.on("messageCreate", handleMessageCreate);
-      client?.on("messageUpdate", handleMessageCreate);
+      client?.off("messageCreate", handleMessageCreate);
+      client?.off("messageDelete", handleMessageDelete);
+      client?.off("messageUpdate", handleMessageCreate);
     }
   }, [client, handlePresenceUpdate, handleReady]);
 
   useEffect(() => {
-    if (!cookie.get("token")! && !["/login", "/register"].includes(pathname!)) window.location.href = "/login";
+    if (!localStorage.getItem("token")! && !["/login", "/register"].includes(pathname!)) window.location.href = "/login";
     else if (!connected.current && !["/login", "/register"].includes(pathname!)) init();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, client]);

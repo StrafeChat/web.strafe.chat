@@ -1,4 +1,3 @@
-import { useClient } from "@/hooks";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import Badges from "../shared/Badges";
 import { Formatting } from "@/helpers/formatter";
@@ -7,14 +6,16 @@ const { DateTime } = require('luxon');
 export default function ProfilePopup({
   children,
   user,
+  client,
 }: {
   children: JSX.Element;
   user: any;
+  client: any;
 }) {
 
 function formatDate(timpstamp: number) {
     const dt = DateTime.fromISO(timpstamp);
-    return dt.toFormat('LLL d\'th\', yyyy');
+    return dt.setLocale(client?.user?.locale!).toFormat('LLL d, yyyy');
 }
 
   return (
@@ -80,7 +81,7 @@ function formatDate(timpstamp: number) {
               ) : (
                 <span className="text-gray-400">No About Provided</span>
               )} 
-              <span className="text-sm font-bold block mt-2">MEMBER SINCE</span>
+              <span className="text-sm font-bold block mt-2 upperc">MEMBER SINCE</span>
                 <span className="text-gray-400">{formatDate(user.created_at)}</span>
             </div>
           </div>

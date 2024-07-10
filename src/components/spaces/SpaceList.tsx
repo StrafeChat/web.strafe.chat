@@ -1,30 +1,18 @@
 import { useClient, useModal } from "@/hooks";
 import Link from "next/link";
 import { useState } from "react";
-import { FaCompass, FaGear, FaPenToSquare, FaPlus } from "react-icons/fa6";
+import { FaCirclePlus, FaCompass, FaFolderPlus, FaGear, FaPenToSquare, FaPlus, FaRightFromBracket, FaUserPlus } from "react-icons/fa6";
 import { NavLink } from "../shared";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "../ui/context-menu";
 import { Formatting } from "@/helpers/formatter";
-let isMobile = typeof window !== "undefined" && window.innerWidth < 768;
-typeof window !== "undefined" && window.addEventListener("resize", () => {
-   isMobile = window.innerWidth < 768;
-});
 export default function SpaceList() {
    let [hide, setHide] = useState(false);
    const { openModal } = useModal();
    const { client } = useClient();
 
-   if (typeof window !== "undefined" && isMobile) {
-      window.addEventListener("hide-sidebar", () => {
-         setHide(!hide);
-      });
-   } 
-
 
    return (
-      <div className="space-list"
-         style={{ display: hide && isMobile ? "" : "" }}
-      >
+      <div className="space-list">
          <ContextMenu>
             <ContextMenuTrigger>
                <NavLink href="/" activate={["/friends", "/notes", "/rooms"]}>
@@ -51,21 +39,44 @@ export default function SpaceList() {
             </ContextMenuContent>
          </ContextMenu>
          <div className="seperator" />
-         <div className="spaces">
+         <div key="spaces" className="spaces">
             {client?.spaces.map((space) => (
-                <div key={space.id}>
-                   <NavLink href={`/spaces/${space.id}`}>
-                  <button className="space" draggable={true}>
-                    {
-                      space.icon ? (
-                         <img className="space" src={space.icon} alt="Space Icon" />
-                      ) : (
-                         <>{space.nameAcronym}</>
-                      )
-                    }
-                 </button>
-               </NavLink>
-            </div>
+              <div key={space.id}>
+                <ContextMenu>
+                  <ContextMenuTrigger>
+                    <div key={space.id}>
+                      <NavLink href={`/spaces/${space.id}`}>
+                        <button className="space" draggable={true}>
+                          {
+                            space.icon ? (
+                              <img className="space" src={space.icon} alt="Space Icon" />
+                            ) : (
+                              <>{space.nameAcronym}</>
+                            )
+                          }
+                        </button>
+                      </NavLink>
+                    </div>
+                  </ContextMenuTrigger>
+                  <ContextMenuContent>
+                    <ContextMenuItem className="flex gap-2 items-center disabled"> Mark As Read</ContextMenuItem>
+                    <hr />
+                    <ContextMenuItem onClick={() => openModal("create-invite", { spaceId: space?.id })} className="flex gap-2 items-center"><FaUserPlus /> Invite People</ContextMenuItem>
+                    {space.ownerId == client?.user?.id && (
+                      <>
+                        <hr />
+                        <ContextMenuItem onClick={() => openModal("space-settings", { spaceId: space?.id })} className="flex gap-2 items-center"><FaGear /> Settings</ContextMenuItem>
+                        <ContextMenuItem onClick={() => openModal("create-room", { spaceId: space?.id })} className="flex gap-2 items-center"><FaCirclePlus /> Create Room</ContextMenuItem>
+                        <ContextMenuItem onClick={() => openModal("create-section", { spaceId: space?.id })} className="flex gap-2 items-center"><FaFolderPlus /> Create Section</ContextMenuItem>
+                      </>
+                    )}
+                    <hr />
+                    {space.ownerId !== client?.user?.id && (
+                      <ContextMenuItem onClick={() => openModal("leave-space", { spaceId: space?.id })} className={`flex items-center pl-2 p-1.5 hover:bg-red-500 rounded cursor-pointer text-red-500`}><FaRightFromBracket /> Leave Space</ContextMenuItem>
+                    )}
+                  </ContextMenuContent>
+                </ContextMenu>
+              </div>
            ))}
          </div>
 
@@ -76,9 +87,6 @@ export default function SpaceList() {
          </button>
          <button className="primary disabled">
             <FaCompass />
-         </button>
-         <button className="primary" onClick={() => openModal("settings")}>
-            <FaGear />
          </button>
       </div>
    );

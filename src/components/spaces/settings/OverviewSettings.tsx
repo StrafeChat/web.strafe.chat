@@ -1,5 +1,5 @@
 import { Button } from "@/components/ui/button";
-import { formatDiscrim } from "@/helpers/formatter";
+import { Formatting } from "@/helpers/formatter";
 import { useClient, useForceUpdate, useModal } from "@/hooks";
 import { useState } from "react";
 import { useTranslation } from "react-i18next";
