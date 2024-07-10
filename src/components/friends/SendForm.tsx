@@ -41,8 +41,9 @@ export function SendFriendRequestForm({}) {
 
           {/*<Label htmlFor="discrim">Discriminator</Label>*/}
           <Input name="discriminator" style={{
-            flexGrow: 1
-          }} type="text" id="discrim" placeholder="Discriminator"></Input>
+            flexGrow: 1,
+            maxWidth: "7rem"
+          }} type="text" id="discrim" placeholder="Discriminator" autoComplete="false"></Input>
 
           <Button type="submit" variant={"outline"}>Send Friend Request</Button>
         </div>
