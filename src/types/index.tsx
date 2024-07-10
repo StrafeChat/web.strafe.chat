@@ -1,7 +1,8 @@
 import { LinkProps } from "next/link";
 import { Dispatch, SetStateAction } from "react";
-import { Message } from "@strafechat/strafe.js";
+import { Member, Message } from "@strafechat/strafe.js";
 import { IconType } from "react-icons";
+import type { Participant } from "livekit-client";
 
 export interface NavLinkProps extends LinkProps {
     children: JSX.Element | JSX.Element[] | string;
@@ -20,12 +21,19 @@ export interface MessageProps {
     sameAuthor: boolean;
     showMoreOptions: boolean;
     ghost?: boolean;
+    //setReferenceMessage: Dispatch<SetStateAction<any | null>>;
 }
 
 export interface VoiceHeaderProps {
     name: string;
     icon?: IconType,
     type: "pm" | "server"
+}
+export interface ParticipantTileProps {
+  user: Member,
+  participant: Participant,
+  isLocal?: boolean,
+  audioTrack?: MediaStreamTrack | null,
 }
 
 export interface Register {
@@ -72,5 +80,5 @@ export interface ModalControllerState {
 
 export interface ModalState {
     name: string;
-    closeModal: (name: string) => void;
+    closeModal: (name: string, data?: any) => void;
 }

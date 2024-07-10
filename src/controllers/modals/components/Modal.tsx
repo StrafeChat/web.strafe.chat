@@ -28,7 +28,7 @@ export default class Modal<Props, State> extends Component<ModalState & State, P
         window.removeEventListener("keydown", this.handleKeyDown);
     }
 
-    close() {
-        this.props.closeModal(this.props.name);
+    close(data?: any) {
+        this.props.closeModal(this.props.name, data);
     }
 }

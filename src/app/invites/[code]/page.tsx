@@ -2,7 +2,6 @@
 import { Button } from "@/components/ui/button";
 import { useClient } from "@/hooks";
 import { useRouter } from "next/navigation";
-import cookie from "js-cookie";
 import { Invite } from "@strafechat/strafe.js/dist/structure/Invite";
 import { User } from "@strafechat/strafe.js/dist/structure/User";
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -57,7 +56,7 @@ export default function Page({ params }: { params: { code: string } }) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'authorization': `${cookie.get("token")!}`
+          'authorization': `${localStorage.getItem("token")}`
         }
       });
       if (response.ok) {

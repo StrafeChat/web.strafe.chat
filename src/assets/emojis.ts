@@ -1,4 +1,6 @@
+
 export const emojis: Record<string, string> = {
+    "capybara": "http://localhost:3000/emojis/capybara.webp",
     "100": "💯",
     "1234": "🔢",
     "grinning": "😀",
