@@ -33,7 +33,7 @@
     "js-cookie": "^3.0.5",
     "livekit-client": "^2.3.1",
     "localforage": "^1.10.0",
-    "lucide-react": "^0.341.0",
+    "lucide-react": "^0.379.0",
     "luxon": "^3.4.4",
     "next": "^14.1.0",
     "next-i18next": "^15.2.0",
