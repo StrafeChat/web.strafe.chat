@@ -243,7 +243,10 @@ function StrafeVoiceCall() {
                   }
                 />
               </div>
-              <div className="m-2" >
+              </>
+            );
+          })}
+           <div className="m-2" >
                 <ParticipantTile
                 user={roomInfo?.space?.members?.get(manager?.client.user?.id!)!}
                 participant={localParticipant!}
@@ -251,9 +254,6 @@ function StrafeVoiceCall() {
                 isLocal={true}
               />
               </div>
-              </>
-            );
-          })}
         </div>
       </div>
       <div className="mt-auto mb-12">
