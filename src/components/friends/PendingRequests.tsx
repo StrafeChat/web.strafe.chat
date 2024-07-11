@@ -8,7 +8,7 @@ interface ExtendedFriendRequest {
   request: FriendRequest;
 }
 
-export function FriendRequestList({}) {
+export function PendingRequests({}) {
   const { client } = useClient();
 
   const [incoming, setIncoming] = useState<ExtendedFriendRequest[]>([]);

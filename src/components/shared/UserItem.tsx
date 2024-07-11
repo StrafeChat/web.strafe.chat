@@ -42,13 +42,13 @@ export function UserItem(props: UserItemProps) {
               verticalAlign: "middle",
             }}>
               <img draggable={false} src={`${Formatting.formatAvatar(user.id, user.avatar)}`} alt="Avatar" style={{
-                maxWidth: "1.2rem",
+                maxWidth: "1.5rem",
                 aspectRatio: "1/1",
                 borderRadius: "50%",
                 marginRight: "0.3rem"
               }}></img>
             </div>
-            <span className="username">{user.global_name ?? user.username}</span>
+            <span className="username ml-1">{user.global_name ?? user.username}</span>
           </div>          
         </li>
      </ProfilePopup>

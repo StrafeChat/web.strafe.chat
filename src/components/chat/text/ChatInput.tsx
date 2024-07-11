@@ -419,7 +419,7 @@ export function ChatInput({
                 attachments: viewImages,
               });
               console.log(message)
-              if (message.nonce === 1) setMessageSending(false);
+              if (message) setMessageSending(false);
               setContent("");
               setCharacterCount(0);
               setCurrentlyTyping(false);

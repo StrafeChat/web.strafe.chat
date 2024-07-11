@@ -464,7 +464,7 @@ export default function SpaceRoomList({ params }: SpaceRoomListProps) {
                           </ContextMenuContent>
                         </ContextMenu>
                       </NavLink>
-                      <ul>
+                      <ul className="flex flex-col gap-[8px]">
                         <>
                           {(room.type === 2) ?
                             (voiceUserMap?.get(room.id)?.map((member) => (

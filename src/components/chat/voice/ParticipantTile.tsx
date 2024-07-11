@@ -39,7 +39,7 @@ export function ParticipantTile({
           ></img>
         )}
       </div>
-      <h3>{user?.user.display_name ?? "Strife"}</h3>
+      {/* <h3>{user?.user.display_name ?? "Strife"}</h3> */}
       <audio ref={audioRef} autoPlay={true}></audio>
       {!!audioTrack ? (
         <WaveformVisualisation

@@ -1199,3 +1199,26 @@ div.avatar-status-client-user {
 	margin-bottom: 5px;
 	margin-right: 5px;
 }
+
+div.tabs {
+	display: flex;
+	gap: 1rem;
+	padding-left: 1rem;
+
+	button {
+	  padding: 0.25rem;
+	  border-radius: 0.5rem;
+
+	  &:hover {
+		background: var(--ui-settings-hover)
+	  }
+
+	  &.active {
+		background: var(--ui-settings-active);
+	  }
+
+	  &.add-friend {
+		background: var(--button-primary);
+	  }
+	}
+  }
