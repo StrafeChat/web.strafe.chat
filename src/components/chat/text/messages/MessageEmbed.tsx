@@ -173,7 +173,6 @@ export function MessageEmbed({ embed }: { embed: any }) {
                     >
                   | Iterable<React.ReactNode>
                   | React.ReactPortal
-                  | React.PromiseLikeOfReactNode
                   | Iterable<React.ReactNode>
                   | null
                   | undefined;
@@ -187,7 +186,6 @@ export function MessageEmbed({ embed }: { embed: any }) {
                     >
                   | Iterable<React.ReactNode>
                   | React.ReactPortal
-                  | React.PromiseLikeOfReactNode
                   | Iterable<React.ReactNode>
                   | null
                   | undefined;

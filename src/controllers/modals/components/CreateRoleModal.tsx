@@ -24,7 +24,7 @@ class CreateRoleModal extends Modal<{ roleName: string }, { data: { spaceId: str
         const handleSubmit = async (event: FormEvent) => {
             event.preventDefault();
             const space = client.spaces.get(this.props.data.spaceId);
-            await space!.roles.create({ name: this.state.roleName, type: 0, space_id: space?.id, });
+            // await space!.roles.create({ name: this.state.roleName, type: 0, space_id: space?.id, });
             this.close();
         }
 
