@@ -260,7 +260,7 @@ export default function ChatBody({ room, scrollToMessageId }: { room: Room, scro
           return null;
         })()}
         {messages.map((message, key) => (
-          <div key={message.id} ref={el => messageRefs.current[message.id] = el}>
+          <div key={message.id}>
             {key > 0 &&
               (() => {
                 const messageDate = new Date(message.createdAt);
