@@ -1,10 +1,13 @@
 "use client";
 import { useUI } from "@/providers/UIProvider";
 import { FaNoteSticky, FaArrowRight, FaArrowLeft } from "react-icons/fa6";
-import { useTranslation } from 'react-i18next';
+import { useTranslation } from "react-i18next";
 import { Button } from "@/components/ui/button";
-import { useClient } from "@/hooks";
-import { useEffect, useState } from "react";
+import { useClient, useModal, useVoice } from "@/hooks";
+import { useEffect, useRef, useState } from "react";
+import { P2PConnection } from "@strafechat/strafe.js/dist/voice/P2PConnection";
+import { toast } from "@/components/ui/use-toast";
+import { Input } from "@/components/ui/input";
 
 enum OP {
   IDENTIFY = 0,
@@ -20,170 +23,121 @@ export default function Notes() {
   const { t } = useTranslation();
 
   const { client } = useClient();
+  const { openCallbackModal } = useModal();
+  const { setRoomInfo, setConnection } = useVoice();
 
   const [selfViewTrack, setSelfViewTrack] = useState<MediaStream | null>(null);
-  const [remoteViewTrack, setRemoteViewTrack] = useState<MediaStream | null>(null);
+  const [remoteViewTrack, setRemoteViewTrack] = useState<MediaStream | null>(
+    null
+  );
 
-  const friendId = "187437957982979072";
-  var polite = false;
+  // const friendId = "187437957982979072"; RedTech Programming
+  const friend = useRef<HTMLInputElement | null>(null);
 
-  var pc: RTCPeerConnection | null = null;
-  var makingOffer = false;
+  var con: P2PConnection | null = null;
+
+  const kinds: string[] = [];
+  const tracks: MediaStreamTrack[] = [];
 
   const init = async () => {
-    if (!client) return console.warn("client not set");
-    const ids = [client.user?.id, friendId].sort();
-    const roomId = ids.join(":");
+    if (!client) return console.error("Client not initialized");
 
-    const res = await fetch("http://localhost:3001/v1/portal/personal/join", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: client.token!,
-      },
-      body: JSON.stringify({ roomId }),
-    });
-
-    const resData = await res.json();
-    if (!res.ok) return console.error("Failed to join room", resData);
-
-    console.log("token", resData);
-    connectWebsocket(resData.token);
-  }
-
-  const connectWebsocket = (token: string) => {
-    const ws = new WebSocket("ws://localhost:3001/portal/signaling/p2p");
-    ws.onopen = () => {
-      ws.send(JSON.stringify({
-        op: OP.IDENTIFY,
-        data: {
-          token,
-          id: client!.user!.id,
-        }
-      }));
-    }
-    ws.onclose = (message) => {
-      console.warn("closed", message, message.reason);
-    }
-
-    let ignoreOffer = false;
-    ws.onmessage = async (message) => {
-      const data = JSON.parse(message.data);
-      console.log("message", data);
-      switch (data.op) {
-        case OP.SETTINGS:
-          polite = data.data.role === "polite" ? true : false;
-          sendMessage(OP.ACK, { id: data.data.id });
-
-          console.log("settings received");
-
-          startNegotiation();
-          break;
-        case OP.NEGOTIATION:
-          const { description, candidate } = data.data;
-          try {
-            if (description) {
-              const offerCollision = 
-                description.type === "offer" &&
-                (makingOffer || pc!.signalingState !== "stable");
-              
-              ignoreOffer = !polite && offerCollision;
-              if (ignoreOffer) return;
-
-              await pc!.setRemoteDescription(description);
-              if (description.type === "offer") {
-                await pc!.setLocalDescription();
-                sendMessage(OP.NEGOTIATION, { description: pc!.localDescription });
-              }
-            } else if (candidate) {
-              try {
-                await pc!.addIceCandidate(candidate);
-              } catch(err) {
-                if (!ignoreOffer) {
-                  throw err;
-                }
-              }
-            }
-          } catch(e) {
-            console.error(e);
-          }
-        break;
-      }
-    }
-
-    const startNegotiation = async () => {
-      pc = new RTCPeerConnection({
-        iceServers: [
-          {
-            urls: "stun:stun.l.google.com:19302"
-          }
-        ]
+    try {
+      con = await client.voice.callUser(friend.current!.value);
+    } catch (e: any) {
+      return toast({
+        title: "Error",
+        description: e.message,
+        duration: 5000,
+        variant: "destructive",
       });
-      
-      startMedia();
-
-      pc.ontrack = ({ track, streams }) => {
-        track.onunmute = () => {
-          if (remoteViewTrack) {
-            return;
-          }
-          setRemoteViewTrack(streams[0]);
-        }
-      }
-      pc.onnegotiationneeded = async () => {
-        console.log("negotionation needed");
-        try {
-          makingOffer = true;
-          await pc!.setLocalDescription();
-          sendMessage(OP.NEGOTIATION, { description: pc!.localDescription });
-        } catch(e) {
-          console.error("Failed to set local description", e);
-        } finally {
-          makingOffer = false;
-        }
-      }
-      pc.onicecandidate = ({ candidate }) => {
-        sendMessage(OP.NEGOTIATION, { candidate });
-      }
     }
-
-    const startMedia = async () => {
+    setupEvents();
+  };
+  const setupEvents = () => {
+    kinds.length = 0;
+    con!.on("callStart", async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
-
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            deviceId: await deviceChooser(),
+          },
+          video: true,
+        });
         for (const track of stream.getTracks()) {
-          pc!.addTrack(track, stream);
+          con!.addTrack(track, stream);
         }
         setSelfViewTrack(stream);
       } catch (e) {
         console.error("Failed to get user media", e);
       }
-    }
-
-    const sendMessage = (op: OP, data: any) => {
-      ws.send(JSON.stringify({ op, data }));
-    }
-  }
+    });
+    con!.on("trackAdd", (data) => {
+      /*if (kinds.includes(data.track.kind)) return;
+      kinds.push(data.track.kind);
+      tracks.push(data.track);
+      const stream = new MediaStream(tracks);
+      console.log(stream, data.stream);*/
+      console.log("trackAdd", data);
+      if (remoteViewTrack) return;
+      setRemoteViewTrack(data.stream);
+    });
+  };
 
   useEffect(() => {
     if (!client) return;
 
-    const startCall = async (callData: { caller: string, token: string }) => {
+    const startCall = async (callData: { caller: string; token: string }) => {
       console.log("callData", callData);
       const join = prompt("Join call with " + callData.caller + "? (y/n)");
       if (join !== "y") return;
 
-      console.log("jointoken", callData.token);
-
-      connectWebsocket(callData.token);
-    }
+      con = client.voice.joinCall(callData.token, callData.caller);
+      setupEvents();
+    };
 
     client.on("callInit", startCall);
 
     return () => {
       client.off("callInit", startCall);
-    }
+    };
   }, [client]);
+
+  const deviceChooser = (): Promise<ConstrainDOMString> => {
+    return new Promise(async (res, rej) => {
+      if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+        return res("default");
+      }
+
+      const s = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: true,
+      });
+
+      const devices = (await navigator.mediaDevices.enumerateDevices()).filter(
+        (d) => d.kind === "audioinput"
+      );
+
+      const id = (await openCallbackModal("choose-device", {
+        devices,
+      })) as ConstrainDOMString & "strafechat-cancel";
+      s.getTracks().forEach((t) => t.stop());
+      if (id === "strafechat-cancel") return rej();
+
+      return res(id); // TODO: fix this
+      navigator.mediaDevices
+        .enumerateDevices()
+        .then((devices) => {
+          devices = devices.filter((d) => d.kind === "audioinput");
+
+          console.log(devices, "opening");
+        })
+        .catch((e) => {
+          console.warn(e);
+          return "default";
+        });
+    });
+  };
 
   return (
     <>
@@ -193,39 +147,68 @@ export default function Notes() {
             {hideRoomList ? (
               <>
                 <FaNoteSticky onClick={() => setHideRoomList(!hideRoomList)} />
-                <FaArrowRight className="!w-[12px] !h-[12px]" onClick={() => setHideRoomList(!hideRoomList)} />
+                <FaArrowRight
+                  className="!w-[12px] !h-[12px]"
+                  onClick={() => setHideRoomList(!hideRoomList)}
+                />
               </>
             ) : (
               <>
-                <FaArrowLeft className="!w-[13px] !h-[13px]" onClick={() => setHideRoomList(!hideRoomList)} />
+                <FaArrowLeft
+                  className="!w-[13px] !h-[13px]"
+                  onClick={() => setHideRoomList(!hideRoomList)}
+                />
                 <FaNoteSticky onClick={() => setHideRoomList(!hideRoomList)} />
               </>
             )}
           </span>
-          <span><b>{t('notes_page.header')}</b></span>
+          <span>
+            <b>{t("notes_page.header")}</b>
+          </span>
         </div>
-        <div>
-          <h1>Notes Page</h1>
-
+        <div className="p-10">
           <p>This page is currently being used to test p2p calls.</p>
 
-          <Button variant={"default"} onClick={() => {
-            init();
-          }}>Start connection</Button>
+          <Input
+            placeholder="UserId to call"
+            ref={friend}
+            defaultValue={"187437957982979072"}
+            type="text"
+          ></Input>
+          <Button
+            variant={"default"}
+            onClick={() => {
+              init();
+            }}
+          >
+            Start connection
+          </Button>
 
           <br></br>
+          <div className="flex flex-grid p-2">
+            <video
+              className="rounded-lg mx-2 aspect-video"
+              autoPlay
+              playsInline
+              ref={(ref) => {
+                if (!ref) return;
+                ref.srcObject = selfViewTrack;
+              }}
+            ></video>
 
-          <video autoPlay playsInline muted ref={(ref) => {
-            if (!ref) return;
-            ref.srcObject = selfViewTrack;
-          }}></video>
-
-          <video autoPlay playsInline ref={(ref) => {
-            if (!ref) return;
-            ref.srcObject = remoteViewTrack;
-          }}></video>
+            <video
+              className="mx-2 aspect-video rounded-lg"
+              autoPlay
+              playsInline
+              ref={(ref) => {
+                if (!ref) return;
+                console.log("remoteViewTrack", remoteViewTrack);
+                ref.srcObject = remoteViewTrack;
+              }}
+            ></video>
+          </div>
         </div>
       </div>
     </>
-  )
+  );
 }
