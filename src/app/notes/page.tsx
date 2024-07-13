@@ -4,10 +4,13 @@ import { FaNoteSticky, FaArrowRight, FaArrowLeft } from "react-icons/fa6";
 import { useTranslation } from 'react-i18next';
 import { Button } from "@/components/ui/button";
 import { useClient } from "@/hooks";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 enum OP {
   IDENTIFY = 0,
+  ACK = 1, // confirmation of a message
+  SETTINGS = 2,
+  NEGOTIATION = 3,
 
   ERROR = 20,
 }
@@ -18,7 +21,14 @@ export default function Notes() {
 
   const { client } = useClient();
 
+  const [selfViewTrack, setSelfViewTrack] = useState<MediaStream | null>(null);
+  const [remoteViewTrack, setRemoteViewTrack] = useState<MediaStream | null>(null);
+
   const friendId = "187437957982979072";
+  var polite = false;
+
+  var pc: RTCPeerConnection | null = null;
+  var makingOffer = false;
 
   const init = async () => {
     if (!client) return console.warn("client not set");
@@ -54,6 +64,104 @@ export default function Notes() {
     }
     ws.onclose = (message) => {
       console.warn("closed", message, message.reason);
+    }
+
+    let ignoreOffer = false;
+    ws.onmessage = async (message) => {
+      const data = JSON.parse(message.data);
+      console.log("message", data);
+      switch (data.op) {
+        case OP.SETTINGS:
+          polite = data.data.role === "polite" ? true : false;
+          sendMessage(OP.ACK, { id: data.data.id });
+
+          console.log("settings received");
+
+          startNegotiation();
+          break;
+        case OP.NEGOTIATION:
+          const { description, candidate } = data.data;
+          try {
+            if (description) {
+              const offerCollision = 
+                description.type === "offer" &&
+                (makingOffer || pc!.signalingState !== "stable");
+              
+              ignoreOffer = !polite && offerCollision;
+              if (ignoreOffer) return;
+
+              await pc!.setRemoteDescription(description);
+              if (description.type === "offer") {
+                await pc!.setLocalDescription();
+                sendMessage(OP.NEGOTIATION, { description: pc!.localDescription });
+              }
+            } else if (candidate) {
+              try {
+                await pc!.addIceCandidate(candidate);
+              } catch(err) {
+                if (!ignoreOffer) {
+                  throw err;
+                }
+              }
+            }
+          } catch(e) {
+            console.error(e);
+          }
+        break;
+      }
+    }
+
+    const startNegotiation = async () => {
+      pc = new RTCPeerConnection({
+        iceServers: [
+          {
+            urls: "stun:stun.l.google.com:19302"
+          }
+        ]
+      });
+      
+      startMedia();
+
+      pc.ontrack = ({ track, streams }) => {
+        track.onunmute = () => {
+          if (remoteViewTrack) {
+            return;
+          }
+          setRemoteViewTrack(streams[0]);
+        }
+      }
+      pc.onnegotiationneeded = async () => {
+        console.log("negotionation needed");
+        try {
+          makingOffer = true;
+          await pc!.setLocalDescription();
+          sendMessage(OP.NEGOTIATION, { description: pc!.localDescription });
+        } catch(e) {
+          console.error("Failed to set local description", e);
+        } finally {
+          makingOffer = false;
+        }
+      }
+      pc.onicecandidate = ({ candidate }) => {
+        sendMessage(OP.NEGOTIATION, { candidate });
+      }
+    }
+
+    const startMedia = async () => {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+
+        for (const track of stream.getTracks()) {
+          pc!.addTrack(track, stream);
+        }
+        setSelfViewTrack(stream);
+      } catch (e) {
+        console.error("Failed to get user media", e);
+      }
+    }
+
+    const sendMessage = (op: OP, data: any) => {
+      ws.send(JSON.stringify({ op, data }));
     }
   }
 
@@ -104,6 +212,18 @@ export default function Notes() {
           <Button variant={"default"} onClick={() => {
             init();
           }}>Start connection</Button>
+
+          <br></br>
+
+          <video autoPlay playsInline muted ref={(ref) => {
+            if (!ref) return;
+            ref.srcObject = selfViewTrack;
+          }}></video>
+
+          <video autoPlay playsInline ref={(ref) => {
+            if (!ref) return;
+            ref.srcObject = remoteViewTrack;
+          }}></video>
         </div>
       </div>
     </>
