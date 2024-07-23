@@ -55,7 +55,7 @@
     "remark-gfm": "^4.0.0",
     "remark-math": "^6.0.0",
     "remark-twemoji": "^0.1.1",
-    "tailwind-merge": "^2.2.0",
+    "tailwind-merge": "^2.4.0",
     "tailwindcss-animate": "^1.0.7",
     "twemoji": "^14.0.2"
   },
