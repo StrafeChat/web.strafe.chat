@@ -1,6 +1,6 @@
 import { useClient, useModal } from "@/hooks";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   FaCirclePlus,
   FaCompass,
@@ -20,9 +20,35 @@ import {
 } from "../ui/context-menu";
 import { Formatting } from "@/helpers/formatter";
 export default function SpaceList() {
-  let [hide, setHide] = useState(false);
   const { openModal } = useModal();
   const { client } = useClient();
+
+  function ifUnread(spaceId: string) {
+    const space = client?.spaces.get(spaceId);
+    let boolean = false;
+    space?.rooms.map((room) => {
+      if (room.unreads.toArray()[0]) return boolean = true;
+    })
+    if (boolean) {
+      return true;
+    } 
+    return false;
+  }
+
+ useEffect(() => {
+   client?.spaces.forEach((space) => {
+    let boolean = false;
+    space?.rooms.map((room) => {
+      if (room.mentions.toArray()[0]) {
+        boolean = true;
+      }
+    })
+    if (boolean) {
+      return true;
+    } 
+    return false;
+   })
+ })
 
   return (
     <div className="space-list">
@@ -97,6 +123,8 @@ export default function SpaceList() {
                 <ContextMenu>
                   <ContextMenuTrigger>
                     <div key={space.id}>
+                     { ifUnread(space.id) && <div className="unread" />}
+                     { <div className="mentions"> 5 </div>}
                       <NavLink href={`/spaces/${space.id}`}>
                         <button className="space" draggable={true}>
                           {space.icon ? (

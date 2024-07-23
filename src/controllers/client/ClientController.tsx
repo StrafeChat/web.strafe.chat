@@ -29,6 +29,7 @@ export default function ClientController({ children }: { children: JSX.Element }
     setReady(true);
     setClientError(false);
     i18n.changeLanguage(client?.user?.locale.replace("-", "_"))
+    console.log(client?.unreads)
   }, [i18n, client])
 
   const handlePresenceUpdate = useCallback((data: any) => {
@@ -38,7 +39,7 @@ export default function ClientController({ children }: { children: JSX.Element }
   }, [client]);
 
   const handleMessageCreate = useCallback((data: any) => {
-    forceUpdate();
+    // forceUpdate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [client]);
 

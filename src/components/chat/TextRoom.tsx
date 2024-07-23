@@ -3,6 +3,9 @@ import { useTranslation } from "react-i18next";
 import MemberList from "./MemberList";
 import { ChatHeader } from "./text/ChatHeader";
 import ChatArea from "./text/ChatArea";
+import { useEffect } from "react";
+import { usePathname } from "next/navigation";
+import { useForceUpdate } from "@/hooks";
 
 export default function TextRoom(props: { space: Space, room: Room, hidden: boolean }) {
   const members = props.space.members;

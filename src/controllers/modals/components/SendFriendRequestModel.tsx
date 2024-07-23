@@ -12,26 +12,53 @@ const modalVariants = {
     closed: { opacity: 0, transition: { ease: "backOut", duration: 0.3, x: { duration: 1 } } },
 };
 
-class SendFriendRequestModal extends Modal<{ username: string, discriminator: number }, {}> {
+class SendFriendRequestModal extends Modal<{ usernameAndTag: string }, {}> {
 
     static contextType = ClientControllerContext;
     context!: React.ContextType<typeof ClientControllerContext>;
 
-    state = { username: "", discriminator: 0 };
+    state = { usernameAndTag: "" };
 
     render() {
         const { client } = this.context as { client: Client };
 
         const handleSubmit = async (event: FormEvent) => {
             event.preventDefault();
-            const result = await client!.user!.sendFriendRequest(this.state.username, this.state.discriminator);
+            const { usernameAndTag } = this.state;
+            const regex = /^(.+?)#(\d{4})$/;
+            const match = usernameAndTag.match(regex);
+
+            if (!match) {
+                toast({
+                    title: "Error",
+                    description: "Invalid format. Use 'username#1234'.",
+                    duration: 5000,
+                    variant: "destructive"
+                });
+                return;
+            }
+
+            const [_, username, discriminatorString] = match;
+            const discriminator = Number(discriminatorString);
+
+            if (isNaN(discriminator)) {
+                toast({
+                    title: "Error",
+                    description: "Discriminator must be a valid number.",
+                    duration: 5000,
+                    variant: "destructive"
+                });
+                return;
+            }
+
+            const result = await client!.user!.sendFriendRequest(username, discriminator);
             if (!result.ok) {
               toast({
                 title: "Error",
                 description: result.message,
                 duration: 5000,
                 variant: "destructive"
-              })
+              });
             } else {
               (event.target as HTMLFormElement).reset();
             }
@@ -54,20 +81,12 @@ class SendFriendRequestModal extends Modal<{ username: string, discriminator: nu
                                 <form onSubmit={handleSubmit}>
                                     <h1>Add Friend</h1>
                                     <p className="text-xs pt-4 pb-2 uppercase text-gray-300 font-bold">Username</p>
-                                    <div className="flex items-center gap-2">
                                         <input
-                                            placeholder="username"
-                                            onChange={(event) => this.setState({ username: event.target.value })}
+                                            placeholder="username#1234"
+                                            onChange={(event) => this.setState({ usernameAndTag: event.target.value })}
                                             style={{ flexGrow: 1 }}
                                             required
                                         />
-                                        <input
-                                            placeholder="1234"
-                                            onChange={(event) => this.setState({ discriminator: parseInt(event.target.value) })}
-                                            style={{ width: "60px" }}
-                                            required
-                                        />
-                                    </div>
                                     <div className="flex gap-2 py-2 w-full pt-4 rounded-[20px]">
                                        <Button type='submit' className='w-full bg-primary font-bold hover:opacity-55'>Send</Button>
                                     </div>

@@ -81,7 +81,7 @@ export function MessageEmbed({ embed }: { embed: any }) {
     height: number
   ): React.CSSProperties => {
     const maxWidth = 500;
-    const maxHeight = 500;
+    const maxHeight = 350;
     const aspectRatio = width / height;
 
     if (width > maxWidth || height > maxHeight) {
@@ -102,7 +102,7 @@ export function MessageEmbed({ embed }: { embed: any }) {
   };
 
   const isEmbeddableUrl = (url: string): boolean => {
-    const embeddableDomains = ["youtube.com", "twitch.tv", "vimeo.com"]; // Add more domains as needed
+    const embeddableDomains = ["youtube.com", "twitch.tv", "vimeo.com", "rumble.com"]; // Add more domains as needed
     try {
       const urlObj = new URL(url);
       return embeddableDomains.some((domain) =>

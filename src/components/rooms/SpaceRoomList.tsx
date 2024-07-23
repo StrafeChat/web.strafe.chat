@@ -49,6 +49,7 @@ export default function SpaceRoomList({ params }: SpaceRoomListProps) {
         initialState[room.id] = true;
       }
     });
+
     setIsSectionExpanded(initialState);
   }, [params.spaceId]);
 
@@ -399,6 +400,7 @@ export default function SpaceRoomList({ params }: SpaceRoomListProps) {
                   .sort((a, b) => a.position - b.position)
                   .map((room, index) => (
                     <div key={room.id}>
+                     { room.unreads.toArray()[0] && <div className={`unread ${room.mentions.toArray()[0] && "mentioned"}`} /> }
                       <NavLink
                         key={room.id}
                         href={`/spaces/${space.id}/rooms/${room.id}`}

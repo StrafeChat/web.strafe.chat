@@ -1,10 +1,14 @@
 import { useEffect, useRef, useState, useCallback } from "react";
 import { IMessage, Message, Room } from "@strafechat/strafe.js";
-import { useClient } from "@/hooks";
+import { useClient, useForceUpdate } from "@/hooks";
+import { usePathname } from "next/navigation";
 import { MessageComponent } from "./messages/Message";
 
 export default function ChatBody({ room, scrollToMessageId }: { room: Room, scrollToMessageId?: string }) {
+  const unreads = room.unreads;
+  const pathname = usePathname();
   const scrollRef = useRef<HTMLUListElement>(null);
+  const forceUpdate = useForceUpdate();
   const messageRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
   const { client } = useClient();
   const [showMoreOptionsForMessages, setShowMoreOptionsForMessages] = useState(false);
@@ -18,6 +22,7 @@ export default function ChatBody({ room, scrollToMessageId }: { room: Room, scro
   const [scrollFraction, setScrollFraction] = useState(1);
 
   useEffect(() => {
+
     if (messages.length < 100) setHasMoreUp(false);
 
     const scrollElement = scrollRef.current;
@@ -28,6 +33,7 @@ export default function ChatBody({ room, scrollToMessageId }: { room: Room, scro
 
     const handleNewMessage = (message: Message) => {
       if (message.roomId !== room.id) return;
+      room.unreads.delete(room.id);
       setMessages((prevMessages) => [...prevMessages, message]);
         if (scrollElement) {
           scrollElement.scrollTop = scrollElement.scrollHeight;
@@ -182,6 +188,13 @@ export default function ChatBody({ room, scrollToMessageId }: { room: Room, scro
       document.removeEventListener("keyup", handleKeyUp);
     };
   }, []);
+
+  useEffect(() => {
+    if (unreads.toArray()[0]) {
+      room.read();
+      forceUpdate();
+    } 
+  }, [pathname, room.unreads.toArray().length])
 
   useEffect(() => {
     const handleScroll = () => {

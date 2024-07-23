@@ -43,6 +43,9 @@ import {
   SpotifyEmbed,
 } from "@/utils";
 import { MessageAttachment } from "./MessageAttachment";
+import remarkGfm from "remark-gfm";
+import rehypeRaw from 'rehype-raw';
+import DOMPurify from 'dompurify';
 
 export function MessageComponent({
   message,
@@ -121,12 +124,12 @@ export function MessageComponent({
     });
 
     client?.on("messageDelete", (msg) => {
-      setTimeout(() => {
-        metadataFetched.current = false;
-        spotifyEmbedFetched.current = false;
-        setSpotifyEmbed(null);
-        setMetadataDetails(null);
-      }, 1);
+      // setTimeout(() => {
+      //   metadataFetched.current = false;
+      //   spotifyEmbedFetched.current = false;
+      //   setSpotifyEmbed(null);
+      //   setMetadataDetails(null);
+      // }, 1);
     });
   }, []);
 
@@ -207,67 +210,97 @@ export function MessageComponent({
   };
 
   const transformMessage = (content: string) => {
-    let text = content;
-    const inviteCode = extractInviteCode(text);
-    const urlRegex =
-      /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/g;
-    const spotifyUrlRegex =
-      /(?:https?:\/\/)?(?:open\.spotify\.com\/|spotify:(track|episode|album|playlist|artist):)(track|episode|album|playlist|artist)[\/:]([a-zA-Z0-9]{22})(?:\S+)?/;
+  let text = content;
+  const inviteCode = extractInviteCode(text);
+  const urlRegex = /https?:\/\/(www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b([-a-zA-Z0-9()@:%_\+.~#?&//=]*)/g;
+  const spotifyUrlRegex = /(?:https?:\/\/)?(?:open\.spotify\.com\/|spotify:(track|episode|album|playlist|artist):)(track|episode|album|playlist|artist)[\/:]([a-zA-Z0-9]{22})(?:\S+)?/;
+  const userMentionRegex = /<@!?(\d{17,19})>/g;
+  
+  let userIds: string[] = [];
+  let match: RegExpExecArray | null;
 
-    if (text && inviteCode) {
-      client?.invites
-        .fetch(inviteCode)
-        .then((invite) => {
-          setInviteDetails(invite);
-        })
-        .catch((error) => {
-          console.error("Error fetching invite details:", error);
-        });
+  while ((match = userMentionRegex.exec(text)) !== null) {
+    userIds.push(match[1]);
+  }
+
+  if (userIds.length > 0) {
+    console.log(userIds)
+   for (const userId in userIds) {
+    if (message.spaceId) {
+      const space = client?.spaces.get(message.spaceId)
+      const member = space?.members.get(userIds[userId]);
+      if (member) {
+        text = text.replace(new RegExp(`<@!?${userIds[userId]}>`, "g"), `<span class="bg-[#241f1f]	text-[#a1a1a1] rounded-2xl font-bold py-1 px-1.5"><img class="w-4 h-4 mt-[-2px] rounded-full" src="http://localhost:446/avatars/6492719156893320192/3553df4f9b2733cff28bde3cf26b7a1592dc657e812bb0eff2c8433839dda687.webp"> </img>${member.user.display_name}</span>`);
+      } else {
+        text = text.replace(new RegExp(`<@!?${userIds[userId]}>`, "g"), `@Unknown User`);
+      }
     } else {
-      if (text && urlRegex.test(text)) {
-        if (!spotifyUrlRegex.test(text)) {
-          if (!metadataFetched.current) {
-            const matches = text.match(urlRegex);
-            fetchMetadata(matches![0], (metadata) => {
-              if (metadata) {
-                setMetadataDetails(metadata);
-                metadataFetched.current = true;
-              }
-            });
-          }
+      const user = client?.users.get(userId);
+      if (user) {
+        text = text.replace(new RegExp(`<@!?${userIds[userId]}>`, "g"), `<span class="bg-[#241f1f]	text-[#a1a1a1] rounded-2xl font-bold py-1 px-1.5"><img class="w-4 h-4 mt-[-2px] rounded-full" src="http://localhost:446/avatars/6492719156893320192/3553df4f9b2733cff28bde3cf26b7a1592dc657e812bb0eff2c8433839dda687.webp"> </img>${user.displayName}</span>`);
+      } else {
+        text = text.replace(new RegExp(`<@!?${userIds[userId]}>`, "g"), `@Unknown User`);
+      }
+    }
+   }
+  }
+
+  text = DOMPurify.sanitize(text, { ALLOWED_TAGS: ["span", "img"], ALLOWED_ATTR: ["class", "src"] });
+
+  if (text && inviteCode) {
+    client?.invites
+      .fetch(inviteCode)
+      .then((invite) => {
+        setInviteDetails(invite);
+      })
+      .catch((error) => {
+        console.error("Error fetching invite details:", error);
+      });
+  } else {
+    if (text && urlRegex.test(text)) {
+      if (!spotifyUrlRegex.test(text)) {
+        if (!metadataFetched.current) {
+          const matches = text.match(urlRegex);
+          fetchMetadata(matches![0], (metadata) => {
+            if (metadata) {
+              setMetadataDetails(metadata);
+              metadataFetched.current = true;
+            }
+          });
         }
       }
     }
+  }
 
-    if (text && spotifyUrlRegex.test(text)) {
-      if (!spotifyEmbedFetched.current) {
-        const matches = text.match(spotifyUrlRegex);
-        fetchSpotifyEmbed(matches![0], (spotifyEmbed) => {
-          if (spotifyEmbed) {
-            setSpotifyEmbed(spotifyEmbed);
-            spotifyEmbedFetched.current = true;
-          }
-        });
-      }
+  if (text && spotifyUrlRegex.test(text)) {
+    if (!spotifyEmbedFetched.current) {
+      const matches = text.match(spotifyUrlRegex);
+      fetchSpotifyEmbed(matches![0], (spotifyEmbed) => {
+        if (spotifyEmbed) {
+          setSpotifyEmbed(spotifyEmbed);
+          spotifyEmbedFetched.current = true;
+        }
+      });
     }
+  }
 
-    const patterns: Record<
-      string,
-      (match: string, ...groups: string[]) => string
-    > = {
-      ":([^:]+):": (match, content) => {
-        const emojiValue = emojis[content];
-        return emojiValue ?? match;
-      },
-    };
-
-    for (const pattern in patterns) {
-      const regex = new RegExp(pattern, "g");
-      text = text.replace(regex, patterns[pattern]);
-    }
-
-    return text;
+  const patterns: Record<
+    string,
+    (match: string, ...groups: string[]) => string
+  > = {
+    ":([^:]+):": (match, content) => {
+      const emojiValue = emojis[content];
+      return emojiValue ?? match;
+    },
   };
+
+  for (const pattern in patterns) {
+    const regex = new RegExp(pattern, "g");
+    text = text.replace(regex, patterns[pattern]);
+  }
+
+  return text;
+};
 
   const handleClearContent = () => {
     if (contentRef.current) {
@@ -282,7 +315,7 @@ export function MessageComponent({
       {!sameAuthor ? (
         <ContextMenu>
           <ContextMenuTrigger>
-            <li key={key} className="group message full">
+            <li key={key} className={`group message full ${message.mentions?.includes(client?.user?.id!) && "bg-[#363030] bg-opacity-75 border-l-2 border-l-primary"}`}>
               <div className="options group-hover:flex">
                 <div className="icon">
                   <TooltipProvider>
@@ -417,16 +450,17 @@ export function MessageComponent({
                       {editable && (message.content as string)}
                       {!editable && (
                         <ReactMarkdown
+                          children={transformMessage(message.content as string)}
                           components={{ a: CustomLink }}
                           remarkPlugins={[
                             gfm,
                             remarkMath,
                             remarkFrontmatter,
                             remarkParse,
+                            remarkGfm
                           ]}
-                        >
-                          {transformMessage(message.content as string)!}
-                        </ReactMarkdown>
+                          rehypePlugins={[rehypeRaw]}
+                        />
                       )}
                     </>
                   )}
@@ -501,7 +535,7 @@ export function MessageComponent({
       ) : (
         <li
           key={key}
-          className="group message"
+          className={`group message ${message.mentions?.includes(client?.user?.id!) && "bg-[#363030] bg-opacity-75 border-l-2 border-l-primary w-full"}`}
           onMouseEnter={() => setIsHovered(true)}
           onMouseLeave={() => setIsHovered(false)}
         >
@@ -581,7 +615,7 @@ export function MessageComponent({
               </>
             )}
           </div>
-          <div className="flex flex-col w-full">
+          <div className={`flex flex-col w-full h-full`}>
             <span className="timestamp absolute text-center text-[11px] pt-2.5 px-3">
               {isHovered && messageDate.toLocaleString(DateTime.TIME_SIMPLE)}
             </span>
@@ -609,7 +643,9 @@ export function MessageComponent({
                         remarkMath,
                         remarkFrontmatter,
                         remarkParse,
+                        remarkGfm
                       ]}
+                      rehypePlugins={[rehypeRaw]}
                     >
                       {transformMessage(message.content as string)}
                     </ReactMarkdown>
