@@ -1,0 +1,73 @@
+export const lightTheme = {
+  id: "light",
+  name: "Light",
+  author: "Strafe",
+  colors: {
+    primary: "hsl(118 28% 45%)",
+    background: "hsl(0 0% 100%)",
+    background0: "hsl(0 0% 97%)",
+    background1: "hsl(0 0% 95%)",
+    background2: "hsl(0 0% 92%)",
+    foreground: "hsl(0 0% 0%)",
+    accent: "hsl(118 28% 45%)",
+    surface: "hsl(0 0% 96%)",
+    text: {
+      primary: "hsl(0 0% 0%)",
+      secondary: "hsl(0 0% 40%)",
+      accent: "hsl(142 71% 45%)",
+      inverse: "hsl(0 0% 100%)",
+    },
+    border: "hsl(0 0% 88%)",
+    error: "#ff3b30",
+    success: "#34c759",
+    warning: "#ffcc00",
+  },
+  shadows: {
+    sm: "0 1px 2px rgba(0, 0, 0, 0.05)",
+    md: "0 4px 6px rgba(0, 0, 0, 0.1)",
+    lg: "0 10px 15px rgba(0, 0, 0, 0.1)",
+  },
+  radii: {
+    sm: "0.25rem",
+    md: "0.5rem",
+    lg: "1rem",
+    full: "9999px",
+  },
+};
+
+export const darkTheme = {
+  id: "dark",
+  name: "Dark",
+  author: "Strafe",
+  colors: {
+    primary: "hsl(118 28% 45%)",
+    background: "hsl(0 0% 4%)",
+    background0: "hsl(0 0% 7%)",
+    background1: "hsl(0 0% 8%)",
+    background2: "hsl(0 0% 10%)",
+    foreground: "hsl(0 0% 100%)",
+    accent: "hsl(118 28% 45%)",
+    surface: "hsl(0 0% 15%)",
+    text: {
+      primary: "hsl(0 0% 100%)",
+      secondary: "hsl(0 0% 65%)",
+      accent: "hsl(142 71% 45%)",
+      inverse: "hsl(0 0% 0%)",
+    },
+    border: "hsl(0 0% 12%)",
+    error: "#ff453a",
+    success: "#32d74b",
+    warning: "#ffd60a",
+  },
+  shadows: {
+    sm: "0 1px 2px rgba(0, 0, 0, 0.2)",
+    md: "0 4px 6px rgba(0, 0, 0, 0.3)",
+    lg: "0 10px 15px rgba(0, 0, 0, 0.3)",
+  },
+  radii: {
+    sm: "0.25rem",
+    md: "0.5rem",
+    lg: "1rem",
+    full: "9999px",
+  },
+};

@@ -1,0 +1,128 @@
+{
+  "title": "Liste",
+  "search": "Rechercher",
+  "create": "Créer",
+  "delete": "Supprimer",
+  "auth": {
+    "login": {
+      "title": "Connexion",
+      "subtitle": "Connectez-vous à votre compte existant",
+      "email": "Email",
+      "password": "Mot de passe",
+      "submit": "Se connecter",
+      "needAccount": "Besoin d'un compte ? S'inscrire",
+      "error": {
+        "emptyFields": "Veuillez remplir tous les champs",
+        "invalidCredentials": "Identifiants invalides"
+      }
+    },
+    "register": {
+      "title": "Inscription",
+      "subtitle": "Créer un compte sur Strafe",
+      "username": "Nom d'utilisateur",
+      "discriminator": "Discriminateur",
+      "displayName": "Nom d'affichage",
+      "email": "Email",
+      "password": "Mot de passe",
+      "dateOfBirth": "Date de naissance",
+      "tos": "J'accepte les",
+      "tosLink": "Conditions d'utilisation",
+      "and": "et la",
+      "privacyLink": "Politique de confidentialité",
+      "submit": "S'inscrire",
+      "haveAccount": "Vous avez déjà un compte ? Se connecter",
+      "error": {
+        "requiredFields": "Veuillez remplir tous les champs requis",
+        "registrationFailed": "L'inscription a échoué. Veuillez réessayer."
+      }
+    }
+  },
+  "settings": {
+    "sections": {
+      "user": "Paramètres utilisateur",
+      "app": "Paramètres de l'application",
+      "account": "Compte",
+      "profile": "Profil",
+      "privacy": "Confidentialité et sécurité",
+      "appearance": "Apparence",
+      "accessibility": "Accessibilité",
+      "voice": "Voix et vidéo",
+      "text": "Texte et images",
+      "notifications": "Notifications",
+      "keybinds": "Raccourcis clavier",
+      "language": "Langue",
+      "logout": "Se déconnecter"
+    },
+    "account": {
+      "title": "Compte",
+      "description": "Mettez à jour votre compte",
+      "status": {
+        "online": "En ligne",
+        "offline": "Hors ligne",
+        "idle": "Inactif",
+        "dnd": "Ne pas déranger"
+      },
+      "editProfile": "Modifier le profil",
+      "avatar": {
+        "alt": "Avatar de l'utilisateur"
+      }
+    },
+    "appearance": {
+      "title": "Apparence",
+      "description": "Faites de Strafe le vôtre"
+    },
+    "language": {
+      "title": "Langue",
+      "description": "Sélectionnez votre langue"
+    },
+    "default": {
+      "underDevelopment": "Cette section est en cours de développement."
+    }
+  },
+  "components": {
+    "datePicker": {
+      "months": {
+        "january": "Janvier",
+        "february": "Février",
+        "march": "Mars",
+        "april": "Avril",
+        "may": "Mai",
+        "june": "Juin",
+        "july": "Juillet",
+        "august": "Août",
+        "september": "Septembre",
+        "october": "Octobre",
+        "november": "Novembre",
+        "december": "Décembre"
+      },
+      "weekDays": {
+        "sunday": "Di",
+        "monday": "Lu",
+        "tuesday": "Ma",
+        "wednesday": "Me",
+        "thursday": "Je",
+        "friday": "Ve",
+        "saturday": "Sa"
+      },
+      "selectMonth": "Sélectionner le mois",
+      "selectYear": "Sélectionner l'année",
+      "dateFormat": "{{day}} {{month}} {{year}}"
+    }
+  },
+  "home": {
+    "cards": {
+      "settings": "Paramètres et Préférences",
+      "settingsDescription": "Personnalisez votre expérience Strafe avec des paramètres et des préférences personnalisés.",
+      "exploreSettings": "Ouvrir les Paramètres",
+      "community": "Rejoignez la Communauté",
+      "communityDescription": "Connectez-vous avec d'autres utilisateurs Strafe, partagez des expériences et faites de nouveaux amis.",
+      "joinCommunity": "Rejoindre Maintenant",
+      "donate": "Soutenez STRAFE",
+      "donateDescription": "Aidez-nous à maintenir et à développer Strafe avec votre soutien.",
+      "supportUs": "Faire un Don",
+      "discover": "Découvrir Plus",
+      "discoverDescription": "Explorez toutes les fonctionnalités et possibilités que Strafe a à offrir.",
+      "exploreMore": "En Savoir Plus"
+    }
+  }
+}

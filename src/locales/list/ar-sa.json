@@ -1,0 +1,40 @@
+{
+  "home": {
+    "title": "الرئيسية",
+    "welcome": "مرحباً بك في",
+    "cards": {
+      "settings": "الإعدادات",
+      "settingsDescription": "خصص تجربتك في Strafe مع الإعدادات الشخصية",
+      "exploreSettings": "استكشف الإعدادات",
+      "community": "المجتمع",
+      "communityDescription": "انضم إلى مجتمعنا النابض بالحياة وتواصل مع الآخرين",
+      "joinCommunity": "انضم للمجتمع",
+      "donate": "ادعمنا",
+      "donateDescription": "ساعدنا في الحفاظ على Strafe وتطويره",
+      "supportUs": "ادعمنا",
+      "discover": "اكتشف",
+      "discoverDescription": "استكشف الميزات والتحديثات الجديدة"
+    }
+  },
+  "friends": {
+    "title": "الأصدقاء",
+    "tabs": {
+      "online": "متصل",
+      "all": "الكل",
+      "pending": "معلق",
+      "blocked": "محظور"
+    },
+    "addFriend": "إضافة صديق",
+    "noFriends": {
+      "title": "لا يوجد أصدقاء حتى الآن",
+      "description": "ابدأ بإضافة الأصدقاء للتواصل معهم"
+    }
+  },
+  "messages": {
+    "privateMessages": "الرسائل الخاصة"
+  },
+  "navigation": {
+    "home": "الرئيسية",
+    "friends": "الأصدقاء"
+  }
+}

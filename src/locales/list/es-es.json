@@ -1,0 +1,124 @@
+{
+  "auth": {
+    "login": {
+      "title": "Iniciar sesión",
+      "subtitle": "Inicia sesión en tu cuenta existente",
+      "email": "Correo electrónico",
+      "password": "Contraseña",
+      "submit": "Iniciar sesión",
+      "needAccount": "¿Necesitas una cuenta? Regístrate",
+      "error": {
+        "emptyFields": "Por favor, rellena todos los campos",
+        "invalidCredentials": "Credenciales inválidas"
+      }
+    },
+    "register": {
+      "title": "Registro",
+      "subtitle": "Crea una cuenta en Strafe",
+      "username": "Nombre de usuario",
+      "discriminator": "Discriminador",
+      "displayName": "Nombre para mostrar",
+      "email": "Correo electrónico",
+      "password": "Contraseña",
+      "dateOfBirth": "Fecha de nacimiento",
+      "tos": "Acepto los",
+      "tosLink": "Términos de servicio",
+      "and": "y la",
+      "privacyLink": "Política de privacidad",
+      "submit": "Registrarse",
+      "haveAccount": "¿Ya tienes una cuenta? Inicia sesión",
+      "error": {
+        "requiredFields": "Por favor, rellena todos los campos requeridos",
+        "registrationFailed": "El registro falló. Por favor, inténtalo de nuevo."
+      }
+    }
+  },
+  "settings": {
+    "sections": {
+      "user": "Ajustes de usuario",
+      "app": "Ajustes de la aplicación",
+      "account": "Cuenta",
+      "profile": "Perfil",
+      "privacy": "Privacidad y seguridad",
+      "appearance": "Apariencia",
+      "accessibility": "Accesibilidad",
+      "voice": "Voz y vídeo",
+      "text": "Texto e imágenes",
+      "notifications": "Notificaciones",
+      "keybinds": "Atajos de teclado",
+      "language": "Idioma",
+      "logout": "Cerrar sesión"
+    },
+    "account": {
+      "title": "Cuenta",
+      "description": "Actualiza tu cuenta",
+      "status": {
+        "online": "En línea",
+        "offline": "Desconectado",
+        "idle": "Ausente",
+        "dnd": "No molestar"
+      },
+      "editProfile": "Editar perfil",
+      "avatar": {
+        "alt": "Avatar del usuario"
+      }
+    },
+    "appearance": {
+      "title": "Apariencia",
+      "description": "Haz Strafe tuyo"
+    },
+    "language": {
+      "title": "Idioma",
+      "description": "Selecciona tu idioma"
+    },
+    "default": {
+      "underDevelopment": "Esta sección está en desarrollo."
+    }
+  },
+  "components": {
+    "datePicker": {
+      "months": {
+        "january": "Enero",
+        "february": "Febrero",
+        "march": "Marzo",
+        "april": "Abril",
+        "may": "Mayo",
+        "june": "Junio",
+        "july": "Julio",
+        "august": "Agosto",
+        "september": "Septiembre",
+        "october": "Octubre",
+        "november": "Noviembre",
+        "december": "Diciembre"
+      },
+      "weekDays": {
+        "sunday": "Do",
+        "monday": "Lu",
+        "tuesday": "Ma",
+        "wednesday": "Mi",
+        "thursday": "Ju",
+        "friday": "Vi",
+        "saturday": "Sa"
+      },
+      "selectMonth": "Seleccionar mes",
+      "selectYear": "Seleccionar año",
+      "dateFormat": "{{day}} de {{month}} de {{year}}"
+    }
+  },
+  "home": {
+    "cards": {
+      "settings": "Configuración y Preferencias",
+      "settingsDescription": "Personaliza tu experiencia Strafe con ajustes y preferencias personalizadas.",
+      "exploreSettings": "Abrir Configuración",
+      "community": "Únete a la Comunidad",
+      "communityDescription": "Conéctate con otros usuarios de Strafe, comparte experiencias y haz nuevos amigos.",
+      "joinCommunity": "Unirse Ahora",
+      "donate": "Apoya a Strafe",
+      "donateDescription": "Ayúdanos a mantener y hacer crecer Strafe con tu apoyo.",
+      "supportUs": "Donar",
+      "discover": "Descubre más",
+      "discoverDescription": "Explora todas las características y posibilidades que Strafe tiene para ofrecer.",
+      "exploreMore": "Saber más"
+    }
+  }
+}

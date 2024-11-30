@@ -1,0 +1,139 @@
+{
+  "auth": {
+    "login": {
+      "title": "Login",
+      "subtitle": "Sign in to your existing account",
+      "email": "Email",
+      "password": "Password",
+      "submit": "Sign In",
+      "needAccount": "Need an account? Register",
+      "error": {
+        "emptyFields": "Please fill in all fields",
+        "invalidCredentials": "Invalid credentials"
+      }
+    },
+    "register": {
+      "title": "Register",
+      "subtitle": "Create an account on Strafe",
+      "username": "Username",
+      "discriminator": "Discriminator",
+      "displayName": "Display Name",
+      "email": "Email",
+      "password": "Password",
+      "dateOfBirth": "Date of Birth",
+      "tos": "I agree to the",
+      "tosLink": "Terms of Service",
+      "and": "and",
+      "privacyLink": "Privacy Policy",
+      "submit": "Sign Up",
+      "haveAccount": "Already have an account? Login",
+      "error": {
+        "requiredFields": "Please fill in all required fields",
+        "registrationFailed": "Registration failed. Please try again."
+      }
+    }
+  },
+  "settings": {
+    "sections": {
+      "user": "User Settings",
+      "app": "App Settings",
+      "account": "Account",
+      "profile": "Profile",
+      "privacy": "Privacy & Safety",
+      "appearance": "Appearance",
+      "accessibility": "Accessibility",
+      "voice": "Voice & Video",
+      "text": "Text & Images",
+      "notifications": "Notifications",
+      "keybinds": "Keybinds",
+      "language": "Language",
+      "logout": "Log Out"
+    },
+    "account": {
+      "title": "Account",
+      "description": "Update your account",
+      "status": {
+        "online": "Online",
+        "offline": "Offline",
+        "idle": "Idle",
+        "dnd": "Do Not Disturb"
+      },
+      "editProfile": "Edit Profile",
+      "avatar": {
+        "alt": "User avatar"
+      }
+    },
+    "appearance": {
+      "title": "Appearance",
+      "description": "Make Strafe yours"
+    },
+    "language": {
+      "title": "Language",
+      "description": "Select your language"
+    },
+    "default": {
+      "underDevelopment": "This section is under development."
+    }
+  },
+  "components": {
+    "datePicker": {
+      "months": {
+        "january": "January",
+        "february": "February",
+        "march": "March",
+        "april": "April",
+        "may": "May",
+        "june": "June",
+        "july": "July",
+        "august": "August",
+        "september": "September",
+        "october": "October",
+        "november": "November",
+        "december": "December"
+      },
+      "weekDays": {
+        "sunday": "Su",
+        "monday": "Mo",
+        "tuesday": "Tu",
+        "wednesday": "We",
+        "thursday": "Th",
+        "friday": "Fr",
+        "saturday": "Sa"
+      },
+      "selectMonth": "Select Month",
+      "selectYear": "Select Year",
+      "dateFormat": "{{day}} {{month}} {{year}}"
+    }
+  },
+  "home": {
+    "title": "Home",
+    "welcome": "Welcome to",
+    "cards": {
+      "settings": "Settings",
+      "settingsDescription": "Customize your Strafe experience with personalized settings",
+      "exploreSettings": "Explore Settings",
+      "community": "Community",
+      "communityDescription": "Join our vibrant community and connect with others",
+      "joinCommunity": "Join Community",
+      "donate": "Support Us",
+      "donateDescription": "Help us keep Strafe running and growing",
+      "supportUs": "Support Us",
+      "discover": "Discover",
+      "discoverDescription": "Explore new features and updates"
+    }
+  },
+  "friends": {
+    "title": "Friends",
+    "tabs": {
+      "online": "Online",
+      "all": "All",
+      "pending": "Pending",
+      "blocked": "Blocked"
+    },
+    "addFriend": "Add Friend",
+    "noFriends": {
+      "title": "No friends yet",
+      "description": "Start adding friends to connect with them"
+    }
+  }
+}

@@ -1,0 +1,88 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --primary: #21c35e;
+    --background: #000000;
+    --background0: #111111;
+    --background1: #222222;
+    --background2: #333333;
+    --foreground: #ffffff;
+    --accent: #1a9d4b;
+    --surface: #f5f5f5;
+    --text-primary: #000000;
+    --text-secondary: #666666;
+    --text-accent: #21c35e;
+    --text-inverse: #ffffff;
+    --border: #e0e0e0;
+    --error: #ff3b30;
+    --success: #34c759;
+    --warning: #ffcc00;
+
+    --ring: var(--primary);
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: #000000;
+    --background0: #111111;
+    --background1: #222222;
+    --background2: #333333;
+    --foreground: #ffffff;
+    --surface: #333333;
+    --text-primary: #ffffff;
+    --text-secondary: #aaaaaa;
+    --border: #444444;
+  }
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    @apply h-full w-full overflow-hidden;
+  }
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+/* Custom utility classes for theme colors */
+.bg-primary {
+  background-color: var(--primary);
+}
+.bg-background {
+  background-color: var(--background);
+}
+.bg-background0 {
+  background-color: var(--background0);
+}
+.bg-background1 {
+  background-color: var(--background1);
+}
+.bg-background2 {
+  background-color: var(--background2);
+}
+.bg-surface {
+  background-color: var(--surface);
+}
+.text-text-primary {
+  color: var(--text-primary);
+}
+.text-text-secondary {
+  color: var(--text-secondary);
+}
+.text-text-accent {
+  color: var(--text-accent);
+}
+.text-text-inverse {
+  color: var(--text-inverse);
+}
+.border-border {
+  border-color: var(--border);
+}

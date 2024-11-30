@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <link rel="stylesheet" href="/src/index.css" />
+    <link rel="icon" type="image/x-icon" href="/favicon.ico" />
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="manifest" href="/manifest.json" />
+    <meta name="theme-color" content="#000000" />
+    <title>Strafe</title>
+  </head>
+  <body>
+    <noscript>You need to enable JavaScript to run this app.</noscript>
+    <div id="root"></div>
+    <script type="module" src="/src/index.tsx"></script>
+  </body>
+  <script>
+    (function () {
+      const savedTheme = localStorage.getItem("sc_theme");
+      const root = document.documentElement;
+
+      if (savedTheme) {
+        const theme = JSON.parse(savedTheme);
+
+        root.style.setProperty(
+          "--primary-border",
+          theme.colors.primary || "var(--primary)"
+        );
+        root.style.setProperty(
+          "--background",
+          theme.colors.background || "var(--background)"
+        );
+      }
+
+      const loadingScreen = document.createElement("div");
+      loadingScreen.innerHTML = `
+        <div class="fixed inset-0 flex justify-center items-center transition-opacity duration-500" style="background-color: var(--background);">
+          <div class="w-16 h-16 border-4 rounded-full animate-spin" style="border-color: var(--primary); border-top-color: transparent;"></div>
+        </div>
+      `;
+      loadingScreen.style.position = "fixed";
+      loadingScreen.style.inset = "0";
+      loadingScreen.style.zIndex = "9999";
+
+      document.body.appendChild(loadingScreen);
+
+      const style = document.createElement("style");
+      style.textContent = `
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        .animate-spin { animation: spin 1s linear infinite; }
+      `;
+      document.head.appendChild(style);
+
+      window.addEventListener("load", function () {
+        loadingScreen.firstElementChild.style.opacity = "0";
+        setTimeout(() => document.body.removeChild(loadingScreen), 1000);
+      });
+    })();
+  </script>
+</html>
