@@ -42,10 +42,8 @@ export function initConsoleDetector(): void {
     }
   };
 
-  let devToolsOpen = false;
   Object.defineProperty(window, "devtools", {
     get: function () {
-      devToolsOpen = true;
       printWarningMessages();
       return null;
     },

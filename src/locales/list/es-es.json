@@ -33,6 +33,34 @@
       }
     }
   },
+  "common": {
+    "cancel": "Cancelar",
+    "loading": "Cargando...",
+    "unknownError": "Se produjo un error desconocido"
+  },
+  "friends": {
+    "title": "Amigos",
+    "tabs": {
+      "online": "En línea",
+      "all": "Todos",
+      "pending": "Pendiente",
+      "blocked": "Bloqueados"
+    },
+    "addFriend": "Agregar Amigo",
+    "friendTag": "Etiqueta de Amigo",
+    "enterFriendTag": "Ingresa la etiqueta de un amigo (ej: usuario#0000)",
+    "errors": {
+      "notFound": "Usuario no encontrado",
+      "alreadyFriends": "Ya eres amigo de este usuario",
+      "pendingRequest": "Solicitud de amistad pendiente",
+      "invalidTag": "Formato de etiqueta inválido",
+      "cannotAddSelf": "No puedes agregarte a ti mismo como amigo"
+    },
+    "noFriends": {
+      "title": "Aún no tienes amigos",
+      "description": "Comienza a agregar amigos para conectarte con ellos"
+    }
+  },
   "settings": {
     "sections": {
       "user": "Ajustes de usuario",

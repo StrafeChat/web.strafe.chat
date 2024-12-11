@@ -8,61 +8,77 @@ import {
   onCleanup,
 } from "solid-js";
 import { WebSocketClient } from "../../ws/WebSocketClient";
+import { useCache } from "../cache/CacheProvider";
+import { handleWebSocketMessage } from "../../events";
 
 // API Configuration
-const BASE_URL = "http://127.0.0.1:443";
-const WS_URL = "ws://127.0.0.1:8080/events";
-const API_ENDPOINTS = {
+export const BASE_URL = "http://127.0.0.1:443";
+export const WS_URL = "ws://127.0.0.1:8080/events";
+export const API_ENDPOINTS = {
   REGISTER: `${BASE_URL}/auth/register`,
   LOGIN: `${BASE_URL}/auth/login`,
   USER_ME: `${BASE_URL}/users/@me`,
+  RELATIONSHIPS: `${BASE_URL}/users/@me/relationships`,
 };
 
 const API_HEADERS = {
   JSON: { "Content-Type": "application/json" },
+  SESSION: () => ({
+    "X-Session-Token": localStorage.getItem("sc_token") || "",
+  }),
 };
 
-type User = {
+type Clientuser = {
   id: string;
   username: string;
   discriminator: string;
+  friends?: string[];
   display_name?: string;
   email: string;
   date_of_birth?: string;
   avatar?: string;
-  global_name?: string;
 };
 
 type AuthContextType = {
-  user: () => User | null;
+  user: () => Clientuser | null;
+  relationships: () => Relationship[];
   login: (credentials: { email: string; password: string }) => Promise<boolean>;
-  isAuthenticated: () => boolean;
   register: (data: RegisterData) => Promise<boolean>;
   logout: () => void;
+  isAuthenticated: () => boolean;
   loading: () => boolean;
   isMobile: () => boolean;
   wsClient: () => WebSocketClient | null;
 };
 
-interface RegisterData {
+type RegisterData = {
   username: string;
   discriminator: string;
   display_name?: string;
   email: string;
   password: string;
   date_of_birth: string;
-}
+};
+
+type Relationship = {
+  id: string;
+  sender_id: string;
+  recipient_id: string;
+  created_at: string;
+  type?: string;
+};
 
 const AuthContext = createContext<AuthContextType>();
 
 export const AuthProvider: ParentComponent = (props) => {
-  const [user, setUser] = createSignal<User | null>(null);
+  const cache = useCache();
+  const [user, setUser] = createSignal<Clientuser | null>(null);
+  const [relationships, setRelationships] = createSignal<Relationship[]>([]);
   const [isAuthenticated, setIsAuthenticated] = createSignal(false);
   const [loading, setLoading] = createSignal(true);
   const [isMobile, setIsMobile] = createSignal(window.innerWidth <= 768);
   const [wsClient, setWsClient] = createSignal<WebSocketClient | null>(null);
 
-  // Memoized mobile check for better performance
   const mobileCheck = createMemo(() => isMobile());
 
   createEffect(() => {
@@ -75,41 +91,76 @@ export const AuthProvider: ParentComponent = (props) => {
   });
 
   const logError = (context: string, error: unknown) => {
-    console.error(`[AuthProvider] Error in ${context}:`, error);
+    console.error(`[AuthProvider:${context}]`, error);
   };
 
-  const initializeWebSocket = async (token: string) => {
-    try {
-      const client = new WebSocketClient(WS_URL);
+  const initializeWebSocket = () => {
+    const ws = new WebSocket(WS_URL);
+    const client = new WebSocketClient(ws);
+    setWsClient(client);
 
-      // Add connection state handler
-      client.onConnectionStateChange((connected) => {
-        console.log("[AuthProvider] WebSocket connection state:", connected);
-        setLoading(!connected);
+    // Connect with the token
+    const token = localStorage.getItem("sc_token");
+    if (token) {
+      client.connect(token).catch((error) => {
+        console.error("[WebSocket] Failed to connect:", error);
       });
-
-      const connected = await client.connect(token);
-
-      if (connected) {
-        setWsClient(client);
-        // Remove heartbeat response - the worker will handle heartbeats
-        return true;
-      }
-      return false;
-    } catch (error) {
-      logError("initializeWebSocket", error);
-      return false;
     }
+
+    client.onMessage("READY", (data) => {
+      console.log("[WebSocket] Received READY payload:", data);
+      if (data.client_user) {
+        setUser({
+          id: data.client_user.ID,
+          username: data.client_user.Username,
+          discriminator: data.client_user.Discriminator,
+          display_name:
+            data.client_user.DisplayName || data.client_user.Username,
+          email: data.client_user.Email,
+          avatar: data.client_user.Avatar,
+          date_of_birth: data.client_user.DateOfBirth,
+        });
+      }
+      if (data.users) {
+        console.log("[WebSocket] Received users data:", data.users);
+        cache.setUsers(data.users);
+      }
+    });
+
+    client.onMessage("relationshipCreate", (data) => {
+      handleWebSocketMessage(
+        { type: "relationshipCreate", ...data },
+        cache,
+        setRelationships
+      );
+    });
+
+    client.onMessage("relationshipAccept", (data) => {
+      handleWebSocketMessage(
+        { type: "relationshipAccept", ...data },
+        cache,
+        setRelationships
+      );
+    });
+
+    client.onMessage("relationshipDelete", (data) => {
+      handleWebSocketMessage(
+        { type: "relationshipDelete", ...data },
+        cache,
+        setRelationships
+      );
+    });
+
+    return client.isConnected();
   };
 
   const fetchUserData = async (token: string): Promise<boolean> => {
     try {
       setLoading(true);
       const res = await fetch(API_ENDPOINTS.USER_ME, {
-        method: "GET",
         headers: {
+          ...API_HEADERS.JSON,
           "X-Session-Token": token,
-          "Content-Type": "application/json",
         },
       });
 
@@ -121,40 +172,88 @@ export const AuthProvider: ParentComponent = (props) => {
       }
 
       const data = await res.json();
+      console.log(
+        "[AuthProvider] Received user data:",
+        JSON.stringify(data, null, 2)
+      );
 
-      const userData: User = {
-        id: data.client_user?.id || data.id || "",
-        username: data.client_user?.username || data.username || "",
-        discriminator:
-          data.client_user?.discriminator || data.discriminator || "",
-        display_name:
-          data.client_user?.display_name ||
-          data.client_user?.global_name ||
-          data.display_name ||
-          data.global_name ||
-          data.username,
-        email: data.client_user?.email || data.email || "",
-        date_of_birth:
-          data.client_user?.date_of_birth || data.date_of_birth || "",
-        avatar: data.client_user?.avatar || data.avatar || "",
-        global_name: data.client_user?.global_name || data.global_name,
-      };
+      const clientUser = data.client_user;
+      console.log(
+        "[AuthProvider] Client user data:",
+        JSON.stringify(clientUser, null, 2)
+      );
 
-      // Set user data first
-      setUser(userData);
-      setIsAuthenticated(true);
-
-      // Then establish WebSocket connection
-      const wsConnected = await initializeWebSocket(token);
-      if (!wsConnected) {
-        logError("fetchUserData", "Failed to establish WebSocket connection");
-        setUser(null);
+      if (
+        !clientUser ||
+        !clientUser.id ||
+        !clientUser.username ||
+        !clientUser.discriminator ||
+        !clientUser.email
+      ) {
+        console.error(
+          "[AuthProvider] Invalid client user data - missing required fields:",
+          clientUser
+        );
+        console.error("[AuthProvider] Required fields check:", {
+          hasId: !!clientUser?.id,
+          hasUsername: !!clientUser?.username,
+          hasDiscriminator: !!clientUser?.discriminator,
+          hasEmail: !!clientUser?.email,
+        });
         setIsAuthenticated(false);
         setLoading(false);
         return false;
       }
 
-      // Only remove loading state after both user verification and WebSocket connection
+      const normalizedUser = {
+        id: clientUser.id,
+        username: clientUser.username,
+        discriminator: clientUser.discriminator,
+        display_name: clientUser.display_name,
+        avatar: clientUser.avatar,
+        email: clientUser.email,
+      };
+
+      console.log(
+        "[AuthProvider] Normalized user data:",
+        JSON.stringify(normalizedUser, null, 2)
+      );
+
+      cache.setUser(normalizedUser);
+      setUser(normalizedUser);
+      setIsAuthenticated(true);
+
+      if (Array.isArray(data.relationships)) {
+        console.log(
+          "[AuthProvider] Processing relationships:",
+          data.relationships
+        );
+        const normalizedRelationships = data.relationships.map((rel: any) => {
+          return {
+            id: rel.id,
+            sender_id: rel.sender_id || (rel.sender && rel.sender.id),
+            recipient_id:
+              rel.recipient_id || (rel.recipient && rel.recipient.id),
+            created_at: "2024-12-07T00:24:05-06:00",
+          };
+        });
+
+        console.log(
+          "[AuthProvider] Setting normalized relationships:",
+          normalizedRelationships.map((r: any) => ({
+            id: r.id,
+            sender_id: r.sender_id,
+            recipient_id: r.recipient_id,
+          }))
+        );
+        console.log(
+          "[AuthProvider] Normalized relationships:",
+          normalizedRelationships
+        );
+        setRelationships(normalizedRelationships);
+      }
+
+      initializeWebSocket();
       setLoading(false);
       return true;
     } catch (error) {
@@ -165,7 +264,6 @@ export const AuthProvider: ParentComponent = (props) => {
     }
   };
 
-  // Optimize initial token check
   const initializeAuth = () => {
     const token = localStorage.getItem("sc_token");
     if (token) {
@@ -178,7 +276,6 @@ export const AuthProvider: ParentComponent = (props) => {
     }
   };
 
-  // Call initialization on provider mount
   initializeAuth();
 
   const login = async (credentials: {
@@ -215,16 +312,10 @@ export const AuthProvider: ParentComponent = (props) => {
   const register = async (data: RegisterData): Promise<boolean> => {
     try {
       setLoading(true);
-      const apiData = {
-        ...data,
-        discriminator: parseInt(data.discriminator),
-        display_name: data.display_name || undefined,
-      };
-
       const res = await fetch(API_ENDPOINTS.REGISTER, {
         method: "POST",
         headers: API_HEADERS.JSON,
-        body: JSON.stringify(apiData),
+        body: JSON.stringify(data),
       });
 
       if (!res.ok) {
@@ -247,37 +338,44 @@ export const AuthProvider: ParentComponent = (props) => {
   };
 
   const logout = () => {
-    wsClient()?.disconnect();
-    setWsClient(null);
     localStorage.removeItem("sc_token");
     setUser(null);
     setIsAuthenticated(false);
     setLoading(false);
-    window.location.href = "/login";
+    wsClient()?.disconnect();
+    setWsClient(null);
   };
 
+  // Handle cleanup
   onCleanup(() => {
-    wsClient()?.disconnect();
+    const client = wsClient();
+    if (client) {
+      client.disconnect();
+      setWsClient(null);
+    }
   });
 
-  const value = {
-    user,
-    login,
-    register,
-    logout,
-    isAuthenticated: () => isAuthenticated(),
-    loading: () => loading(),
-    isMobile: mobileCheck,
-    wsClient: () => wsClient(),
-  };
-
   return (
-    <AuthContext.Provider value={value}>{props.children}</AuthContext.Provider>
+    <AuthContext.Provider
+      value={{
+        user: () => user(),
+        relationships: () => relationships(),
+        login,
+        register,
+        logout,
+        isAuthenticated: () => isAuthenticated(),
+        loading: () => loading(),
+        isMobile: mobileCheck,
+        wsClient: () => wsClient(),
+      }}
+    >
+      {props.children}
+    </AuthContext.Provider>
   );
 };
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth must be used within AuthProvider");
+  if (!context) throw new Error("useAuth must be used within an AuthProvider");
   return context;
 };

@@ -21,10 +21,19 @@
     "tabs": {
       "online": "متصل",
       "all": "الكل",
-      "pending": "معلق",
+      "pending": "قيد الانتظار",
       "blocked": "محظور"
     },
     "addFriend": "إضافة صديق",
+    "friendTag": "علامة الصديق",
+    "enterFriendTag": "أدخل علامة صديق (مثال: username#0000)",
+    "errors": {
+      "notFound": "لم يتم العثور على المستخدم",
+      "alreadyFriends": "أنت بالفعل صديق مع هذا المستخدم",
+      "pendingRequest": "طلب الصداقة قيد الانتظار",
+      "invalidTag": "تنسيق علامة غير صالح",
+      "cannotAddSelf": "لا يمكنك إضافة نفسك كصديق"
+    },
     "noFriends": {
       "title": "لا يوجد أصدقاء حتى الآن",
       "description": "ابدأ بإضافة الأصدقاء للتواصل معهم"

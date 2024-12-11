@@ -52,7 +52,6 @@
   }
 }
 
-/* Custom utility classes for theme colors */
 .bg-primary {
   background-color: var(--primary);
 }
@@ -85,4 +84,22 @@
 }
 .border-border {
   border-color: var(--border);
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;  /* Internet Explorer and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
+
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
 }

@@ -2,7 +2,8 @@ import {
   createContext, 
   createSignal, 
   JSX, 
-  useContext 
+  useContext,
+  createRoot
 } from 'solid-js';
 import type { ModalContextType } from '../types';
 
@@ -18,8 +19,10 @@ export function ModalProvider(props: { children: JSX.Element }) {
   const [content, setContent] = createSignal<JSX.Element | null>(null);
 
   const openModal = (modalContent: JSX.Element) => {
-    setContent(modalContent);
-    setIsOpen(true);
+    createRoot(() => {
+      setContent(modalContent);
+      setIsOpen(true);
+    });
   };
 
   const closeModal = () => {

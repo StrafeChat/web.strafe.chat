@@ -1,6 +1,7 @@
 import { ThemeProvider } from "./lib/providers/theme/ThemeProvider";
 import { ContextMenuProvider } from "./lib/providers/context/ContextMenuProvider";
 import { AuthProvider } from "./lib/providers/auth/AuthProvider";
+import { CacheProvider } from "./lib/providers/cache/CacheProvider";
 import { TransProvider } from "@mbarzda/solid-i18next";
 import { Router, Route } from "@solidjs/router";
 import en from "./locales/list/en-us.json";
@@ -12,7 +13,7 @@ import Login from "./components/auth/Login";
 import Register from "./components/auth/Register";
 import { Interface } from "./components/shared/Interface";
 import { Home } from "./components/home/Home";
-import { Friends } from "./components/home/Friends";
+import { Friends } from "./components/home/friends/Friends";
 import { getDirection } from "./lib/utils/direction";
 
 const MountApp = (props: ParentProps) => {
@@ -38,9 +39,11 @@ const MountApp = (props: ParentProps) => {
     >
       <ThemeProvider>
         <ContextMenuProvider>
-          <AuthProvider>
-            <div class="h-screen w-screen">{props.children}</div>
-          </AuthProvider>
+          <CacheProvider>
+            <AuthProvider>
+              <div class="h-screen w-screen">{props.children}</div>
+            </AuthProvider>
+          </CacheProvider>
         </ContextMenuProvider>
       </ThemeProvider>
     </TransProvider>

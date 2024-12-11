@@ -25,13 +25,18 @@
       "tosLink": "Terms of Service",
       "and": "and",
       "privacyLink": "Privacy Policy",
-      "submit": "Sign Up",
+      "submit": "Register",
       "haveAccount": "Already have an account? Login",
       "error": {
         "requiredFields": "Please fill in all required fields",
         "registrationFailed": "Registration failed. Please try again."
       }
     }
+  },
+  "common": {
+    "cancel": "Cancel",
+    "loading": "Loading...",
+    "unknownError": "An unknown error occurred"
   },
   "settings": {
     "sections": {
@@ -105,6 +110,29 @@
       "dateFormat": "{{day}} {{month}} {{year}}"
     }
   },
+  "friends": {
+    "title": "Friends",
+    "tabs": {
+      "online": "Online",
+      "all": "All",
+      "pending": "Pending",
+      "blocked": "Blocked"
+    },
+    "addFriend": "Add Friend",
+    "friendTag": "Username and Discriminator",
+    "enterFriendTag": "e.g., username#0000",
+    "errors": {
+      "notFound": "User not found",
+      "alreadyFriends": "You are already friends with this user",
+      "pendingRequest": "Friend request already pending",
+      "invalidTag": "Invalid user tag format",
+      "cannotAddSelf": "You cannot add yourself as a friend"
+    },
+    "noFriends": {
+      "title": "No friends yet",
+      "description": "Start adding friends to connect with them"
+    }
+  },
   "home": {
     "title": "Home",
     "welcome": "Welcome to",
@@ -120,20 +148,6 @@
       "supportUs": "Support Us",
       "discover": "Discover",
       "discoverDescription": "Explore new features and updates"
-    }
-  },
-  "friends": {
-    "title": "Friends",
-    "tabs": {
-      "online": "Online",
-      "all": "All",
-      "pending": "Pending",
-      "blocked": "Blocked"
-    },
-    "addFriend": "Add Friend",
-    "noFriends": {
-      "title": "No friends yet",
-      "description": "Start adding friends to connect with them"
     }
   }
 }

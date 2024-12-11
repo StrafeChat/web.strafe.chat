@@ -38,24 +38,53 @@ const Modal: Component<ModalProps> = (props) => {
               exit={{ opacity: 0 }}
               transition={{ duration: 0.3 }}
               class="fixed inset-0 bg-black"
+              onClick={() => props.type !== "full" && props.onClose?.()}
             />
 
-            <Motion
-              initial={{ opacity: 0, scale: 0.95 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{
-                duration: 0.3,
-                easing: [0.4, 0, 0.2, 1],
-              }}
-              class={`${
-                props.type === "full"
-                  ? "fixed inset-0 bg-background"
-                  : "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-md bg-background2 rounded-lg"
-              }`}
-            >
-              {props.children}
-            </Motion>
+            {props.type === "full" ? (
+              <Motion
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                transition={{ duration: 0.3 }}
+                class="fixed inset-0 bg-background"
+              >
+                {props.children}
+              </Motion>
+            ) : (
+              <div 
+                class="fixed inset-0 overflow-y-auto"
+                onClick={(e) => {
+                  if (e.target === e.currentTarget) {
+                    props.onClose?.();
+                  }
+                }}
+              >
+                <div 
+                  class="flex min-h-full items-center justify-center p-4"
+                  onClick={(e) => {
+                    if (e.target === e.currentTarget) {
+                      props.onClose?.();
+                    }
+                  }}
+                >
+                  <Motion
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    transition={{
+                      duration: 0.3,
+                      easing: [0.4, 0, 0.2, 1],
+                    }}
+                    class="relative w-full max-w-md bg-background2 rounded-lg shadow-xl border border-border overflow-hidden"
+                  >
+                    <div class="p-6">
+                      {props.children}
+                    </div>
+                  </Motion>
+                </div>
+              </div>
+            )}
           </Motion>
         )}
       </Presence>

@@ -37,6 +37,34 @@
       }
     }
   },
+  "common": {
+    "cancel": "Annuler",
+    "loading": "Chargement...",
+    "unknownError": "Une erreur inconnue s'est produite"
+  },
+  "friends": {
+    "title": "Amis",
+    "tabs": {
+      "online": "En ligne",
+      "all": "Tous",
+      "pending": "En attente",
+      "blocked": "Bloqués"
+    },
+    "addFriend": "Ajouter un ami",
+    "friendTag": "Tag d'ami",
+    "enterFriendTag": "Entrez le tag d'un ami (ex: utilisateur#0000)",
+    "errors": {
+      "notFound": "Utilisateur non trouvé",
+      "alreadyFriends": "Vous êtes déjà ami avec cet utilisateur",
+      "pendingRequest": "Demande d'ami déjà en attente",
+      "invalidTag": "Format de tag invalide",
+      "cannotAddSelf": "Vous ne pouvez pas vous ajouter comme ami"
+    },
+    "noFriends": {
+      "title": "Pas encore d'amis",
+      "description": "Commencez à ajouter des amis pour vous connecter avec eux"
+    }
+  },
   "settings": {
     "sections": {
       "user": "Paramètres utilisateur",

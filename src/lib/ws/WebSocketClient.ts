@@ -1,4 +1,11 @@
-export type PayloadType = "IDENTIFY" | "HEARTBEAT" | "MESSAGE" | "READY";
+export type PayloadType =
+  | "IDENTIFY"
+  | "HEARTBEAT"
+  | "MESSAGE"
+  | "READY"
+  | "relationshipCreate"
+  | "relationshipUpdate"
+  | "relationshipAccept";
 
 export interface BasePayload {
   type: PayloadType;
@@ -25,25 +32,57 @@ export interface ReadyPayload extends BasePayload {
   type: "READY";
   user_id: string;
   username: string;
+  discriminator: string;
+  display_name?: string;
+  presence?: any;
+  users?: { [key: string]: any };
+  client_user?: any;
+}
+
+export interface RelationshipPayload extends BasePayload {
+  type: "relationshipCreate" | "relationshipUpdate" | "relationshipAccept";
+  relationship: {
+    id: string;
+    sender_id: string;
+    recipient_id: string;
+    created_at: string;
+    sender?: {
+      id: string;
+      username: string;
+      discriminator: string;
+      avatar?: string;
+      display_name?: string;
+    };
+    recipient?: {
+      id: string;
+      username: string;
+      discriminator: string;
+      avatar?: string;
+      display_name?: string;
+    };
+  };
 }
 
 export type WSPayload =
   | IdentifyPayload
   | HeartbeatPayload
   | MessagePayload
-  | ReadyPayload;
+  | ReadyPayload
+  | RelationshipPayload;
 
 export class WebSocketClient {
   private readonly worker: SharedWorker;
-  private readonly messageHandlers: Map<PayloadType, (data: any) => void> =
+  private readonly messageHandlers: Map<string, (data: any) => void> =
     new Map();
   private connectPromise: Promise<boolean> | null = null;
   private readyPromise: Promise<ReadyPayload> | null = null;
   private readonly connectionStateCallbacks: ((connected: boolean) => void)[] =
     [];
   private connected = false;
+  public cache: any;
+  private relationships: { [key: string]: any } = {};
 
-  constructor(private readonly wsUrl: string = "ws://localhost:8080/events") {
+  constructor(private readonly ws: WebSocket) {
     this.worker = new SharedWorker(
       new URL("./WebSocketWorker.ts", import.meta.url),
       {
@@ -57,20 +96,61 @@ export class WebSocketClient {
 
     this.worker.port.postMessage({
       type: "init",
-      payload: { url: this.wsUrl },
+      payload: { url: this.ws.url },
     });
+
+    // Set up default message handlers
+    this.messageHandlers.set("READY", this.handleReady.bind(this));
+    console.log("[WebSocket] READY handler set");
+    console.log("[WebSocket] Message handlers set up:", this.messageHandlers);
+    this.onMessage("relationshipCreate", this.handleRelationship.bind(this));
+    this.onMessage("relationshipUpdate", this.handleRelationship.bind(this));
+    this.onMessage("relationshipAccept", this.handleRelationship.bind(this));
   }
 
   private handleWorkerMessage(event: MessageEvent) {
+    console.log("[WebSocket] handleWorkerMessage invoked");
     const { type, payload } = event.data;
+    console.log("[WebSocket] Message type received:", type);
+    console.log("[WebSocket] Received worker message:", type, payload);
 
     switch (type) {
       case "message":
-        const handler = this.messageHandlers.get(payload.type as PayloadType);
+        console.log("[WebSocket] Processing message type:", payload.type);
+        const handler = this.messageHandlers.get(payload.type);
         if (handler) {
+          console.log("[WebSocket] Calling handler for type:", payload.type);
+          console.log("[WebSocket] Handler function:", handler);
           handler(payload);
+        } else {
+          console.warn("[WebSocket] No handler found for type:", payload.type);
         }
         break;
+      case "relationshipCreate":
+      case "relationshipUpdate":
+      case "relationshipAccept":
+        console.log(
+          "[WebSocket] Processing relationship event:",
+          type,
+          payload
+        );
+        const relationshipHandler = this.messageHandlers.get(type);
+        if (relationshipHandler) {
+          console.log(
+            "[WebSocket] Calling relationship handler for type:",
+            type
+          );
+          relationshipHandler(payload);
+        } else {
+          console.warn(
+            "[WebSocket] No handler found for relationship event:",
+            type
+          );
+        }
+        break;
+      case "ready":
+        this.handleReady(payload);
+        return;
       case "connectionState":
         this.connected = payload.connected;
         this.notifyConnectionState(payload.connected);
@@ -81,16 +161,120 @@ export class WebSocketClient {
     }
   }
 
+  private handleReady(data: ReadyPayload) {
+    console.log("[WebSocket] Received READY payload:", data);
+
+    // Pass the full READY payload to any registered READY handlers
+    const readyHandler = this.messageHandlers.get("READY");
+    if (readyHandler) {
+      readyHandler(data);
+    }
+
+    // Cache users if available
+    if (data.users && this.cache) {
+      this.cache.setUsers(data.users);
+    }
+  }
+
+  private handleRelationship(payload: RelationshipPayload) {
+    console.log("[WebSocketClient] Handling relationship event:", payload);
+
+    const relationshipId = payload.relationship.id;
+    console.log(
+      `[WebSocketClient] Processing relationship ${relationshipId} for event type ${payload.type}`
+    );
+
+    if (!this.cache) {
+      console.warn("[WebSocket] No cache available for relationship update");
+      return;
+    }
+
+    const { sender, recipient } = payload.relationship;
+
+    // Handle sender data if present
+    if (sender && typeof sender === "object") {
+      const normalizedSender = {
+        id: sender.id,
+        username: sender.username,
+        discriminator: sender.discriminator,
+        display_name: sender.display_name || sender.username,
+        avatar: sender.avatar,
+      };
+
+      if (
+        normalizedSender.id &&
+        normalizedSender.username &&
+        normalizedSender.discriminator
+      ) {
+        console.log("[WebSocket] Caching normalized sender:", normalizedSender);
+        this.cache.setUser(normalizedSender);
+      } else {
+        console.warn("[WebSocket] Invalid sender data:", sender);
+      }
+    }
+
+    // Handle recipient data if present
+    if (recipient && typeof recipient === "object") {
+      const normalizedRecipient = {
+        id: recipient.id,
+        username: recipient.username,
+        discriminator: recipient.discriminator,
+        display_name: recipient.display_name || recipient.username,
+        avatar: recipient.avatar,
+      };
+
+      if (
+        normalizedRecipient.id &&
+        normalizedRecipient.username &&
+        normalizedRecipient.discriminator
+      ) {
+        console.log(
+          "[WebSocket] Caching normalized recipient:",
+          normalizedRecipient
+        );
+        this.cache.setUser(normalizedRecipient);
+      } else {
+        console.warn("[WebSocket] Invalid recipient data:", recipient);
+      }
+    }
+
+    // Update relationships based on event type
+    switch (payload.type) {
+      case "relationshipCreate":
+        this.relationships[relationshipId] = payload.relationship;
+        break;
+      case "relationshipUpdate":
+        this.relationships[relationshipId] = {
+          ...this.relationships[relationshipId],
+          ...payload.relationship,
+        };
+        break;
+      case "relationshipAccept":
+        // Remove from relationships if accepted
+        delete this.relationships[relationshipId];
+        break;
+    }
+
+    console.log("[WebSocketClient] Relationships updated:", this.relationships);
+
+    // Emit relationship update event
+    const handler = this.messageHandlers.get(payload.type);
+    if (handler) {
+      handler(payload);
+    }
+  }
+
   public onConnectionStateChange(callback: (connected: boolean) => void) {
     this.connectionStateCallbacks.push(callback);
+    // Immediately notify of current state if connected
+    if (this.connected) {
+      callback(true);
+    }
   }
 
   private notifyConnectionState(connected: boolean) {
     console.log(`[WebSocket] Connection state changed: ${connected}`);
-    this.connectionStateCallbacks.forEach((callback) => {
-      console.log(`[WebSocket] Notifying callback of state: ${connected}`);
-      callback(connected);
-    });
+    this.connectionStateCallbacks.forEach((callback) => callback(connected));
   }
 
   public connect(token: string): Promise<boolean> {
@@ -152,7 +336,7 @@ export class WebSocketClient {
     });
   }
 
-  public onMessage(type: PayloadType, handler: (data: any) => void) {
+  public onMessage(type: string, handler: (data: any) => void) {
     this.messageHandlers.set(type, handler);
   }
 
