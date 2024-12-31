@@ -108,7 +108,7 @@ export const AddFriendModal: Component<AddFriendModalProps> = (props) => {
               <button
                 type="submit"
                 disabled={loading()}
-                class="px-4 py-2.5 bg-primary text-text-inverse rounded-md hover:opacity-90 transition-opacity disabled:opacity-50 font-medium"
+                class="px-4 py-2.5 bg-primary text-text-primary rounded-md hover:opacity-90 transition-opacity disabled:opacity-50 font-medium"
               >
                 {loading() ? t("common.loading") : t("friends.addFriend")}
               </button>

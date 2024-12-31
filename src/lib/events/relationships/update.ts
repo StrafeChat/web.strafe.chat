@@ -4,7 +4,7 @@ import { BASE_URL } from "../../../constants";
 export const handleRelationshipUpdate = async (
   payload: RelationshipPayload,
   cache: any,
-  setRelationships: (updater: (prev: any[]) => any[]) => void
+  setRelationshipRequests: (updater: (prev: any[]) => any[]) => void
 ) => {
   console.log("[RelationshipUpdate] Processing payload:", {
     payload,
@@ -43,7 +43,7 @@ export const handleRelationshipUpdate = async (
     }
   }
 
-  setRelationships((prev) => {
+  setRelationshipRequests((prev) => {
     console.log("[RelationshipUpdate] Current relationships:", prev);
     const newRelationships = [...prev];
 

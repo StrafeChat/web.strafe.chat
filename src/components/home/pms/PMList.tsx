@@ -1,11 +1,21 @@
-import { Component, createSignal } from "solid-js";
+import { Component, createMemo, createSignal, Show } from "solid-js";
 import { useAuth } from "../../../lib/providers/auth/AuthProvider";
 import UserSettings from "../../settings/UserSettings";
 import { A } from "@solidjs/router";
 
 export const PMList: Component = () => {
-  const { user } = useAuth();
+  const { relationshipRequests, user } = useAuth();
   const [showSettings, setShowSettings] = createSignal(false);
+
+  const pendingCount = createMemo(() => {
+    const currentUser = user();
+    const currentRelationships = relationshipRequests();
+    if (!currentUser?.id || !currentRelationships) return 0;
+
+    return currentRelationships.filter(
+      (rel) => rel.recipient_id === currentUser.id
+    ).length;
+  });
 
   return (
     <div class="flex flex-col h-full bg-background1 rounded-tl-2xl">
@@ -54,6 +64,11 @@ export const PMList: Component = () => {
             <path d="M16 3.13a4 4 0 0 1 0 7.75" />
           </svg>
           <span class="text-sm font-medium">Friends</span>
+          <Show when={pendingCount() > 0}>
+            <div class="ml-auto bg-red-500 text-white text-xs w-[20px] h-[20px] rounded-full grid place-items-center">
+              {pendingCount()}
+            </div>
+          </Show>
         </A>
         {/* <A
           href="/notes"

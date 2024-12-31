@@ -41,7 +41,11 @@ type Clientuser = {
 
 type AuthContextType = {
   user: () => Clientuser | null;
+  setUser: (user: Clientuser | null) => void;
   relationships: () => Relationship[];
+  setRelationships: (relationships: Relationship[]) => void;
+  relationshipRequests: () => Relationship[];
+  setRelationshipRequests: (requests: Relationship[]) => void;
   login: (credentials: { email: string; password: string }) => Promise<boolean>;
   register: (data: RegisterData) => Promise<boolean>;
   logout: () => void;
@@ -53,7 +57,7 @@ type AuthContextType = {
 
 type RegisterData = {
   username: string;
-  discriminator: string;
+  discriminator: number;
   display_name?: string;
   email: string;
   password: string;
@@ -74,6 +78,9 @@ export const AuthProvider: ParentComponent = (props) => {
   const cache = useCache();
   const [user, setUser] = createSignal<Clientuser | null>(null);
   const [relationships, setRelationships] = createSignal<Relationship[]>([]);
+  const [relationshipRequests, setRelationshipRequests] = createSignal<
+    Relationship[]
+  >([]);
   const [isAuthenticated, setIsAuthenticated] = createSignal(false);
   const [loading, setLoading] = createSignal(true);
   const [isMobile, setIsMobile] = createSignal(window.innerWidth <= 768);
@@ -131,7 +138,7 @@ export const AuthProvider: ParentComponent = (props) => {
       handleWebSocketMessage(
         { type: "relationshipCreate", ...data },
         cache,
-        setRelationships
+        setRelationshipRequests
       );
     });
 
@@ -139,7 +146,7 @@ export const AuthProvider: ParentComponent = (props) => {
       handleWebSocketMessage(
         { type: "relationshipAccept", ...data },
         cache,
-        setRelationships
+        setRelationshipRequests
       );
     });
 
@@ -147,7 +154,7 @@ export const AuthProvider: ParentComponent = (props) => {
       handleWebSocketMessage(
         { type: "relationshipDelete", ...data },
         cache,
-        setRelationships
+        setRelationshipRequests
       );
     });
 
@@ -250,7 +257,7 @@ export const AuthProvider: ParentComponent = (props) => {
           "[AuthProvider] Normalized relationships:",
           normalizedRelationships
         );
-        setRelationships(normalizedRelationships);
+        setRelationshipRequests(normalizedRelationships);
       }
 
       initializeWebSocket();
@@ -359,7 +366,11 @@ export const AuthProvider: ParentComponent = (props) => {
     <AuthContext.Provider
       value={{
         user: () => user(),
+        setUser,
+        relationshipRequests: () => relationshipRequests(),
+        setRelationshipRequests,
         relationships: () => relationships(),
+        setRelationships,
         login,
         register,
         logout,

@@ -250,6 +250,7 @@ class WebSocketWorkerHandler {
         RELATIONSHIP_CREATE: "RELATIONSHIP_CREATE",
         RELATIONSHIP_UPDATE: "RELATIONSHIP_UPDATE",
         RELATIONSHIP_ACCEPT: "RELATIONSHIP_ACCEPT",
+        RELATIONSHIP_DELETE: "RELATIONSHIP_DELETE",
         MESSAGE: "MESSAGE",
         DISPATCH: "DISPATCH",
       };
@@ -360,6 +361,37 @@ class WebSocketWorkerHandler {
           });
           break;
 
+        case OpCodes.RELATIONSHIP_DELETE:
+          console.log(
+            "[WebSocketWorker] Received RELATIONSHIP_DELETE raw data:",
+            data
+          );
+          if (!data.d || !data.d.id) {
+            console.error("[WebSocketWorker] Invalid relationship delete data received:", data);
+            break;
+          }
+          const deletedRelationship = {
+            id: data.d.id,
+            sender_id: data.d.sender_id,
+            recipient_id: data.d.recipient_id,
+            created_at: data.d.created_at || new Date().toISOString(),
+            type: "relationshipDelete",
+            sender: data.d.sender || null,
+            recipient: data.d.recipient || null
+          };
+          console.log(
+            "[WebSocketWorker] Raw relationship delete data:",
+            data.d,
+            "\nNormalized relationship:",
+            deletedRelationship
+          );
+
+          this.broadcast({
+            type: "relationshipDelete",
+            payload: deletedRelationship,
+          });
+          break;
+
         case OpCodes.MESSAGE:
           console.log("[WebSocketWorker] Received MESSAGE:", data.d);
           this.broadcast({
@@ -429,6 +461,7 @@ class WebSocketWorkerHandler {
       RELATIONSHIP_CREATE: "RELATIONSHIP_CREATE",
       RELATIONSHIP_UPDATE: "RELATIONSHIP_UPDATE",
       RELATIONSHIP_ACCEPT: "RELATIONSHIP_ACCEPT",
+      RELATIONSHIP_DELETE: "RELATIONSHIP_DELETE",
       MESSAGE: "MESSAGE",
     };
 

@@ -5,7 +5,8 @@ export type PayloadType =
   | "READY"
   | "relationshipCreate"
   | "relationshipUpdate"
-  | "relationshipAccept";
+  | "relationshipAccept"
+  | "relationshipDelete";
 
 export interface BasePayload {
   type: PayloadType;
@@ -40,7 +41,11 @@ export interface ReadyPayload extends BasePayload {
 }
 
 export interface RelationshipPayload extends BasePayload {
-  type: "relationshipCreate" | "relationshipUpdate" | "relationshipAccept";
+  type:
+    | "relationshipCreate"
+    | "relationshipUpdate"
+    | "relationshipAccept"
+    | "relationshipDelete";
   relationship: {
     id: string;
     sender_id: string;
@@ -81,6 +86,7 @@ export class WebSocketClient {
   private connected = false;
   public cache: any;
   private relationships: { [key: string]: any } = {};
+  private relationshipRequests: { [key: string]: any } = {};
 
   constructor(private readonly ws: WebSocket) {
     this.worker = new SharedWorker(
@@ -106,6 +112,7 @@ export class WebSocketClient {
     this.onMessage("relationshipCreate", this.handleRelationship.bind(this));
     this.onMessage("relationshipUpdate", this.handleRelationship.bind(this));
     this.onMessage("relationshipAccept", this.handleRelationship.bind(this));
+    this.onMessage("relationshipDelete", this.handleRelationship.bind(this));
   }
 
   private handleWorkerMessage(event: MessageEvent) {
@@ -129,6 +136,7 @@ export class WebSocketClient {
       case "relationshipCreate":
       case "relationshipUpdate":
       case "relationshipAccept":
+      case "relationshipDelete":
         console.log(
           "[WebSocket] Processing relationship event:",
           type,
@@ -238,20 +246,21 @@ export class WebSocketClient {
       }
     }
 
-    // Update relationships based on event type
+    // Update relationship requests based on event type
     switch (payload.type) {
       case "relationshipCreate":
-        this.relationships[relationshipId] = payload.relationship;
+        this.relationshipRequests[relationshipId] = payload.relationship;
         break;
       case "relationshipUpdate":
-        this.relationships[relationshipId] = {
-          ...this.relationships[relationshipId],
+        this.relationshipRequests[relationshipId] = {
+          ...this.relationshipRequests[relationshipId],
           ...payload.relationship,
         };
         break;
       case "relationshipAccept":
-        // Remove from relationships if accepted
-        delete this.relationships[relationshipId];
+      case "relationshipDelete":
+        // Remove from relationships if accepted or deleted
+        delete this.relationshipRequests[relationshipId];
         break;
     }
 

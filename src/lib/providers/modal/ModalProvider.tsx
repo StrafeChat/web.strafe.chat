@@ -1,17 +1,17 @@
-import { 
-  createContext, 
-  createSignal, 
-  JSX, 
+import {
+  createContext,
+  createSignal,
+  JSX,
   useContext,
-  createRoot
-} from 'solid-js';
-import type { ModalContextType } from '../types';
+  createRoot,
+} from "solid-js";
+import type { ModalContextType } from "../types";
 
 const ModalContext = createContext<ModalContextType>({
   isOpen: false,
   content: null,
   openModal: () => {},
-  closeModal: () => {}
+  closeModal: () => {},
 });
 
 export function ModalProvider(props: { children: JSX.Element }) {
@@ -31,32 +31,31 @@ export function ModalProvider(props: { children: JSX.Element }) {
   };
 
   return (
-    <ModalContext.Provider 
+    <ModalContext.Provider
       value={{
         isOpen: isOpen(),
         content: content(),
         openModal,
-        closeModal
+        closeModal,
       }}
     >
       {props.children}
-      
+
       {isOpen() && (
-        <div 
+        <div
           class="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm"
           onClick={(e) => {
-            // Close modal if clicking on the overlay
             if (e.target === e.currentTarget) {
               closeModal();
             }
           }}
         >
-          <div 
+          <div
             class="bg-surface border border-border rounded-lg shadow-xl p-6 max-w-md w-full relative"
             onClick={(e) => e.stopPropagation()}
           >
             {content()}
-            <button 
+            <button
               class="absolute top-4 right-4 text-text-secondary hover:text-text-primary"
               onClick={closeModal}
             >

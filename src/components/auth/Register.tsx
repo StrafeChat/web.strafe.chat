@@ -12,18 +12,6 @@ const Register = () => {
   const [email, setEmail] = createSignal("");
   const [password, setPassword] = createSignal("");
   const [dateOfBirth, setDateOfBirth] = createSignal(new Date());
-  const [dateOfBirthISO, setDateOfBirthISO] = createSignal(
-    new Date(
-      Date.UTC(
-        new Date().getFullYear(),
-        new Date().getMonth(),
-        new Date().getDate(),
-        0,
-        0,
-        0
-      )
-    ).toISOString()
-  );
   const [error, setError] = createSignal("");
   const { register, isMobile } = useAuth();
   const [t] = useTransContext();
@@ -44,13 +32,26 @@ const Register = () => {
       return;
     }
 
+    const discNumber = parseInt(discriminator(), 10);
+    if (isNaN(discNumber)) {
+      setError("Discriminator must be a valid number");
+      return;
+    }
+
+    // Format the date to match the required format
+    const date = new Date(dateOfBirth());
+    const utcDate = new Date(
+      Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
+    );
+    const isoDate = utcDate.toISOString();
+
     const success = await register({
-      username: username(),
-      discriminator: discriminator(),
-      display_name: displayName() || undefined,
       email: email(),
+      username: username(),
+      discriminator: discNumber,
+      display_name: displayName() || undefined,
+      date_of_birth: isoDate,
       password: password(),
-      date_of_birth: dateOfBirthISO(),
     });
 
     if (success) {
@@ -212,10 +213,7 @@ const Register = () => {
               </label>
               <DatePicker
                 value={dateOfBirth()}
-                onChange={(date, iso) => {
-                  setDateOfBirth(date);
-                  setDateOfBirthISO(iso);
-                }}
+                onChange={(date) => setDateOfBirth(date)}
                 minDate={new Date(1900, 0, 1)}
                 maxDate={new Date()}
                 class="w-full"
