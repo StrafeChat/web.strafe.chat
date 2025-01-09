@@ -78,9 +78,7 @@ export const AuthProvider: ParentComponent = (props) => {
   const cache = useCache();
   const [user, setUser] = createSignal<Clientuser | null>(null);
   const [relationships, setRelationships] = createSignal<Relationship[]>([]);
-  const [relationshipRequests, setRelationshipRequests] = createSignal<
-    Relationship[]
-  >([]);
+  const [relationshipRequests, setRelationshipRequests] = createSignal<Relationship[]>([]);
   const [isAuthenticated, setIsAuthenticated] = createSignal(false);
   const [loading, setLoading] = createSignal(true);
   const [isMobile, setIsMobile] = createSignal(window.innerWidth <= 768);
@@ -126,6 +124,7 @@ export const AuthProvider: ParentComponent = (props) => {
           email: data.client_user.Email,
           avatar: data.client_user.Avatar,
           date_of_birth: data.client_user.DateOfBirth,
+          friends: data.client_user.Friends || [],
         });
       }
       if (data.users) {
@@ -148,6 +147,16 @@ export const AuthProvider: ParentComponent = (props) => {
         cache,
         setRelationshipRequests
       );
+      
+      // Update the user's friends list when a relationship is accepted
+      const currentUser = user();
+      if (currentUser) {
+        const otherUserId = currentUser.id === data.sender_id ? data.recipient_id : data.sender_id;
+        setUser({
+          ...currentUser,
+          friends: [...(currentUser.friends || []), otherUserId],
+        });
+      }
     });
 
     client.onMessage("relationshipDelete", (data) => {

@@ -1,6 +1,7 @@
 import { Component, createMemo, createEffect, For, Show } from "solid-js";
 import { useAuth } from "../../../../lib/providers/auth/AuthProvider";
 import { useCache } from "../../../../lib/providers/cache/CacheProvider";
+import { Tooltip } from "../../../common/Tooltip";
 
 export const PendingTab: Component = () => {
   const { relationshipRequests, user, setRelationshipRequests } = useAuth();
@@ -243,11 +244,13 @@ export const PendingTab: Component = () => {
                     <div class="flex gap-2">
                       {isIncoming ? (
                         <>
-                          <button
-                            onClick={() => handleAccept(request)}
-                            class="p-2 border-2 border-accent text-accent hover:bg-accent hover:text-white rounded-full transition-colors"
-                            title="Accept Friend Request"
+                          <Tooltip
+                            content={"Accept"}
+                            position="top"
                           >
+                            <button
+                            onClick={() => handleAccept(request)}
+                            class="p-2 border-2 border-green-600 text-green-600 hover:bg-green-600 hover:text-white rounded-full transition-colors">
                             <svg
                               xmlns="http://www.w3.org/2000/svg"
                               class="w-5 h-5"
@@ -261,10 +264,15 @@ export const PendingTab: Component = () => {
                               <polyline points="20 6 9 17 4 12" />
                             </svg>
                           </button>
+                          </Tooltip>
+
+                          <Tooltip
+                            content={"Deny"}
+                            position="top"
+                          >
                           <button
                             onClick={() => handleDecline(request)}
                             class="p-2 border-2 border-red-600 text-red-600 hover:bg-red-600 hover:text-white rounded-full transition-colors"
-                            title="Decline Friend Request"
                           >
                             <svg
                               xmlns="http://www.w3.org/2000/svg"
@@ -280,6 +288,7 @@ export const PendingTab: Component = () => {
                               <line x1="6" y1="6" x2="18" y2="18" />
                             </svg>
                           </button>
+                          </Tooltip>
                         </>
                       ) : (
                         <button

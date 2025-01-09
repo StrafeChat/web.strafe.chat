@@ -13,31 +13,69 @@ export const Tooltip: Component<TooltipProps> = (props) => {
   const [tooltipPosition, setTooltipPosition] = createSignal({
     top: 0,
     left: 0,
+    stemPosition: 'center'
   });
 
   const updatePosition = (targetElement: HTMLElement) => {
     const rect = targetElement.getBoundingClientRect();
-    const scrollLeft =
-      window.pageXOffset || document.documentElement.scrollLeft;
+    const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
     const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+    const viewportWidth = window.innerWidth;
+    const gap = 12; // Increased gap between tooltip and target element
 
-    if (props.position === "right") {
-      setTooltipPosition({
-        top: rect.top + scrollTop + rect.height / 2,
-        left: rect.right + scrollLeft + 8,
-      });
-    } else if (props.position === "bottom") {
-      setTooltipPosition({
-        top: rect.bottom + scrollTop + 8,
-        left: rect.left + scrollLeft + rect.width / 2,
-      });
-    } else {
-      // Default to top
-      setTooltipPosition({
-        top: rect.top + scrollTop - 8,
-        left: rect.left + scrollLeft + rect.width / 2,
-      });
-    }
+    // We need to render the tooltip first to get its width
+    setIsVisible(true);
+    setTimeout(() => {
+      const tooltip = document.querySelector('[data-tooltip]') as HTMLElement;
+      if (!tooltip) return;
+      
+      const tooltipWidth = tooltip.offsetWidth;
+      const tooltipHeight = tooltip.offsetHeight;
+      let left = rect.left + scrollLeft;
+      let top = rect.top + scrollTop;
+      let stemPosition = 'center'; // can be 'left', 'center', or 'right'
+
+      if (props.position === "right") {
+        left = rect.right + scrollLeft + gap;
+        top = rect.top + scrollTop + (rect.height / 2) - (tooltipHeight / 2);
+        
+        if (rect.right + tooltipWidth + gap > viewportWidth) {
+          left = rect.left - tooltipWidth - gap;
+          stemPosition = 'right';
+        } else {
+          stemPosition = 'left';
+        }
+      } else if (props.position === "bottom") {
+        top = rect.bottom + scrollTop + gap;
+        
+        left = rect.left + scrollLeft + (rect.width / 2) - (tooltipWidth / 2);
+        stemPosition = 'center';
+        
+        if (left + tooltipWidth > viewportWidth) {
+          left = viewportWidth - tooltipWidth - gap;
+          stemPosition = 'right';
+        } else if (left < gap) {
+          left = gap;
+          stemPosition = 'left';
+        }
+      } else {
+        // Default to top
+        top = rect.top + scrollTop - tooltipHeight - gap;
+        
+        left = rect.left + scrollLeft + (rect.width / 2) - (tooltipWidth / 2);
+        stemPosition = 'center';
+        
+        if (left + tooltipWidth > viewportWidth) {
+          left = viewportWidth - tooltipWidth - gap;
+          stemPosition = 'right';
+        } else if (left < gap) {
+          left = gap;
+          stemPosition = 'left';
+        }
+      }
+
+      setTooltipPosition({ top, left, stemPosition });
+    }, 0);
   };
 
   const handleMouseEnter = (e: MouseEvent) => {
@@ -53,22 +91,34 @@ export const Tooltip: Component<TooltipProps> = (props) => {
   const getPositionClasses = () => {
     switch (props.position) {
       case "right":
-        return "-translate-y-1/2";
+        return "";
       case "bottom":
-        return "-translate-x-1/2";
+        return "";
       default: // top
-        return "-translate-x-1/2 -translate-y-full";
+        return "";
     }
   };
 
   const getArrowClasses = () => {
+    const position = tooltipPosition().stemPosition;
+    const baseClasses = "absolute border-[8px]";
+    
     switch (props.position) {
       case "right":
-        return "left-0 top-1/2 -translate-x-1 -translate-y-1/2 border-r-gray-900 border-y-transparent border-l-transparent";
+        return `${baseClasses} left-[-16px] ${
+          position === 'center' ? 'top-1/2 -translate-y-1/2' : 
+          position === 'left' ? 'top-[10px]' : 'bottom-[10px]'
+        } border-r-[var(--surface)] border-y-transparent border-l-transparent`;
       case "bottom":
-        return "left-1/2 top-0 -translate-x-1/2 -translate-y-1 border-b-gray-900 border-x-transparent border-t-transparent";
+        return `${baseClasses} top-[-16px] ${
+          position === 'center' ? 'left-1/2 -translate-x-1/2' : 
+          position === 'left' ? 'left-[10px]' : 'right-[10px]'
+        } border-b-[var(--surface)] border-x-transparent border-t-transparent`;
       default: // top
-        return "left-1/2 top-full -translate-x-1/2 -translate-y-1 border-t-gray-900 border-x-transparent border-b-transparent";
+        return `${baseClasses} bottom-[-16px] ${
+          position === 'center' ? 'left-1/2 -translate-x-1/2' : 
+          position === 'left' ? 'left-[10px]' : 'right-[10px]'
+        } border-t-[var(--surface)] border-x-transparent border-b-transparent`;
     }
   };
 
@@ -84,17 +134,17 @@ export const Tooltip: Component<TooltipProps> = (props) => {
       <Show when={isVisible()}>
         <Portal>
           <div
-            class={`fixed z-50 px-2 py-1 text-sm font-medium text-white bg-gray-900 rounded shadow-lg pointer-events-none transform ${getPositionClasses()} ${
+            data-tooltip
+            class={`fixed z-50 px-3 py-1.5 text-sm font-medium text-[var(--text-primary)] bg-[var(--surface)] border border-[var(--border)] rounded shadow-[var(--md)] pointer-events-none ${getPositionClasses()} ${
               props.class || ""
             }`}
             style={{
               top: `${tooltipPosition().top}px`,
               left: `${tooltipPosition().left}px`,
-              "max-width": "200px",
             }}
           >
             {props.content}
-            <div class={`absolute border-[5px] ${getArrowClasses()}`} />
+            <div class={getArrowClasses()} />
           </div>
         </Portal>
       </Show>

@@ -37,6 +37,7 @@ export const handleRelationshipUpdate = async (
         discriminator: userData.discriminator,
         display_name: userData.display_name || userData.username,
         avatar: userData.avatar,
+        friends: userData.friends || [],
       });
     } catch (error) {
       console.error("[RelationshipUpdate] Failed to fetch user data:", error);
@@ -67,6 +68,7 @@ export const handleRelationshipUpdate = async (
           (r) => r.id === payload.id
         );
         if (acceptIndex !== -1) {
+          // Remove from pending requests
           newRelationships.splice(acceptIndex, 1);
         }
         break;
