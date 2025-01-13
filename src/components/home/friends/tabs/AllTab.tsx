@@ -1,6 +1,6 @@
 import { Component, For, Show, createMemo } from "solid-js";
 import { useAuth } from "../../../../lib/providers/auth/AuthProvider";
-import { useCache } from "../../../../lib/providers/cache/CacheProvider";
+import {  useCache } from "../../../../lib/providers/cache/CacheProvider";
 import { Tooltip } from "../../../common/Tooltip";
 
 type FriendData = {
@@ -9,7 +9,6 @@ type FriendData = {
   display_name: string;
   avatar?: string;
   status: string;
-  online: boolean;
   custom_status: string;
 };
 
@@ -20,19 +19,19 @@ export const AllTab: Component = () => {
   const friends = createMemo(() => {
     const currentUser = user();
     if (!currentUser?.friends?.length) return [] as const;
-
+    console.log("[AllTab] All cached users:", cache.users());
     return currentUser.friends
       .map(friendId => {
         const friend = cache.getUser(friendId);
         if (!friend?.username) return null;
-        
+        console.log("[AllTab] Friend data:", friend);
+
         const friendData: FriendData = {
           id: friend.id,
           username: friend.username,
           display_name: friend.display_name || friend.username,
           avatar: friend.avatar,
-          status: friend.presence?.status || "offline",
-          online: friend.presence?.online || false,
+          status: friend.presence?.status || "Offline",
           custom_status: friend.presence?.custom_status || "",
         };
         return friendData;
@@ -71,8 +70,7 @@ export const AllTab: Component = () => {
                 <div class="flex flex-col flex-grow">
                   <span>{friend.display_name}</span>
                   <span class="text-text-secondary text-sm">
-                    {friend.online ? friend.status : "Offline"}
-                    {friend.custom_status && ` • ${friend.custom_status}`}
+                    {friend.custom_status ? `(${friend.custom_status})` : friend.status?.charAt(0).toUpperCase() + friend.status?.slice(1)}
                   </span>
                 </div>
                 <div class="flex gap-2">

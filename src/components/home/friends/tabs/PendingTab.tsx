@@ -80,6 +80,12 @@ export const PendingTab: Component = () => {
   const getUserDisplay = (userId: string) => {
     const userData = createMemo(() => {
       const cachedUsers = cache.users();
+      console.log(
+        "[PendingTab] Cached users:",
+        cachedUsers,
+        "User ID:",
+        userId
+      );
       const user = cachedUsers[userId];
       console.log(
         "[PendingTab] Getting user display for:",
@@ -219,6 +225,7 @@ export const PendingTab: Component = () => {
               const person = getUserDisplay(
                 isIncoming ? request.sender_id : request.recipient_id
               );
+              console.log(person);
               return (
                 <div class="flex flex-col bg-background-secondary rounded-lg p-3">
                   <div class="flex items-center gap-3 text-text-primary">
@@ -291,10 +298,13 @@ export const PendingTab: Component = () => {
                           </Tooltip>
                         </>
                       ) : (
+                        <Tooltip
+                            content={"Cancel"}
+                            position="top"
+                          >
                         <button
                           onClick={() => handleCancel(request)}
                           class="p-2 border-2 border-red-600 text-red-600 hover:bg-red-600 hover:text-white rounded-full transition-colors"
-                          title="Cancel Friend Request"
                         >
                           <svg
                             xmlns="http://www.w3.org/2000/svg"
@@ -310,6 +320,7 @@ export const PendingTab: Component = () => {
                             <line x1="6" y1="6" x2="18" y2="18" />
                           </svg>
                         </button>
+                        </Tooltip>
                       )}
                     </div>
                   </div>

@@ -7,7 +7,6 @@ import {
 
 export type Presence = {
   status: string;
-  online: boolean;
   custom_status: string;
 };
 
@@ -19,13 +18,10 @@ export type User = {
   avatar?: string;
   banner?: string;
   bot?: boolean;
-  bots?: string[];
   system?: boolean;
   bio?: string;
   flags?: number;
   about_me?: string;
-  accent_color?: string;
-  locale?: string;
   presence?: Presence;
   created_at?: string;
   updated_at?: string;
@@ -65,16 +61,21 @@ export const CacheProvider: ParentComponent = (props) => {
       Object.entries(usersData).forEach(([userId, userData]) => {
         console.log("[CacheProvider] Processing user:", { userId, userData });
         if (userData) {
+          console.log("[CacheProvider] Valid user data:", userData);
           newUsers[userId] = {
             id: userData.ID,
             username: userData.Username,
             discriminator: userData.Discriminator,
             display_name: userData.DisplayName || userData.Username,
             avatar: userData.Avatar,
+            presence: {
+              status: userData.Presence.Status,
+              custom_status: userData.Presence.CustomStatus,
+            },
           };
         } else {
           console.warn("[CacheProvider] Skipping invalid user data:", userData);
-        }
+        } 
       });
       return newUsers;
     });
