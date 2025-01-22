@@ -19,7 +19,7 @@ class WebSocketWorkerHandler {
   private ports: Set<MessagePort> = new Set();
   private url: string;
 
-  constructor(url: string = "ws://localhost:8080/events?format=msgpack") {
+  constructor(url: string = process.env.WEBSOCKET_URL ?? "wss://stargate.strafechat.dev/events?format=msgpack") {
     this.url = url;
   }
 
