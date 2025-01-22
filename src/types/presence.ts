@@ -9,4 +9,4 @@ export type PresenceStatus = {
   status?: string;
   online: boolean;
   custom_status: string;
-}
+};

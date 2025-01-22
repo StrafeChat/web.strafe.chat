@@ -1,7 +1,15 @@
-import { Component, For, Show, createMemo } from "solid-js";
+import {
+  Component,
+  For,
+  Show,
+  createMemo,
+  createEffect,
+  createSignal,
+} from "solid-js";
 import { useAuth } from "../../../../lib/providers/auth/AuthProvider";
-import {  useCache } from "../../../../lib/providers/cache/CacheProvider";
+import { useCache } from "../../../../lib/providers/cache/CacheProvider";
 import { Tooltip } from "../../../common/Tooltip";
+import { FriendSearch } from "../FriendSearch";
 
 type FriendData = {
   id: string;
@@ -13,18 +21,44 @@ type FriendData = {
 };
 
 export const AllTab: Component = () => {
-  const { user } = useAuth();
+  const { user, relationships } = useAuth();
   const cache = useCache();
+  const [searchQuery, setSearchQuery] = createSignal("");
+
+  console.log("[AllTab:Initial] Auth context loaded");
 
   const friends = createMemo(() => {
+    console.log("[AllTab:friends] Starting friends memo computation");
+
     const currentUser = user();
-    if (!currentUser?.friends?.length) return [] as const;
-    console.log("[AllTab] All cached users:", cache.users());
-    return currentUser.friends
-      .map(friendId => {
+    console.log("[AllTab:friends] Current user:", currentUser);
+
+    const friendIds = relationships();
+    console.log("[AllTab:friends] Friend IDs from relationships:", friendIds);
+
+    if (!currentUser?.id) {
+      console.log("[AllTab:friends] No current user ID");
+      return [] as const;
+    }
+
+    if (!friendIds?.length) {
+      console.log("[AllTab:friends] No friend IDs found");
+      return [] as const;
+    }
+
+    const users = cache.users();
+    console.log("[AllTab:friends] All cached users:", users);
+
+    const mappedFriends = friendIds
+      .map((friendId) => {
+        console.log("[AllTab:friends] Processing friend ID:", friendId);
         const friend = cache.getUser(friendId);
-        if (!friend?.username) return null;
-        console.log("[AllTab] Friend data:", friend);
+        console.log("[AllTab:friends] Found friend in cache:", friend);
+
+        if (!friend?.username) {
+          console.log("[AllTab:friends] Friend missing username:", friend);
+          return null;
+        }
 
         const friendData: FriendData = {
           id: friend.id,
@@ -34,28 +68,51 @@ export const AllTab: Component = () => {
           status: friend.presence?.status || "Offline",
           custom_status: friend.presence?.custom_status || "",
         };
+        console.log("[AllTab:friends] Created friend data:", friendData);
         return friendData;
       })
       .filter((friend): friend is FriendData => friend !== null);
+
+    console.log("[AllTab:friends] Final mapped friends:", mappedFriends);
+    return mappedFriends;
   }) as () => FriendData[];
 
+  const filteredFriends = createMemo(() => {
+    const query = searchQuery().toLowerCase();
+    if (!query) return friends();
+
+    return friends().filter(
+      (friend) =>
+        friend.username.toLowerCase().includes(query) ||
+        friend.display_name.toLowerCase().includes(query) ||
+        friend.id.toLowerCase().includes(query)
+    );
+  });
+
+  createEffect(() => {
+    console.log("[AllTab:effect] Current friends list:", friends());
+  });
+
   return (
-    <div class="p-4 flex flex-col gap-2">
+    <div class="p-4 px-7 mb-5 flex flex-col">
+      <FriendSearch onSearch={setSearchQuery} />
       <Show
-        when={friends().length > 0}
+        when={filteredFriends().length > 0}
         fallback={
           <div class="text-text-secondary text-center p-4">
-            No friends added yet. Add some friends to get started!
+            {searchQuery()
+              ? "No friends found matching your search."
+              : "No friends added yet. Add some friends to get started!"}
           </div>
         }
       >
-        <h3 class="text-text-primary font-medium">
-          All - {friends().length}
+        <h3 class="text-text-primary font-medium text-lg px-2 pb-4 mt-2">
+          All - {filteredFriends().length}
         </h3>
-        <For each={friends()}>
+        <For each={filteredFriends()}>
           {(friend) => (
-            <div class="flex flex-col bg-background-secondary rounded-lg p-3">
-              <div class="flex items-center gap-3 text-text-primary">
+            <div class="flex flex-col bg-background-secondary p-2 pb-3.5 border-t-2 border-t-border hover:bg-border hover:rounded-lg hover:cursor-pointer">
+              <div class="flex items-center">
                 {friend.avatar ? (
                   <img
                     src={friend.avatar}
@@ -70,7 +127,10 @@ export const AllTab: Component = () => {
                 <div class="flex flex-col flex-grow">
                   <span>{friend.display_name}</span>
                   <span class="text-text-secondary text-sm">
-                    {friend.custom_status ? `(${friend.custom_status})` : friend.status?.charAt(0).toUpperCase() + friend.status?.slice(1)}
+                    {friend.custom_status
+                      ? `(${friend.custom_status})`
+                      : friend.status?.charAt(0).toUpperCase() +
+                        friend.status?.slice(1)}
                   </span>
                 </div>
                 <div class="flex gap-2">

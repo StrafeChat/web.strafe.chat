@@ -12,7 +12,8 @@ import { useCache } from "../cache/CacheProvider";
 import { handleWebSocketMessage } from "../../events";
 
 // API Configuration
-export const BASE_URL = "http://127.0.0.1:443";
+export const BASE_URL =
+  process.env.BASE_URL || "htttps://equinox.strafechat.dev";
 export const WS_URL = "ws://127.0.0.1:8080/events";
 export const API_ENDPOINTS = {
   REGISTER: `${BASE_URL}/auth/register`,
@@ -42,8 +43,8 @@ type Clientuser = {
 type AuthContextType = {
   user: () => Clientuser | null;
   setUser: (user: Clientuser | null) => void;
-  relationships: () => Relationship[];
-  setRelationships: (relationships: Relationship[]) => void;
+  relationships: () => string[];
+  setRelationships: (relationships: string[]) => void;
   relationshipRequests: () => Relationship[];
   setRelationshipRequests: (requests: Relationship[]) => void;
   login: (credentials: { email: string; password: string }) => Promise<boolean>;
@@ -77,8 +78,10 @@ const AuthContext = createContext<AuthContextType>();
 export const AuthProvider: ParentComponent = (props) => {
   const cache = useCache();
   const [user, setUser] = createSignal<Clientuser | null>(null);
-  const [relationships, setRelationships] = createSignal<Relationship[]>([]);
-  const [relationshipRequests, setRelationshipRequests] = createSignal<Relationship[]>([]);
+  const [relationships, setRelationships] = createSignal<string[]>([]);
+  const [relationshipRequests, setRelationshipRequests] = createSignal<
+    Relationship[]
+  >([]);
   const [isAuthenticated, setIsAuthenticated] = createSignal(false);
   const [loading, setLoading] = createSignal(true);
   const [isMobile, setIsMobile] = createSignal(window.innerWidth <= 768);
@@ -95,6 +98,13 @@ export const AuthProvider: ParentComponent = (props) => {
     return () => window.removeEventListener("resize", handleResize);
   });
 
+  createEffect(() => {
+    console.log(
+      "[AuthProvider:effect] Current relationships value:",
+      relationships()
+    );
+  });
+
   const logError = (context: string, error: unknown) => {
     console.error(`[AuthProvider:${context}]`, error);
   };
@@ -103,6 +113,11 @@ export const AuthProvider: ParentComponent = (props) => {
     const ws = new WebSocket(WS_URL);
     const client = new WebSocketClient(ws);
     setWsClient(client);
+
+    client.onConnectionStateChange((connected) => {
+      console.log("[AuthProvider] WebSocket connection state:", connected);
+      setLoading(!connected);
+    });
 
     // Connect with the token
     const token = localStorage.getItem("sc_token");
@@ -113,9 +128,13 @@ export const AuthProvider: ParentComponent = (props) => {
     }
 
     client.onMessage("READY", (data) => {
-      console.log("[WebSocket] Received READY payload:", data);
+      console.log(
+        "[AuthProvider:READY] Full data payload:",
+        JSON.stringify(data, null, 2)
+      );
+
       if (data.client_user) {
-        setUser({
+        const userData = {
           id: data.client_user.ID,
           username: data.client_user.Username,
           discriminator: data.client_user.Discriminator,
@@ -125,11 +144,42 @@ export const AuthProvider: ParentComponent = (props) => {
           avatar: data.client_user.Avatar,
           date_of_birth: data.client_user.DateOfBirth,
           friends: data.client_user.Friends || [],
-        });
+        };
+        console.log("[AuthProvider:READY] Setting user data:", userData);
+        setUser(userData);
       }
+
       if (data.users) {
-        console.log("[WebSocket] Received users data:", data.users);
+        console.log("[AuthProvider:READY] Setting users in cache:", data.users);
         cache.setUsers(data.users);
+      }
+
+      // Handle relationships and requests separately
+      if (data.relationships) {
+        console.log(
+          "[AuthProvider:READY] Setting relationships:",
+          data.relationships
+        );
+        setRelationships(data.relationships);
+      }
+
+      if (data.relationship_requests) {
+        console.log(
+          "[AuthProvider:READY] Setting relationship requests:",
+          data.relationship_requests
+        );
+        // Map the relationship requests to match our expected format
+        const requests = data.relationship_requests.map((request: any) => ({
+          id: request.ID,
+          sender_id: request.SenderID,
+          recipient_id: request.RecipientID,
+          created_at: request.CreatedAt || new Date().toISOString(),
+        }));
+        console.log(
+          "[AuthProvider:READY] Mapped relationship requests:",
+          requests
+        );
+        setRelationshipRequests(requests);
       }
     });
 
@@ -137,7 +187,9 @@ export const AuthProvider: ParentComponent = (props) => {
       handleWebSocketMessage(
         { type: "relationshipCreate", ...data },
         cache,
-        setRelationshipRequests
+        setRelationshipRequests,
+        setRelationships,
+        user()?.id || ""
       );
     });
 
@@ -145,13 +197,18 @@ export const AuthProvider: ParentComponent = (props) => {
       handleWebSocketMessage(
         { type: "relationshipAccept", ...data },
         cache,
-        setRelationshipRequests
+        setRelationshipRequests,
+        setRelationships,
+        user()?.id || ""
       );
-      
+
       // Update the user's friends list when a relationship is accepted
       const currentUser = user();
       if (currentUser) {
-        const otherUserId = currentUser.id === data.sender_id ? data.recipient_id : data.sender_id;
+        const otherUserId =
+          currentUser.id === data.sender_id
+            ? data.recipient_id
+            : data.sender_id;
         setUser({
           ...currentUser,
           friends: [...(currentUser.friends || []), otherUserId],
@@ -163,7 +220,9 @@ export const AuthProvider: ParentComponent = (props) => {
       handleWebSocketMessage(
         { type: "relationshipDelete", ...data },
         cache,
-        setRelationshipRequests
+        setRelationshipRequests,
+        setRelationships,
+        user()?.id || ""
       );
     });
 
@@ -244,29 +303,20 @@ export const AuthProvider: ParentComponent = (props) => {
           "[AuthProvider] Processing relationships:",
           data.relationships
         );
-        const normalizedRelationships = data.relationships.map((rel: any) => {
-          return {
-            id: rel.id,
-            sender_id: rel.sender_id || (rel.sender && rel.sender.id),
-            recipient_id:
-              rel.recipient_id || (rel.recipient && rel.recipient.id),
-            created_at: "2024-12-07T00:24:05-06:00",
-          };
-        });
+        const friendIds = data.relationships
+          .filter((rel: Relationship) => rel.type === "accepted")
+          .map((rel: Relationship) => {
+            return rel.sender_id === data.client_user.ID
+              ? rel.recipient_id
+              : rel.sender_id;
+          });
+        setRelationships(friendIds);
 
-        console.log(
-          "[AuthProvider] Setting normalized relationships:",
-          normalizedRelationships.map((r: any) => ({
-            id: r.id,
-            sender_id: r.sender_id,
-            recipient_id: r.recipient_id,
-          }))
+        const requests = data.relationships.filter(
+          (rel: Relationship) =>
+            rel.recipient_id === data.client_user.ID && !rel.type
         );
-        console.log(
-          "[AuthProvider] Normalized relationships:",
-          normalizedRelationships
-        );
-        setRelationshipRequests(normalizedRelationships);
+        setRelationshipRequests(requests);
       }
 
       initializeWebSocket();

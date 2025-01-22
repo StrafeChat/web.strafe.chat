@@ -6,7 +6,7 @@ export const Home: Component = () => {
 
   return (
     <div class="flex flex-col h-full bg-background2">
-      <div class="p-2 flex flex-col border-b border-border">
+      <div class="p-2 flex flex-col [box-shadow:0_2px_4px_-2px_rgba(0,0,0,0.2)]">
         <div class="flex items-center gap-2 px-3 py-2">
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -18,7 +18,9 @@ export const Home: Component = () => {
           >
             <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
           </svg>
-          <h2 class="text-xl font-semibold text-text-primary">{t("home.title")}</h2>
+          <h2 class="text-xl font-semibold text-text-primary">
+            {t("home.title")}
+          </h2>
         </div>
       </div>
       <div class="flex flex-col items-center justify-center flex-1 p-4 md:p-8 overflow-y-auto">

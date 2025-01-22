@@ -253,6 +253,7 @@ class WebSocketWorkerHandler {
         RELATIONSHIP_DELETE: "RELATIONSHIP_DELETE",
         MESSAGE: "MESSAGE",
         DISPATCH: "DISPATCH",
+        PRESENCE_UPDATE: "PRESENCE_UPDATE",
       };
 
       switch (data.op) {
@@ -274,7 +275,10 @@ class WebSocketWorkerHandler {
             data
           );
           if (!data.d || !data.d.id) {
-            console.error("[WebSocketWorker] Invalid relationship data received:", data);
+            console.error(
+              "[WebSocketWorker] Invalid relationship data received:",
+              data
+            );
             break;
           }
           const relationship = {
@@ -284,7 +288,7 @@ class WebSocketWorkerHandler {
             created_at: data.d.created_at || new Date().toISOString(),
             type: "relationshipCreate",
             sender: data.d.sender || null,
-            recipient: data.d.recipient || null
+            recipient: data.d.recipient || null,
           };
           console.log(
             "[WebSocketWorker] Raw relationship data:",
@@ -305,7 +309,10 @@ class WebSocketWorkerHandler {
             data
           );
           if (!data.d || !data.d.id) {
-            console.error("[WebSocketWorker] Invalid relationship update data received:", data);
+            console.error(
+              "[WebSocketWorker] Invalid relationship update data received:",
+              data
+            );
             break;
           }
           const updatedRelationship = {
@@ -315,7 +322,7 @@ class WebSocketWorkerHandler {
             created_at: data.d.created_at || new Date().toISOString(),
             type: "relationshipUpdate",
             sender: data.d.sender || null,
-            recipient: data.d.recipient || null
+            recipient: data.d.recipient || null,
           };
           console.log(
             "[WebSocketWorker] Raw relationship update data:",
@@ -336,7 +343,10 @@ class WebSocketWorkerHandler {
             data
           );
           if (!data.d || !data.d.id) {
-            console.error("[WebSocketWorker] Invalid relationship accept data received:", data);
+            console.error(
+              "[WebSocketWorker] Invalid relationship accept data received:",
+              data
+            );
             break;
           }
           const acceptedRelationship = {
@@ -346,7 +356,7 @@ class WebSocketWorkerHandler {
             created_at: data.d.created_at || new Date().toISOString(),
             type: "relationshipAccept",
             sender: data.d.sender || null,
-            recipient: data.d.recipient || null
+            recipient: data.d.recipient || null,
           };
           console.log(
             "[WebSocketWorker] Raw relationship accept data:",
@@ -367,7 +377,10 @@ class WebSocketWorkerHandler {
             data
           );
           if (!data.d || !data.d.id) {
-            console.error("[WebSocketWorker] Invalid relationship delete data received:", data);
+            console.error(
+              "[WebSocketWorker] Invalid relationship delete data received:",
+              data
+            );
             break;
           }
           const deletedRelationship = {
@@ -377,7 +390,7 @@ class WebSocketWorkerHandler {
             created_at: data.d.created_at || new Date().toISOString(),
             type: "relationshipDelete",
             sender: data.d.sender || null,
-            recipient: data.d.recipient || null
+            recipient: data.d.recipient || null,
           };
           console.log(
             "[WebSocketWorker] Raw relationship delete data:",
@@ -417,6 +430,35 @@ class WebSocketWorkerHandler {
               payload: data.d,
             });
           }
+          break;
+
+        case OpCodes.PRESENCE_UPDATE:
+          console.log(
+            "[WebSocketWorker] Received PRESENCE_UPDATE raw data:",
+            data
+          );
+          if (!data.d || !data.d.user_id) {
+            console.error(
+              "[WebSocketWorker] Invalid presence update data received:",
+              data
+            );
+            break;
+          }
+          const presenceUpdate = {
+            type: "presenceUpdate",
+            user_id: data.d.user_id,
+            status: data.d.status || "Offline",
+            custom_status: data.d.custom_status || "",
+          };
+          console.log(
+            "[WebSocketWorker] Normalized presence update:",
+            presenceUpdate
+          );
+
+          this.broadcast({
+            type: "dispatch",
+            payload: presenceUpdate,
+          });
           break;
 
         default:

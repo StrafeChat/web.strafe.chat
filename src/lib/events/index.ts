@@ -5,13 +5,14 @@ import { handleUserUpdate } from "./users/update";
 export const handleWebSocketMessage = async (
   data: any,
   cache: any,
-  setRelationshipRequests: (updater: (prev: any[]) => any[]) => void
+  setRelationshipRequests: (updater: (prev: any[]) => any[]) => void,
+  setRelationships: (updater: (prev: string[]) => string[]) => void,
+  currentUserId: string
 ) => {
   console.log("[WebSocket] Processing message:", {
     type: data.type,
     payload: data,
-    currentRelationships: cache.relationships,
-    cacheState: cache,
+    currentUserId,
   });
 
   switch (data.type) {
@@ -22,7 +23,7 @@ export const handleWebSocketMessage = async (
         type: data.type,
         data: data,
       });
-      await handleRelationshipUpdate(data, cache, setRelationshipRequests);
+      await handleRelationshipUpdate(data, cache, setRelationshipRequests, setRelationships, currentUserId);
       break;
 
     case "presenceUpdate":
@@ -34,6 +35,6 @@ export const handleWebSocketMessage = async (
       break;
 
     default:
-      console.warn("[WebSocket] Unhandled event type:", data.type);
+      console.log("[WebSocket] Unhandled message type:", data.type);
   }
 };

@@ -3,6 +3,7 @@ export type PayloadType =
   | "HEARTBEAT"
   | "MESSAGE"
   | "READY"
+  | "PRESENCE_UPDATE"
   | "relationshipCreate"
   | "relationshipUpdate"
   | "relationshipAccept"
@@ -68,12 +69,23 @@ export interface RelationshipPayload extends BasePayload {
   };
 }
 
+export interface PresenceUpdatePayload extends BasePayload {
+  type: "PRESENCE_UPDATE";
+  user_id: string;
+  status: string;
+  custom_status: string;
+}
+
 export type WSPayload =
   | IdentifyPayload
   | HeartbeatPayload
   | MessagePayload
   | ReadyPayload
-  | RelationshipPayload;
+  | RelationshipPayload
+  | PresenceUpdatePayload;
+
+import { UserCache } from "../cache/UserCache";
+import { handlePresenceUpdate } from "../events/presence/update";
 
 export class WebSocketClient {
   private readonly worker: SharedWorker;
@@ -84,11 +96,12 @@ export class WebSocketClient {
   private readonly connectionStateCallbacks: ((connected: boolean) => void)[] =
     [];
   private connected = false;
-  public cache: any;
+  public cache: UserCache;
   private relationships: { [key: string]: any } = {};
   private relationshipRequests: { [key: string]: any } = {};
 
   constructor(private readonly ws: WebSocket) {
+    this.cache = new UserCache();
     this.worker = new SharedWorker(
       new URL("./WebSocketWorker.ts", import.meta.url),
       {
@@ -113,6 +126,34 @@ export class WebSocketClient {
     this.onMessage("relationshipUpdate", this.handleRelationship.bind(this));
     this.onMessage("relationshipAccept", this.handleRelationship.bind(this));
     this.onMessage("relationshipDelete", this.handleRelationship.bind(this));
+    this.onMessage("PRESENCE_UPDATE", this.handlePresenceUpdate.bind(this));
+
+    // Listen for presence updates
+    this.cache.onPresenceUpdate((userId, presence) => {
+      // Dispatch presence update to any listeners
+      const user = this.cache.getUser(userId);
+      if (user) {
+        console.log(
+          "[WebSocketClient] Dispatching user update with presence:",
+          { user, presence }
+        );
+        this.dispatchEvent("userUpdate", {
+          id: user.ID,
+          username: user.Username,
+          discriminator: user.Discriminator,
+          display_name: user.DisplayName,
+          avatar: user.Avatar,
+          presence: {
+            status: presence.status,
+            custom_status: presence.custom_status,
+          },
+        });
+      }
+    });
+  }
+
+  private dispatchEvent(type: string, data: any) {
+    window.dispatchEvent(new CustomEvent(type, { detail: data }));
   }
 
   private handleWorkerMessage(event: MessageEvent) {
@@ -123,6 +164,7 @@ export class WebSocketClient {
 
     switch (type) {
       case "message":
+      case "dispatch":
         console.log("[WebSocket] Processing message type:", payload.type);
         const handler = this.messageHandlers.get(payload.type);
         if (handler) {
@@ -131,6 +173,9 @@ export class WebSocketClient {
           handler(payload);
         } else {
           console.warn("[WebSocket] No handler found for type:", payload.type);
+          console.log("[WebSocket] Available handlers:", [
+            ...this.messageHandlers.keys(),
+          ]);
         }
         break;
       case "relationshipCreate":
@@ -215,7 +260,7 @@ export class WebSocketClient {
         normalizedSender.discriminator
       ) {
         console.log("[WebSocket] Caching normalized sender:", normalizedSender);
-        this.cache.setUser(normalizedSender);
+        this.cache.setUsers({ [normalizedSender.id]: normalizedSender });
       } else {
         console.warn("[WebSocket] Invalid sender data:", sender);
       }
@@ -240,7 +285,7 @@ export class WebSocketClient {
           "[WebSocket] Caching normalized recipient:",
           normalizedRecipient
         );
-        this.cache.setUser(normalizedRecipient);
+        this.cache.setUsers({ [normalizedRecipient.id]: normalizedRecipient });
       } else {
         console.warn("[WebSocket] Invalid recipient data:", recipient);
       }
@@ -271,6 +316,19 @@ export class WebSocketClient {
     if (handler) {
       handler(payload);
     }
+  }
+
+  private handlePresenceUpdate(payload: PresenceUpdatePayload) {
+    console.log("[WebSocketClient] Handling presence update:", payload);
+    if (!this.cache) {
+      console.warn("[WebSocketClient] No cache available for presence update");
+      return;
+    }
+    console.log(
+      "[WebSocketClient] Cache exists, current users:",
+      Array.from(this.cache.getUsers().keys())
+    );
+    handlePresenceUpdate(payload, this.cache);
   }
 
   public onConnectionStateChange(callback: (connected: boolean) => void) {

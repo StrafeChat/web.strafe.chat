@@ -3,6 +3,7 @@ import {
   createContext,
   useContext,
   createSignal,
+  createEffect,
 } from "solid-js";
 
 export type Presence = {
@@ -39,19 +40,44 @@ const CacheContext = createContext<CacheContextType>();
 export const CacheProvider: ParentComponent = (props) => {
   const [users, setUsers] = createSignal<Record<string, User>>({});
 
+  // Listen for user updates
+  createEffect(() => {
+    const handleUserUpdate = (event: CustomEvent) => {
+      const userData = event.detail;
+      if (userData && userData.id) {
+        setUser(userData);
+      }
+    };
+
+    window.addEventListener("userUpdate", handleUserUpdate as EventListener);
+    return () => {
+      window.removeEventListener(
+        "userUpdate",
+        handleUserUpdate as EventListener
+      );
+    };
+  });
+
   const setUser = (userData: Partial<User> & { id: string }) => {
     if (!userData || !userData.id) {
       console.warn("[CacheProvider] Invalid user data:", userData);
       return;
     }
 
-    setUsers((prev) => ({
-      ...prev,
-      [userData.id]: {
-        ...prev[userData.id],
-        ...userData,
-      },
-    }));
+    console.log("[CacheProvider] Setting user with data:", userData);
+
+    setUsers((prev) => {
+      const existingUser = prev[userData.id];
+      return {
+        ...prev,
+        [userData.id]: {
+          ...existingUser,
+          ...userData,
+          // Ensure presence is properly updated and merged
+          presence: userData.presence || existingUser?.presence,
+        },
+      };
+    });
   };
 
   const setUsersData = (usersData: Record<string, any>) => {
@@ -75,7 +101,7 @@ export const CacheProvider: ParentComponent = (props) => {
           };
         } else {
           console.warn("[CacheProvider] Skipping invalid user data:", userData);
-        } 
+        }
       });
       return newUsers;
     });

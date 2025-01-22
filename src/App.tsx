@@ -14,6 +14,7 @@ import Register from "./components/auth/Register";
 import { Interface } from "./components/shared/Interface";
 import { Home } from "./components/home/Home";
 import { Friends } from "./components/home/friends/Friends";
+import { Notes } from "./components/home/notes/Notes";
 import { getDirection } from "./lib/utils/direction";
 
 const MountApp = (props: ParentProps) => {
@@ -59,6 +60,7 @@ const App = () => {
         <Route path="/" component={Interface as never}>
           <Route path="/" component={Home} />
           <Route path="/friends" component={Friends} />
+          <Route path="/notes" component={Notes} />
         </Route>
       </Router>
     </MountApp>

@@ -1,12 +1,21 @@
-import { Component, createMemo, createEffect, For, Show } from "solid-js";
+import {
+  Component,
+  createMemo,
+  createEffect,
+  For,
+  Show,
+  createSignal,
+} from "solid-js";
 import { useAuth } from "../../../../lib/providers/auth/AuthProvider";
 import { useCache } from "../../../../lib/providers/cache/CacheProvider";
 import { Tooltip } from "../../../common/Tooltip";
+import { FriendSearch } from "../FriendSearch";
 
 export const PendingTab: Component = () => {
   const { relationshipRequests, user, setRelationshipRequests } = useAuth();
   const cache = useCache();
   const loading = createMemo(() => !user()?.id || !relationshipRequests());
+  const [searchQuery, setSearchQuery] = createSignal("");
 
   createEffect(() => {
     console.log("[PendingTab] Auth state:", {
@@ -111,6 +120,27 @@ export const PendingTab: Component = () => {
     };
   };
 
+  const filteredRequests = createMemo(() => {
+    const query = searchQuery().toLowerCase();
+    const allRequests = [...incoming(), ...outgoing()];
+
+    if (!query) return allRequests;
+
+    return allRequests.filter((request) => {
+      const isIncoming = request.recipient_id === user()?.id;
+      const targetId = isIncoming ? request.sender_id : request.recipient_id;
+      const person = getUserDisplay(targetId);
+      const userData = cache.getUser(targetId);
+
+      return (
+        person.name.toLowerCase().includes(query) ||
+        targetId.toLowerCase().includes(query) ||
+        userData?.username?.toLowerCase().includes(query) ||
+        userData?.display_name?.toLowerCase().includes(query)
+      );
+    });
+  });
+
   const handleAccept = async (request: Relationship) => {
     try {
       const response = await fetch(
@@ -211,53 +241,60 @@ export const PendingTab: Component = () => {
   };
 
   return (
-    <div class="p-4 flex flex-col gap-4 min-h-0 overflow-y-auto">
+    <div class="p-4 px-7 mb-5 flex flex-col">
+      <FriendSearch onSearch={setSearchQuery} />
       <Show
-        when={!loading() && (incoming().length > 0 || outgoing().length > 0)}
+        when={!loading() && filteredRequests().length > 0}
+        fallback={
+          <div class="text-text-secondary text-center p-4">
+            {searchQuery()
+              ? "No pending requests found matching your search."
+              : !loading()
+              ? "No pending friend requests"
+              : "Loading friend requests..."}
+          </div>
+        }
       >
-        <div class="flex flex-col gap-2">
-          <h3 class="text-text-primary font-medium">
-            Pending - {incoming().length + outgoing().length}
-          </h3>
-          <For each={[...incoming(), ...outgoing()]}>
-            {(request) => {
-              const isIncoming = request.recipient_id === user()?.id;
-              const person = getUserDisplay(
-                isIncoming ? request.sender_id : request.recipient_id
-              );
-              console.log(person);
-              return (
-                <div class="flex flex-col bg-background-secondary rounded-lg p-3">
-                  <div class="flex items-center gap-3 text-text-primary">
-                    {person.avatar ? (
-                      <img
-                        src={person.avatar}
-                        alt="avatar"
-                        class="w-10 h-10 rounded-full"
-                      />
-                    ) : (
-                      <div class="w-10 h-10 rounded-full bg-background-tertiary flex items-center justify-center">
-                        {person.name.charAt(0)}
-                      </div>
-                    )}
-                    <div class="flex flex-col flex-grow">
-                      <span>{person.name}</span>
-                      <span class="text-text-secondary text-sm">
-                        {isIncoming
-                          ? "Incoming Friend Request"
-                          : "Outgoing Friend Request"}
-                      </span>
+        <h3 class="text-text-primary font-medium text-lg px-2 pb-4 mt-2">
+          Pending - {filteredRequests().length}
+        </h3>
+        <For each={filteredRequests()}>
+          {(request) => {
+            const isIncoming = request.recipient_id === user()?.id;
+            const person = getUserDisplay(
+              isIncoming ? request.sender_id : request.recipient_id
+            );
+            console.log(person);
+            return (
+              <div class="flex flex-col bg-background-secondary p-2 pb-3.5 border-t-2 border-t-border hover:bg-border hover:rounded-lg hover:cursor-pointer">
+                <div class="flex items-center">
+                  {person.avatar ? (
+                    <img
+                      src={person.avatar}
+                      alt="avatar"
+                      class="w-10 h-10 rounded-full"
+                    />
+                  ) : (
+                    <div class="w-10 h-10 rounded-full bg-background-tertiary flex items-center justify-center">
+                      {person.name.charAt(0)}
                     </div>
-                    <div class="flex gap-2">
-                      {isIncoming ? (
-                        <>
-                          <Tooltip
-                            content={"Accept"}
-                            position="top"
-                          >
-                            <button
+                  )}
+                  <div class="flex flex-col flex-grow">
+                    <span>{person.name}</span>
+                    <span class="text-text-secondary text-sm">
+                      {isIncoming
+                        ? "Incoming Friend Request"
+                        : "Outgoing Friend Request"}
+                    </span>
+                  </div>
+                  <div class="flex">
+                    {isIncoming ? (
+                      <>
+                        <Tooltip content={"Accept"} position="top">
+                          <button
                             onClick={() => handleAccept(request)}
-                            class="p-2 border-2 border-green-600 text-green-600 hover:bg-green-600 hover:text-white rounded-full transition-colors">
+                            class="p-2 border-2 border-green-600 text-green-600 hover:bg-green-600 hover:text-white rounded-full transition-colors"
+                          >
                             <svg
                               xmlns="http://www.w3.org/2000/svg"
                               class="w-5 h-5"
@@ -271,12 +308,9 @@ export const PendingTab: Component = () => {
                               <polyline points="20 6 9 17 4 12" />
                             </svg>
                           </button>
-                          </Tooltip>
+                        </Tooltip>
 
-                          <Tooltip
-                            content={"Deny"}
-                            position="top"
-                          >
+                        <Tooltip content={"Deny"} position="top">
                           <button
                             onClick={() => handleDecline(request)}
                             class="p-2 border-2 border-red-600 text-red-600 hover:bg-red-600 hover:text-white rounded-full transition-colors"
@@ -295,13 +329,10 @@ export const PendingTab: Component = () => {
                               <line x1="6" y1="6" x2="18" y2="18" />
                             </svg>
                           </button>
-                          </Tooltip>
-                        </>
-                      ) : (
-                        <Tooltip
-                            content={"Cancel"}
-                            position="top"
-                          >
+                        </Tooltip>
+                      </>
+                    ) : (
+                      <Tooltip content={"Cancel"} position="top">
                         <button
                           onClick={() => handleCancel(request)}
                           class="p-2 border-2 border-red-600 text-red-600 hover:bg-red-600 hover:text-white rounded-full transition-colors"
@@ -320,29 +351,14 @@ export const PendingTab: Component = () => {
                             <line x1="6" y1="6" x2="18" y2="18" />
                           </svg>
                         </button>
-                        </Tooltip>
-                      )}
-                    </div>
+                      </Tooltip>
+                    )}
                   </div>
                 </div>
-              );
-            }}
-          </For>
-        </div>
-      </Show>
-
-      <Show
-        when={!loading() && incoming().length === 0 && outgoing().length === 0}
-      >
-        <div class="text-text-secondary text-center py-8">
-          No pending friend requests
-        </div>
-      </Show>
-
-      <Show when={loading()}>
-        <div class="text-text-secondary text-center py-8">
-          Loading friend requests...
-        </div>
+              </div>
+            );
+          }}
+        </For>
       </Show>
     </div>
   );

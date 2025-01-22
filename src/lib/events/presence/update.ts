@@ -1,20 +1,17 @@
-import { PresencePayload } from "../../../types/presence";
+import { PresenceUpdatePayload } from "../../ws/WebSocketClient";
 
-export const handlePresenceUpdate = (payload: PresencePayload, cache: any) => {
+export const handlePresenceUpdate = (payload: PresenceUpdatePayload, cache: any) => {
+  console.log("[PresenceUpdate] Handling presence update with payload:", payload);
+  
   if (!payload.user_id) {
     console.error("[PresenceUpdate] Missing user_id in payload:", payload);
     return;
   }
 
-  const user = cache.getUser(payload.user_id);
-  if (user) {
-    cache.setUser({
-      ...user,
-      presence: {
-        status: payload.status,
-        online: payload.online,
-        custom_status: payload.custom_status || "",
-      },
-    });
-  }
+  console.log("[PresenceUpdate] Updating presence for user:", payload.user_id);
+  cache.updateUserPresence(
+    payload.user_id,
+    payload.status,
+    payload.custom_status || ""
+  );
 };
