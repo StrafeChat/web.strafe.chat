@@ -89,29 +89,49 @@ import { handlePresenceUpdate } from "../events/presence/update";
 
 export class WebSocketClient {
   private readonly worker: SharedWorker;
-  private readonly messageHandlers: Map<string, (data: any) => void> =
-    new Map();
+  private readonly messageHandlers: Map<string, (data: any) => void> = new Map();
   private connectPromise: Promise<boolean> | null = null;
   private readyPromise: Promise<ReadyPayload> | null = null;
-  private readonly connectionStateCallbacks: ((connected: boolean) => void)[] =
-    [];
+  private readonly connectionStateCallbacks: ((connected: boolean) => void)[] = [];
   private connected = false;
   public cache: UserCache;
   private relationships: { [key: string]: any } = {};
   private relationshipRequests: { [key: string]: any } = {};
+  private static workerChannel: BroadcastChannel;
+  private static activeWorker: SharedWorker | null = null;
 
   constructor(private readonly ws: WebSocket) {
     this.cache = new UserCache();
-    this.worker = new SharedWorker(
-      new URL("./WebSocketWorker.ts", import.meta.url),
-      {
-        type: "module",
-        name: "StrafeChat WebSocket Worker",
-      }
-    );
+    
+    // Create or join the coordination channel
+    if (!WebSocketClient.workerChannel) {
+      WebSocketClient.workerChannel = new BroadcastChannel('strafe-websocket-worker');
+    }
 
+    // Try to get existing worker or create new one
+    if (!WebSocketClient.activeWorker) {
+      WebSocketClient.activeWorker = new SharedWorker(
+        new URL("./WebSocketWorker.ts", import.meta.url),
+        {
+          type: "module",
+          name: "StrafeChat WebSocket Worker",
+        }
+      );
+      
+      // Notify other tabs that we've created a worker
+      WebSocketClient.workerChannel.postMessage({ type: 'worker-created' });
+    }
+
+    this.worker = WebSocketClient.activeWorker;
     this.worker.port.onmessage = this.handleWorkerMessage.bind(this);
     this.worker.port.start();
+
+    // Listen for worker creation from other tabs
+    WebSocketClient.workerChannel.onmessage = (event) => {
+      if (event.data.type === 'worker-created') {
+        WebSocketClient.activeWorker = this.worker;
+      }
+    };
 
     this.worker.port.postMessage({
       type: "init",

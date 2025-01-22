@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 
 import * as msgpack from "@msgpack/msgpack";
+import { WS_URL } from "../config";
 
 interface WebSocketMessage {
   type: "connect" | "disconnect" | "send" | "connectionState" | "init";
@@ -19,7 +20,7 @@ class WebSocketWorkerHandler {
   private ports: Set<MessagePort> = new Set();
   private url: string;
 
-  constructor(url: string = process.env.WEBSOCKET_URL ?? "wss://stargate.strafechat.dev/events?format=msgpack") {
+  constructor(url: string = WS_URL) {
     this.url = url;
   }
 

@@ -10,12 +10,8 @@ import {
 import { WebSocketClient } from "../../ws/WebSocketClient";
 import { useCache } from "../cache/CacheProvider";
 import { handleWebSocketMessage } from "../../events";
+import { BASE_URL, WS_URL } from "../../config";
 
-// API Configuration
-export const BASE_URL =
-  process.env.BASE_URL || "https://equinox.strafechat.dev";
-export const WS_URL =
-  process.env.WEBSOCKET_URL || "wss://stargate.strafechat.dev/events";
 export const API_ENDPOINTS = {
   REGISTER: `${BASE_URL}/auth/register`,
   LOGIN: `${BASE_URL}/auth/login`,
@@ -117,14 +113,16 @@ export const AuthProvider: ParentComponent = (props) => {
 
     client.onConnectionStateChange((connected) => {
       console.log("[AuthProvider] WebSocket connection state:", connected);
-      setLoading(!connected);
+      if (!connected) {
+        setLoading(true);
+      }
     });
 
-    // Connect with the token
     const token = localStorage.getItem("sc_token");
     if (token) {
       client.connect(token).catch((error) => {
         console.error("[WebSocket] Failed to connect:", error);
+        setLoading(false);
       });
     }
 
@@ -155,7 +153,6 @@ export const AuthProvider: ParentComponent = (props) => {
         cache.setUsers(data.users);
       }
 
-      // Handle relationships and requests separately
       if (data.relationships) {
         console.log(
           "[AuthProvider:READY] Setting relationships:",
@@ -169,7 +166,6 @@ export const AuthProvider: ParentComponent = (props) => {
           "[AuthProvider:READY] Setting relationship requests:",
           data.relationship_requests
         );
-        // Map the relationship requests to match our expected format
         const requests = data.relationship_requests.map((request: any) => ({
           id: request.ID,
           sender_id: request.SenderID,
@@ -182,6 +178,8 @@ export const AuthProvider: ParentComponent = (props) => {
         );
         setRelationshipRequests(requests);
       }
+
+      setLoading(false);
     });
 
     client.onMessage("relationshipCreate", (data) => {
@@ -203,7 +201,6 @@ export const AuthProvider: ParentComponent = (props) => {
         user()?.id || ""
       );
 
-      // Update the user's friends list when a relationship is accepted
       const currentUser = user();
       if (currentUser) {
         const otherUserId =
@@ -413,7 +410,6 @@ export const AuthProvider: ParentComponent = (props) => {
     setWsClient(null);
   };
 
-  // Handle cleanup
   onCleanup(() => {
     const client = wsClient();
     if (client) {
