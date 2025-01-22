@@ -10,6 +10,7 @@ import { useAuth } from "../../../../lib/providers/auth/AuthProvider";
 import { useCache } from "../../../../lib/providers/cache/CacheProvider";
 import { Tooltip } from "../../../common/Tooltip";
 import { FriendSearch } from "../FriendSearch";
+import { BASE_URL } from "../../../../lib/config";
 
 export const PendingTab: Component = () => {
   const { relationshipRequests, user, setRelationshipRequests } = useAuth();
@@ -144,7 +145,7 @@ export const PendingTab: Component = () => {
   const handleAccept = async (request: Relationship) => {
     try {
       const response = await fetch(
-        `http://127.0.0.1:443/users/@me/relationships/${request.id}`,
+        `${BASE_URL}/users/@me/relationships/${request.id}`,
         {
           method: "PUT",
           headers: {
@@ -177,7 +178,7 @@ export const PendingTab: Component = () => {
   const handleDecline = async (request: Relationship) => {
     try {
       const response = await fetch(
-        `http://127.0.0.1:443/users/@me/relationships/${request.id}`,
+        `${BASE_URL}/users/@me/relationships/${request.id}`,
         {
           method: "DELETE",
           headers: {
@@ -210,7 +211,7 @@ export const PendingTab: Component = () => {
   const handleCancel = async (request: Relationship) => {
     try {
       const response = await fetch(
-        `http://127.0.0.1:443/users/@me/relationships/${request.id}`,
+        `${BASE_URL}/users/@me/relationships/${request.id}`,
         {
           method: "DELETE",
           headers: {
