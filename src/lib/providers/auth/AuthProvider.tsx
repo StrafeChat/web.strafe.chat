@@ -15,7 +15,7 @@ import { handleWebSocketMessage } from "../../events";
 export const BASE_URL =
   process.env.BASE_URL || "https://equinox.strafechat.dev";
 export const WS_URL =
-  process.env.WEBSOCKET_URL || "wss://equinox.strafechat.dev/events";
+  process.env.WEBSOCKET_URL || "wss://stargate.strafechat.dev/events";
 export const API_ENDPOINTS = {
   REGISTER: `${BASE_URL}/auth/register`,
   LOGIN: `${BASE_URL}/auth/login`,
