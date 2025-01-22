@@ -27,14 +27,6 @@ export const OnlineTab: Component = () => {
 
   console.log("[OnlineTab:Initial] Auth context loaded");
 
-  // Watch for any changes in the users cache
-  createEffect(() => {
-    const users = cache.users();
-    console.log(
-      "[OnlineTab:effect] Users cache changed, recomputing online friends"
-    );
-  });
-
   const onlineFriends = createMemo(() => {
     console.log("[OnlineTab:friends] Starting friends memo computation");
 
