@@ -83,10 +83,15 @@ class WebSocketWorkerHandler {
       clearTimeout(this.reconnectTimeout);
     }
 
-    const delay = Math.min(
-      this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts),
-      30000
-    );
+    // More aggressive initial reconnect attempts
+    let delay;
+    if (this.reconnectAttempts < 3) {
+      // First 3 attempts: 1s, 2s, 4s
+      delay = Math.min(this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts), 4000);
+    } else {
+      // After 3 attempts, use exponential backoff up to 30s
+      delay = Math.min(this.baseReconnectDelay * Math.pow(1.5, this.reconnectAttempts), 30000);
+    }
 
     console.log(
       `[WebSocketWorker] Scheduling reconnect attempt ${
@@ -102,6 +107,11 @@ class WebSocketWorkerHandler {
         );
         const firstPort = Array.from(this.ports)[0];
         if (firstPort) {
+          // Reset reconnect attempts if we've been disconnected for a while
+          if (this.reconnectAttempts > 5) {
+            console.log("[WebSocketWorker] Resetting reconnect attempts");
+            this.reconnectAttempts = 0;
+          }
           this.handleConnect(this.currentToken, firstPort);
         }
       }
@@ -111,7 +121,9 @@ class WebSocketWorkerHandler {
   private startHeartbeat() {
     this.stopHeartbeat();
 
+    // Send initial heartbeat immediately
     if (this.isConnected()) {
+      console.log("[WebSocketWorker] Sending initial heartbeat");
       const payload = {
         type: "HEARTBEAT",
         timestamp: Date.now(),
@@ -119,8 +131,10 @@ class WebSocketWorkerHandler {
       this.send(payload);
     }
 
+    // Set up heartbeat interval (every 15 seconds instead of 45)
     this.heartbeatInterval = setInterval(() => {
       if (this.isConnected()) {
+        console.log("[WebSocketWorker] Sending heartbeat");
         const payload = {
           type: "HEARTBEAT",
           timestamp: Date.now(),
@@ -133,7 +147,7 @@ class WebSocketWorkerHandler {
           }
         });
       }
-    }, 45000) as unknown as number;
+    }, 15000) as unknown as number;
   }
 
   private stopHeartbeat() {

@@ -239,6 +239,7 @@ export const AuthProvider: ParentComponent = (props) => {
       if (!res.ok) {
         logError("fetchUserData", `HTTP Error: ${res.status}`);
         setIsAuthenticated(false);
+        setLoading(false);
         return false;
       }
 
@@ -272,6 +273,7 @@ export const AuthProvider: ParentComponent = (props) => {
           hasEmail: !!clientUser?.email,
         });
         setIsAuthenticated(false);
+        setLoading(false);
         return false;
       }
 
@@ -315,10 +317,12 @@ export const AuthProvider: ParentComponent = (props) => {
       }
 
       initializeWebSocket();
+      setLoading(false);
       return true;
     } catch (error) {
       logError("fetchUserData", error);
       setIsAuthenticated(false);
+      setLoading(false);
       return false;
     }
   };
@@ -328,7 +332,10 @@ export const AuthProvider: ParentComponent = (props) => {
     if (token) {
       fetchUserData(token).catch(() => {
         localStorage.removeItem("sc_token");
+        setLoading(false);
       });
+    } else {
+      setLoading(false);
     }
   };
 

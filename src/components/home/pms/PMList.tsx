@@ -4,11 +4,7 @@ import UserSettings from "../../settings/UserSettings";
 import { A } from "@solidjs/router";
 import { Tooltip } from "../../common/Tooltip";
 
-interface PMListProps {
-  onCreatePM: () => void;
-}
-
-export const PMList: Component<PMListProps> = (props) => {
+export const PMList: Component = () => {
   const { relationshipRequests, user } = useAuth();
   const [showSettings, setShowSettings] = createSignal(false);
 
@@ -115,10 +111,7 @@ export const PMList: Component<PMListProps> = (props) => {
           </span>
           <div class="ml-auto">
             <Tooltip content="Create PM" position="top">
-              <button
-                class="w-6 h-6 rounded-full hover:bg-surface hover:bg-opacity-10 transition-colors grid place-items-center text-text-primary"
-                onClick={props.onCreatePM}
-              >
+              <button class="w-6 h-6 rounded-full hover:bg-surface hover:bg-opacity-10 transition-colors grid place-items-center text-text-primary">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
                   class="w-4 h-4"
