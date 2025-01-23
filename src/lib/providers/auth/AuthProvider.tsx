@@ -114,7 +114,7 @@ export const AuthProvider: ParentComponent = (props) => {
     client.onConnectionStateChange((connected) => {
       console.log("[AuthProvider] WebSocket connection state:", connected);
       if (!connected) {
-        setLoading(true);
+        setLoading(true); // Show loading when connection is lost
       }
     });
 
@@ -131,6 +131,7 @@ export const AuthProvider: ParentComponent = (props) => {
         JSON.stringify(data, null, 2)
       );
 
+      // Process all data before setting loading to false
       if (data.client_user) {
         const userData = {
           id: data.client_user.ID,
@@ -178,6 +179,8 @@ export const AuthProvider: ParentComponent = (props) => {
         setRelationshipRequests(requests);
       }
 
+      // Only set loading to false after all data is processed
+      console.log("[AuthProvider:READY] All data processed, setting loading to false");
       setLoading(false);
     });
 

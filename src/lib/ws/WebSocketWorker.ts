@@ -19,6 +19,7 @@ class WebSocketWorkerHandler {
   private currentToken: string | null = null;
   private ports: Set<MessagePort> = new Set();
   private url: string;
+  private loading = true;
 
   constructor(url: string = WS_URL) {
     this.url = url;
@@ -30,10 +31,27 @@ class WebSocketWorkerHandler {
       token.substring(0, 10) + "..."
     );
 
+    // If we already have an active connection with the same token, just add the port
+    if (this.ws?.readyState === WebSocket.OPEN && this.currentToken === token) {
+      console.log("[WebSocketWorker] Reusing existing connection for new port");
+      this.addPort(port);
+      // Send a READY event to the new port to initialize its state
+      this.notifyConnectionState(true, port);
+      // Send an identify request to get the initial state for this port
+      this.sendIdentify(token)
+        .then(() => {
+          console.log("[WebSocketWorker] Identify sent successfully for new port");
+        })
+        .catch((error) => {
+          console.error("[WebSocketWorker] Failed to send identify for new port:", error);
+          this.notifyError(error, port);
+        });
+      return;
+    }
+
+    // If we have a different token or no connection, create a new one
     if (this.ws) {
-      console.log(
-        "[WebSocketWorker] Closing existing connection before new connect"
-      );
+      console.log("[WebSocketWorker] Closing existing connection due to token change");
       this.ws.close();
     }
 
@@ -49,6 +67,7 @@ class WebSocketWorkerHandler {
             console.log("[WebSocketWorker] Identify sent successfully");
             this.notifyConnectionState(true);
             this.startHeartbeat();
+            this.reconnectAttempts = 0; // Reset reconnect attempts on successful connection
           })
           .catch((error) => {
             console.error("[WebSocketWorker] Failed to send identify:", error);
@@ -70,7 +89,10 @@ class WebSocketWorkerHandler {
         console.log("[WebSocketWorker] WebSocket closed:", event);
         this.notifyConnectionState(false);
         this.stopHeartbeat();
-        this.scheduleReconnect();
+        // Only schedule reconnect if we still have ports
+        if (this.ports.size > 0) {
+          this.scheduleReconnect();
+        }
       };
     } catch (error) {
       console.error("[WebSocketWorker] Connection setup error:", error);
@@ -101,21 +123,48 @@ class WebSocketWorkerHandler {
 
     this.reconnectTimeout = setTimeout(() => {
       this.reconnectAttempts++;
-      if (this.currentToken) {
+      if (this.currentToken && this.ports.size > 0) {
         console.log(
           `[WebSocketWorker] Attempting reconnect ${this.reconnectAttempts}`
         );
-        const firstPort = Array.from(this.ports)[0];
-        if (firstPort) {
-          // Reset reconnect attempts if we've been disconnected for a while
-          if (this.reconnectAttempts > 5) {
-            console.log("[WebSocketWorker] Resetting reconnect attempts");
-            this.reconnectAttempts = 0;
-          }
-          this.handleConnect(this.currentToken, firstPort);
+        // Use any port since we're maintaining a single connection
+        const port = Array.from(this.ports)[0];
+        // Reset reconnect attempts if we've been disconnected for a while
+        if (this.reconnectAttempts > 5) {
+          console.log("[WebSocketWorker] Resetting reconnect attempts");
+          this.reconnectAttempts = 0;
         }
+        this.handleConnect(this.currentToken, port);
       }
     }, delay) as unknown as number;
+  }
+
+  public addPort(port: MessagePort) {
+    if (!this.ports.has(port)) {
+      this.ports.add(port);
+      port.onmessage = (event: MessageEvent<WebSocketMessage>) => {
+        const { type, payload } = event.data;
+        console.log("[WebSocketWorker] Received message from port:", type, payload);
+        switch (type) {
+          case "init":
+            this.url = payload.url;
+            break;
+          case "connect":
+            this.handleConnect(payload.token, port);
+            break;
+          case "disconnect":
+            this.handleDisconnect();
+            break;
+          case "send":
+            this.send(payload).catch((error) => {
+              console.error("[WebSocketWorker] Error sending message:", error);
+              this.notifyError(error, port);
+            });
+            break;
+        }
+      };
+      port.start();
+    }
   }
 
   private startHeartbeat() {
@@ -274,6 +323,7 @@ class WebSocketWorkerHandler {
       switch (data.op) {
         case OpCodes.READY:
           console.log("[WebSocketWorker] Received READY event:", data.d);
+          this.loading = false;
           this.broadcast({
             type: "ready",
             payload: data.d,
@@ -573,7 +623,7 @@ class WebSocketWorkerHandler {
     connected: boolean,
     specificPort?: MessagePort
   ) {
-    const message = { type: "connectionState", payload: { connected } };
+    const message = { type: "connectionState", payload: { connected, loading: this.loading } };
     if (specificPort) {
       specificPort.postMessage(message);
     } else {
@@ -596,37 +646,16 @@ class WebSocketWorkerHandler {
   }
 
   private broadcast(message: any) {
+    console.log("[WebSocketWorker] Broadcasting message to all ports:", message);
     this.ports.forEach((port) => {
       try {
         port.postMessage(message);
       } catch (error) {
-        console.error("[WebSocketWorker] Error broadcasting message:", error);
+        console.error("[WebSocketWorker] Error broadcasting message to port:", error);
+        // Remove the port if it's broken
+        this.removePort(port);
       }
     });
-  }
-
-  public addPort(port: MessagePort) {
-    this.ports.add(port);
-    port.onmessage = (event: MessageEvent<WebSocketMessage>) => {
-      const { type, payload } = event.data;
-      switch (type) {
-        case "init":
-          this.url = payload.url;
-          break;
-        case "connect":
-          this.handleConnect(payload.token, port);
-          break;
-        case "disconnect":
-          this.handleDisconnect();
-          break;
-        case "send":
-          this.send(payload).catch((error) => {
-            console.error("[WebSocketWorker] Error sending message:", error);
-            this.notifyError(error);
-          });
-          break;
-      }
-    };
   }
 
   public removePort(port: MessagePort) {
