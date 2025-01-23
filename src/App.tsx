@@ -8,7 +8,7 @@ import en from "./locales/list/en-us.json";
 import es from "./locales/list/es-es.json";
 import fr from "./locales/list/fr-fr.json";
 import ar from "./locales/list/ar-sa.json";
-import { ParentProps, createEffect, onMount } from "solid-js";
+import { ParentProps, createEffect } from "solid-js";
 import Login from "./components/auth/Login";
 import Register from "./components/auth/Register";
 import { Interface } from "./components/shared/Interface";

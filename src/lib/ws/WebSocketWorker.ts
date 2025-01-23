@@ -1,7 +1,7 @@
 /// <reference lib="webworker" />
 
 import * as msgpack from "@msgpack/msgpack";
-import { WS_URL } from "../config";
+import { WS_URL } from "../../constants";
 
 interface WebSocketMessage {
   type: "connect" | "disconnect" | "send" | "connectionState" | "init";

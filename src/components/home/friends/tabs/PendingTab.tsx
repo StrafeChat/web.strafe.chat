@@ -10,7 +10,7 @@ import { useAuth } from "../../../../lib/providers/auth/AuthProvider";
 import { useCache } from "../../../../lib/providers/cache/CacheProvider";
 import { Tooltip } from "../../../common/Tooltip";
 import { FriendSearch } from "../FriendSearch";
-import { BASE_URL } from "../../../../lib/config";
+import { BASE_URL } from "../../../../constants";
 
 export const PendingTab: Component = () => {
   const { relationshipRequests, user, setRelationshipRequests } = useAuth();
