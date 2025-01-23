@@ -161,7 +161,7 @@ export const OnlineTab: Component = () => {
                   </div>
                   <div class="flex">
                     <Tooltip content="Message" position="top">
-                      <button class="p-2 hover:bg-background-tertiary rounded-full transition-colors">
+                      <button class="p-2 rounded-full transition-colors bg-border hover:bg-[rgba(68,68,68,0.4)]">
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
                           class="w-5 h-5"

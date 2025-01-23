@@ -3,9 +3,9 @@ import { useTheme } from "../../lib/providers/theme/ThemeProvider";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
 import type { Theme } from "../../lib/themes/types";
 import ColorPicker from "./ColorPicker";
+import { CUSTOM_CSS_KEY, applyCustomStyles } from "../../lib/utils/customStyles";
 
 const CUSTOM_THEMES_KEY = "sc_custom_themes";
-const CUSTOM_CSS_KEY = "sc_custom_css";
 
 export function ThemeSwitcher() {
   const { theme, setTheme, availableThemes, addTheme } = useTheme();
@@ -77,28 +77,7 @@ export function ThemeSwitcher() {
   // Apply custom CSS effect
   createEffect(() => {
     try {
-      // Remove any previously added custom style
-      const existingStyle = document.getElementById("custom-app-styles");
-      if (existingStyle) {
-        existingStyle.remove();
-      }
-
-      // Create and apply new custom style
-      const styleElement = document.createElement("style");
-      styleElement.id = "custom-app-styles";
-
-      // Apply CSS variables
-      let cssVariablesString = ":root {\n";
-      Object.entries(cssVariables()).forEach(([key, value]) => {
-        cssVariablesString += `  ${key}: ${value};\n`;
-      });
-      cssVariablesString += "}\n\n";
-
-      // Add custom CSS
-      styleElement.textContent = cssVariablesString + customCSS();
-
-      document.head.appendChild(styleElement);
-
+      // Store the updated custom CSS data
       localStorage.setItem(
         CUSTOM_CSS_KEY,
         JSON.stringify({
@@ -106,6 +85,9 @@ export function ThemeSwitcher() {
           variables: cssVariables(),
         })
       );
+
+      // Apply the updated styles
+      applyCustomStyles();
     } catch (error) {
       console.error("Error applying custom styles:", error);
     }

@@ -8,7 +8,7 @@ import en from "./locales/list/en-us.json";
 import es from "./locales/list/es-es.json";
 import fr from "./locales/list/fr-fr.json";
 import ar from "./locales/list/ar-sa.json";
-import { ParentProps, createEffect } from "solid-js";
+import { ParentProps, createEffect, onMount } from "solid-js";
 import Login from "./components/auth/Login";
 import Register from "./components/auth/Register";
 import { Interface } from "./components/shared/Interface";
@@ -16,13 +16,18 @@ import { Home } from "./components/home/Home";
 import { Friends } from "./components/home/friends/Friends";
 import { Notes } from "./components/home/notes/Notes";
 import { getDirection } from "./lib/utils/direction";
+import { applyCustomStyles } from "./lib/utils/customStyles";
 
 const MountApp = (props: ParentProps) => {
   const savedLang = localStorage.getItem("sc_lang") || "en_us";
 
   createEffect(() => {
+    // Set language and direction
     document.documentElement.dir = getDirection(savedLang);
     document.documentElement.lang = savedLang.split("_")[0];
+
+    // Apply custom styles
+    applyCustomStyles();
   });
 
   return (
