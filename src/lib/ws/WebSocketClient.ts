@@ -86,6 +86,7 @@ export type WSPayload =
 
 import { UserCache } from "../cache/UserCache";
 import { handlePresenceUpdate } from "../events/presence/update";
+import { decode } from "@msgpack/msgpack";
 
 export class WebSocketClient {
   private readonly worker?: SharedWorker | null;
@@ -100,6 +101,11 @@ export class WebSocketClient {
   private static workerChannel?: BroadcastChannel;
   private static activeWorker: SharedWorker | null | undefined = null;
   private static isSharedWorkerSupported = typeof SharedWorker !== 'undefined';
+  private heartbeatInterval: number | null = null;
+  private reconnectTimeout: number | null = null;
+  private reconnectAttempts = 0;
+  private baseReconnectDelay = 1000;
+  private currentToken: string | null = null;
 
   constructor(private readonly ws: WebSocket) {
     this.cache = new UserCache();
@@ -171,35 +177,164 @@ export class WebSocketClient {
 
     if (!WebSocketClient.isSharedWorkerSupported) {
       console.log("[WebSocket] Using direct WebSocket connection (SharedWorker not supported)");
-      // Direct WebSocket handling when SharedWorker is not supported
-      this.ws.onmessage = (event) => {
+      
+      this.ws.onopen = () => {
+        console.log("[WebSocket] Direct connection opened");
+      };
+
+      this.ws.onmessage = async (event) => {
         try {
-          const data = JSON.parse(event.data);
-          console.log("[WebSocket] Received direct message:", data);
-          // For READY events in direct mode, we need to normalize the payload
-          if (data.type === "READY") {
-            console.log("[WebSocket] Received READY event in direct mode:", data);
-            const normalizedData = {
-              type: "READY",
-              ...data
-            };
-            this.handleMessage(normalizedData);
+          console.log("[WebSocket] Received direct message, event type:", typeof event.data);
+          console.log("[WebSocket] Raw message data:", event.data);
+
+          let data: any;
+
+          // Handle Blob data
+          if (event.data instanceof Blob) {
+            const arrayBuffer = await event.data.arrayBuffer();
+            const uint8Array = new Uint8Array(arrayBuffer);
+
+            // Try MessagePack first
+            try {
+              data = decode(uint8Array);
+              console.log("[WebSocket] Successfully decoded with MessagePack:", data);
+            } catch (msgpackError) {
+              // Fallback to JSON if MessagePack fails
+              try {
+                const textDecoder = new TextDecoder("utf-8");
+                const jsonString = textDecoder.decode(uint8Array);
+                data = JSON.parse(jsonString);
+                console.log("[WebSocket] Successfully decoded with JSON:", data);
+              } catch (jsonError) {
+                console.error("[WebSocket] Failed to decode message:", {
+                  originalData: event.data,
+                  msgpackError,
+                  jsonError,
+                });
+                return;
+              }
+            }
+          } else if (event.data instanceof Uint8Array) {
+            // Handle Uint8Array directly
+            try {
+              const textDecoder = new TextDecoder("utf-8");
+              const jsonString = textDecoder.decode(event.data);
+              data = JSON.parse(jsonString);
+              console.log("[WebSocket] Successfully decoded Uint8Array with JSON:", data);
+            } catch (jsonError) {
+              console.error("[WebSocket] Failed to decode Uint8Array:", {
+                originalData: event.data,
+                jsonError,
+              });
+              return;
+            }
+          } else if (typeof event.data === "string") {
+            // Handle string data (JSON)
+            data = JSON.parse(event.data);
           } else {
-            this.handleMessage(data);
+            // Handle other types of data
+            data = event.data;
+          }
+
+          // Normalize the payload to use lowercase keys
+          data = this.normalizePayload(data);
+
+          // Ensure the data follows the standard event payload structure
+          if (!(data.op !== undefined && data.d !== undefined)) {
+            console.warn("[WebSocket] Received non-standard payload:", data);
+            data = {
+              op: 0,
+              d: data,
+            };
+          }
+
+          console.log("[WebSocket] Message details:", {
+            opCode: data.op,
+            data: data.d,
+          });
+
+          const OpCodes = {
+            READY: "READY",
+            HEARTBEAT_ACK: "HEARTBEAT_ACK",
+            RELATIONSHIP_CREATE: "RELATIONSHIP_CREATE",
+            RELATIONSHIP_UPDATE: "RELATIONSHIP_UPDATE",
+            RELATIONSHIP_ACCEPT: "RELATIONSHIP_ACCEPT",
+            RELATIONSHIP_DELETE: "RELATIONSHIP_DELETE",
+            MESSAGE: "MESSAGE",
+            DISPATCH: "DISPATCH",
+            PRESENCE_UPDATE: "PRESENCE_UPDATE",
+          };
+
+          switch (data.op) {
+            case OpCodes.READY:
+              console.log("[WebSocket] Received READY event:", data.d);
+              this.handleMessage(data.d);
+              break;
+
+            case OpCodes.HEARTBEAT_ACK:
+              console.log("[WebSocket] Received HEARTBEAT_ACK");
+              break;
+
+            case OpCodes.RELATIONSHIP_CREATE:
+              if (!data.d || !data.d.id) {
+                console.error("[WebSocket] Invalid relationship data received:", data);
+                break;
+              }
+              const relationship = {
+                id: data.d.id,
+                sender_id: data.d.sender_id,
+                recipient_id: data.d.recipient_id,
+                created_at: data.d.created_at || new Date().toISOString(),
+                type: "relationshipCreate",
+                sender: data.d.sender || null,
+                recipient: data.d.recipient || null,
+              };
+              this.handleMessage(relationship);
+              break;
+
+            case OpCodes.RELATIONSHIP_UPDATE:
+            case OpCodes.RELATIONSHIP_ACCEPT:
+            case OpCodes.RELATIONSHIP_DELETE:
+              if (!data.d || !data.d.id) {
+                console.error("[WebSocket] Invalid relationship data received:", data);
+                break;
+              }
+              const relationshipEvent = {
+                id: data.d.id,
+                sender_id: data.d.sender_id,
+                recipient_id: data.d.recipient_id,
+                created_at: data.d.created_at || new Date().toISOString(),
+                type: data.op.toLowerCase(),
+                sender: data.d.sender || null,
+                recipient: data.d.recipient || null,
+              };
+              this.handleMessage(relationshipEvent);
+              break;
+
+            case OpCodes.PRESENCE_UPDATE:
+              this.handleMessage(data.d);
+              break;
+
+            default:
+              console.log("[WebSocket] Unhandled message type:", data.op);
+              break;
           }
         } catch (error) {
-          console.error("Failed to parse WebSocket message:", error);
+          console.error("[WebSocket] Error handling message:", error);
         }
       };
 
-      this.ws.onclose = () => {
-        console.log("[WebSocket] Direct connection closed");
+      this.ws.onclose = (event) => {
+        console.log("[WebSocket] Direct connection closed:", event);
         this.connected = false;
         this.notifyConnectionState();
+        if (this.currentToken) {
+          this.scheduleReconnect();
+        }
       };
 
       this.ws.onerror = (error) => {
-        console.error("WebSocket error:", error);
+        console.error("[WebSocket] Direct connection error:", error);
         this.connected = false;
         this.notifyConnectionState();
       };
@@ -439,11 +574,96 @@ export class WebSocketClient {
     handlePresenceUpdate(payload, this.cache);
   }
 
+  private normalizePayload(data: any): any {
+    if (Array.isArray(data)) {
+      return data.map(item => this.normalizePayload(item));
+    } else if (typeof data === 'object' && data !== null) {
+      const normalized: any = {};
+      for (const [key, value] of Object.entries(data)) {
+        const normalizedKey = key.charAt(0).toLowerCase() + key.slice(1);
+        normalized[normalizedKey] = this.normalizePayload(value);
+      }
+      return normalized;
+    }
+    return data;
+  }
+
+  private scheduleReconnect() {
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+    }
+
+    // More aggressive initial reconnect attempts
+    let delay;
+    if (this.reconnectAttempts < 3) {
+      // First 3 attempts: 1s, 2s, 4s
+      delay = Math.min(this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts), 4000);
+    } else {
+      // After 3 attempts, use exponential backoff up to 30s
+      delay = Math.min(this.baseReconnectDelay * Math.pow(1.5, this.reconnectAttempts), 30000);
+    }
+
+    console.log(`[WebSocket] Scheduling reconnect attempt ${this.reconnectAttempts + 1} in ${delay}ms`);
+
+    this.reconnectTimeout = setTimeout(() => {
+      this.reconnectAttempts++;
+      if (this.currentToken) {
+        console.log(`[WebSocket] Attempting reconnect ${this.reconnectAttempts}`);
+        // Reset reconnect attempts if we've been disconnected for a while
+        if (this.reconnectAttempts > 5) {
+          console.log("[WebSocket] Resetting reconnect attempts");
+          this.reconnectAttempts = 0;
+        }
+        this.connect(this.currentToken);
+      }
+    }, delay) as unknown as number;
+  }
+
+  private startHeartbeat() {
+    this.stopHeartbeat();
+
+    // Send initial heartbeat immediately
+    if (this.isConnected()) {
+      console.log("[WebSocket] Sending initial heartbeat");
+      const payload: HeartbeatPayload = {
+        type: "HEARTBEAT",
+        timestamp: BigInt(Date.now())
+      };
+      this.send(payload);
+    }
+
+    // Set up heartbeat interval (every 15 seconds)
+    this.heartbeatInterval = setInterval(() => {
+      if (this.isConnected()) {
+        console.log("[WebSocket] Sending heartbeat");
+        const payload: HeartbeatPayload = {
+          type: "HEARTBEAT",
+          timestamp: BigInt(Date.now())
+        };
+
+        this.send(payload).catch((error) => {
+          console.error("[WebSocket] Heartbeat failed:", error);
+          if (this.currentToken) {
+            this.ws?.close(1000, "Heartbeat failed");
+          }
+        });
+      }
+    }, 15000) as unknown as number;
+  }
+
+  private stopHeartbeat() {
+    if (this.heartbeatInterval) {
+      clearInterval(this.heartbeatInterval);
+      this.heartbeatInterval = null;
+    }
+  }
+
   public async connect(token: string): Promise<boolean> {
     if (this.connectPromise) {
       return this.connectPromise;
     }
 
+    this.currentToken = token;
     this.connectPromise = new Promise((resolve) => {
       if (WebSocketClient.isSharedWorkerSupported && this.worker) {
         console.log("[WebSocket] Sending connect message to worker with token");
@@ -454,6 +674,7 @@ export class WebSocketClient {
       } else {
         // Direct WebSocket connection when SharedWorker is not supported
         this.ws.onopen = () => {
+          console.log("[WebSocket] Direct connection opened, sending identify");
           this.ws.send(JSON.stringify({
             type: "IDENTIFY",
             token,
@@ -461,6 +682,8 @@ export class WebSocketClient {
           }));
           this.connected = true;
           this.notifyConnectionState();
+          this.startHeartbeat();
+          this.reconnectAttempts = 0;
           resolve(true);
         };
       }
