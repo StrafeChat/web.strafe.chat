@@ -20,7 +20,11 @@ export const API_ENDPOINTS = {
 };
 
 const API_HEADERS = {
-  JSON: { "Content-Type": "application/json" },
+  JSON: { 
+    "Content-Type": "application/json",
+    "Accept": "application/json",
+    "Origin": window.location.origin
+  },
   SESSION: () => ({
     "X-Session-Token": localStorage.getItem("sc_token") || "",
   }),
@@ -350,25 +354,47 @@ export const AuthProvider: ParentComponent = (props) => {
   }): Promise<boolean> => {
     try {
       setLoading(true);
+      console.log("[AuthProvider] Attempting login with credentials:", {
+        email: credentials.email,
+        passwordLength: credentials.password.length,
+      });
+
       const res = await fetch(API_ENDPOINTS.LOGIN, {
         method: "POST",
         headers: API_HEADERS.JSON,
+        credentials: "include",
         body: JSON.stringify(credentials),
       });
 
       if (!res.ok) {
-        logError("login", `Login failed: ${res.status}`);
+        const errorText = await res.text();
+        console.error("[AuthProvider] Login failed:", {
+          status: res.status,
+          statusText: res.statusText,
+          headers: Object.fromEntries(res.headers.entries()),
+          error: errorText,
+        });
         setIsAuthenticated(false);
         setLoading(false);
         return false;
       }
 
-      const { token } = await res.json();
-      localStorage.setItem("sc_token", token);
+      const data = await res.json();
+      if (!data.token) {
+        console.error("[AuthProvider] Login response missing token:", data);
+        setIsAuthenticated(false);
+        setLoading(false);
+        return false;
+      }
 
-      return await fetchUserData(token);
+      localStorage.setItem("sc_token", data.token);
+      return await fetchUserData(data.token);
     } catch (error) {
-      logError("login", error);
+      console.error("[AuthProvider] Login error:", {
+        error,
+        message: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       setIsAuthenticated(false);
       setLoading(false);
       return false;
