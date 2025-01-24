@@ -104,6 +104,27 @@ export class WebSocketClient {
   constructor(private readonly ws: WebSocket) {
     this.cache = new UserCache();
 
+    // Set up default message handlers
+    this.messageHandlers.set("READY", this.handleReady.bind(this));
+    console.log("[WebSocket] READY handler set");
+    this.onMessage("relationshipCreate", this.handleRelationship.bind(this));
+    this.onMessage("relationshipUpdate", this.handleRelationship.bind(this));
+    this.onMessage("relationshipAccept", this.handleRelationship.bind(this));
+    this.onMessage("relationshipDelete", this.handleRelationship.bind(this));
+    this.onMessage("PRESENCE_UPDATE", this.handlePresenceUpdate.bind(this));
+    console.log("[WebSocket] Message handlers set up:", [...this.messageHandlers.entries()]);
+
+    // Initialize readyPromise
+    this.readyPromise = new Promise((resolve) => {
+      const readyHandler = this.messageHandlers.get("READY");
+      if (readyHandler) {
+        this.messageHandlers.set("READY", (data) => {
+          readyHandler(data);
+          resolve(data);
+        });
+      }
+    });
+
     if (WebSocketClient.isSharedWorkerSupported) {
       // Create or join the coordination channel
       if (!WebSocketClient.workerChannel) {
@@ -145,31 +166,34 @@ export class WebSocketClient {
           type: "init",
           payload: { url: this.ws.url },
         });
-
-        // Set up default message handlers
-        this.messageHandlers.set("READY", this.handleReady.bind(this));
-        console.log("[WebSocket] READY handler set");
-        console.log("[WebSocket] Message handlers set up:", this.messageHandlers);
-        this.onMessage("relationshipCreate", this.handleRelationship.bind(this));
-        this.onMessage("relationshipUpdate", this.handleRelationship.bind(this));
-        this.onMessage("relationshipAccept", this.handleRelationship.bind(this));
-        this.onMessage("relationshipDelete", this.handleRelationship.bind(this));
-        this.onMessage("PRESENCE_UPDATE", this.handlePresenceUpdate.bind(this));
       }
     }
 
     if (!WebSocketClient.isSharedWorkerSupported) {
+      console.log("[WebSocket] Using direct WebSocket connection (SharedWorker not supported)");
       // Direct WebSocket handling when SharedWorker is not supported
       this.ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          this.handleMessage(data);
+          console.log("[WebSocket] Received direct message:", data);
+          // For READY events in direct mode, we need to normalize the payload
+          if (data.type === "READY") {
+            console.log("[WebSocket] Received READY event in direct mode:", data);
+            const normalizedData = {
+              type: "READY",
+              ...data
+            };
+            this.handleMessage(normalizedData);
+          } else {
+            this.handleMessage(data);
+          }
         } catch (error) {
           console.error("Failed to parse WebSocket message:", error);
         }
       };
 
       this.ws.onclose = () => {
+        console.log("[WebSocket] Direct connection closed");
         this.connected = false;
         this.notifyConnectionState();
       };
@@ -271,15 +295,23 @@ export class WebSocketClient {
   }
 
   private handleMessage(data: any) {
+    console.log("[WebSocket] Handling message:", data);
     const handler = this.messageHandlers.get(data.type);
     if (handler) {
+      console.log("[WebSocket] Found handler for type:", data.type);
       handler(data);
+    } else {
+      console.warn("[WebSocket] No handler found for type:", data.type, "Available handlers:", [...this.messageHandlers.keys()]);
     }
   }
 
   private handleReady(data: ReadyPayload) {
     console.log("[WebSocket] Received READY payload:", JSON.stringify(data, null, 2));
     console.log("[WebSocket] Current messageHandlers:", [...this.messageHandlers.entries()]);
+
+    // Set connected state
+    this.connected = true;
+    this.notifyConnectionState();
 
     // Pass the full READY payload to any registered READY handlers
     const readyHandler = this.messageHandlers.get("READY");
