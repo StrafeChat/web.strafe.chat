@@ -21,11 +21,12 @@ const Login = () => {
       return;
     }
 
-    if (await login({ email: email(), password: password() })) {
-      navigate("/", { replace: true });
-    } else {
-      setError(t("auth.login.error.invalidCredentials"));
-    }
+    await login({
+      email: email(),
+      password: password(),
+    }).catch((e) => {
+      setError(e);
+    });
   };
 
   return (

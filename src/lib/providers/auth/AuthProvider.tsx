@@ -403,6 +403,7 @@ export const AuthProvider: ParentComponent = (props) => {
       let data;
       try {
         data = await res.json();
+        throw data;
         await debugLog("[AuthProvider] Login response parsed", {
           hasToken: !!data.token,
         });
@@ -426,11 +427,11 @@ export const AuthProvider: ParentComponent = (props) => {
 
       localStorage.setItem("sc_token", data.token);
       const success = await fetchUserData(data.token);
-      
+
       await debugLog("[AuthProvider] Login flow completed", {
         success,
         authenticated: isAuthenticated(),
-        hasUser: !!user()
+        hasUser: !!user(),
       });
 
       return success;
