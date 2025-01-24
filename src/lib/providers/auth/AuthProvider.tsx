@@ -20,9 +20,9 @@ export const API_ENDPOINTS = {
 };
 
 const API_HEADERS = {
-  JSON: { 
+  JSON: {
     "Content-Type": "application/json",
-    "Accept": "application/json",
+    Accept: "application/json",
   },
   SESSION: () => ({
     "X-Session-Token": localStorage.getItem("sc_token") || "",
@@ -183,7 +183,9 @@ export const AuthProvider: ParentComponent = (props) => {
       }
 
       // Only set loading to false after all data is processed
-      console.log("[AuthProvider:READY] All data processed, setting loading to false");
+      console.log(
+        "[AuthProvider:READY] All data processed, setting loading to false"
+      );
       setLoading(false);
     });
 
@@ -235,6 +237,11 @@ export const AuthProvider: ParentComponent = (props) => {
   const fetchUserData = async (token: string): Promise<boolean> => {
     try {
       setLoading(true);
+      await debugLog("[AuthProvider] Starting fetchUserData", {
+        hasToken: !!token,
+        isMobile: isMobile(),
+      });
+
       const res = await fetch(API_ENDPOINTS.USER_ME, {
         headers: {
           ...API_HEADERS.JSON,
@@ -242,25 +249,29 @@ export const AuthProvider: ParentComponent = (props) => {
         },
       });
 
+      await debugLog("[AuthProvider] User data response received", {
+        status: res.status,
+        headers: Object.fromEntries(res.headers.entries()),
+      });
+
       if (!res.ok) {
-        logError("fetchUserData", `HTTP Error: ${res.status}`);
+        const errorText = await res.text();
+        await debugLog("[AuthProvider] fetchUserData failed", {
+          status: res.status,
+          error: errorText,
+        });
         setIsAuthenticated(false);
         setLoading(false);
         return false;
       }
 
       const data = await res.json();
-      console.log(
-        "[AuthProvider] Received user data:",
-        JSON.stringify(data, null, 2)
-      );
+      await debugLog("[AuthProvider] User data parsed", {
+        hasClientUser: !!data.client_user,
+        clientUser: data.client_user,
+      });
 
       const clientUser = data.client_user;
-      console.log(
-        "[AuthProvider] Client user data:",
-        JSON.stringify(clientUser, null, 2)
-      );
-
       if (
         !clientUser ||
         !clientUser.id ||
@@ -268,11 +279,8 @@ export const AuthProvider: ParentComponent = (props) => {
         !clientUser.discriminator ||
         !clientUser.email
       ) {
-        console.error(
-          "[AuthProvider] Invalid client user data - missing required fields:",
-          clientUser
-        );
-        console.error("[AuthProvider] Required fields check:", {
+        await debugLog("[AuthProvider] Invalid client user data", {
+          clientUser,
           hasId: !!clientUser?.id,
           hasUsername: !!clientUser?.username,
           hasDiscriminator: !!clientUser?.discriminator,
@@ -292,20 +300,18 @@ export const AuthProvider: ParentComponent = (props) => {
         email: clientUser.email,
       };
 
-      console.log(
-        "[AuthProvider] Normalized user data:",
-        JSON.stringify(normalizedUser, null, 2)
-      );
+      await debugLog("[AuthProvider] Setting up user state", {
+        normalizedUser,
+      });
 
       cache.setUser(normalizedUser);
       setUser(normalizedUser);
       setIsAuthenticated(true);
 
       if (Array.isArray(data.relationships)) {
-        console.log(
-          "[AuthProvider] Processing relationships:",
-          data.relationships
-        );
+        await debugLog("[AuthProvider] Processing relationships", {
+          relationshipCount: data.relationships.length,
+        });
         const friendIds = data.relationships
           .filter((rel: Relationship) => rel.type === "accepted")
           .map((rel: Relationship) => {
@@ -322,37 +328,42 @@ export const AuthProvider: ParentComponent = (props) => {
         setRelationshipRequests(requests);
       }
 
-      initializeWebSocket();
+      const wsConnected = initializeWebSocket();
+      await debugLog("[AuthProvider] WebSocket initialization", {
+        connected: wsConnected,
+      });
+
       setLoading(false);
       return true;
     } catch (error) {
-      logError("fetchUserData", error);
+      await debugLog("[AuthProvider] fetchUserData error", {
+        error,
+        message: error instanceof Error ? error.message : "Unknown error",
+        stack: error instanceof Error ? error.stack : undefined,
+      });
       setIsAuthenticated(false);
       setLoading(false);
       return false;
     }
   };
 
-  const initializeAuth = () => {
-    const token = localStorage.getItem("sc_token");
-    if (token) {
-      fetchUserData(token).catch(() => {
-        localStorage.removeItem("sc_token");
-        setLoading(false);
-      });
-    } else {
-      setLoading(false);
-    }
-  };
-
   const debugLog = async (message: string, data: any) => {
     try {
       await fetch(`${BASE_URL}/debug/log`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message, data, timestamp: new Date().toISOString(), userAgent: navigator.userAgent })
-      }).catch(() => {/* ignore errors */});
-    } catch {/* ignore errors */}
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          message,
+          data,
+          timestamp: new Date().toISOString(),
+          userAgent: navigator.userAgent,
+        }),
+      }).catch(() => {
+        /* ignore errors */
+      });
+    } catch {
+      /* ignore errors */
+    }
   };
 
   const login = async (credentials: {
@@ -361,72 +372,75 @@ export const AuthProvider: ParentComponent = (props) => {
   }): Promise<boolean> => {
     try {
       setLoading(true);
-      await debugLog("[AuthProvider] Attempting login", {
+      await debugLog("[AuthProvider] Starting login attempt", {
         email: credentials.email,
-        passwordLength: credentials.password.length,
+        isMobile: isMobile(),
         userAgent: navigator.userAgent,
-        platform: navigator.platform,
       });
 
       const res = await fetch(API_ENDPOINTS.LOGIN, {
         method: "POST",
-        headers: {
-          ...API_HEADERS.JSON,
-        },
+        headers: API_HEADERS.JSON,
         body: JSON.stringify(credentials),
       });
+
+      await debugLog("[AuthProvider] Login response received", {
+        status: res.status,
+        headers: Object.fromEntries(res.headers.entries()),
+      });
+
+      if (!res.ok) {
+        const errorText = await res.text();
+        await debugLog("[AuthProvider] Login failed", {
+          status: res.status,
+          error: errorText,
+        });
+        setIsAuthenticated(false);
+        setLoading(false);
+        return false;
+      }
 
       let data;
       try {
         data = await res.json();
-        await debugLog("[AuthProvider] Login response", {
-          status: res.status,
-          statusText: res.statusText,
-          headers: Object.fromEntries(res.headers.entries()),
-          data,
+        await debugLog("[AuthProvider] Login response parsed", {
+          hasToken: !!data.token,
         });
       } catch (e) {
-        await debugLog("[AuthProvider] Failed to parse login response", { error: e });
+        await debugLog("[AuthProvider] Failed to parse login response", {
+          error: e,
+          responseText: await res.text(),
+        });
         console.error("[AuthProvider] Failed to parse login response:", e);
         setIsAuthenticated(false);
         setLoading(false);
         return false;
       }
 
-      if (!res.ok || !data.token) {
-        await debugLog("[AuthProvider] Login failed", {
-          status: res.status,
-          statusText: res.statusText,
-          headers: Object.fromEntries(res.headers.entries()),
-          error: data.error || "Unknown error",
-          data,
-        });
-        console.error("[AuthProvider] Login failed:", {
-          status: res.status,
-          statusText: res.statusText,
-          headers: Object.fromEntries(res.headers.entries()),
-          error: data.error || "Unknown error",
-          data,
-        });
+      if (!data.token) {
+        await debugLog("[AuthProvider] No token in response", { data });
         setIsAuthenticated(false);
         setLoading(false);
         return false;
       }
 
-      await debugLog("[AuthProvider] Login successful", {
-        status: res.status,
-        headers: Object.fromEntries(res.headers.entries()),
-        data,
+      localStorage.setItem("sc_token", data.token);
+      const success = await fetchUserData(data.token);
+      
+      await debugLog("[AuthProvider] Login flow completed", {
+        success,
+        authenticated: isAuthenticated(),
+        hasUser: !!user()
       });
 
-      localStorage.setItem("sc_token", data.token);
-      return await fetchUserData(data.token);
+      return success;
     } catch (error) {
-      console.error("[AuthProvider] Login error:", {
+      await debugLog("[AuthProvider] Login error", {
         error,
         message: error instanceof Error ? error.message : "Unknown error",
         stack: error instanceof Error ? error.stack : undefined,
       });
+      console.error("[AuthProvider] Login error:", error);
       setIsAuthenticated(false);
       setLoading(false);
       return false;
@@ -463,6 +477,7 @@ export const AuthProvider: ParentComponent = (props) => {
 
   const logout = () => {
     localStorage.removeItem("sc_token");
+    window.location.replace("/login");
     setUser(null);
     setIsAuthenticated(false);
     setLoading(false);
@@ -477,6 +492,18 @@ export const AuthProvider: ParentComponent = (props) => {
       setWsClient(null);
     }
   });
+
+  const initializeAuth = () => {
+    const token = localStorage.getItem("sc_token");
+    if (token) {
+      fetchUserData(token).catch(() => {
+        localStorage.removeItem("sc_token");
+        setLoading(false);
+      });
+    } else {
+      setLoading(false);
+    }
+  };
 
   initializeAuth();
 
