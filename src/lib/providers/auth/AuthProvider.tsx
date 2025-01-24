@@ -362,7 +362,6 @@ export const AuthProvider: ParentComponent = (props) => {
       const res = await fetch(API_ENDPOINTS.LOGIN, {
         method: "POST",
         headers: API_HEADERS.JSON,
-        credentials: "include",
         body: JSON.stringify(credentials),
       });
 
