@@ -252,7 +252,7 @@ export class WebSocketClient {
         break;
       case "ready":
         this.handleReady(payload);
-        return;
+        break;
       case "connectionState":
         this.connected = payload.connected;
         this.notifyConnectionState();
@@ -266,9 +266,6 @@ export class WebSocketClient {
         if (this.connectPromise) {
           this.connectPromise = Promise.resolve(payload.connected);
         }
-        break;
-      case "message":
-        this.handleMessage(payload);
         break;
     }
   }
