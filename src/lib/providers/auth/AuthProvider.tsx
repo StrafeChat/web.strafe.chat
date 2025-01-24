@@ -362,31 +362,38 @@ export const AuthProvider: ParentComponent = (props) => {
         method: "POST",
         headers: {
           ...API_HEADERS.JSON,
-          "Origin": window.location.origin,
         },
         body: JSON.stringify(credentials),
       });
 
-      const data = await res.json();
+      let data;
+      try {
+        data = await res.json();
+      } catch (e) {
+        console.error("[AuthProvider] Failed to parse login response:", e);
+        setIsAuthenticated(false);
+        setLoading(false);
+        return false;
+      }
 
-      if (!res.ok) {
+      if (!res.ok || !data.token) {
         console.error("[AuthProvider] Login failed:", {
           status: res.status,
           statusText: res.statusText,
           headers: Object.fromEntries(res.headers.entries()),
-          error: data.error,
+          error: data.error || "Unknown error",
+          data,
         });
         setIsAuthenticated(false);
         setLoading(false);
         return false;
       }
 
-      if (!data.token) {
-        console.error("[AuthProvider] Login response missing token:", data);
-        setIsAuthenticated(false);
-        setLoading(false);
-        return false;
-      }
+      console.log("[AuthProvider] Login successful:", {
+        status: res.status,
+        headers: Object.fromEntries(res.headers.entries()),
+        data,
+      });
 
       localStorage.setItem("sc_token", data.token);
       return await fetchUserData(data.token);
