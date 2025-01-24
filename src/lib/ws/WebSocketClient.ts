@@ -88,69 +88,98 @@ import { UserCache } from "../cache/UserCache";
 import { handlePresenceUpdate } from "../events/presence/update";
 
 export class WebSocketClient {
-  private readonly worker: SharedWorker;
-  private readonly messageHandlers: Map<string, (data: any) => void> =
-    new Map();
+  private readonly worker?: SharedWorker | null;
+  private readonly messageHandlers: Map<string, (data: any) => void> = new Map();
   private connectPromise: Promise<boolean> | null = null;
   private readyPromise: Promise<ReadyPayload> | null = null;
-  private readonly connectionStateCallbacks: ((connected: boolean) => void)[] =
-    [];
+  private readonly connectionStateCallbacks: ((connected: boolean) => void)[] = [];
   private connected = false;
   public cache: UserCache;
   private relationships: { [key: string]: any } = {};
   private relationshipRequests: { [key: string]: any } = {};
-  private static workerChannel: BroadcastChannel;
-  private static activeWorker: SharedWorker | null = null;
+  private static workerChannel?: BroadcastChannel;
+  private static activeWorker: SharedWorker | null | undefined = null;
+  private static isSharedWorkerSupported = typeof SharedWorker !== 'undefined';
 
   constructor(private readonly ws: WebSocket) {
     this.cache = new UserCache();
 
-    // Create or join the coordination channel
-    if (!WebSocketClient.workerChannel) {
-      WebSocketClient.workerChannel = new BroadcastChannel(
-        "strafe-websocket-worker"
-      );
-    }
-
-    // Try to get existing worker or create new one
-    if (!WebSocketClient.activeWorker) {
-      WebSocketClient.activeWorker = new SharedWorker(
-        new URL("./WebSocketWorker.ts", import.meta.url),
-        {
-          type: "module",
-          name: "StrafeChat WebSocket Worker",
-        }
-      );
-
-      // Notify other tabs that we've created a worker
-      WebSocketClient.workerChannel.postMessage({ type: "worker-created" });
-    }
-
-    this.worker = WebSocketClient.activeWorker;
-    this.worker.port.onmessage = this.handleWorkerMessage.bind(this);
-    this.worker.port.start();
-
-    // Listen for worker creation from other tabs
-    WebSocketClient.workerChannel.onmessage = (event) => {
-      if (event.data.type === "worker-created") {
-        WebSocketClient.activeWorker = this.worker;
+    if (WebSocketClient.isSharedWorkerSupported) {
+      // Create or join the coordination channel
+      if (!WebSocketClient.workerChannel) {
+        WebSocketClient.workerChannel = new BroadcastChannel("strafe-websocket-worker");
       }
-    };
 
-    this.worker.port.postMessage({
-      type: "init",
-      payload: { url: this.ws.url },
-    });
+      // Try to get existing worker or create new one
+      if (!WebSocketClient.activeWorker) {
+        try {
+          WebSocketClient.activeWorker = new SharedWorker(
+            new URL("./WebSocketWorker.ts", import.meta.url),
+            {
+              type: "module",
+              name: "StrafeChat WebSocket Worker",
+            }
+          );
 
-    // Set up default message handlers
-    this.messageHandlers.set("READY", this.handleReady.bind(this));
-    console.log("[WebSocket] READY handler set");
-    console.log("[WebSocket] Message handlers set up:", this.messageHandlers);
-    this.onMessage("relationshipCreate", this.handleRelationship.bind(this));
-    this.onMessage("relationshipUpdate", this.handleRelationship.bind(this));
-    this.onMessage("relationshipAccept", this.handleRelationship.bind(this));
-    this.onMessage("relationshipDelete", this.handleRelationship.bind(this));
-    this.onMessage("PRESENCE_UPDATE", this.handlePresenceUpdate.bind(this));
+          // Notify other tabs that we've created a worker
+          WebSocketClient.workerChannel.postMessage({ type: "worker-created" });
+        } catch (error) {
+          console.warn("Failed to create SharedWorker, falling back to direct WebSocket:", error);
+          WebSocketClient.isSharedWorkerSupported = false;
+        }
+      }
+
+      if (WebSocketClient.activeWorker) {
+        this.worker = WebSocketClient.activeWorker;
+        this.worker.port.onmessage = this.handleWorkerMessage.bind(this);
+        this.worker.port.start();
+
+        // Listen for worker creation from other tabs
+        WebSocketClient.workerChannel.onmessage = (event) => {
+          if (event.data.type === "worker-created") {
+            WebSocketClient.activeWorker = this.worker;
+          }
+        };
+
+        this.worker.port.postMessage({
+          type: "init",
+          payload: { url: this.ws.url },
+        });
+
+        // Set up default message handlers
+        this.messageHandlers.set("READY", this.handleReady.bind(this));
+        console.log("[WebSocket] READY handler set");
+        console.log("[WebSocket] Message handlers set up:", this.messageHandlers);
+        this.onMessage("relationshipCreate", this.handleRelationship.bind(this));
+        this.onMessage("relationshipUpdate", this.handleRelationship.bind(this));
+        this.onMessage("relationshipAccept", this.handleRelationship.bind(this));
+        this.onMessage("relationshipDelete", this.handleRelationship.bind(this));
+        this.onMessage("PRESENCE_UPDATE", this.handlePresenceUpdate.bind(this));
+      }
+    }
+
+    if (!WebSocketClient.isSharedWorkerSupported) {
+      // Direct WebSocket handling when SharedWorker is not supported
+      this.ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          this.handleMessage(data);
+        } catch (error) {
+          console.error("Failed to parse WebSocket message:", error);
+        }
+      };
+
+      this.ws.onclose = () => {
+        this.connected = false;
+        this.notifyConnectionState();
+      };
+
+      this.ws.onerror = (error) => {
+        console.error("WebSocket error:", error);
+        this.connected = false;
+        this.notifyConnectionState();
+      };
+    }
 
     // Listen for presence updates
     this.cache.onPresenceUpdate((userId, presence) => {
@@ -181,10 +210,10 @@ export class WebSocketClient {
   }
 
   private handleWorkerMessage(event: MessageEvent) {
-    console.log("[WebSocket] handleWorkerMessage invoked");
+    console.log("[WebSocket] handleWorkerMessage invoked with data:", JSON.stringify(event.data, null, 2));
     const { type, payload } = event.data;
     console.log("[WebSocket] Message type received:", type);
-    console.log("[WebSocket] Received worker message:", type, payload);
+    console.log("[WebSocket] Payload:", JSON.stringify(payload, null, 2));
 
     switch (type) {
       case "message":
@@ -193,13 +222,9 @@ export class WebSocketClient {
         const handler = this.messageHandlers.get(payload.type);
         if (handler) {
           console.log("[WebSocket] Calling handler for type:", payload.type);
-          console.log("[WebSocket] Handler function:", handler);
           handler(payload);
         } else {
-          console.warn("[WebSocket] No handler found for type:", payload.type);
-          console.log("[WebSocket] Available handlers:", [
-            ...this.messageHandlers.keys(),
-          ]);
+          console.warn("[WebSocket] No handler found for type:", payload.type, "Available handlers:", [...this.messageHandlers.keys()]);
         }
         break;
       case "relationshipCreate":
@@ -230,26 +255,56 @@ export class WebSocketClient {
         return;
       case "connectionState":
         this.connected = payload.connected;
-        this.notifyConnectionState(payload.connected);
+        this.notifyConnectionState();
         break;
       case "error":
         console.error("[WebSocket] Error from worker:", payload.error);
         break;
+      case "connected":
+        this.connected = payload.connected;
+        this.notifyConnectionState();
+        if (this.connectPromise) {
+          this.connectPromise = Promise.resolve(payload.connected);
+        }
+        break;
+      case "message":
+        this.handleMessage(payload);
+        break;
+    }
+  }
+
+  private handleMessage(data: any) {
+    const handler = this.messageHandlers.get(data.type);
+    if (handler) {
+      handler(data);
     }
   }
 
   private handleReady(data: ReadyPayload) {
-    console.log("[WebSocket] Received READY payload:", data);
+    console.log("[WebSocket] Received READY payload:", JSON.stringify(data, null, 2));
+    console.log("[WebSocket] Current messageHandlers:", [...this.messageHandlers.entries()]);
 
     // Pass the full READY payload to any registered READY handlers
     const readyHandler = this.messageHandlers.get("READY");
     if (readyHandler) {
+      console.log("[WebSocket] Calling READY handler with data");
       readyHandler(data);
+    } else {
+      console.warn("[WebSocket] No READY handler found!");
     }
 
     // Cache users if available
     if (data.users && this.cache) {
+      console.log("[WebSocket] Caching users:", Object.keys(data.users).length);
       this.cache.setUsers(data.users);
+    } else {
+      console.warn("[WebSocket] No users data in READY payload or cache not initialized");
+    }
+
+    if (data.client_user) {
+      console.log("[WebSocket] Client user data received:", data.client_user);
+    } else {
+      console.warn("[WebSocket] No client_user data in READY payload");
     }
   }
 
@@ -355,61 +410,31 @@ export class WebSocketClient {
     handlePresenceUpdate(payload, this.cache);
   }
 
-  public onConnectionStateChange(callback: (connected: boolean) => void) {
-    this.connectionStateCallbacks.push(callback);
-    // Immediately notify of current state if connected
-    if (this.connected) {
-      callback(true);
-    }
-  }
-
-  private notifyConnectionState(connected: boolean) {
-    console.log(`[WebSocket] Connection state changed: ${connected}`);
-    this.connectionStateCallbacks.forEach((callback) => callback(connected));
-  }
-
-  public connect(token: string): Promise<boolean> {
-    console.log("[WebSocket] Connect called with token");
-
-    if (this.connected) {
-      console.log("[WebSocket] Already connected");
-      return Promise.resolve(true);
-    }
-
+  public async connect(token: string): Promise<boolean> {
     if (this.connectPromise) {
-      console.log("[WebSocket] Already connecting");
       return this.connectPromise;
     }
 
-    this.readyPromise = new Promise((resolve) => {
-      const handler = (readyPayload: ReadyPayload) => {
-        console.log("[WebSocket] Received READY payload:", readyPayload);
-        this.messageHandlers.delete("READY");
-        resolve(readyPayload);
-      };
-      this.onMessage("READY", handler);
-    });
-
-    this.connectPromise = new Promise((resolve, reject) => {
-      const timeout = window.setTimeout(() => {
-        if (!this.connected) {
-          reject(new Error("Connection timeout"));
-        }
-      }, 10000);
-
-      const connectionStateHandler = (connected: boolean) => {
-        if (connected) {
-          clearTimeout(timeout);
-          this.readyPromise
-            ?.then(() => {
-              resolve(true);
-            })
-            .catch(reject);
-        }
-      };
-
-      this.onConnectionStateChange(connectionStateHandler);
-      this.worker.port.postMessage({ type: "connect", payload: { token } });
+    this.connectPromise = new Promise((resolve) => {
+      if (WebSocketClient.isSharedWorkerSupported && this.worker) {
+        console.log("[WebSocket] Sending connect message to worker with token");
+        this.worker.port.postMessage({
+          type: "connect",
+          payload: { token }
+        });
+      } else {
+        // Direct WebSocket connection when SharedWorker is not supported
+        this.ws.onopen = () => {
+          this.ws.send(JSON.stringify({
+            type: "IDENTIFY",
+            token,
+            device: "mobile",
+          }));
+          this.connected = true;
+          this.notifyConnectionState();
+          resolve(true);
+        };
+      }
     });
 
     return this.connectPromise;
@@ -422,7 +447,11 @@ export class WebSocketClient {
         return;
       }
 
-      this.worker.port.postMessage({ type: "send", payload });
+      if (WebSocketClient.isSharedWorkerSupported && this.worker) {
+        this.worker.port.postMessage({ type: "send", payload });
+      } else {
+        this.ws.send(JSON.stringify(payload));
+      }
       resolve();
     });
   }
@@ -436,10 +465,13 @@ export class WebSocketClient {
   }
 
   public disconnect() {
-    this.messageHandlers.clear();
-    this.connectPromise = null;
-    this.readyPromise = null;
-    this.worker.port.postMessage({ type: "disconnect" });
+    if (WebSocketClient.isSharedWorkerSupported && this.worker) {
+      this.worker.port.postMessage({ type: "disconnect" });
+    } else {
+      this.ws.close();
+    }
+    this.connected = false;
+    this.notifyConnectionState();
   }
 
   public async getUserDetails(): Promise<ReadyPayload> {
@@ -447,5 +479,19 @@ export class WebSocketClient {
       throw new Error("Not connected or authentication not complete");
     }
     return this.readyPromise;
+  }
+
+  public onConnectionStateChange(callback: (connected: boolean) => void) {
+    this.connectionStateCallbacks.push(callback);
+    // Immediately notify of current state if connected
+    if (this.connected) {
+      callback(true);
+    }
+  }
+
+  private notifyConnectionState() {
+    for (const callback of this.connectionStateCallbacks) {
+      callback(this.connected);
+    }
   }
 }
