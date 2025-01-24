@@ -23,7 +23,6 @@ const API_HEADERS = {
   JSON: { 
     "Content-Type": "application/json",
     "Accept": "application/json",
-    "Origin": window.location.origin
   },
   SESSION: () => ({
     "X-Session-Token": localStorage.getItem("sc_token") || "",
@@ -361,24 +360,27 @@ export const AuthProvider: ParentComponent = (props) => {
 
       const res = await fetch(API_ENDPOINTS.LOGIN, {
         method: "POST",
-        headers: API_HEADERS.JSON,
+        headers: {
+          ...API_HEADERS.JSON,
+          "Origin": window.location.origin,
+        },
         body: JSON.stringify(credentials),
       });
 
+      const data = await res.json();
+
       if (!res.ok) {
-        const errorText = await res.text();
         console.error("[AuthProvider] Login failed:", {
           status: res.status,
           statusText: res.statusText,
           headers: Object.fromEntries(res.headers.entries()),
-          error: errorText,
+          error: data.error,
         });
         setIsAuthenticated(false);
         setLoading(false);
         return false;
       }
 
-      const data = await res.json();
       if (!data.token) {
         console.error("[AuthProvider] Login response missing token:", data);
         setIsAuthenticated(false);
