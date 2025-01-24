@@ -21,12 +21,12 @@ const Login = () => {
       return;
     }
 
-    await login({
-      email: email(),
-      password: password(),
-    }).catch((e) => {
-      setError(e);
-    });
+    const result = await login({ email: email(), password: password() });
+    if (result.success) {
+      navigate("/", { replace: true });
+    } else {
+      setError(result.error || t("auth.login.error.invalidCredentials"));
+    }
   };
 
   return (

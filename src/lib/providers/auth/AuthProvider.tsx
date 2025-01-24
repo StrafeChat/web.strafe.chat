@@ -47,8 +47,8 @@ type AuthContextType = {
   setRelationships: (relationships: string[]) => void;
   relationshipRequests: () => Relationship[];
   setRelationshipRequests: (requests: Relationship[]) => void;
-  login: (credentials: { email: string; password: string }) => Promise<boolean>;
-  register: (data: RegisterData) => Promise<boolean>;
+  login: (credentials: { email: string; password: string }) => Promise<{ success: boolean; error?: string }>;
+  register: (data: RegisterData) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   isAuthenticated: () => boolean;
   loading: () => boolean;
@@ -79,9 +79,7 @@ export const AuthProvider: ParentComponent = (props) => {
   const cache = useCache();
   const [user, setUser] = createSignal<Clientuser | null>(null);
   const [relationships, setRelationships] = createSignal<string[]>([]);
-  const [relationshipRequests, setRelationshipRequests] = createSignal<
-    Relationship[]
-  >([]);
+  const [relationshipRequests, setRelationshipRequests] = createSignal<Relationship[]>([]);
   const [isAuthenticated, setIsAuthenticated] = createSignal(false);
   const [loading, setLoading] = createSignal(true);
   const [isMobile, setIsMobile] = createSignal(window.innerWidth <= 768);
@@ -234,7 +232,7 @@ export const AuthProvider: ParentComponent = (props) => {
     return client.isConnected();
   };
 
-  const fetchUserData = async (token: string): Promise<boolean> => {
+  const fetchUserData = async (token: string): Promise<{ success: boolean; error?: string }> => {
     try {
       setLoading(true);
       await debugLog("[AuthProvider] Starting fetchUserData", {
@@ -256,13 +254,21 @@ export const AuthProvider: ParentComponent = (props) => {
 
       if (!res.ok) {
         const errorText = await res.text();
+        let errorMessage: string;
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.error || "Failed to fetch user data";
+        } catch {
+          errorMessage = errorText || `HTTP Error: ${res.status}`;
+        }
+        
         await debugLog("[AuthProvider] fetchUserData failed", {
           status: res.status,
-          error: errorText,
+          error: errorMessage,
         });
         setIsAuthenticated(false);
         setLoading(false);
-        return false;
+        return { success: false, error: errorMessage };
       }
 
       const data = await res.json();
@@ -288,7 +294,7 @@ export const AuthProvider: ParentComponent = (props) => {
         });
         setIsAuthenticated(false);
         setLoading(false);
-        return false;
+        return { success: false, error: "Invalid client user data" };
       }
 
       const normalizedUser = {
@@ -334,7 +340,7 @@ export const AuthProvider: ParentComponent = (props) => {
       });
 
       setLoading(false);
-      return true;
+      return { success: true };
     } catch (error) {
       await debugLog("[AuthProvider] fetchUserData error", {
         error,
@@ -343,7 +349,7 @@ export const AuthProvider: ParentComponent = (props) => {
       });
       setIsAuthenticated(false);
       setLoading(false);
-      return false;
+      return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
   };
 
@@ -369,7 +375,7 @@ export const AuthProvider: ParentComponent = (props) => {
   const login = async (credentials: {
     email: string;
     password: string;
-  }): Promise<boolean> => {
+  }): Promise<{ success: boolean; error?: string }> => {
     try {
       setLoading(true);
       await debugLog("[AuthProvider] Starting login attempt", {
@@ -391,23 +397,31 @@ export const AuthProvider: ParentComponent = (props) => {
 
       if (!res.ok) {
         const errorText = await res.text();
+        let errorMessage: string;
+        try {
+          const errorJson = JSON.parse(errorText);
+          errorMessage = errorJson.error || "Unknown error";
+        } catch {
+          errorMessage = errorText || `HTTP Error: ${res.status}`;
+        }
+        
         await debugLog("[AuthProvider] Login failed", {
           status: res.status,
-          error: errorText,
+          error: errorMessage,
         });
         setIsAuthenticated(false);
         setLoading(false);
-        return false;
+        return { success: false, error: errorMessage };
       }
 
       let data;
       try {
         data = await res.json();
-        throw data;
         await debugLog("[AuthProvider] Login response parsed", {
           hasToken: !!data.token,
         });
       } catch (e) {
+        const error = "Failed to parse login response";
         await debugLog("[AuthProvider] Failed to parse login response", {
           error: e,
           responseText: await res.text(),
@@ -415,40 +429,46 @@ export const AuthProvider: ParentComponent = (props) => {
         console.error("[AuthProvider] Failed to parse login response:", e);
         setIsAuthenticated(false);
         setLoading(false);
-        return false;
+        return { success: false, error };
       }
 
       if (!data.token) {
+        const error = "No token received from server";
         await debugLog("[AuthProvider] No token in response", { data });
         setIsAuthenticated(false);
         setLoading(false);
-        return false;
+        return { success: false, error };
       }
 
       localStorage.setItem("sc_token", data.token);
-      const success = await fetchUserData(data.token);
+      const userDataResult = await fetchUserData(data.token);
+      
+      if (!userDataResult.success) {
+        return { success: false, error: userDataResult.error || "Failed to fetch user data" };
+      }
 
       await debugLog("[AuthProvider] Login flow completed", {
-        success,
+        success: true,
         authenticated: isAuthenticated(),
         hasUser: !!user(),
       });
 
-      return success;
+      return { success: true };
     } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
       await debugLog("[AuthProvider] Login error", {
         error,
-        message: error instanceof Error ? error.message : "Unknown error",
+        message: errorMessage,
         stack: error instanceof Error ? error.stack : undefined,
       });
       console.error("[AuthProvider] Login error:", error);
       setIsAuthenticated(false);
       setLoading(false);
-      return false;
+      return { success: false, error: errorMessage };
     }
   };
 
-  const register = async (data: RegisterData): Promise<boolean> => {
+  const register = async (data: RegisterData): Promise<{ success: boolean; error?: string }> => {
     try {
       setLoading(true);
       const res = await fetch(API_ENDPOINTS.REGISTER, {
@@ -461,7 +481,7 @@ export const AuthProvider: ParentComponent = (props) => {
         logError("register", `Registration failed: ${res.status}`);
         setIsAuthenticated(false);
         setLoading(false);
-        return false;
+        return { success: false, error: `Registration failed: ${res.status}` };
       }
 
       const { token } = await res.json();
@@ -472,7 +492,7 @@ export const AuthProvider: ParentComponent = (props) => {
       logError("register", error);
       setIsAuthenticated(false);
       setLoading(false);
-      return false;
+      return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
     }
   };
 
