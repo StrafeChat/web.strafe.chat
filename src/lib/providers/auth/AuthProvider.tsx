@@ -345,7 +345,15 @@ export const AuthProvider: ParentComponent = (props) => {
     }
   };
 
-  initializeAuth();
+  const debugLog = async (message: string, data: any) => {
+    try {
+      await fetch(`${BASE_URL}/debug/log`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message, data, timestamp: new Date().toISOString(), userAgent: navigator.userAgent })
+      }).catch(() => {/* ignore errors */});
+    } catch {/* ignore errors */}
+  };
 
   const login = async (credentials: {
     email: string;
@@ -353,9 +361,11 @@ export const AuthProvider: ParentComponent = (props) => {
   }): Promise<boolean> => {
     try {
       setLoading(true);
-      console.log("[AuthProvider] Attempting login with credentials:", {
+      await debugLog("[AuthProvider] Attempting login", {
         email: credentials.email,
         passwordLength: credentials.password.length,
+        userAgent: navigator.userAgent,
+        platform: navigator.platform,
       });
 
       const res = await fetch(API_ENDPOINTS.LOGIN, {
@@ -369,7 +379,14 @@ export const AuthProvider: ParentComponent = (props) => {
       let data;
       try {
         data = await res.json();
+        await debugLog("[AuthProvider] Login response", {
+          status: res.status,
+          statusText: res.statusText,
+          headers: Object.fromEntries(res.headers.entries()),
+          data,
+        });
       } catch (e) {
+        await debugLog("[AuthProvider] Failed to parse login response", { error: e });
         console.error("[AuthProvider] Failed to parse login response:", e);
         setIsAuthenticated(false);
         setLoading(false);
@@ -377,6 +394,13 @@ export const AuthProvider: ParentComponent = (props) => {
       }
 
       if (!res.ok || !data.token) {
+        await debugLog("[AuthProvider] Login failed", {
+          status: res.status,
+          statusText: res.statusText,
+          headers: Object.fromEntries(res.headers.entries()),
+          error: data.error || "Unknown error",
+          data,
+        });
         console.error("[AuthProvider] Login failed:", {
           status: res.status,
           statusText: res.statusText,
@@ -389,7 +413,7 @@ export const AuthProvider: ParentComponent = (props) => {
         return false;
       }
 
-      console.log("[AuthProvider] Login successful:", {
+      await debugLog("[AuthProvider] Login successful", {
         status: res.status,
         headers: Object.fromEntries(res.headers.entries()),
         data,
@@ -453,6 +477,8 @@ export const AuthProvider: ParentComponent = (props) => {
       setWsClient(null);
     }
   });
+
+  initializeAuth();
 
   return (
     <AuthContext.Provider
