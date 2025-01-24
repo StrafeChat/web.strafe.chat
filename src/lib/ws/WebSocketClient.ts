@@ -39,6 +39,13 @@ export interface ReadyPayload extends BasePayload {
   presence?: any;
   users?: { [key: string]: any };
   client_user?: any;
+  relationships?: string[];
+  relationship_requests?: Array<{
+    id: string;
+    sender_id: string;
+    recipient_id: string;
+    created_at: string;
+  }>;
 }
 
 export interface RelationshipPayload extends BasePayload {
@@ -281,13 +288,15 @@ export class WebSocketClient {
                 break;
               }
               const relationship = {
-                id: data.d.id,
-                sender_id: data.d.sender_id,
-                recipient_id: data.d.recipient_id,
-                created_at: data.d.created_at || new Date().toISOString(),
                 type: "relationshipCreate",
-                sender: data.d.sender || null,
-                recipient: data.d.recipient || null,
+                relationship: {
+                  id: data.d.id,
+                  sender_id: data.d.sender_id,
+                  recipient_id: data.d.recipient_id,
+                  created_at: data.d.created_at || new Date().toISOString(),
+                  sender: data.d.sender || null,
+                  recipient: data.d.recipient || null,
+                }
               };
               this.handleMessage(relationship);
               break;
@@ -300,13 +309,15 @@ export class WebSocketClient {
                 break;
               }
               const relationshipEvent = {
-                id: data.d.id,
-                sender_id: data.d.sender_id,
-                recipient_id: data.d.recipient_id,
-                created_at: data.d.created_at || new Date().toISOString(),
                 type: data.op.toLowerCase(),
-                sender: data.d.sender || null,
-                recipient: data.d.recipient || null,
+                relationship: {
+                  id: data.d.id,
+                  sender_id: data.d.sender_id,
+                  recipient_id: data.d.recipient_id,
+                  created_at: data.d.created_at || new Date().toISOString(),
+                  sender: data.d.sender || null,
+                  recipient: data.d.recipient || null,
+                }
               };
               this.handleMessage(relationshipEvent);
               break;
@@ -448,15 +459,6 @@ export class WebSocketClient {
     this.connected = true;
     this.notifyConnectionState();
 
-    // Pass the full READY payload to any registered READY handlers
-    const readyHandler = this.messageHandlers.get("READY");
-    if (readyHandler) {
-      console.log("[WebSocket] Calling READY handler with data");
-      readyHandler(data);
-    } else {
-      console.warn("[WebSocket] No READY handler found!");
-    }
-
     // Cache users if available
     if (data.users && this.cache) {
       console.log("[WebSocket] Caching users:", Object.keys(data.users).length);
@@ -465,10 +467,41 @@ export class WebSocketClient {
       console.warn("[WebSocket] No users data in READY payload or cache not initialized");
     }
 
+    // Process relationships
+    if (data.relationships) {
+      console.log("[WebSocket] Processing relationships:", data.relationships);
+      this.relationships = data.relationships.reduce((acc: { [key: string]: any }, relationshipId: string) => {
+        acc[relationshipId] = true;
+        return acc;
+      }, {});
+    } else {
+      console.warn("[WebSocket] No relationships data in READY payload");
+    }
+
+    // Process relationship requests
+    if (data.relationship_requests) {
+      console.log("[WebSocket] Processing relationship requests:", data.relationship_requests);
+      this.relationshipRequests = data.relationship_requests.reduce((acc: { [key: string]: any }, request) => {
+        acc[request.id] = request;
+        return acc;
+      }, {});
+    } else {
+      console.warn("[WebSocket] No relationship requests data in READY payload");
+    }
+
     if (data.client_user) {
       console.log("[WebSocket] Client user data received:", data.client_user);
     } else {
       console.warn("[WebSocket] No client_user data in READY payload");
+    }
+
+    // Pass the full READY payload to any registered READY handlers
+    const readyHandler = this.messageHandlers.get("READY");
+    if (readyHandler) {
+      console.log("[WebSocket] Calling READY handler with data");
+      readyHandler(data);
+    } else {
+      console.warn("[WebSocket] No READY handler found!");
     }
   }
 
