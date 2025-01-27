@@ -39,13 +39,6 @@ export interface ReadyPayload extends BasePayload {
   presence?: any;
   users?: { [key: string]: any };
   client_user?: any;
-  relationships?: string[];
-  relationship_requests?: Array<{
-    id: string;
-    sender_id: string;
-    recipient_id: string;
-    created_at: string;
-  }>;
 }
 
 export interface RelationshipPayload extends BasePayload {
@@ -97,17 +90,19 @@ import { decode } from "@msgpack/msgpack";
 
 export class WebSocketClient {
   private readonly worker?: SharedWorker | null;
-  private readonly messageHandlers: Map<string, (data: any) => void> = new Map();
+  private readonly messageHandlers: Map<string, (data: any) => void> =
+    new Map();
   private connectPromise: Promise<boolean> | null = null;
   private readyPromise: Promise<ReadyPayload> | null = null;
-  private readonly connectionStateCallbacks: ((connected: boolean) => void)[] = [];
+  private readonly connectionStateCallbacks: ((connected: boolean) => void)[] =
+    [];
   private connected = false;
   public cache: UserCache;
   private relationships: { [key: string]: any } = {};
   private relationshipRequests: { [key: string]: any } = {};
   private static workerChannel?: BroadcastChannel;
   private static activeWorker: SharedWorker | null | undefined = null;
-  private static isSharedWorkerSupported = typeof SharedWorker !== 'undefined';
+  private static isSharedWorkerSupported = typeof SharedWorker !== "undefined";
   private heartbeatInterval: number | null = null;
   private reconnectTimeout: number | null = null;
   private reconnectAttempts = 0;
@@ -125,7 +120,9 @@ export class WebSocketClient {
     this.onMessage("relationshipAccept", this.handleRelationship.bind(this));
     this.onMessage("relationshipDelete", this.handleRelationship.bind(this));
     this.onMessage("PRESENCE_UPDATE", this.handlePresenceUpdate.bind(this));
-    console.log("[WebSocket] Message handlers set up:", [...this.messageHandlers.entries()]);
+    console.log("[WebSocket] Message handlers set up:", [
+      ...this.messageHandlers.entries(),
+    ]);
 
     // Initialize readyPromise
     this.readyPromise = new Promise((resolve) => {
@@ -141,7 +138,9 @@ export class WebSocketClient {
     if (WebSocketClient.isSharedWorkerSupported) {
       // Create or join the coordination channel
       if (!WebSocketClient.workerChannel) {
-        WebSocketClient.workerChannel = new BroadcastChannel("strafe-websocket-worker");
+        WebSocketClient.workerChannel = new BroadcastChannel(
+          "strafe-websocket-worker"
+        );
       }
 
       // Try to get existing worker or create new one
@@ -158,7 +157,10 @@ export class WebSocketClient {
           // Notify other tabs that we've created a worker
           WebSocketClient.workerChannel.postMessage({ type: "worker-created" });
         } catch (error) {
-          console.warn("Failed to create SharedWorker, falling back to direct WebSocket:", error);
+          console.warn(
+            "Failed to create SharedWorker, falling back to direct WebSocket:",
+            error
+          );
           WebSocketClient.isSharedWorkerSupported = false;
         }
       }
@@ -183,15 +185,20 @@ export class WebSocketClient {
     }
 
     if (!WebSocketClient.isSharedWorkerSupported) {
-      console.log("[WebSocket] Using direct WebSocket connection (SharedWorker not supported)");
-      
+      console.log(
+        "[WebSocket] Using direct WebSocket connection (SharedWorker not supported)"
+      );
+
       this.ws.onopen = () => {
         console.log("[WebSocket] Direct connection opened");
       };
 
       this.ws.onmessage = async (event) => {
         try {
-          console.log("[WebSocket] Received direct message, event type:", typeof event.data);
+          console.log(
+            "[WebSocket] Received direct message, event type:",
+            typeof event.data
+          );
           console.log("[WebSocket] Raw message data:", event.data);
 
           let data: any;
@@ -204,14 +211,20 @@ export class WebSocketClient {
             // Try MessagePack first
             try {
               data = decode(uint8Array);
-              console.log("[WebSocket] Successfully decoded with MessagePack:", data);
+              console.log(
+                "[WebSocket] Successfully decoded with MessagePack:",
+                data
+              );
             } catch (msgpackError) {
               // Fallback to JSON if MessagePack fails
               try {
                 const textDecoder = new TextDecoder("utf-8");
                 const jsonString = textDecoder.decode(uint8Array);
                 data = JSON.parse(jsonString);
-                console.log("[WebSocket] Successfully decoded with JSON:", data);
+                console.log(
+                  "[WebSocket] Successfully decoded with JSON:",
+                  data
+                );
               } catch (jsonError) {
                 console.error("[WebSocket] Failed to decode message:", {
                   originalData: event.data,
@@ -227,7 +240,10 @@ export class WebSocketClient {
               const textDecoder = new TextDecoder("utf-8");
               const jsonString = textDecoder.decode(event.data);
               data = JSON.parse(jsonString);
-              console.log("[WebSocket] Successfully decoded Uint8Array with JSON:", data);
+              console.log(
+                "[WebSocket] Successfully decoded Uint8Array with JSON:",
+                data
+              );
             } catch (jsonError) {
               console.error("[WebSocket] Failed to decode Uint8Array:", {
                 originalData: event.data,
@@ -284,19 +300,20 @@ export class WebSocketClient {
 
             case OpCodes.RELATIONSHIP_CREATE:
               if (!data.d || !data.d.id) {
-                console.error("[WebSocket] Invalid relationship data received:", data);
+                console.error(
+                  "[WebSocket] Invalid relationship data received:",
+                  data
+                );
                 break;
               }
               const relationship = {
+                id: data.d.id,
+                sender_id: data.d.sender_id,
+                recipient_id: data.d.recipient_id,
+                created_at: data.d.created_at || new Date().toISOString(),
                 type: "relationshipCreate",
-                relationship: {
-                  id: data.d.id,
-                  sender_id: data.d.sender_id,
-                  recipient_id: data.d.recipient_id,
-                  created_at: data.d.created_at || new Date().toISOString(),
-                  sender: data.d.sender || null,
-                  recipient: data.d.recipient || null,
-                }
+                sender: data.d.sender || null,
+                recipient: data.d.recipient || null,
               };
               this.handleMessage(relationship);
               break;
@@ -305,19 +322,20 @@ export class WebSocketClient {
             case OpCodes.RELATIONSHIP_ACCEPT:
             case OpCodes.RELATIONSHIP_DELETE:
               if (!data.d || !data.d.id) {
-                console.error("[WebSocket] Invalid relationship data received:", data);
+                console.error(
+                  "[WebSocket] Invalid relationship data received:",
+                  data
+                );
                 break;
               }
               const relationshipEvent = {
+                id: data.d.id,
+                sender_id: data.d.sender_id,
+                recipient_id: data.d.recipient_id,
+                created_at: data.d.created_at || new Date().toISOString(),
                 type: data.op.toLowerCase(),
-                relationship: {
-                  id: data.d.id,
-                  sender_id: data.d.sender_id,
-                  recipient_id: data.d.recipient_id,
-                  created_at: data.d.created_at || new Date().toISOString(),
-                  sender: data.d.sender || null,
-                  recipient: data.d.recipient || null,
-                }
+                sender: data.d.sender || null,
+                recipient: data.d.recipient || null,
               };
               this.handleMessage(relationshipEvent);
               break;
@@ -380,7 +398,10 @@ export class WebSocketClient {
   }
 
   private handleWorkerMessage(event: MessageEvent) {
-    console.log("[WebSocket] handleWorkerMessage invoked with data:", JSON.stringify(event.data, null, 2));
+    console.log(
+      "[WebSocket] handleWorkerMessage invoked with data:",
+      JSON.stringify(event.data, null, 2)
+    );
     const { type, payload } = event.data;
     console.log("[WebSocket] Message type received:", type);
     console.log("[WebSocket] Payload:", JSON.stringify(payload, null, 2));
@@ -394,7 +415,12 @@ export class WebSocketClient {
           console.log("[WebSocket] Calling handler for type:", payload.type);
           handler(payload);
         } else {
-          console.warn("[WebSocket] No handler found for type:", payload.type, "Available handlers:", [...this.messageHandlers.keys()]);
+          console.warn(
+            "[WebSocket] No handler found for type:",
+            payload.type,
+            "Available handlers:",
+            [...this.messageHandlers.keys()]
+          );
         }
         break;
       case "relationshipCreate":
@@ -447,53 +473,27 @@ export class WebSocketClient {
       console.log("[WebSocket] Found handler for type:", data.type);
       handler(data);
     } else {
-      console.warn("[WebSocket] No handler found for type:", data.type, "Available handlers:", [...this.messageHandlers.keys()]);
+      console.warn(
+        "[WebSocket] No handler found for type:",
+        data.type,
+        "Available handlers:",
+        [...this.messageHandlers.keys()]
+      );
     }
   }
 
   private handleReady(data: ReadyPayload) {
-    console.log("[WebSocket] Received READY payload:", JSON.stringify(data, null, 2));
-    console.log("[WebSocket] Current messageHandlers:", [...this.messageHandlers.entries()]);
+    console.log(
+      "[WebSocket] Received READY payload:",
+      JSON.stringify(data, null, 2)
+    );
+    console.log("[WebSocket] Current messageHandlers:", [
+      ...this.messageHandlers.entries(),
+    ]);
 
     // Set connected state
     this.connected = true;
     this.notifyConnectionState();
-
-    // Cache users if available
-    if (data.users && this.cache) {
-      console.log("[WebSocket] Caching users:", Object.keys(data.users).length);
-      this.cache.setUsers(data.users);
-    } else {
-      console.warn("[WebSocket] No users data in READY payload or cache not initialized");
-    }
-
-    // Process relationships
-    if (data.relationships) {
-      console.log("[WebSocket] Processing relationships:", data.relationships);
-      this.relationships = data.relationships.reduce((acc: { [key: string]: any }, relationshipId: string) => {
-        acc[relationshipId] = true;
-        return acc;
-      }, {});
-    } else {
-      console.warn("[WebSocket] No relationships data in READY payload");
-    }
-
-    // Process relationship requests
-    if (data.relationship_requests) {
-      console.log("[WebSocket] Processing relationship requests:", data.relationship_requests);
-      this.relationshipRequests = data.relationship_requests.reduce((acc: { [key: string]: any }, request) => {
-        acc[request.id] = request;
-        return acc;
-      }, {});
-    } else {
-      console.warn("[WebSocket] No relationship requests data in READY payload");
-    }
-
-    if (data.client_user) {
-      console.log("[WebSocket] Client user data received:", data.client_user);
-    } else {
-      console.warn("[WebSocket] No client_user data in READY payload");
-    }
 
     // Pass the full READY payload to any registered READY handlers
     const readyHandler = this.messageHandlers.get("READY");
@@ -502,6 +502,22 @@ export class WebSocketClient {
       readyHandler(data);
     } else {
       console.warn("[WebSocket] No READY handler found!");
+    }
+
+    // Cache users if available
+    if (data.users && this.cache) {
+      console.log("[WebSocket] Caching users:", Object.keys(data.users).length);
+      this.cache.setUsers(data.users);
+    } else {
+      console.warn(
+        "[WebSocket] No users data in READY payload or cache not initialized"
+      );
+    }
+
+    if (data.client_user) {
+      console.log("[WebSocket] Client user data received:", data.client_user);
+    } else {
+      console.warn("[WebSocket] No client_user data in READY payload");
     }
   }
 
@@ -609,8 +625,8 @@ export class WebSocketClient {
 
   private normalizePayload(data: any): any {
     if (Array.isArray(data)) {
-      return data.map(item => this.normalizePayload(item));
-    } else if (typeof data === 'object' && data !== null) {
+      return data.map((item) => this.normalizePayload(item));
+    } else if (typeof data === "object" && data !== null) {
       const normalized: any = {};
       for (const [key, value] of Object.entries(data)) {
         const normalizedKey = key.charAt(0).toLowerCase() + key.slice(1);
@@ -630,18 +646,30 @@ export class WebSocketClient {
     let delay;
     if (this.reconnectAttempts < 3) {
       // First 3 attempts: 1s, 2s, 4s
-      delay = Math.min(this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts), 4000);
+      delay = Math.min(
+        this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts),
+        4000
+      );
     } else {
       // After 3 attempts, use exponential backoff up to 30s
-      delay = Math.min(this.baseReconnectDelay * Math.pow(1.5, this.reconnectAttempts), 30000);
+      delay = Math.min(
+        this.baseReconnectDelay * Math.pow(1.5, this.reconnectAttempts),
+        30000
+      );
     }
 
-    console.log(`[WebSocket] Scheduling reconnect attempt ${this.reconnectAttempts + 1} in ${delay}ms`);
+    console.log(
+      `[WebSocket] Scheduling reconnect attempt ${
+        this.reconnectAttempts + 1
+      } in ${delay}ms`
+    );
 
     this.reconnectTimeout = setTimeout(() => {
       this.reconnectAttempts++;
       if (this.currentToken) {
-        console.log(`[WebSocket] Attempting reconnect ${this.reconnectAttempts}`);
+        console.log(
+          `[WebSocket] Attempting reconnect ${this.reconnectAttempts}`
+        );
         // Reset reconnect attempts if we've been disconnected for a while
         if (this.reconnectAttempts > 5) {
           console.log("[WebSocket] Resetting reconnect attempts");
@@ -660,7 +688,7 @@ export class WebSocketClient {
       console.log("[WebSocket] Sending initial heartbeat");
       const payload: HeartbeatPayload = {
         type: "HEARTBEAT",
-        timestamp: BigInt(Date.now())
+        timestamp: BigInt(Date.now()),
       };
       this.send(payload);
     }
@@ -671,7 +699,7 @@ export class WebSocketClient {
         console.log("[WebSocket] Sending heartbeat");
         const payload: HeartbeatPayload = {
           type: "HEARTBEAT",
-          timestamp: BigInt(Date.now())
+          timestamp: BigInt(Date.now()),
         };
 
         this.send(payload).catch((error) => {
@@ -702,17 +730,19 @@ export class WebSocketClient {
         console.log("[WebSocket] Sending connect message to worker with token");
         this.worker.port.postMessage({
           type: "connect",
-          payload: { token }
+          payload: { token },
         });
       } else {
         // Direct WebSocket connection when SharedWorker is not supported
         this.ws.onopen = () => {
           console.log("[WebSocket] Direct connection opened, sending identify");
-          this.ws.send(JSON.stringify({
-            type: "IDENTIFY",
-            token,
-            device: "mobile",
-          }));
+          this.ws.send(
+            JSON.stringify({
+              type: "IDENTIFY",
+              token,
+              device: "mobile",
+            })
+          );
           this.connected = true;
           this.notifyConnectionState();
           this.startHeartbeat();

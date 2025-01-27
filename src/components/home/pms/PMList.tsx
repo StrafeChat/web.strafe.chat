@@ -3,9 +3,12 @@ import { useAuth } from "../../../lib/providers/auth/AuthProvider";
 import UserSettings from "../../settings/UserSettings";
 import { A } from "@solidjs/router";
 import { Tooltip } from "../../common/Tooltip";
+import { useTransContext } from "@mbarzda/solid-i18next";
+import { StatusIndicator } from "../../common/StatusIndicator";
 
 export const PMList: Component = () => {
   const { relationshipRequests, user } = useAuth();
+  const [t] = useTransContext();
   const [showSettings, setShowSettings] = createSignal(false);
 
   const pendingCount = createMemo(() => {
@@ -135,15 +138,21 @@ export const PMList: Component = () => {
         </div>
       </div>
 
-      <div class="p-2 border-t border-border mt-auto">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2 hover:bg-surface hover:bg-opacity-10 transition-colors hover:cursor-pointer rounded-md px-2">
-            <img
-              src="https://cdn.discordapp.com/avatars/529815278456930314/718130faa9edf64dc453e04ee63fa1fe.png?format=webp&quality=lossless&width=897&height=897"
-              alt="User avatar"
-              draggable="false"
-              class="w-8 h-8 rounded-full object-cover"
-            />
+      <div class="border-t border-border mt-auto">
+        <div class="flex items-center justify-between bg-background1 pl-1 pr-2 py-1">
+          <div class="group flex items-center gap-2 hover:bg-surface hover:bg-opacity-10 transition-colors hover:cursor-pointer rounded-md px-2 py-1">
+            <div class="relative flex items-center">
+              <img
+                src="https://cdn.discordapp.com/avatars/529815278456930314/718130faa9edf64dc453e04ee63fa1fe.png?format=webp&quality=lossless&width=897&height=897"
+                alt="User avatar"
+                draggable="false"
+                class="w-8 h-8 rounded-full object-cover"
+              />
+              <StatusIndicator
+                status="online"
+                class="border-background1 group-hover:border-surface group-hover:border-opacity-10 transition-colors"
+              />
+            </div>
             <div class="flex-1 min-w-0">
               <div class="text-sm font-medium truncate select-none">
                 {user()?.display_name}
@@ -153,25 +162,27 @@ export const PMList: Component = () => {
               </div>
             </div>
           </div>
-          <button
-            class="p-2 text-text-secondary hover:text-text-primary transition-colors rounded-md hover:bg-surface hover:bg-opacity-10"
-            onClick={() => setShowSettings(true)}
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="w-5 h-5"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
+          {/* User Settings Modal */}
+          <Tooltip content={t("settings.sections.user")} position="top">
+            <button
+              class="p-2 text-text-secondary hover:text-text-primary transition-colors rounded-md hover:bg-surface hover:bg-opacity-10"
+              onClick={() => setShowSettings(true)}
             >
-              <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
-              <circle cx="12" cy="12" r="3" />
-            </svg>
-          </button>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="w-5 h-5"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+              >
+                <path d="M12.22 2h-.44a2 2 0 0 0-2 2v.18a2 2 0 0 1-1 1.73l-.43.25a2 2 0 0 1-2 0l-.15-.08a2 2 0 0 0-2.73.73l-.22.38a2 2 0 0 0 .73 2.73l.15.1a2 2 0 0 1 1 1.72v.51a2 2 0 0 1-1 1.74l-.15.09a2 2 0 0 0-.73 2.73l.22.38a2 2 0 0 0 2.73.73l.15-.08a2 2 0 0 1 2 0l.43.25a2 2 0 0 1 1 1.73V20a2 2 0 0 0 2 2h.44a2 2 0 0 0 2-2v-.18a2 2 0 0 1 1-1.73l.43-.25a2 2 0 0 1 2 0l.15.08a2 2 0 0 0 2.73-.73l.22-.39a2 2 0 0 0-.73-2.73l-.15-.08a2 2 0 0 1-1-1.74v-.5a2 2 0 0 1 1-1.74l.15-.09a2 2 0 0 0 .73-2.73l-.22-.38a2 2 0 0 0-2.73-.73l-.15.08a2 2 0 0 1-2 0l-.43-.25a2 2 0 0 1-1-1.73V4a2 2 0 0 0-2-2z" />
+                <circle cx="12" cy="12" r="3" />
+              </svg>
+            </button>
+          </Tooltip>
         </div>
       </div>
-      {/* User Settings Modal */}
       <UserSettings
         isOpen={showSettings()}
         onClose={() => setShowSettings(false)}

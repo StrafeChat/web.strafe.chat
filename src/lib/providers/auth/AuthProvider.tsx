@@ -47,8 +47,13 @@ type AuthContextType = {
   setRelationships: (relationships: string[]) => void;
   relationshipRequests: () => Relationship[];
   setRelationshipRequests: (requests: Relationship[]) => void;
-  login: (credentials: { email: string; password: string }) => Promise<{ success: boolean; error?: string }>;
-  register: (data: RegisterData) => Promise<{ success: boolean; error?: string }>;
+  login: (credentials: {
+    email: string;
+    password: string;
+  }) => Promise<{ success: boolean; error?: string }>;
+  register: (
+    data: RegisterData
+  ) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   isAuthenticated: () => boolean;
   loading: () => boolean;
@@ -79,7 +84,9 @@ export const AuthProvider: ParentComponent = (props) => {
   const cache = useCache();
   const [user, setUser] = createSignal<Clientuser | null>(null);
   const [relationships, setRelationships] = createSignal<string[]>([]);
-  const [relationshipRequests, setRelationshipRequests] = createSignal<Relationship[]>([]);
+  const [relationshipRequests, setRelationshipRequests] = createSignal<
+    Relationship[]
+  >([]);
   const [isAuthenticated, setIsAuthenticated] = createSignal(false);
   const [loading, setLoading] = createSignal(true);
   const [isMobile, setIsMobile] = createSignal(window.innerWidth <= 768);
@@ -107,7 +114,11 @@ export const AuthProvider: ParentComponent = (props) => {
     console.error(`[AuthProvider:${context}]`, error);
   };
 
-  const initializeWebSocket = () => {
+  const initializeWebSocket = (
+    token: string = localStorage.getItem("sc_token") || ""
+  ) => {
+    if (!token) return false;
+
     const ws = new WebSocket(WS_URL);
     const client = new WebSocketClient(ws);
     setWsClient(client);
@@ -119,12 +130,9 @@ export const AuthProvider: ParentComponent = (props) => {
       }
     });
 
-    const token = localStorage.getItem("sc_token");
-    if (token) {
-      client.connect(token).catch((error) => {
-        console.error("[WebSocket] Failed to connect:", error);
-      });
-    }
+    client.connect(token).catch((error) => {
+      console.error("[WebSocket] Failed to connect:", error);
+    });
 
     client.onMessage("READY", (data) => {
       console.log(
@@ -147,6 +155,7 @@ export const AuthProvider: ParentComponent = (props) => {
         };
         console.log("[AuthProvider:READY] Setting user data:", userData);
         setUser(userData);
+        setIsAuthenticated(true);
       }
 
       if (data.users) {
@@ -180,9 +189,15 @@ export const AuthProvider: ParentComponent = (props) => {
         setRelationshipRequests(requests);
       }
 
-      // Only set loading to false after all data is processed
+      // Verify all required data is present before removing loading screen
+      if (!data.client_user || !data.users) {
+        console.error("[AuthProvider:READY] Missing required data");
+        return;
+      }
+
+      // Only set loading to false after all data is processed and verified
       console.log(
-        "[AuthProvider:READY] All data processed, setting loading to false"
+        "[AuthProvider:READY] All data processed and verified, setting loading to false"
       );
       setLoading(false);
     });
@@ -229,146 +244,63 @@ export const AuthProvider: ParentComponent = (props) => {
       );
     });
 
-    return client.isConnected();
+    return true;
   };
 
-  const fetchUserData = async (token: string): Promise<{ success: boolean; error?: string }> => {
+  const fetchUserData = async (
+    token: string
+  ): Promise<{ success: boolean; error?: string }> => {
     try {
-      setLoading(true);
-      await debugLog("[AuthProvider] Starting fetchUserData", {
-        hasToken: !!token,
-        isMobile: isMobile(),
-      });
-
+      // Don't set loading to false here, let the WebSocket READY event handle it
       const res = await fetch(API_ENDPOINTS.USER_ME, {
         headers: {
           ...API_HEADERS.JSON,
-          "X-Session-Token": token,
+          ...API_HEADERS.SESSION(),
         },
       });
 
-      await debugLog("[AuthProvider] User data response received", {
-        status: res.status,
-        headers: Object.fromEntries(res.headers.entries()),
-      });
-
       if (!res.ok) {
-        const errorText = await res.text();
-        let errorMessage: string;
-        try {
-          const errorJson = JSON.parse(errorText);
-          errorMessage = errorJson.error || "Failed to fetch user data";
-        } catch {
-          errorMessage = errorText || `HTTP Error: ${res.status}`;
-        }
-        
-        await debugLog("[AuthProvider] fetchUserData failed", {
-          status: res.status,
-          error: errorMessage,
-        });
-        setIsAuthenticated(false);
-        setLoading(false);
-        return { success: false, error: errorMessage };
+        setLoading(false); // Only set loading false on error
+        return { success: false, error: "Failed to fetch user data" };
       }
 
       const data = await res.json();
-      await debugLog("[AuthProvider] User data parsed", {
-        hasClientUser: !!data.client_user,
-        clientUser: data.client_user,
-      });
 
-      const clientUser = data.client_user;
-      if (
-        !clientUser ||
-        !clientUser.id ||
-        !clientUser.username ||
-        !clientUser.discriminator ||
-        !clientUser.email
-      ) {
-        await debugLog("[AuthProvider] Invalid client user data", {
-          clientUser,
-          hasId: !!clientUser?.id,
-          hasUsername: !!clientUser?.username,
-          hasDiscriminator: !!clientUser?.discriminator,
-          hasEmail: !!clientUser?.email,
-        });
-        setIsAuthenticated(false);
-        setLoading(false);
-        return { success: false, error: "Invalid client user data" };
+      if (!data || !data.client_user) {
+        setLoading(false); // Only set loading false on error
+        return { success: false, error: "Invalid response format" };
       }
 
-      const normalizedUser = {
-        id: clientUser.id,
-        username: clientUser.username,
-        discriminator: clientUser.discriminator,
-        display_name: clientUser.display_name,
-        avatar: clientUser.avatar,
-        email: clientUser.email,
+      // Process user data
+      const userData = {
+        id: data.client_user.ID,
+        username: data.client_user.Username,
+        discriminator: data.client_user.Discriminator,
+        display_name: data.client_user.DisplayName || data.client_user.Username,
+        email: data.client_user.Email,
+        avatar: data.client_user.Avatar,
+        date_of_birth: data.client_user.DateOfBirth,
+        friends: data.client_user.Friends || [],
       };
 
-      await debugLog("[AuthProvider] Setting up user state", {
-        normalizedUser,
-      });
+      setUser(userData);
 
-      cache.setUser(normalizedUser);
-      setUser(normalizedUser);
-      setIsAuthenticated(true);
-
-      if (Array.isArray(data.relationships)) {
-        await debugLog("[AuthProvider] Processing relationships", {
-          relationshipCount: data.relationships.length,
-        });
-        const friendIds = data.relationships
-          .filter((rel: Relationship) => rel.type === "accepted")
-          .map((rel: Relationship) => {
-            return rel.sender_id === data.client_user.ID
-              ? rel.recipient_id
-              : rel.sender_id;
-          });
-        setRelationships(friendIds);
-
-        const requests = data.relationships.filter(
-          (rel: Relationship) =>
-            rel.recipient_id === data.client_user.ID && !rel.type
-        );
-        setRelationshipRequests(requests);
+      // Process relationships if available
+      if (data.relationships) {
+        setRelationships(data.relationships);
       }
 
-      const wsConnected = initializeWebSocket();
-      await debugLog("[AuthProvider] WebSocket initialization", {
-        connected: wsConnected,
-      });
+      // Initialize WebSocket connection
+      initializeWebSocket(token);
+      setIsAuthenticated(true);
 
-      setLoading(false);
       return { success: true };
     } catch (error) {
-      await debugLog("[AuthProvider] fetchUserData error", {
-        error,
-        message: error instanceof Error ? error.message : "Unknown error",
-        stack: error instanceof Error ? error.stack : undefined,
-      });
-      setIsAuthenticated(false);
-      setLoading(false);
-      return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
-    }
-  };
-
-  const debugLog = async (message: string, data: any) => {
-    try {
-      await fetch(`${BASE_URL}/debug/log`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message,
-          data,
-          timestamp: new Date().toISOString(),
-          userAgent: navigator.userAgent,
-        }),
-      }).catch(() => {
-        /* ignore errors */
-      });
-    } catch {
-      /* ignore errors */
+      setLoading(false); // Only set loading false on error
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
     }
   };
 
@@ -378,11 +310,6 @@ export const AuthProvider: ParentComponent = (props) => {
   }): Promise<{ success: boolean; error?: string }> => {
     try {
       setLoading(true);
-      await debugLog("[AuthProvider] Starting login attempt", {
-        email: credentials.email,
-        isMobile: isMobile(),
-        userAgent: navigator.userAgent,
-      });
 
       const res = await fetch(API_ENDPOINTS.LOGIN, {
         method: "POST",
@@ -390,85 +317,37 @@ export const AuthProvider: ParentComponent = (props) => {
         body: JSON.stringify(credentials),
       });
 
-      await debugLog("[AuthProvider] Login response received", {
-        status: res.status,
-        headers: Object.fromEntries(res.headers.entries()),
-      });
-
       if (!res.ok) {
-        const errorText = await res.text();
-        let errorMessage: string;
-        try {
-          const errorJson = JSON.parse(errorText);
-          errorMessage = errorJson.error || "Unknown error";
-        } catch {
-          errorMessage = errorText || `HTTP Error: ${res.status}`;
-        }
-        
-        await debugLog("[AuthProvider] Login failed", {
-          status: res.status,
-          error: errorMessage,
-        });
-        setIsAuthenticated(false);
-        setLoading(false);
-        return { success: false, error: errorMessage };
+        return { success: false, error: "Invalid credentials" };
       }
 
-      let data;
       try {
-        data = await res.json();
-        await debugLog("[AuthProvider] Login response parsed", {
-          hasToken: !!data.token,
-        });
-      } catch (e) {
-        const error = "Failed to parse login response";
-        await debugLog("[AuthProvider] Failed to parse login response", {
-          error: e,
-          responseText: await res.text(),
-        });
-        console.error("[AuthProvider] Failed to parse login response:", e);
-        setIsAuthenticated(false);
-        setLoading(false);
-        return { success: false, error };
+        const data = await res.json();
+
+        if (!data || !data.token) {
+          return { success: false, error: "No token in response" };
+        }
+
+        localStorage.setItem("sc_token", data.token);
+        const result = await fetchUserData(data.token);
+        setIsAuthenticated(result.success);
+        return result;
+      } catch (parseError) {
+        return { success: false, error: "Failed to parse response" };
       }
-
-      if (!data.token) {
-        const error = "No token received from server";
-        await debugLog("[AuthProvider] No token in response", { data });
-        setIsAuthenticated(false);
-        setLoading(false);
-        return { success: false, error };
-      }
-
-      localStorage.setItem("sc_token", data.token);
-      const userDataResult = await fetchUserData(data.token);
-      
-      if (!userDataResult.success) {
-        return { success: false, error: userDataResult.error || "Failed to fetch user data" };
-      }
-
-      await debugLog("[AuthProvider] Login flow completed", {
-        success: true,
-        authenticated: isAuthenticated(),
-        hasUser: !!user(),
-      });
-
-      return { success: true };
     } catch (error) {
-      const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
-      await debugLog("[AuthProvider] Login error", {
-        error,
-        message: errorMessage,
-        stack: error instanceof Error ? error.stack : undefined,
-      });
-      console.error("[AuthProvider] Login error:", error);
-      setIsAuthenticated(false);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    } finally {
       setLoading(false);
-      return { success: false, error: errorMessage };
     }
   };
 
-  const register = async (data: RegisterData): Promise<{ success: boolean; error?: string }> => {
+  const register = async (
+    data: RegisterData
+  ): Promise<{ success: boolean; error?: string }> => {
     try {
       setLoading(true);
       const res = await fetch(API_ENDPOINTS.REGISTER, {
@@ -492,7 +371,10 @@ export const AuthProvider: ParentComponent = (props) => {
       logError("register", error);
       setIsAuthenticated(false);
       setLoading(false);
-      return { success: false, error: error instanceof Error ? error.message : "Unknown error" };
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
     }
   };
 
@@ -517,6 +399,7 @@ export const AuthProvider: ParentComponent = (props) => {
   const initializeAuth = () => {
     const token = localStorage.getItem("sc_token");
     if (token) {
+      initializeWebSocket(token);
       fetchUserData(token).catch(() => {
         localStorage.removeItem("sc_token");
         setLoading(false);
