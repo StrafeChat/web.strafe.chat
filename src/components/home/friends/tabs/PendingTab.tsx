@@ -10,7 +10,7 @@ import { useAuth } from "../../../../lib/providers/auth/AuthProvider";
 import { useCache } from "../../../../lib/providers/cache/CacheProvider";
 import { Tooltip } from "../../../common/Tooltip";
 import { FriendSearch } from "../FriendSearch";
-import { BASE_URL } from "../../../../constants";
+import { BASE_URL, FS_URL } from "../../../../constants";
 
 export const PendingTab: Component = () => {
   const { relationshipRequests, user, setRelationshipRequests } = useAuth();
@@ -116,6 +116,7 @@ export const PendingTab: Component = () => {
     }
 
     return {
+      id: userData()?.id,
       name: `${userData()?.display_name || userData()?.username}`,
       avatar: userData()?.avatar,
     };
@@ -265,13 +266,12 @@ export const PendingTab: Component = () => {
             const person = getUserDisplay(
               isIncoming ? request.sender_id : request.recipient_id
             );
-            console.log(person);
             return (
               <div class="flex flex-col bg-background-secondary p-2 pb-3.5 border-t-2 border-t-border hover:bg-border hover:rounded-lg hover:cursor-pointer">
-                <div class="flex items-center">
+                <div class="flex items-center gap-3">
                   {person.avatar ? (
                     <img
-                      src={person.avatar}
+                      src={`${FS_URL}/avatars/${person.id}/${person.avatar}`}
                       alt="avatar"
                       class="w-10 h-10 rounded-full"
                     />

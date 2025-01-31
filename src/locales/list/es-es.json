@@ -86,9 +86,20 @@
         "idle": "Ausente",
         "dnd": "No molestar"
       },
-      "editProfile": "Editar perfil",
+      "editProfile": "Editar perfil"
+    },
+    "profile": {
+      "title": "Perfil",
+      "description": "Personaliza cómo te ven los demás",
       "avatar": {
-        "alt": "Avatar del usuario"
+        "alt": "Avatar del usuario",
+        "change": "Cambiar Avatar",
+        "uploading": "Subiendo...",
+        "success": "Avatar actualizado correctamente",
+        "error": {
+          "invalidType": "Tipo de archivo inválido. Por favor, sube una imagen.",
+          "generic": "Error al actualizar el avatar. Por favor, inténtalo de nuevo."
+        }
       }
     },
     "appearance": {

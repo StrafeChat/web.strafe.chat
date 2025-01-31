@@ -15,23 +15,13 @@ const AccountSettings: Component = () => {
         {t("settings.account.description")}
       </p>
       <div class="bg-background1 rounded-lg p-4">
-        <div class="flex flex-col md:flex-row items-center md:items-start gap-4">
-          <img
-            src="https://cdn.discordapp.com/avatars/529815278456930314/718130faa9edf64dc453e04ee63fa1fe.png?format=webp&quality=lossless&width=897&height=897"
-            alt={t("settings.account.avatar.alt")}
-            class="w-20 h-20 rounded-full object-cover"
-          />
-          <div class="flex-1 text-center md:text-left">
-            <div class="text-lg font-medium text-text-primary">
-              {user()!.username}
-            </div>
-            <div class="text-sm text-text-secondary">
-              {t("settings.account.status.online")}
-            </div>
-          </div>
-          <button class="px-4 py-2 bg-primary text-text-inverse rounded hover:brightness-110 transition-all">
-            {t("settings.account.editProfile")}
-          </button>
+        <div class="flex-1">
+          <h3 class="text-lg font-semibold text-text-primary">
+            {user()?.display_name || user()?.username}
+          </h3>
+          <p class="text-text-secondary text-sm">
+            {user()?.username}#{user()?.discriminator}
+          </p>
         </div>
       </div>
     </div>

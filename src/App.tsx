@@ -17,6 +17,7 @@ import { Friends } from "./components/home/friends/Friends";
 import { Notes } from "./components/home/notes/Notes";
 import { getDirection } from "./lib/utils/direction";
 import { applyCustomStyles } from "./lib/utils/customStyles";
+import { ToastProvider } from "./components/common/Toast";
 
 const MountApp = (props: ParentProps) => {
   const savedLang = localStorage.getItem("sc_lang") || "en_us";
@@ -44,13 +45,15 @@ const MountApp = (props: ParentProps) => {
       }}
     >
       <ThemeProvider>
-        <ContextMenuProvider>
-          <CacheProvider>
-            <AuthProvider>
-              <div class="h-screen w-screen">{props.children}</div>
-            </AuthProvider>
-          </CacheProvider>
-        </ContextMenuProvider>
+        <ToastProvider>
+          <ContextMenuProvider>
+            <CacheProvider>
+              <AuthProvider>
+                <div class="h-screen w-screen">{props.children}</div>
+              </AuthProvider>
+            </CacheProvider>
+          </ContextMenuProvider>
+        </ToastProvider>
       </ThemeProvider>
     </TransProvider>
   );

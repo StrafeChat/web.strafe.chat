@@ -38,11 +38,16 @@ type Clientuser = {
   email: string;
   date_of_birth?: string;
   avatar?: string;
+  presence?: {
+    status: string;
+    custom_status: string;
+  };
 };
 
 type AuthContextType = {
   user: () => Clientuser | null;
   setUser: (user: Clientuser | null) => void;
+  updateUser: (user: Partial<Clientuser>) => void;
   relationships: () => string[];
   setRelationships: (relationships: string[]) => void;
   relationshipRequests: () => Relationship[];
@@ -152,6 +157,10 @@ export const AuthProvider: ParentComponent = (props) => {
           avatar: data.client_user.Avatar,
           date_of_birth: data.client_user.DateOfBirth,
           friends: data.client_user.Friends || [],
+          presence: {
+            status: data.client_user.Presence.Status,
+            custom_status: data.client_user.Presence.CustomStatus,
+          },
         };
         console.log("[AuthProvider:READY] Setting user data:", userData);
         setUser(userData);
@@ -416,6 +425,20 @@ export const AuthProvider: ParentComponent = (props) => {
       value={{
         user: () => user(),
         setUser,
+        updateUser: (userUpdate: Partial<Clientuser>) => {
+          const currentUser = user();
+          if (!currentUser) return;
+          
+          // Only update fields that are present in userUpdate
+          const updatedUser = {
+            ...currentUser,
+            ...Object.fromEntries(
+              Object.entries(userUpdate).filter(([_, value]) => value !== undefined)
+            )
+          };
+          
+          setUser(updatedUser);
+        },
         relationshipRequests: () => relationshipRequests(),
         setRelationshipRequests,
         relationships: () => relationships(),

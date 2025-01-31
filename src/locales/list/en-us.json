@@ -63,9 +63,20 @@
         "idle": "Idle",
         "dnd": "Do Not Disturb"
       },
-      "editProfile": "Edit Profile",
+      "editProfile": "Edit Profile"
+    },
+    "profile": {
+      "title": "Profile",
+      "description": "Customize how others see you",
       "avatar": {
-        "alt": "User avatar"
+        "alt": "User avatar",
+        "change": "Change Avatar",
+        "uploading": "Uploading...",
+        "success": "Avatar updated successfully",
+        "error": {
+          "invalidType": "Invalid file type. Please upload an image.",
+          "generic": "Failed to update avatar. Please try again."
+        }
       }
     },
     "appearance": {

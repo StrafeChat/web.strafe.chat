@@ -2,6 +2,7 @@ import { Component, createMemo, Show } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
 import { Tooltip } from "../common/Tooltip";
+import Plus from "../shared/icons/Plus";
 
 const SpacesList: Component = () => {
   const navigate = useNavigate();
@@ -56,16 +57,7 @@ const SpacesList: Component = () => {
       <div class="flex flex-col gap-2">
         <Tooltip content={"Add a Space"} position="right">
           <button class="w-12 h-12 rounded-full bg-surface hover:bg-accent transition-all">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="w-6 h-6 mx-auto"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-            >
-              <path d="M12 4v16m8-8H4" />
-            </svg>
+            <Plus />
           </button>
         </Tooltip>
 

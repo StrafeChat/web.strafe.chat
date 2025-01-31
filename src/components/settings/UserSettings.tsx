@@ -3,6 +3,7 @@ import { useAuth } from "../../lib/providers/auth/AuthProvider";
 import Modal from "../modals/Modal";
 import SwipeableView from "../shared/SwipeableView";
 import AccountSettings from "./pages/AccountSettings";
+import ProfileSettings from "./pages/ProfileSettings";
 import AppearanceSettings from "./pages/AppearanceSettings";
 import DefaultSettings from "./pages/DefaultSettings";
 import LanguageSettings from "./pages/LanguageSettings";
@@ -50,6 +51,8 @@ const UserSettings: Component<UserSettingsProps> = (props) => {
     switch (activeSection()) {
       case "account":
         return <AccountSettings />;
+      case "profile":
+        return <ProfileSettings />;
       case "appearance":
         return <AppearanceSettings />;
       case "language":

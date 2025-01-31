@@ -10,13 +10,15 @@ import { useAuth } from "../../../../lib/providers/auth/AuthProvider";
 import { useCache } from "../../../../lib/providers/cache/CacheProvider";
 import { Tooltip } from "../../../common/Tooltip";
 import { FriendSearch } from "../FriendSearch";
+import { FS_URL } from "../../../../constants";
+import { StatusIndicator, UserStatus } from "../../../common/StatusIndicator";
 
 type FriendData = {
   id: string;
   username: string;
   display_name: string;
   avatar?: string;
-  status: string;
+  status: UserStatus;
   custom_status: string;
 };
 
@@ -85,12 +87,25 @@ export const OnlineTab: Component = () => {
           status: friend.presence?.status,
         });
 
+        const isValidUserStatus = (
+          status: string | undefined
+        ): status is UserStatus => {
+          return (
+            status === "online" ||
+            status === "idle" ||
+            status === "dnd" ||
+            status === "offline"
+          );
+        };
+
         const friendData: FriendData = {
           id: friend.id,
           username: friend.username,
           display_name: friend.display_name || friend.username,
           avatar: friend.avatar,
-          status: friend.presence?.status || "offline",
+          status: isValidUserStatus(friend.presence?.status)
+            ? friend.presence.status
+            : "offline",
           custom_status: friend.presence?.custom_status || "",
         };
 
@@ -138,16 +153,24 @@ export const OnlineTab: Component = () => {
           {(friend: FriendData | null) =>
             friend && (
               <div class="flex flex-col bg-background-secondary p-2 pb-3.5 border-t-2 border-t-border hover:bg-border hover:rounded-lg hover:cursor-pointer">
-                <div class="flex items-center">
+                <div class="flex items-center gap-3">
                   {friend.avatar ? (
-                    <img
-                      src={friend.avatar}
-                      alt="avatar"
-                      class="w-10 h-10 rounded-full"
-                    />
+                    <div class="relative">
+                      <img
+                        src={`${FS_URL}/avatars/${friend.id}/${friend.avatar}`}
+                        alt="avatar"
+                        class="w-10 h-10 rounded-full"
+                      />
+                      <StatusIndicator status={friend.status} />
+                    </div>
                   ) : (
-                    <div class="w-10 h-10 rounded-full bg-background-tertiary flex items-center justify-center">
-                      {friend.display_name.charAt(0)}
+                    <div class="relative">
+                      <div class="w-10 h-10 rounded-full bg-background-tertiary flex items-center justify-center">
+                        <span class="text-text-secondary text-sm">
+                          {friend.username[0].toUpperCase()}
+                        </span>
+                      </div>
+                      <StatusIndicator status={friend.status} />
                     </div>
                   )}
                   <div class="flex flex-col flex-grow">

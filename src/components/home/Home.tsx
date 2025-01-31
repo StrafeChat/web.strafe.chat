@@ -1,8 +1,10 @@
-import { Component } from "solid-js";
+import { Component, createSignal } from "solid-js";
 import { useTransContext } from "@mbarzda/solid-i18next";
+import UserSettings from "../settings/UserSettings";
 
 export const Home: Component = () => {
   const [t] = useTransContext();
+  const [showSettings, setShowSettings] = createSignal(false);
 
   return (
     <div class="flex flex-col h-full bg-background2">
@@ -38,7 +40,10 @@ export const Home: Component = () => {
             <p class="mb-4 text-sm md:text-base">
               {t("home.cards.settingsDescription")}
             </p>
-            <button class="w-full md:w-auto bg-accent text-text-primary px-4 py-2 rounded hover:bg-primary-dark transition-colors">
+            <button
+              class="w-full md:w-auto bg-accent text-text-primary px-4 py-2 rounded hover:bg-primary-dark transition-colors"
+              onClick={() => setShowSettings(true)}
+            >
               {t("home.cards.exploreSettings")}
             </button>
           </div>
@@ -60,7 +65,10 @@ export const Home: Component = () => {
             <p class="mb-4 text-sm md:text-base">
               {t("home.cards.donateDescription")}
             </p>
-            <button class="w-full md:w-auto bg-accent text-text-primary px-4 py-2 rounded hover:bg-secondary-dark transition-colors">
+            <button
+              class="w-full md:w-auto bg-accent text-text-primary px-4 py-2 rounded hover:bg-secondary-dark transition-colors"
+              onClick={() => window.open("https://ko-fi.com/bryden", "_blank")}
+            >
               {t("home.cards.supportUs")}
             </button>
           </div>
@@ -77,6 +85,10 @@ export const Home: Component = () => {
           </div>
         </div>
       </div>
+      <UserSettings
+        isOpen={showSettings()}
+        onClose={() => setShowSettings(false)}
+      />
     </div>
   );
 };
