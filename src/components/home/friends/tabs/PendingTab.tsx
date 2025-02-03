@@ -8,6 +8,7 @@ import {
 } from "solid-js";
 import { useAuth } from "../../../../lib/providers/auth/AuthProvider";
 import { useCache } from "../../../../lib/providers/cache/CacheProvider";
+import { useTransContext } from "@mbarzda/solid-i18next";
 import { Tooltip } from "../../../common/Tooltip";
 import { FriendSearch } from "../FriendSearch";
 import { BASE_URL, FS_URL } from "../../../../constants";
@@ -15,7 +16,7 @@ import { BASE_URL, FS_URL } from "../../../../constants";
 export const PendingTab: Component = () => {
   const { relationshipRequests, user, setRelationshipRequests } = useAuth();
   const cache = useCache();
-  const loading = createMemo(() => !user()?.id || !relationshipRequests());
+  const [t] = useTransContext();
   const [searchQuery, setSearchQuery] = createSignal("");
 
   createEffect(() => {
@@ -80,6 +81,8 @@ export const PendingTab: Component = () => {
     console.log("[PendingTab] Found outgoing relationships:", rels);
     return rels;
   });
+
+  const pendingRequests = createMemo(() => [...incoming(), ...outgoing()]);
 
   interface Relationship {
     id: string;
@@ -246,78 +249,123 @@ export const PendingTab: Component = () => {
     <div class="p-4 px-7 flex flex-col h-full overflow-hidden">
       <FriendSearch onSearch={setSearchQuery} />
       <Show
-        when={!loading() && filteredRequests().length > 0}
+        when={pendingRequests().length > 0}
         fallback={
-          <div class="text-text-secondary text-center p-4">
-            {searchQuery()
-              ? "No pending requests found matching your search."
-              : !loading()
-              ? "No pending friend requests"
-              : "Loading friend requests..."}
+          <div class="flex-1 flex flex-col items-center justify-center text-text-secondary">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="w-16 h-16 mb-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
+              <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+              <circle cx="8" cy="7" r="4"></circle>
+              <line x1="20" y1="8" x2="20" y2="14"></line>
+              <line x1="23" y1="11" x2="17" y2="11"></line>
+            </svg>
+            <span class="text-lg">
+              {t("friends.emptyStates.noPendingRequests")}
+            </span>
           </div>
         }
       >
-        <h3 class="text-text-primary font-medium text-lg px-2 pb-4 mt-2">
-          Pending - {filteredRequests().length}
-        </h3>
-        <div class="overflow-y-auto flex-1 min-h-0">
-          <For each={filteredRequests()}>
-            {(request) => {
-              const isIncoming = request.recipient_id === user()?.id;
-              const person = getUserDisplay(
-                isIncoming ? request.sender_id : request.recipient_id
-              );
-              return (
-                <div class="flex flex-col bg-background-secondary p-2 pb-3.5 border-t-2 border-t-border hover:bg-border hover:rounded-lg hover:cursor-pointer">
-                  <div class="flex items-center gap-3">
-                    {person.avatar ? (
-                      <div class="relative w-10 h-10">
-                        <img
-                          src={`${FS_URL}/avatars/${person.id}/${person.avatar}`}
-                          alt="avatar"
-                          class="w-full h-full rounded-full object-cover"
-                          style={{ "aspect-ratio": "1/1" }}
-                        />
+        <Show
+          when={filteredRequests().length > 0}
+          fallback={
+            <div class="text-text-secondary text-center p-4">
+              {searchQuery()
+                ? t("friends.emptyStates.noSearchResultsPending")
+                : ""}
+            </div>
+          }
+        >
+          <h3 class="text-text-primary font-medium text-lg px-2 pb-4 mt-2">
+            Pending - {filteredRequests().length}
+          </h3>
+          <div class="overflow-y-auto flex-1 min-h-0">
+            <For each={filteredRequests()}>
+              {(request) => {
+                const isIncoming = request.recipient_id === user()?.id;
+                const person = getUserDisplay(
+                  isIncoming ? request.sender_id : request.recipient_id
+                );
+                return (
+                  <div class="flex flex-col bg-background-secondary p-2 pb-3.5 border-t-2 border-t-border hover:bg-border hover:rounded-lg hover:cursor-pointer">
+                    <div class="flex items-center gap-3">
+                      {person.avatar ? (
+                        <div class="relative w-10 h-10">
+                          <img
+                            src={`${FS_URL}/avatars/${person.id}/${person.avatar}`}
+                            alt="avatar"
+                            class="w-full h-full rounded-full object-cover"
+                            style={{ "aspect-ratio": "1/1" }}
+                          />
+                        </div>
+                      ) : (
+                        <div class="w-10 h-10 rounded-full bg-background-tertiary flex items-center justify-center">
+                          {person.name.charAt(0)}
+                        </div>
+                      )}
+                      <div class="flex flex-col flex-grow">
+                        <span>{person.name}</span>
+                        <span class="text-text-secondary text-sm">
+                          {isIncoming
+                            ? "Incoming Friend Request"
+                            : "Outgoing Friend Request"}
+                        </span>
                       </div>
-                    ) : (
-                      <div class="w-10 h-10 rounded-full bg-background-tertiary flex items-center justify-center">
-                        {person.name.charAt(0)}
-                      </div>
-                    )}
-                    <div class="flex flex-col flex-grow">
-                      <span>{person.name}</span>
-                      <span class="text-text-secondary text-sm">
-                        {isIncoming
-                          ? "Incoming Friend Request"
-                          : "Outgoing Friend Request"}
-                      </span>
-                    </div>
-                    <div class="flex">
-                      {isIncoming ? (
-                        <>
-                          <Tooltip content={"Accept"} position="top">
-                            <button
-                              onClick={() => handleAccept(request)}
-                              class="p-2 border-2 border-green-600 text-green-600 hover:bg-green-600 hover:text-white rounded-full transition-colors"
-                            >
-                              <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                class="w-5 h-5"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                stroke-width="2"
-                                stroke-linecap="round"
-                                stroke-linejoin="round"
+                      <div class="flex gap-4">
+                        {isIncoming ? (
+                          <>
+                            <Tooltip content={"Accept"} position="top">
+                              <button
+                                onClick={() => handleAccept(request)}
+                                class="p-2 border-2 border-green-600 text-green-600 hover:bg-green-600 hover:text-white rounded-full transition-colors"
                               >
-                                <polyline points="20 6 9 17 4 12" />
-                              </svg>
-                            </button>
-                          </Tooltip>
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  class="w-5 h-5"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  stroke-width="2"
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                >
+                                  <polyline points="20 6 9 17 4 12" />
+                                </svg>
+                              </button>
+                            </Tooltip>
 
-                          <Tooltip content={"Deny"} position="top">
+                            <Tooltip content={"Deny"} position="top">
+                              <button
+                                onClick={() => handleDecline(request)}
+                                class="p-2 border-2 border-red-600 text-red-600 hover:bg-red-600 hover:text-white rounded-full transition-colors"
+                              >
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  class="w-5 h-5"
+                                  viewBox="0 0 24 24"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  stroke-width="2"
+                                  stroke-linecap="round"
+                                  stroke-linejoin="round"
+                                >
+                                  <line x1="18" y1="6" x2="6" y2="18" />
+                                  <line x1="6" y1="6" x2="18" y2="18" />
+                                </svg>
+                              </button>
+                            </Tooltip>
+                          </>
+                        ) : (
+                          <Tooltip content={"Cancel"} position="top">
                             <button
-                              onClick={() => handleDecline(request)}
+                              onClick={() => handleCancel(request)}
                               class="p-2 border-2 border-red-600 text-red-600 hover:bg-red-600 hover:text-white rounded-full transition-colors"
                             >
                               <svg
@@ -335,36 +383,15 @@ export const PendingTab: Component = () => {
                               </svg>
                             </button>
                           </Tooltip>
-                        </>
-                      ) : (
-                        <Tooltip content={"Cancel"} position="top">
-                          <button
-                            onClick={() => handleCancel(request)}
-                            class="p-2 border-2 border-red-600 text-red-600 hover:bg-red-600 hover:text-white rounded-full transition-colors"
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              class="w-5 h-5"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              stroke-width="2"
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
-                            >
-                              <line x1="18" y1="6" x2="6" y2="18" />
-                              <line x1="6" y1="6" x2="18" y2="18" />
-                            </svg>
-                          </button>
-                        </Tooltip>
-                      )}
+                        )}
+                      </div>
                     </div>
                   </div>
-                </div>
-              );
-            }}
-          </For>
-        </div>
+                );
+              }}
+            </For>
+          </div>
+        </Show>
       </Show>
     </div>
   );

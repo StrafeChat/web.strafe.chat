@@ -11,12 +11,12 @@ import { FS_URL } from "../../constants";
 import { UserStatus } from "./StatusIndicator";
 import { StatusIndicator } from "./StatusIndicator";
 import { Portal } from "solid-js/web";
-import { capitalizeStatus } from "../../lib/utils/status";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
 import { useSettings } from "../../lib/providers/settings/SettingsProvider";
 import { useToast } from "../common/Toast";
 import UserSettings from "../settings/UserSettings";
 import CustomStatusModal from "../modals/SetCustomStatusModal";
+import { useTransContext } from "@mbarzda/solid-i18next";
 
 interface Props {
   isOpen: boolean;
@@ -41,6 +41,7 @@ const ClientUserPopup: Component<Props> = (props) => {
   const [showStatusMenu, setShowStatusMenu] = createSignal(false);
   const [showCustomStatusModal, setShowCustomStatusModal] = createSignal(false);
   const { showToast } = useToast();
+  const [t] = useTransContext();
   let closeTimeout: number;
   let popupRef: HTMLDivElement | undefined;
   let statusButtonRef: HTMLDivElement | undefined;
@@ -84,7 +85,6 @@ const ClientUserPopup: Component<Props> = (props) => {
       );
       if (success) {
         setShowStatusMenu(false);
-        props.onClose();
       } else {
         showToast("Error updating status", "error");
       }
@@ -140,6 +140,24 @@ const ClientUserPopup: Component<Props> = (props) => {
       left: `${Math.max(10, rect.left) - 35}px`,
       ...verticalPosition,
     };
+  };
+
+  // New StatusDot component for the status menu
+  const StatusDot: Component<{ status: UserStatus }> = (props) => {
+    const getStatusColor = () => {
+      switch (props.status) {
+        case "online":
+          return "bg-[#43B581]";
+        case "idle":
+          return "bg-[#FAA81A]";
+        case "dnd":
+          return "bg-[#F04747]";
+        case "offline":
+          return "bg-[#747F8D]";
+      }
+    };
+
+    return <div class={`w-3 h-3 rounded-full ${getStatusColor()}`} />;
   };
 
   return (
@@ -215,7 +233,7 @@ const ClientUserPopup: Component<Props> = (props) => {
                     >
                       <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04a.996.996 0 0 0 0-1.41l-2.34-2.34a.996.996 0 0 0-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z" />
                     </svg>
-                    <span class="text-sm">Edit Profile</span>
+                    <span class="text-sm">{t("profile.editProfile")}</span>
                   </div>
                 </div>
               </div>
@@ -242,9 +260,7 @@ const ClientUserPopup: Component<Props> = (props) => {
                       }`}
                     />
                     <span class="text-sm">
-                      {capitalizeStatus(
-                        getValidStatus(user()?.presence?.status)
-                      )}
+                      {t(`status.${getValidStatus(user()?.presence?.status)}`)}
                     </span>
                   </div>
                   <div class="ml-auto">
@@ -281,7 +297,7 @@ const ClientUserPopup: Component<Props> = (props) => {
                     >
                       <path d="M20 12a8 8 0 01-8 8l-4 3v-3H6a4 4 0 01-4-4V8a4 4 0 014-4h10a4 4 0 014 4v4z" />
                     </svg>
-                    <span class="text-sm">Custom Status</span>
+                    <span class="text-sm">{t("status.customStatus")}</span>
                   </div>
                 </div>
               </div>
@@ -292,14 +308,14 @@ const ClientUserPopup: Component<Props> = (props) => {
                   class="w-full flex items-center gap-2 px-3 py-2 bg-surface bg-opacity-5 hover:bg-primary hover:bg-opacity-10 rounded-md transition-colors text-left relative group mt-2 cursor-pointer"
                   onClick={() => {
                     navigator.clipboard.writeText(user()?.id!);
-                    showToast("User ID copied to clipboard.", "success");
+                    showToast(t("profile.idCopied"), "success");
                   }}
                 >
                   <div class="flex items-center gap-2">
                     <div class="w-4 h-4 border-2 border-text-secondary group-hover:border-text-primary rounded text-[8px] font-bold flex items-center justify-center text-text-secondary group-hover:text-text-primary">
                       ID
                     </div>
-                    <span class="text-sm">Copy User ID</span>
+                    <span class="text-sm">{t("profile.copyId")}</span>
                   </div>
                 </div>
               </div>
@@ -343,8 +359,8 @@ const ClientUserPopup: Component<Props> = (props) => {
                           class="flex items-center gap-2 px-2 py-1.5 hover:bg-surface rounded-md text-text-primary"
                           onClick={() => handleStatusClick(option.status)}
                         >
-                          <StatusIndicator status={option.status} />
-                          <span>{capitalizeStatus(option.status)}</span>
+                          <StatusDot status={option.status} />
+                          <span>{t(`status.${option.status}`)}</span>
                         </button>
                       )}
                     </For>

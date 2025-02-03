@@ -37,7 +37,7 @@ export const PMList: Component = () => {
     <div class="flex flex-col h-full bg-background1 rounded-tl-2xl">
       <div class="p-2 flex flex-col [box-shadow:0_2px_4px_-2px_rgba(0,0,0,0.2)]">
         <h2 class="text-xl px-3 py-2 font-bold text-text-primary select-none">
-          Private Messages
+          {t("pms.title")}
         </h2>
       </div>
 
@@ -49,7 +49,7 @@ export const PMList: Component = () => {
           end
         >
           <Home />
-          <span class="text-text-primary select-none">Home</span>
+          <span class="text-text-primary select-none">{t("navigation.home")}</span>
         </A>
 
         <A
@@ -59,7 +59,7 @@ export const PMList: Component = () => {
           end
         >
           <Friends />
-          <span class="text-text-primary select-none">Friends</span>
+          <span class="text-text-primary select-none">{t("navigation.friends")}</span>
           <Show when={pendingCount() > 0}>
             <div class="ml-auto">
               <div class="bg-red-500 text-white text-xs font-medium px-2.5 py-0.5 rounded-full select-none">
@@ -76,15 +76,15 @@ export const PMList: Component = () => {
           end
         >
           <Notes />
-          <span class="text-text-primary select-none">Notes</span>
+          <span class="text-text-primary select-none">{t("navigation.notes")}</span>
         </A>
 
         <div class="mt-6 mb-2 pl-3 pr-2 flex items-center">
           <span class="text-xs font-bold text-text-primary tracking-wide uppercase select-none">
-            CONVERSATIONS
+            {t("pms.conversations")}
           </span>
           <div class="ml-auto">
-            <Tooltip content="Create PM" position="top">
+            <Tooltip content={t("pms.createPM")} position="top">
               <button class="w-6 h-6 rounded-full hover:bg-surface hover:bg-opacity-10 transition-colors grid place-items-center text-text-primary">
                 <PlusSmall />
               </button>
@@ -93,14 +93,14 @@ export const PMList: Component = () => {
         </div>
 
         <div class="text-text-secondary text-sm px-3 py-2 select-none">
-          Private messages and group chats coming soon...
+          {t("pms.comingSoon")}
         </div>
       </div>
 
       <div class="border-t border-border mt-auto">
-        <div class="flex items-center bg-background1 pl-1.5 pr-2 py-1">
+        <div class="flex items-center justify-between bg-background1 pl-1.5 pr-2 py-1">
           <div
-            class="group flex items-center gap-2 hover:bg-surface hover:bg-opacity-10 transition-colors hover:cursor-pointer rounded-md pl-1 pr-2 py-1 flex-1 min-w-0"
+            class="group flex items-center gap-2 hover:bg-surface hover:bg-opacity-10 transition-colors hover:cursor-pointer rounded-md pl-1 pr-2 py-1"
             onClick={() => setShowUserPopup(true)}
             ref={setUserProfileTrigger}
           >
@@ -121,7 +121,7 @@ export const PMList: Component = () => {
                 class="border-background1 group-hover:border-surface group-hover:border-opacity-10 transition-colors"
               />
             </div>
-            <div class="flex-1 min-w-0">
+            <div class="min-w-0 max-w-[200px]">
               <div class="text-sm font-medium truncate select-none">
                 {user()?.display_name}
               </div>
@@ -131,7 +131,7 @@ export const PMList: Component = () => {
               </div>
             </div>
           </div>
-          <div class="flex items-center gap-1 flex-shrink-0 ml-1">
+          <div class="flex items-center gap-1 flex-shrink-0">
             {/* Client User Popup */}
             <ClientUserPopup
               isOpen={showUserPopup()}

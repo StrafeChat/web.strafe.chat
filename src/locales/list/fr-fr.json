@@ -63,6 +63,12 @@
     "noFriends": {
       "title": "Pas encore d'amis",
       "description": "Commencez à ajouter des amis pour vous connecter avec eux"
+    },
+    "emptyStates": {
+      "noOnlineFriends": "Aucun de vos amis n'est en ligne pour le moment.",
+      "noSearchResults": "Aucun ami trouvé correspondant à votre recherche.",
+      "noPendingRequests": "Aucune demande d'ami en attente.",
+      "noSearchResultsPending": "Aucune demande trouvée correspondant à votre recherche."
     }
   },
   "settings": {
@@ -125,6 +131,18 @@
       "underDevelopment": "Cette section est en cours de développement."
     }
   },
+  "profile": {
+    "editProfile": "Modifier le Profil",
+    "copyId": "Copier l'ID Utilisateur",
+    "idCopied": "ID utilisateur copié dans le presse-papiers."
+  },
+  "status": {
+    "online": "En ligne",
+    "idle": "Inactif",
+    "dnd": "Ne pas déranger",
+    "offline": "Hors ligne",
+    "customStatus": "Statut Personnalisé"
+  },
   "components": {
     "datePicker": {
       "months": {
@@ -154,6 +172,17 @@
       "selectYear": "Sélectionner l'année",
       "dateFormat": "{{day}} {{month}} {{year}}"
     }
+  },
+  "navigation": {
+    "home": "Accueil",
+    "friends": "Amis",
+    "notes": "Notes"
+  },
+  "pms": {
+    "title": "Messages Privés",
+    "conversations": "CONVERSATIONS",
+    "createPM": "Créer MP",
+    "comingSoon": "Messages privés et discussions de groupe bientôt disponibles..."
   },
   "home": {
     "cards": {

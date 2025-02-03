@@ -154,10 +154,11 @@ export const AllTab: Component = () => {
                   <div class="flex flex-col flex-grow">
                     <span>{friend.display_name}</span>
                     <span class="text-text-secondary text-sm">
-                      {friend.custom_status
-                        ? `${friend.custom_status}`
-                        : friend.status?.charAt(0).toUpperCase() +
-                          friend.status?.slice(1)}
+                      {friend.status === "offline"
+                        ? "Offline"
+                        : friend.custom_status ||
+                          friend.status?.charAt(0).toUpperCase() +
+                            friend.status?.slice(1)}
                     </span>
                   </div>
                   <div class="flex gap-2">

@@ -57,9 +57,26 @@
       "cannotAddSelf": "No puedes agregarte a ti mismo como amigo"
     },
     "noFriends": {
-      "title": "Aún no tienes amigos",
+      "title": "Aún no hay amigos",
       "description": "Comienza a agregar amigos para conectarte con ellos"
+    },
+    "emptyStates": {
+      "noOnlineFriends": "Ninguno de tus amigos está en línea en este momento.",
+      "noSearchResults": "No se encontraron amigos que coincidan con tu búsqueda.",
+      "noPendingRequests": "No hay solicitudes de amistad pendientes.",
+      "noSearchResultsPending": "No se encontraron solicitudes que coincidan con tu búsqueda."
     }
+  },
+  "navigation": {
+    "home": "Inicio",
+    "friends": "Amigos",
+    "notes": "Notas"
+  },
+  "pms": {
+    "title": "Mensajes Privados",
+    "conversations": "CONVERSACIONES",
+    "createPM": "Crear MP",
+    "comingSoon": "Mensajes privados y chats grupales próximamente..."
   },
   "settings": {
     "sections": {
@@ -124,6 +141,18 @@
     "default": {
       "underDevelopment": "Esta sección está en desarrollo."
     }
+  },
+  "profile": {
+    "editProfile": "Editar Perfil",
+    "copyId": "Copiar ID de Usuario",
+    "idCopied": "ID de usuario copiado al portapapeles."
+  },
+  "status": {
+    "online": "En línea",
+    "idle": "Ausente",
+    "dnd": "No molestar",
+    "offline": "Desconectado",
+    "customStatus": "Estado Personalizado"
   },
   "components": {
     "datePicker": {

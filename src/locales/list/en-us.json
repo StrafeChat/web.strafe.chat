@@ -108,6 +108,18 @@
       "underDevelopment": "This section is under development."
     }
   },
+    "profile": {
+      "editProfile": "Edit Profile",
+      "copyId": "Copy User ID",
+      "idCopied": "User ID copied to clipboard."
+    },
+    "status": {
+      "online": "Online",
+      "idle": "Idle",
+      "dnd": "Do Not Disturb",
+      "offline": "Offline",
+      "customStatus": "Custom Status"
+    },
   "components": {
     "datePicker": {
       "months": {
@@ -159,6 +171,12 @@
     "noFriends": {
       "title": "No friends yet",
       "description": "Start adding friends to connect with them"
+    },
+    "emptyStates": {
+      "noOnlineFriends": "None of your friends are online right now.",
+      "noSearchResults": "No friends found matching your search.",
+      "noPendingRequests": "No pending friend requests.",
+      "noSearchResultsPending": "No requests found matching your search."
     }
   },
   "home": {
@@ -177,5 +195,16 @@
       "discover": "Discover",
       "discoverDescription": "Explore new features and updates"
     }
+  },
+  "navigation": {
+    "home": "Home",
+    "friends": "Friends",
+    "notes": "Notes"
+  },
+  "pms": {
+    "title": "Private Messages",
+    "conversations": "CONVERSATIONS",
+    "createPM": "Create PM",
+    "comingSoon": "Private messages and group chats coming soon..."
   }
 }
