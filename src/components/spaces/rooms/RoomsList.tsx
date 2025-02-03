@@ -17,12 +17,15 @@ const RoomsList: Component = () => {
       <div class="p-2 border-t border-border mt-auto">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2 hover:bg-surface hover:bg-opacity-10 transition-colors hover:cursor-pointer rounded-md px-2">
-            <img
-              src="https://cdn.discordapp.com/avatars/529815278456930314/718130faa9edf64dc453e04ee63fa1fe.png?format=webp&quality=lossless&width=897&height=897"
-              alt="User avatar"
-              draggable="false"
-              class="w-8 h-8 rounded-full object-cover"
-            />
+            <div class="relative w-8 h-8">
+              <img
+                src="https://cdn.discordapp.com/avatars/529815278456930314/718130faa9edf64dc453e04ee63fa1fe.png?format=webp&quality=lossless&width=897&height=897"
+                alt="User avatar"
+                draggable="false"
+                class="w-full h-full rounded-full object-cover"
+                style={{ "aspect-ratio": "1/1" }}
+              />
+            </div>
             <div class="flex-1 min-w-0">
               <div class="text-sm font-medium truncate">
                 {user()?.display_name}

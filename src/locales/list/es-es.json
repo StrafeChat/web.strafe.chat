@@ -95,10 +95,21 @@
         "alt": "Avatar del usuario",
         "change": "Cambiar Avatar",
         "uploading": "Subiendo...",
-        "success": "Avatar actualizado correctamente",
+        "success": "Avatar actualizado con éxito.",
         "error": {
           "invalidType": "Tipo de archivo inválido. Por favor, sube una imagen.",
-          "generic": "Error al actualizar el avatar. Por favor, inténtalo de nuevo."
+          "generic": "Error al actualizar el avatar. Por favor, inténtalo de nuevo.",
+          "uploadFailed": "Error al subir el avatar"
+        }
+      },
+      "banner": {
+        "alt": "Banner del usuario",
+        "change": "Cambiar Banner",
+        "uploading": "Subiendo...",
+        "success": "Banner actualizado con éxito.",
+        "error": {
+          "invalidType": "Tipo de archivo inválido. Por favor, sube una imagen.",
+          "uploadFailed": "Error al subir el banner"
         }
       }
     },

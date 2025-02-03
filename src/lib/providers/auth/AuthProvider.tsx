@@ -38,6 +38,7 @@ type Clientuser = {
   email: string;
   date_of_birth?: string;
   avatar?: string;
+  banner?: string;
   presence?: {
     status: string;
     custom_status: string;
@@ -64,6 +65,7 @@ type AuthContextType = {
   loading: () => boolean;
   isMobile: () => boolean;
   wsClient: () => WebSocketClient | null;
+  updateStatus: (status?: string, customStatus?: string) => Promise<boolean>;
 };
 
 type RegisterData = {
@@ -155,6 +157,7 @@ export const AuthProvider: ParentComponent = (props) => {
             data.client_user.DisplayName || data.client_user.Username,
           email: data.client_user.Email,
           avatar: data.client_user.Avatar,
+          banner: data.client_user.Banner,
           date_of_birth: data.client_user.DateOfBirth,
           friends: data.client_user.Friends || [],
           presence: {
@@ -397,6 +400,46 @@ export const AuthProvider: ParentComponent = (props) => {
     setWsClient(null);
   };
 
+  const updateUser = (userUpdate: Partial<Clientuser>) => {
+    const currentUser = user();
+    if (!currentUser) return;
+
+    // Only update fields that are present in userUpdate
+    const updatedUser = {
+      ...currentUser,
+      ...Object.fromEntries(
+        Object.entries(userUpdate).filter(([_, value]) => value !== undefined)
+      ),
+    };
+
+    setUser(updatedUser);
+  };
+
+  const updateStatus = async (status?: string, customStatus?: string) => {
+    try {
+      const res = await fetch(`${BASE_URL}/users/@me/status`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Session-Token": localStorage.getItem("sc_token") || "",
+        },
+        body: JSON.stringify({
+          status,
+          custom_status: customStatus,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Failed to update status");
+
+      const updatedUser = await res.json();
+      setUser(updatedUser);
+      return true;
+    } catch (error) {
+      console.error("Error updating status:", error);
+      return false;
+    }
+  };
+
   onCleanup(() => {
     const client = wsClient();
     if (client) {
@@ -425,20 +468,7 @@ export const AuthProvider: ParentComponent = (props) => {
       value={{
         user: () => user(),
         setUser,
-        updateUser: (userUpdate: Partial<Clientuser>) => {
-          const currentUser = user();
-          if (!currentUser) return;
-          
-          // Only update fields that are present in userUpdate
-          const updatedUser = {
-            ...currentUser,
-            ...Object.fromEntries(
-              Object.entries(userUpdate).filter(([_, value]) => value !== undefined)
-            )
-          };
-          
-          setUser(updatedUser);
-        },
+        updateUser,
         relationshipRequests: () => relationshipRequests(),
         setRelationshipRequests,
         relationships: () => relationships(),
@@ -450,6 +480,7 @@ export const AuthProvider: ParentComponent = (props) => {
         loading: () => loading(),
         isMobile: mobileCheck,
         wsClient: () => wsClient(),
+        updateStatus,
       }}
     >
       {props.children}

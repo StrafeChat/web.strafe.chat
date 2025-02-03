@@ -23,7 +23,7 @@ export const useToast = () => {
   return context;
 };
 
-export function ToastProvider(props: { children: JSX.Element }) {
+export function ToastProvider(props: { children: JSX.Element; usePortal?: boolean }) {
   const [toasts, setToasts] = createSignal<Toast[]>([]);
   let toastId = 0;
 
@@ -37,32 +37,40 @@ export function ToastProvider(props: { children: JSX.Element }) {
     setTimeout(() => removeToast(id), 3000); // Remove after 3 seconds
   };
 
+  const ToastContainer = () => (
+    <div class="fixed top-4 right-4 z-[9999] flex flex-col gap-2">
+      <For each={toasts()}>
+        {(toast) => (
+          <div
+            class={`rounded-lg px-4 py-3 shadow-lg transform transition-all duration-300 ease-in-out
+              ${
+                toast.type === "success"
+                  ? "bg-green-500 text-white"
+                  : toast.type === "error"
+                  ? "bg-red-500 text-white"
+                  : "bg-blue-500 text-white"
+              }`}
+            style={{
+              animation: "slideIn 0.3s ease-out",
+            }}
+          >
+            {toast.message}
+          </div>
+        )}
+      </For>
+    </div>
+  );
+
   return (
     <ToastContext.Provider value={{ showToast }}>
       {props.children}
-      <Portal>
-        <div class="fixed top-4 right-4 z-50 flex flex-col gap-2">
-          <For each={toasts()}>
-            {(toast) => (
-              <div
-                class={`rounded-lg px-4 py-3 shadow-lg transform transition-all duration-300 ease-in-out
-                  ${
-                    toast.type === "success"
-                      ? "bg-green-500 text-white"
-                      : toast.type === "error"
-                      ? "bg-red-500 text-white"
-                      : "bg-blue-500 text-white"
-                  }`}
-                style={{
-                  animation: "slideIn 0.3s ease-out",
-                }}
-              >
-                {toast.message}
-              </div>
-            )}
-          </For>
-        </div>
-      </Portal>
+      {props.usePortal !== false ? (
+        <Portal>
+          <ToastContainer />
+        </Portal>
+      ) : (
+        <ToastContainer />
+      )}
     </ToastContext.Provider>
   );
 }

@@ -54,6 +54,12 @@
       "language": "Language",
       "logout": "Log Out"
     },
+    "status": {
+      "success": "Status updated successfully",
+      "error": "Failed to update status",
+      "customStatus": "Custom Status",
+      "customStatusPlaceholder": "What's on your mind?"
+    },
     "account": {
       "title": "Account",
       "description": "Update your account",
@@ -72,10 +78,21 @@
         "alt": "User avatar",
         "change": "Change Avatar",
         "uploading": "Uploading...",
-        "success": "Avatar updated successfully",
+        "success": "Avatar updated successfully.",
         "error": {
           "invalidType": "Invalid file type. Please upload an image.",
-          "generic": "Failed to update avatar. Please try again."
+          "generic": "Failed to update avatar. Please try again.",
+          "uploadFailed": "Failed to upload avatar"
+        }
+      },
+      "banner": {
+        "alt": "User banner",
+        "change": "Change Banner",
+        "uploading": "Uploading...",
+        "success": "Banner updated successfully.",
+        "error": {
+          "invalidType": "Invalid file type. Please upload an image.",
+          "uploadFailed": "Failed to upload banner"
         }
       }
     },

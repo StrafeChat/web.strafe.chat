@@ -243,7 +243,7 @@ export const PendingTab: Component = () => {
   };
 
   return (
-    <div class="p-4 px-7 mb-5 flex flex-col">
+    <div class="p-4 px-7 flex flex-col h-full overflow-hidden">
       <FriendSearch onSearch={setSearchQuery} />
       <Show
         when={!loading() && filteredRequests().length > 0}
@@ -260,60 +260,86 @@ export const PendingTab: Component = () => {
         <h3 class="text-text-primary font-medium text-lg px-2 pb-4 mt-2">
           Pending - {filteredRequests().length}
         </h3>
-        <For each={filteredRequests()}>
-          {(request) => {
-            const isIncoming = request.recipient_id === user()?.id;
-            const person = getUserDisplay(
-              isIncoming ? request.sender_id : request.recipient_id
-            );
-            return (
-              <div class="flex flex-col bg-background-secondary p-2 pb-3.5 border-t-2 border-t-border hover:bg-border hover:rounded-lg hover:cursor-pointer">
-                <div class="flex items-center gap-3">
-                  {person.avatar ? (
-                    <img
-                      src={`${FS_URL}/avatars/${person.id}/${person.avatar}`}
-                      alt="avatar"
-                      class="w-10 h-10 rounded-full"
-                    />
-                  ) : (
-                    <div class="w-10 h-10 rounded-full bg-background-tertiary flex items-center justify-center">
-                      {person.name.charAt(0)}
+        <div class="overflow-y-auto flex-1 min-h-0">
+          <For each={filteredRequests()}>
+            {(request) => {
+              const isIncoming = request.recipient_id === user()?.id;
+              const person = getUserDisplay(
+                isIncoming ? request.sender_id : request.recipient_id
+              );
+              return (
+                <div class="flex flex-col bg-background-secondary p-2 pb-3.5 border-t-2 border-t-border hover:bg-border hover:rounded-lg hover:cursor-pointer">
+                  <div class="flex items-center gap-3">
+                    {person.avatar ? (
+                      <div class="relative w-10 h-10">
+                        <img
+                          src={`${FS_URL}/avatars/${person.id}/${person.avatar}`}
+                          alt="avatar"
+                          class="w-full h-full rounded-full object-cover"
+                          style={{ "aspect-ratio": "1/1" }}
+                        />
+                      </div>
+                    ) : (
+                      <div class="w-10 h-10 rounded-full bg-background-tertiary flex items-center justify-center">
+                        {person.name.charAt(0)}
+                      </div>
+                    )}
+                    <div class="flex flex-col flex-grow">
+                      <span>{person.name}</span>
+                      <span class="text-text-secondary text-sm">
+                        {isIncoming
+                          ? "Incoming Friend Request"
+                          : "Outgoing Friend Request"}
+                      </span>
                     </div>
-                  )}
-                  <div class="flex flex-col flex-grow">
-                    <span>{person.name}</span>
-                    <span class="text-text-secondary text-sm">
-                      {isIncoming
-                        ? "Incoming Friend Request"
-                        : "Outgoing Friend Request"}
-                    </span>
-                  </div>
-                  <div class="flex">
-                    {isIncoming ? (
-                      <>
-                        <Tooltip content={"Accept"} position="top">
-                          <button
-                            onClick={() => handleAccept(request)}
-                            class="p-2 border-2 border-green-600 text-green-600 hover:bg-green-600 hover:text-white rounded-full transition-colors"
-                          >
-                            <svg
-                              xmlns="http://www.w3.org/2000/svg"
-                              class="w-5 h-5"
-                              viewBox="0 0 24 24"
-                              fill="none"
-                              stroke="currentColor"
-                              stroke-width="2"
-                              stroke-linecap="round"
-                              stroke-linejoin="round"
+                    <div class="flex">
+                      {isIncoming ? (
+                        <>
+                          <Tooltip content={"Accept"} position="top">
+                            <button
+                              onClick={() => handleAccept(request)}
+                              class="p-2 border-2 border-green-600 text-green-600 hover:bg-green-600 hover:text-white rounded-full transition-colors"
                             >
-                              <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                          </button>
-                        </Tooltip>
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                class="w-5 h-5"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                              >
+                                <polyline points="20 6 9 17 4 12" />
+                              </svg>
+                            </button>
+                          </Tooltip>
 
-                        <Tooltip content={"Deny"} position="top">
+                          <Tooltip content={"Deny"} position="top">
+                            <button
+                              onClick={() => handleDecline(request)}
+                              class="p-2 border-2 border-red-600 text-red-600 hover:bg-red-600 hover:text-white rounded-full transition-colors"
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                class="w-5 h-5"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                                stroke-linecap="round"
+                                stroke-linejoin="round"
+                              >
+                                <line x1="18" y1="6" x2="6" y2="18" />
+                                <line x1="6" y1="6" x2="18" y2="18" />
+                              </svg>
+                            </button>
+                          </Tooltip>
+                        </>
+                      ) : (
+                        <Tooltip content={"Cancel"} position="top">
                           <button
-                            onClick={() => handleDecline(request)}
+                            onClick={() => handleCancel(request)}
                             class="p-2 border-2 border-red-600 text-red-600 hover:bg-red-600 hover:text-white rounded-full transition-colors"
                           >
                             <svg
@@ -331,35 +357,14 @@ export const PendingTab: Component = () => {
                             </svg>
                           </button>
                         </Tooltip>
-                      </>
-                    ) : (
-                      <Tooltip content={"Cancel"} position="top">
-                        <button
-                          onClick={() => handleCancel(request)}
-                          class="p-2 border-2 border-red-600 text-red-600 hover:bg-red-600 hover:text-white rounded-full transition-colors"
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            class="w-5 h-5"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                            stroke-linecap="round"
-                            stroke-linejoin="round"
-                          >
-                            <line x1="18" y1="6" x2="6" y2="18" />
-                            <line x1="6" y1="6" x2="18" y2="18" />
-                          </svg>
-                        </button>
-                      </Tooltip>
-                    )}
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            );
-          }}
-        </For>
+              );
+            }}
+          </For>
+        </div>
       </Show>
     </div>
   );

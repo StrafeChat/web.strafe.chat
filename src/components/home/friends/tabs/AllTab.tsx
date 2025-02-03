@@ -109,7 +109,7 @@ export const AllTab: Component = () => {
   });
 
   return (
-    <div class="p-4 px-7 mb-5 flex flex-col">
+    <div class="p-4 px-7 flex flex-col h-full overflow-hidden">
       <FriendSearch onSearch={setSearchQuery} />
       <Show
         when={filteredFriends().length > 0}
@@ -124,60 +124,65 @@ export const AllTab: Component = () => {
         <h3 class="text-text-primary font-medium text-lg px-2 pb-4 mt-2">
           All - {filteredFriends().length}
         </h3>
-        <For each={filteredFriends()}>
-          {(friend) => (
-            <div class="flex flex-col bg-background-secondary p-2 pb-3.5 border-t-2 border-t-border hover:bg-border hover:rounded-lg hover:cursor-pointer">
-              <div class="flex items-center gap-3">
-                {friend.avatar ? (
-                  <div class="relative">
-                    <img
-                      src={`${FS_URL}/avatars/${friend.id}/${friend.avatar}`}
-                      alt="avatar"
-                      class="w-10 h-10 rounded-full"
-                    />
-                    <StatusIndicator status={friend.status} />
-                  </div>
-                ) : (
-                  <div class="relative">
-                    <div class="w-10 h-10 rounded-full bg-background-tertiary flex items-center justify-center">
-                      <span class="text-text-secondary text-sm">
-                        {friend.username[0].toUpperCase()}
-                      </span>
+        <div class="overflow-y-auto flex-1 min-h-0">
+          <For each={filteredFriends()}>
+            {(friend) => (
+              <div class="flex flex-col bg-background-secondary p-2 pb-3.5 border-t-2 border-t-border hover:bg-border hover:rounded-lg hover:cursor-pointer">
+                <div class="flex items-center gap-3">
+                  {friend.avatar ? (
+                    <div class="relative">
+                      <div class="relative w-10 h-10">
+                        <img
+                          src={`${FS_URL}/avatars/${friend.id}/${friend.avatar}`}
+                          alt="avatar"
+                          class="w-full h-full rounded-full object-cover"
+                          style={{ "aspect-ratio": "1/1" }}
+                        />
+                      </div>
+                      <StatusIndicator status={friend.status} />
                     </div>
-                    <StatusIndicator status={friend.status} />
+                  ) : (
+                    <div class="relative">
+                      <div class="w-10 h-10 rounded-full bg-background-tertiary flex items-center justify-center">
+                        <span class="text-text-secondary text-sm">
+                          {friend.username[0].toUpperCase()}
+                        </span>
+                      </div>
+                      <StatusIndicator status={friend.status} />
+                    </div>
+                  )}
+                  <div class="flex flex-col flex-grow">
+                    <span>{friend.display_name}</span>
+                    <span class="text-text-secondary text-sm">
+                      {friend.custom_status
+                        ? `${friend.custom_status}`
+                        : friend.status?.charAt(0).toUpperCase() +
+                          friend.status?.slice(1)}
+                    </span>
                   </div>
-                )}
-                <div class="flex flex-col flex-grow">
-                  <span>{friend.display_name}</span>
-                  <span class="text-text-secondary text-sm">
-                    {friend.custom_status
-                      ? `(${friend.custom_status})`
-                      : friend.status?.charAt(0).toUpperCase() +
-                        friend.status?.slice(1)}
-                  </span>
-                </div>
-                <div class="flex gap-2">
-                  <Tooltip content="Message" position="top">
-                    <button class="p-2 rounded-full transition-colors bg-border hover:bg-[rgba(68,68,68,0.4)]">
-                      <svg
-                        xmlns="http://www.w3.org/2000/svg"
-                        class="w-5 h-5"
-                        viewBox="0 0 24 24"
-                        fill="none"
-                        stroke="currentColor"
-                        stroke-width="2"
-                        stroke-linecap="round"
-                        stroke-linejoin="round"
-                      >
-                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-                      </svg>
-                    </button>
-                  </Tooltip>
+                  <div class="flex gap-2">
+                    <Tooltip content="Message" position="top">
+                      <button class="p-2 rounded-full transition-colors bg-border hover:bg-[rgba(68,68,68,0.4)]">
+                        <svg
+                          xmlns="http://www.w3.org/2000/svg"
+                          class="w-5 h-5"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                          stroke-width="2"
+                          stroke-linecap="round"
+                          stroke-linejoin="round"
+                        >
+                          <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                        </svg>
+                      </button>
+                    </Tooltip>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
-        </For>
+            )}
+          </For>
+        </div>
       </Show>
     </div>
   );

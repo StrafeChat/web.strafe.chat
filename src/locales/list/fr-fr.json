@@ -92,7 +92,25 @@
       },
       "editProfile": "Modifier le profil",
       "avatar": {
-        "alt": "Avatar de l'utilisateur"
+        "alt": "Avatar de l'utilisateur",
+        "change": "Changer l'Avatar",
+        "uploading": "Téléchargement...",
+        "success": "Avatar mis à jour avec succès.",
+        "error": {
+          "invalidType": "Type de fichier invalide. Veuillez télécharger une image.",
+          "generic": "Échec de la mise à jour de l'avatar. Veuillez réessayer.",
+          "uploadFailed": "Échec du téléchargement de l'avatar"
+        }
+      },
+      "banner": {
+        "alt": "Bannière de l'utilisateur",
+        "change": "Changer la Bannière",
+        "uploading": "Téléchargement...",
+        "success": "Bannière mise à jour avec succès.",
+        "error": {
+          "invalidType": "Type de fichier invalide. Veuillez télécharger une image.",
+          "uploadFailed": "Échec du téléchargement de la bannière"
+        }
       }
     },
     "appearance": {

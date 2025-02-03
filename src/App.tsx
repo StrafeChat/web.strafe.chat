@@ -18,6 +18,7 @@ import { Notes } from "./components/home/notes/Notes";
 import { getDirection } from "./lib/utils/direction";
 import { applyCustomStyles } from "./lib/utils/customStyles";
 import { ToastProvider } from "./components/common/Toast";
+import { SettingsProvider } from "./lib/providers/settings/SettingsProvider";
 
 const MountApp = (props: ParentProps) => {
   const savedLang = localStorage.getItem("sc_lang") || "en_us";
@@ -49,7 +50,9 @@ const MountApp = (props: ParentProps) => {
           <ContextMenuProvider>
             <CacheProvider>
               <AuthProvider>
-                <div class="h-screen w-screen">{props.children}</div>
+                <SettingsProvider>
+                  <div class="h-screen w-screen">{props.children}</div>
+                </SettingsProvider>
               </AuthProvider>
             </CacheProvider>
           </ContextMenuProvider>

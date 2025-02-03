@@ -291,7 +291,12 @@ export class WebSocketClient {
           switch (data.op) {
             case OpCodes.READY:
               console.log("[WebSocket] Received READY event:", data.d);
-              this.handleMessage(data.d);
+              // Ensure the data has the correct type field for the handler
+              const readyData = {
+                ...data.d,
+                type: "READY"
+              };
+              this.handleMessage(readyData);
               break;
 
             case OpCodes.HEARTBEAT_ACK:

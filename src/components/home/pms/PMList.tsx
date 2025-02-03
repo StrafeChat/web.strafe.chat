@@ -1,6 +1,7 @@
 import { Component, createSignal, createMemo, Show } from "solid-js";
 import { useAuth } from "../../../lib/providers/auth/AuthProvider";
 import UserSettings from "../../settings/UserSettings";
+import ClientUserPopup from "../../common/ClientUserPopup";
 import { A } from "@solidjs/router";
 import { Tooltip } from "../../common/Tooltip";
 import { useTransContext } from "@mbarzda/solid-i18next";
@@ -11,11 +12,16 @@ import Friends from "../../shared/icons/Friends";
 import Notes from "../../shared/icons/Notes";
 import PlusSmall from "../../shared/icons/PlusSmall";
 import Settings from "../../shared/icons/Settings";
+import { capitalizeStatus } from "../../../lib/utils/status";
 
 export const PMList: Component = () => {
   const { relationshipRequests, user } = useAuth();
   const [t] = useTransContext();
   const [showSettings, setShowSettings] = createSignal(false);
+  const [showUserPopup, setShowUserPopup] = createSignal(false);
+  const [userProfileTrigger, setUserProfileTrigger] = createSignal<HTMLDivElement>();
+  const [customStatus, setCustomStatus] = createSignal("");
+  const [customEmoji, setCustomEmoji] = createSignal("");
 
   const pendingCount = createMemo(() => {
     const currentUser = user();
@@ -26,11 +32,6 @@ export const PMList: Component = () => {
       (rel) => rel.recipient_id === currentUser.id
     ).length;
   });
-
-  const capitalizeStatus = (status: string): UserStatus => {
-    const capitalized = status.charAt(0).toUpperCase() + status.slice(1);
-    return capitalized as UserStatus;
-  };
 
   return (
     <div class="flex flex-col h-full bg-background1 rounded-tl-2xl">
@@ -97,17 +98,24 @@ export const PMList: Component = () => {
       </div>
 
       <div class="border-t border-border mt-auto">
-        <div class="flex items-center justify-between bg-background1 pl-1.5 pr-2 py-1">
-          <div class="group flex items-center gap-2 hover:bg-surface hover:bg-opacity-10 transition-colors hover:cursor-pointer rounded-md pl-1 pr-2 py-1">
-            <div class="relative flex items-center">
-              <img
-                src={`${FS_URL}/avatars/${user()?.id}/${
-                  user()?.avatar || "favicon.ico"
-                }`}
-                alt="User avatar"
-                draggable="false"
-                class="w-8 h-8 rounded-full object-cover"
-              />
+        <div class="flex items-center bg-background1 pl-1.5 pr-2 py-1">
+          <div
+            class="group flex items-center gap-2 hover:bg-surface hover:bg-opacity-10 transition-colors hover:cursor-pointer rounded-md pl-1 pr-2 py-1 flex-1 min-w-0"
+            onClick={() => setShowUserPopup(true)}
+            ref={setUserProfileTrigger}
+          >
+            <div class="relative flex items-center flex-shrink-0">
+              <div class="relative w-8 h-8">
+                <img
+                  src={`${FS_URL}/avatars/${user()?.id}/${
+                    user()?.avatar || "favicon.ico"
+                  }`}
+                  alt="User avatar"
+                  draggable="false"
+                  class="w-full h-full rounded-full object-cover"
+                  style={{ "aspect-ratio": "1/1" }}
+                />
+              </div>
               <StatusIndicator
                 status={(user()?.presence?.status || "offline") as UserStatus}
                 class="border-background1 group-hover:border-surface group-hover:border-opacity-10 transition-colors"
@@ -123,15 +131,27 @@ export const PMList: Component = () => {
               </div>
             </div>
           </div>
-          {/* User Settings Modal */}
-          <Tooltip content={t("settings.sections.user")} position="top">
-            <button
-              class="p-2 text-text-secondary hover:text-text-primary transition-colors rounded-md hover:bg-surface hover:bg-opacity-10"
-              onClick={() => setShowSettings(true)}
-            >
-              <Settings />
-            </button>
-          </Tooltip>
+          <div class="flex items-center gap-1 flex-shrink-0 ml-1">
+            {/* Client User Popup */}
+            <ClientUserPopup
+              isOpen={showUserPopup()}
+              onClose={() => setShowUserPopup(false)}
+              triggerRef={userProfileTrigger()}
+              customStatus={customStatus()}
+              setCustomStatus={setCustomStatus}
+              customEmoji={customEmoji()}
+              setCustomEmoji={setCustomEmoji}
+            />
+            {/* User Settings Modal */}
+            <Tooltip content={t("settings.sections.user")} position="top">
+              <button
+                class="p-2 text-text-secondary hover:text-text-primary transition-colors rounded-md hover:bg-surface hover:bg-opacity-10"
+                onClick={() => setShowSettings(true)}
+              >
+                <Settings />
+              </button>
+            </Tooltip>
+          </div>
         </div>
       </div>
       <UserSettings

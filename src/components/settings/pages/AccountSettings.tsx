@@ -20,7 +20,7 @@ const AccountSettings: Component = () => {
             {user()?.display_name || user()?.username}
           </h3>
           <p class="text-text-secondary text-sm">
-            {user()?.username}#{user()?.discriminator}
+            {user()?.username}#{String(user()?.discriminator).padStart(4, "0")}
           </p>
         </div>
       </div>
