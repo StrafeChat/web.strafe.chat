@@ -84,7 +84,11 @@ export const OnlineTab: Component = () => {
             Online - {filteredFriends().length}
           </h3>
           <div class="overflow-y-auto flex-1 min-h-0">
-            <For each={filteredFriends()}>
+            <For
+              each={filteredFriends().sort((a, b) =>
+                a.display_name.localeCompare(b.display_name)
+              )}
+            >
               {(friend) => (
                 <div class="flex flex-col bg-background-secondary p-2 pb-3.5 border-t-2 border-t-border hover:bg-border hover:rounded-lg hover:cursor-pointer">
                   <div class="flex items-center gap-3">
@@ -137,7 +141,10 @@ export const OnlineTab: Component = () => {
                         </button>
                       </Tooltip>
                       <div class="relative">
-                        <FriendMenu friendId={friend.id} friendName={friend.display_name} />
+                        <FriendMenu
+                          friendId={friend.id}
+                          friendName={friend.display_name}
+                        />
                       </div>
                     </div>
                   </div>
