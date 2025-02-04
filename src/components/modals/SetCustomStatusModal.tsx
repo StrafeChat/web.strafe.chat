@@ -15,16 +15,21 @@ const SetCustomStatusModal: Component<Props> = (props) => {
   const { user, updateStatus } = useAuth();
   const { showToast } = useToast();
   const [loading, setLoading] = createSignal(false);
-  const [customStatus, setCustomStatus] = createSignal(user()?.presence?.custom_status || "");
+  const [customStatus, setCustomStatus] = createSignal(
+    user()?.presence?.custom_status || ""
+  );
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const success = await updateStatus(user()?.presence?.status, customStatus());
+      const success = await updateStatus(
+        user()?.presence?.status,
+        customStatus()
+      );
       if (success) {
-        showToast(t("status.success"), "success");
+        showToast(t("customStatus.success"), "success");
         props.onClose();
       } else {
         showToast(t("status.error"), "error");

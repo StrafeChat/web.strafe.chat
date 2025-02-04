@@ -38,6 +38,12 @@
     "loading": "Loading...",
     "unknownError": "An unknown error occurred"
   },
+  "customStatus": {
+    "success": "Status updated successfully",
+    "error": "Failed to update status",
+    "customStatus": "Custom Status",
+    "customStatusPlaceholder": "What's on your mind?"
+  },
   "settings": {
     "sections": {
       "user": "User Settings",
@@ -53,12 +59,6 @@
       "keybinds": "Keybinds",
       "language": "Language",
       "logout": "Log Out"
-    },
-    "status": {
-      "success": "Status updated successfully",
-      "error": "Failed to update status",
-      "customStatus": "Custom Status",
-      "customStatusPlaceholder": "What's on your mind?"
     },
     "account": {
       "title": "Account",

@@ -19,6 +19,7 @@ type FriendData = {
   username: string;
   display_name: string;
   avatar?: string;
+  banner?: string;
   status: UserStatus;
   custom_status: string;
 };
@@ -79,6 +80,7 @@ export const AllTab: Component = () => {
           username: friend.username,
           display_name: friend.display_name || friend.username,
           avatar: friend.avatar,
+          banner: friend.banner,
           status: isValidUserStatus(friend.presence?.status)
             ? friend.presence.status
             : "offline",

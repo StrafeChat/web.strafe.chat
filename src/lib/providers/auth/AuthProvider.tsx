@@ -29,7 +29,7 @@ const API_HEADERS = {
   }),
 };
 
-type Clientuser = {
+export type Clientuser = {
   id: string;
   username: string;
   discriminator: string;
@@ -254,6 +254,22 @@ export const AuthProvider: ParentComponent = (props) => {
         setRelationships,
         user()?.id || ""
       );
+    });
+
+    client.onMessage("PRESENCE_UPDATE", (data) => {
+      console.log("[AuthProvider] Received presence update:", data);
+      if (data.user_id === user()?.id) {
+        console.log("[AuthProvider] Presence update for self");
+        const currentUser = user()!;
+        setUser({
+          ...currentUser,
+          presence: {
+            status: data.status,
+            custom_status: data.custom_status,
+          },
+        });
+        return;
+      }
     });
 
     return true;

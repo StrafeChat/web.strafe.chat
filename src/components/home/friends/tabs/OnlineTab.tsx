@@ -29,6 +29,7 @@ export const OnlineTab: Component = () => {
         username: friend.username,
         display_name: friend.display_name || friend.username,
         avatar: friend.avatar,
+        banner: friend.banner,
         status: friend.presence?.status || "offline",
         custom_status: friend.presence?.custom_status || "",
       }))
@@ -100,6 +101,10 @@ export const OnlineTab: Component = () => {
                             alt="avatar"
                             class="w-full h-full rounded-full object-cover"
                             style={{ "aspect-ratio": "1/1" }}
+                            onError={(e) => {
+                              const target = e.target as HTMLImageElement;
+                              target.src = "/path/to/fallback/image.jpg";
+                            }}
                           />
                         </div>
                         <StatusIndicator status={friend.status as UserStatus} />

@@ -132,13 +132,13 @@ export const FriendMenu: Component<FriendMenuProps> = (props) => {
             <div class="border-t border-border pt-4">
               <div class="flex justify-end gap-3">
                 <button
-                  class="px-4 py-2 rounded-md bg-[#2b2d31] text-text-primary hover:bg-[#35373c] transition-colors"
+                  class="px-4 py-2.5 text-text-primary hover:bg-surface rounded-md transition-colors font-medium"
                   onClick={() => setShowConfirmation(false)}
                 >
                   Cancel
                 </button>
                 <button
-                  class="px-4 py-2 rounded-md bg-[#da373c] text-white hover:bg-[#a12828] transition-colors"
+                  class="px-4 py-2.5 bg-[#da373c] text-text-primary rounded-md hover:opacity-90 transition-opacity disabled:opacity-50 font-medium"
                   onClick={handleRemoveFriend}
                 >
                   Remove Friend
