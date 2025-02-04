@@ -40,10 +40,15 @@ class WebSocketWorkerHandler {
       // Send an identify request to get the initial state for this port
       this.sendIdentify(token)
         .then(() => {
-          console.log("[WebSocketWorker] Identify sent successfully for new port");
+          console.log(
+            "[WebSocketWorker] Identify sent successfully for new port"
+          );
         })
         .catch((error) => {
-          console.error("[WebSocketWorker] Failed to send identify for new port:", error);
+          console.error(
+            "[WebSocketWorker] Failed to send identify for new port:",
+            error
+          );
           this.notifyError(error, port);
         });
       return;
@@ -51,7 +56,9 @@ class WebSocketWorkerHandler {
 
     // If we have a different token or no connection, create a new one
     if (this.ws) {
-      console.log("[WebSocketWorker] Closing existing connection due to token change");
+      console.log(
+        "[WebSocketWorker] Closing existing connection due to token change"
+      );
       this.ws.close();
     }
 
@@ -109,10 +116,16 @@ class WebSocketWorkerHandler {
     let delay;
     if (this.reconnectAttempts < 3) {
       // First 3 attempts: 1s, 2s, 4s
-      delay = Math.min(this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts), 4000);
+      delay = Math.min(
+        this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts),
+        4000
+      );
     } else {
       // After 3 attempts, use exponential backoff up to 30s
-      delay = Math.min(this.baseReconnectDelay * Math.pow(1.5, this.reconnectAttempts), 30000);
+      delay = Math.min(
+        this.baseReconnectDelay * Math.pow(1.5, this.reconnectAttempts),
+        30000
+      );
     }
 
     console.log(
@@ -144,7 +157,11 @@ class WebSocketWorkerHandler {
       this.ports.add(port);
       port.onmessage = (event: MessageEvent<WebSocketMessage>) => {
         const { type, payload } = event.data;
-        console.log("[WebSocketWorker] Received message from port:", type, payload);
+        console.log(
+          "[WebSocketWorker] Received message from port:",
+          type,
+          payload
+        );
         switch (type) {
           case "init":
             this.url = payload.url;
@@ -623,7 +640,10 @@ class WebSocketWorkerHandler {
     connected: boolean,
     specificPort?: MessagePort
   ) {
-    const message = { type: "connectionState", payload: { connected, loading: this.loading } };
+    const message = {
+      type: "connectionState",
+      payload: { connected, loading: this.loading },
+    };
     if (specificPort) {
       specificPort.postMessage(message);
     } else {
@@ -646,12 +666,18 @@ class WebSocketWorkerHandler {
   }
 
   private broadcast(message: any) {
-    console.log("[WebSocketWorker] Broadcasting message to all ports:", message);
+    console.log(
+      "[WebSocketWorker] Broadcasting message to all ports:",
+      message
+    );
     this.ports.forEach((port) => {
       try {
         port.postMessage(message);
       } catch (error) {
-        console.error("[WebSocketWorker] Error broadcasting message to port:", error);
+        console.error(
+          "[WebSocketWorker] Error broadcasting message to port:",
+          error
+        );
         // Remove the port if it's broken
         this.removePort(port);
       }

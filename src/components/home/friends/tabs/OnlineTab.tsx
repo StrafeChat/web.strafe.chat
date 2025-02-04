@@ -6,6 +6,7 @@ import { Tooltip } from "../../../common/Tooltip";
 import { FriendSearch } from "../FriendSearch";
 import { FS_URL } from "../../../../constants";
 import { StatusIndicator, UserStatus } from "../../../common/StatusIndicator";
+import { FriendMenu } from "../FriendMenu";
 
 export const OnlineTab: Component = () => {
   const { user, relationships } = useAuth();
@@ -135,6 +136,9 @@ export const OnlineTab: Component = () => {
                           </svg>
                         </button>
                       </Tooltip>
+                      <div class="relative">
+                        <FriendMenu friendId={friend.id} friendName={friend.display_name} />
+                      </div>
                     </div>
                   </div>
                 </div>

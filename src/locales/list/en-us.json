@@ -108,18 +108,18 @@
       "underDevelopment": "This section is under development."
     }
   },
-    "profile": {
-      "editProfile": "Edit Profile",
-      "copyId": "Copy User ID",
-      "idCopied": "User ID copied to clipboard."
-    },
-    "status": {
-      "online": "Online",
-      "idle": "Idle",
-      "dnd": "Do Not Disturb",
-      "offline": "Offline",
-      "customStatus": "Custom Status"
-    },
+  "profile": {
+    "editProfile": "Edit Profile",
+    "copyId": "Copy User ID",
+    "idCopied": "User ID copied to clipboard."
+  },
+  "status": {
+    "online": "Online",
+    "idle": "Idle",
+    "dnd": "Do Not Disturb",
+    "offline": "Offline",
+    "customStatus": "Custom Status"
+  },
   "components": {
     "datePicker": {
       "months": {

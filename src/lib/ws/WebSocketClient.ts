@@ -53,18 +53,28 @@ export interface RelationshipPayload extends BasePayload {
     recipient_id: string;
     created_at: string;
     sender?: {
+      banner?: string;
       id: string;
       username: string;
       discriminator: string;
       avatar?: string;
       display_name?: string;
+      presence: {
+        status: string;
+        custom_status: string;
+      };
     };
     recipient?: {
       id: string;
       username: string;
       discriminator: string;
       avatar?: string;
+      banner?: string;
       display_name?: string;
+      presence: {
+        status: string;
+        custom_status: string;
+      };
     };
   };
 }
@@ -279,10 +289,10 @@ export class WebSocketClient {
           const OpCodes = {
             READY: "READY",
             HEARTBEAT_ACK: "HEARTBEAT_ACK",
-            RELATIONSHIP_CREATE: "RELATIONSHIP_CREATE",
-            RELATIONSHIP_UPDATE: "RELATIONSHIP_UPDATE",
-            RELATIONSHIP_ACCEPT: "RELATIONSHIP_ACCEPT",
-            RELATIONSHIP_DELETE: "RELATIONSHIP_DELETE",
+            RELATIONSHIP_CREATE: "relationshipCreate",
+            RELATIONSHIP_UPDATE: "relationshipUpdate",
+            RELATIONSHIP_ACCEPT: "relationshipAccept",
+            RELATIONSHIP_DELETE: "relationshipDelete",
             MESSAGE: "MESSAGE",
             DISPATCH: "DISPATCH",
             PRESENCE_UPDATE: "PRESENCE_UPDATE",
@@ -291,10 +301,9 @@ export class WebSocketClient {
           switch (data.op) {
             case OpCodes.READY:
               console.log("[WebSocket] Received READY event:", data.d);
-              // Ensure the data has the correct type field for the handler
               const readyData = {
                 ...data.d,
-                type: "READY"
+                type: "READY",
               };
               this.handleMessage(readyData);
               break;
@@ -312,13 +321,15 @@ export class WebSocketClient {
                 break;
               }
               const relationship = {
-                id: data.d.id,
-                sender_id: data.d.sender_id,
-                recipient_id: data.d.recipient_id,
-                created_at: data.d.created_at || new Date().toISOString(),
-                type: "relationshipCreate",
-                sender: data.d.sender || null,
-                recipient: data.d.recipient || null,
+                type: OpCodes.RELATIONSHIP_CREATE,
+                relationship: {
+                  id: data.d.id,
+                  sender_id: data.d.sender_id,
+                  recipient_id: data.d.recipient_id,
+                  created_at: data.d.created_at || new Date().toISOString(),
+                  sender: data.d.sender || null,
+                  recipient: data.d.recipient || null,
+                },
               };
               this.handleMessage(relationship);
               break;
@@ -334,13 +345,20 @@ export class WebSocketClient {
                 break;
               }
               const relationshipEvent = {
-                id: data.d.id,
-                sender_id: data.d.sender_id,
-                recipient_id: data.d.recipient_id,
-                created_at: data.d.created_at || new Date().toISOString(),
-                type: data.op.toLowerCase(),
-                sender: data.d.sender || null,
-                recipient: data.d.recipient || null,
+                type:
+                  data.op === OpCodes.RELATIONSHIP_ACCEPT
+                    ? OpCodes.RELATIONSHIP_ACCEPT
+                    : data.op === OpCodes.RELATIONSHIP_UPDATE
+                    ? OpCodes.RELATIONSHIP_UPDATE
+                    : OpCodes.RELATIONSHIP_DELETE,
+                relationship: {
+                  id: data.d.id,
+                  sender_id: data.d.sender_id,
+                  recipient_id: data.d.recipient_id,
+                  created_at: data.d.created_at || new Date().toISOString(),
+                  sender: data.d.sender || null,
+                  recipient: data.d.recipient || null,
+                },
               };
               this.handleMessage(relationshipEvent);
               break;
@@ -389,6 +407,7 @@ export class WebSocketClient {
           discriminator: user.Discriminator,
           display_name: user.DisplayName,
           avatar: user.Avatar,
+          banner: user.Banner,
           presence: {
             status: presence.status,
             custom_status: presence.custom_status,
@@ -529,89 +548,52 @@ export class WebSocketClient {
   private handleRelationship(payload: RelationshipPayload) {
     console.log("[WebSocketClient] Handling relationship event:", payload);
 
+    if (!payload.relationship) {
+      console.error("[WebSocketClient] Invalid relationship payload:", payload);
+      return;
+    }
+
     const relationshipId = payload.relationship.id;
     console.log(
       `[WebSocketClient] Processing relationship ${relationshipId} for event type ${payload.type}`
     );
 
-    if (!this.cache) {
-      console.warn("[WebSocket] No cache available for relationship update");
-      return;
+    // Cache user data
+    if (payload.relationship.sender) {
+      this.cache.setUsers({
+        [payload.relationship.sender.id]: payload.relationship.sender,
+      });
+    }
+    if (payload.relationship.recipient) {
+      this.cache.setUsers({
+        [payload.relationship.recipient.id]: payload.relationship.recipient,
+      });
     }
 
-    const { sender, recipient } = payload.relationship;
+    // Emit event for UI updates
+    this.dispatchEvent(payload.type, {
+      id: relationshipId,
+      type: payload.type,
+      sender: payload.relationship.sender,
+      recipient: payload.relationship.recipient,
+      created_at: payload.relationship.created_at,
+    });
 
-    // Handle sender data if present
-    if (sender && typeof sender === "object") {
-      const normalizedSender = {
-        id: sender.id,
-        username: sender.username,
-        discriminator: sender.discriminator,
-        display_name: sender.display_name || sender.username,
-        avatar: sender.avatar,
-      };
-
-      if (
-        normalizedSender.id &&
-        normalizedSender.username &&
-        normalizedSender.discriminator
-      ) {
-        console.log("[WebSocket] Caching normalized sender:", normalizedSender);
-        this.cache.setUsers({ [normalizedSender.id]: normalizedSender });
-      } else {
-        console.warn("[WebSocket] Invalid sender data:", sender);
-      }
-    }
-
-    // Handle recipient data if present
-    if (recipient && typeof recipient === "object") {
-      const normalizedRecipient = {
-        id: recipient.id,
-        username: recipient.username,
-        discriminator: recipient.discriminator,
-        display_name: recipient.display_name || recipient.username,
-        avatar: recipient.avatar,
-      };
-
-      if (
-        normalizedRecipient.id &&
-        normalizedRecipient.username &&
-        normalizedRecipient.discriminator
-      ) {
-        console.log(
-          "[WebSocket] Caching normalized recipient:",
-          normalizedRecipient
-        );
-        this.cache.setUsers({ [normalizedRecipient.id]: normalizedRecipient });
-      } else {
-        console.warn("[WebSocket] Invalid recipient data:", recipient);
-      }
-    }
-
-    // Update relationship requests based on event type
+    // Update internal state
     switch (payload.type) {
       case "relationshipCreate":
         this.relationshipRequests[relationshipId] = payload.relationship;
         break;
-      case "relationshipUpdate":
-        this.relationshipRequests[relationshipId] = {
-          ...this.relationshipRequests[relationshipId],
-          ...payload.relationship,
-        };
-        break;
       case "relationshipAccept":
-      case "relationshipDelete":
-        // Remove from relationships if accepted or deleted
+        // Move from requests to relationships
         delete this.relationshipRequests[relationshipId];
+        this.relationships[relationshipId] = payload.relationship;
         break;
-    }
-
-    console.log("[WebSocketClient] Relationships updated:", this.relationships);
-
-    // Emit relationship update event
-    const handler = this.messageHandlers.get(payload.type);
-    if (handler) {
-      handler(payload);
+      case "relationshipDelete":
+        // Clean up from both collections
+        delete this.relationshipRequests[relationshipId];
+        delete this.relationships[relationshipId];
+        break;
     }
   }
 
