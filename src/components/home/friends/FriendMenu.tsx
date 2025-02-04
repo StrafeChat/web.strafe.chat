@@ -11,7 +11,7 @@ interface FriendMenuProps {
 
 export const FriendMenu: Component<FriendMenuProps> = (props) => {
   const [isMenuOpen, setIsMenuOpen] = createSignal(false);
-  const [error, setError] = createSignal<string | null>(null);
+  // const [error, setError] = createSignal<string | null>(null);
   const [showConfirmation, setShowConfirmation] = createSignal(false);
 
   // Close menu when clicking outside
@@ -130,11 +130,6 @@ export const FriendMenu: Component<FriendMenuProps> = (props) => {
               friends?
             </p>
             <div class="border-t border-border pt-4">
-              {error() && (
-                <div class="text-sm text-error bg-error/10 px-4 py-2.5 rounded-md mb-4">
-                  {error()}
-                </div>
-              )}
               <div class="flex justify-end gap-3">
                 <button
                   class="px-4 py-2 rounded-md bg-[#2b2d31] text-text-primary hover:bg-[#35373c] transition-colors"
