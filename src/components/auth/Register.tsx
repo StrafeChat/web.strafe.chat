@@ -17,6 +17,8 @@ const Register = () => {
   const [t] = useTransContext();
   const navigate = useNavigate();
 
+  // In Register.tsx, modify the handleSubmit function:
+
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
     setError("");
@@ -38,14 +40,13 @@ const Register = () => {
       return;
     }
 
-    // Format the date to match the required format
     const date = new Date(dateOfBirth());
     const utcDate = new Date(
       Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
     );
     const isoDate = utcDate.toISOString();
 
-    const success = await register({
+    const result = await register({
       email: email(),
       username: username(),
       discriminator: discNumber,
@@ -54,10 +55,10 @@ const Register = () => {
       password: password(),
     });
 
-    if (success) {
+    if (result.success) {
       navigate("/", { replace: true });
     } else {
-      setError(t("auth.register.error.registrationFailed"));
+      setError(result.error || t("auth.register.error.registrationFailed"));
     }
   };
 

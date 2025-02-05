@@ -51,7 +51,7 @@ const MountApp = (props: ParentProps) => {
             <CacheProvider>
               <AuthProvider>
                 <SettingsProvider>
-                  <div class="h-screen w-screen">{props.children}</div>
+                  <div class="h-auto w-auto">{props.children}</div>
                 </SettingsProvider>
               </AuthProvider>
             </CacheProvider>

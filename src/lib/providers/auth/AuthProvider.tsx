@@ -117,9 +117,9 @@ export const AuthProvider: ParentComponent = (props) => {
     );
   });
 
-  const logError = (context: string, error: unknown) => {
-    console.error(`[AuthProvider:${context}]`, error);
-  };
+  // const logError = (context: string, error: unknown) => {
+  //   console.error(`[AuthProvider:${context}]`, error);
+  // };
 
   const initializeWebSocket = (
     token: string = localStorage.getItem("sc_token") || ""
@@ -256,21 +256,20 @@ export const AuthProvider: ParentComponent = (props) => {
       );
     });
 
-    client.onMessage("PRESENCE_UPDATE", (data) => {
-      console.log("[AuthProvider] Received presence update:", data);
-      if (data.user_id === user()?.id) {
-        console.log("[AuthProvider] Presence update for self");
-        const currentUser = user()!;
-        setUser({
-          ...currentUser,
-          presence: {
-            status: data.status,
-            custom_status: data.custom_status,
-          },
-        });
-        return;
-      }
-    });
+    // client.onMessage("presence", (data) => {
+    //   console.log("[AuthProvider] Received presence update:", data);
+    //   if (data.user_id === user()?.id) {
+    //     console.log("[AuthProvider] Presence update for self");
+    //     const currentUser = user()!;
+    //     setUser({
+    //       ...currentUser,
+    //       presence: {
+    //         status: data.status,
+    //         custom_status: data.custom_status,
+    //       },
+    //     });
+    //   }
+    // });
 
     return true;
   };
@@ -385,10 +384,11 @@ export const AuthProvider: ParentComponent = (props) => {
       });
 
       if (!res.ok) {
-        logError("register", `Registration failed: ${res.status}`);
-        setIsAuthenticated(false);
-        setLoading(false);
-        return { success: false, error: `Registration failed: ${res.status}` };
+        const errorData = await res.json();
+        return {
+          success: false,
+          error: errorData.error || `Registration failed: ${res.status}`,
+        };
       }
 
       const { token } = await res.json();
@@ -396,13 +396,12 @@ export const AuthProvider: ParentComponent = (props) => {
 
       return await fetchUserData(token);
     } catch (error) {
-      logError("register", error);
-      setIsAuthenticated(false);
-      setLoading(false);
       return {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
       };
+    } finally {
+      setLoading(false);
     }
   };
 
