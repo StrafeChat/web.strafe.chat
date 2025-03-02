@@ -93,5 +93,10 @@
     "dnd": "عدم الإزعاج",
     "offline": "غير متصل",
     "customStatus": "حالة مخصصة"
+  },
+  "time": {
+    "today": "اليوم في {{time}}",
+    "yesterday": "أمس في {{time}}",
+    "date": "{{weekday}} في {{time}}"
   }
 }

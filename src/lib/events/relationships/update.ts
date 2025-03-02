@@ -6,7 +6,7 @@ export const handleRelationshipUpdate = async (
   cache: any,
   setRelationshipRequests: (updater: (prev: any[]) => any[]) => void,
   setRelationships: (updater: (prev: string[]) => string[]) => void,
-  currentUserId: string
+  currentUserId: string,
 ) => {
   console.log("[RelationshipUpdate] Processing payload:", {
     payload,
@@ -14,7 +14,7 @@ export const handleRelationshipUpdate = async (
   });
 
   const usersToFetch = [payload.sender_id, payload.recipient_id].filter(
-    (userId) => !cache.getUser(userId)
+    (userId) => !cache.getUser(userId),
   );
 
   for (const userId of usersToFetch) {
@@ -62,7 +62,7 @@ export const handleRelationshipUpdate = async (
           (r) =>
             r.id === payload.id ||
             (r.sender_id === payload.sender_id &&
-              r.recipient_id === payload.recipient_id)
+              r.recipient_id === payload.recipient_id),
         );
 
         if (!existingRequest) {
@@ -78,7 +78,7 @@ export const handleRelationshipUpdate = async (
         } else {
           console.log(
             "[RelationshipUpdate] Request already exists:",
-            existingRequest
+            existingRequest,
           );
         }
         break;
@@ -90,7 +90,7 @@ export const handleRelationshipUpdate = async (
           (r) =>
             r.id === payload.id ||
             (r.sender_id === payload.sender_id &&
-              r.recipient_id === payload.recipient_id)
+              r.recipient_id === payload.recipient_id),
         );
         if (requestIndex !== -1) {
           newRelationships.splice(requestIndex, 1);
@@ -117,7 +117,7 @@ export const handleRelationshipUpdate = async (
           (r) =>
             r.id === payload.id ||
             (r.sender_id === payload.sender_id &&
-              r.recipient_id === payload.recipient_id)
+              r.recipient_id === payload.recipient_id),
         );
         if (deleteIndex !== -1) {
           newRelationships.splice(deleteIndex, 1);

@@ -41,7 +41,7 @@ export const OnlineTab: Component = () => {
     return onlineFriends().filter(
       (friend) =>
         friend.username.toLowerCase().includes(query) ||
-        friend.display_name.toLowerCase().includes(query)
+        friend.display_name.toLowerCase().includes(query),
     );
   });
 
@@ -87,7 +87,7 @@ export const OnlineTab: Component = () => {
           <div class="overflow-y-auto flex-1 min-h-0">
             <For
               each={filteredFriends().sort((a, b) =>
-                a.display_name.localeCompare(b.display_name)
+                a.display_name.localeCompare(b.display_name),
               )}
             >
               {(friend) => (

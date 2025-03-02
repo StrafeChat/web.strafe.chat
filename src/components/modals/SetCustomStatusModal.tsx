@@ -16,7 +16,7 @@ const SetCustomStatusModal: Component<Props> = (props) => {
   const { showToast } = useToast();
   const [loading, setLoading] = createSignal(false);
   const [customStatus, setCustomStatus] = createSignal(
-    user()?.presence?.custom_status || ""
+    user()?.presence?.custom_status || "",
   );
 
   const handleSubmit = async (e: Event) => {
@@ -26,7 +26,7 @@ const SetCustomStatusModal: Component<Props> = (props) => {
     try {
       const success = await updateStatus(
         user()?.presence?.status,
-        customStatus()
+        customStatus(),
       );
       if (success) {
         showToast(t("customStatus.success"), "success");
@@ -64,7 +64,7 @@ const SetCustomStatusModal: Component<Props> = (props) => {
             onInput={(e) => setCustomStatus(e.currentTarget.value)}
             placeholder={t(
               "customStatus.placeholder",
-              "What's your status? (e.g. 🎉 Celebrating)"
+              "What's your status? (e.g. 🎉 Celebrating)",
             )}
             class="w-full px-4 py-2.5 bg-background border-2 border-border rounded-md text-text-primary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent placeholder:text-text-secondary"
             disabled={loading()}

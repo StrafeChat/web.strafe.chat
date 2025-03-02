@@ -3,7 +3,10 @@ import { useTheme } from "../../lib/providers/theme/ThemeProvider";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
 import type { Theme } from "../../lib/themes/types";
 import ColorPicker from "./ColorPicker";
-import { CUSTOM_CSS_KEY, applyCustomStyles } from "../../lib/utils/customStyles";
+import {
+  CUSTOM_CSS_KEY,
+  applyCustomStyles,
+} from "../../lib/utils/customStyles";
 
 const CUSTOM_THEMES_KEY = "sc_custom_themes";
 
@@ -83,7 +86,7 @@ export function ThemeSwitcher() {
         JSON.stringify({
           css: customCSS(),
           variables: cssVariables(),
-        })
+        }),
       );
 
       // Apply the updated styles
@@ -136,7 +139,7 @@ export function ThemeSwitcher() {
 
   const handleDeleteTheme = (themeToDelete: Theme) => {
     const updatedCustomThemes = customThemes().filter(
-      (t) => t.id !== themeToDelete.id
+      (t) => t.id !== themeToDelete.id,
     );
     setCustomThemes(updatedCustomThemes);
     saveCustomThemesToLocalStorage(updatedCustomThemes);

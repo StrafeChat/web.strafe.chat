@@ -28,7 +28,7 @@ class WebSocketWorkerHandler {
   public handleConnect(token: string, port: MessagePort) {
     console.log(
       "[WebSocketWorker] Attempting to connect with token:",
-      token.substring(0, 10) + "..."
+      token.substring(0, 10) + "...",
     );
 
     // If we already have an active connection with the same token, just add the port
@@ -41,13 +41,13 @@ class WebSocketWorkerHandler {
       this.sendIdentify(token)
         .then(() => {
           console.log(
-            "[WebSocketWorker] Identify sent successfully for new port"
+            "[WebSocketWorker] Identify sent successfully for new port",
           );
         })
         .catch((error) => {
           console.error(
             "[WebSocketWorker] Failed to send identify for new port:",
-            error
+            error,
           );
           this.notifyError(error, port);
         });
@@ -57,7 +57,7 @@ class WebSocketWorkerHandler {
     // If we have a different token or no connection, create a new one
     if (this.ws) {
       console.log(
-        "[WebSocketWorker] Closing existing connection due to token change"
+        "[WebSocketWorker] Closing existing connection due to token change",
       );
       this.ws.close();
     }
@@ -118,27 +118,27 @@ class WebSocketWorkerHandler {
       // First 3 attempts: 1s, 2s, 4s
       delay = Math.min(
         this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts),
-        4000
+        4000,
       );
     } else {
       // After 3 attempts, use exponential backoff up to 30s
       delay = Math.min(
         this.baseReconnectDelay * Math.pow(1.5, this.reconnectAttempts),
-        30000
+        30000,
       );
     }
 
     console.log(
       `[WebSocketWorker] Scheduling reconnect attempt ${
         this.reconnectAttempts + 1
-      } in ${delay}ms`
+      } in ${delay}ms`,
     );
 
     this.reconnectTimeout = setTimeout(() => {
       this.reconnectAttempts++;
       if (this.currentToken && this.ports.size > 0) {
         console.log(
-          `[WebSocketWorker] Attempting reconnect ${this.reconnectAttempts}`
+          `[WebSocketWorker] Attempting reconnect ${this.reconnectAttempts}`,
         );
         // Use any port since we're maintaining a single connection
         const port = Array.from(this.ports)[0];
@@ -160,7 +160,7 @@ class WebSocketWorkerHandler {
         console.log(
           "[WebSocketWorker] Received message from port:",
           type,
-          payload
+          payload,
         );
         switch (type) {
           case "init":
@@ -232,37 +232,22 @@ class WebSocketWorkerHandler {
   }
 
   private async handleMessage(event: MessageEvent) {
-    console.log(
-      "[WebSocketWorker] Handling message, event type:",
-      typeof event.data
-    );
-    console.log("[WebSocketWorker] Raw message data:", event.data);
-
+    console.log("[WebSocketWorker] Raw message received:", event.data);
     try {
       let data: any;
 
-      // Handle Blob data
       if (event.data instanceof Blob) {
         const arrayBuffer = await event.data.arrayBuffer();
         const uint8Array = new Uint8Array(arrayBuffer);
-
-        // Try MessagePack first
         try {
           data = msgpack.decode(uint8Array);
-          console.log(
-            "[WebSocketWorker] Successfully decoded with MessagePack:",
-            data
-          );
+          console.log("[WebSocketWorker] Successfully decoded with MessagePack:", data);
         } catch (msgpackError) {
-          // Fallback to JSON if MessagePack fails
           try {
             const textDecoder = new TextDecoder("utf-8");
             const jsonString = textDecoder.decode(uint8Array);
             data = JSON.parse(jsonString);
-            console.log(
-              "[WebSocketWorker] Successfully decoded with JSON:",
-              data
-            );
+            console.log("[WebSocketWorker] Successfully decoded with JSON:", data);
           } catch (jsonError) {
             console.error("[WebSocketWorker] Failed to decode message:", {
               originalData: event.data,
@@ -279,51 +264,52 @@ class WebSocketWorkerHandler {
           }
         }
       } else if (event.data instanceof Uint8Array) {
-        // Handle Uint8Array directly
         try {
-          const textDecoder = new TextDecoder("utf-8");
-          const jsonString = textDecoder.decode(event.data);
-          data = JSON.parse(jsonString);
-          console.log(
-            "[WebSocketWorker] Successfully decoded Uint8Array with JSON:",
-            data
-          );
-        } catch (jsonError) {
-          console.error("[WebSocketWorker] Failed to decode Uint8Array:", {
-            originalData: event.data,
-            jsonError,
-          });
+          data = msgpack.decode(event.data);
+          console.log("[WebSocketWorker] Successfully decoded Uint8Array with MessagePack:", data);
+        } catch (msgpackError) {
+          try {
+            const textDecoder = new TextDecoder("utf-8");
+            const jsonString = textDecoder.decode(event.data);
+            data = JSON.parse(jsonString);
+            console.log("[WebSocketWorker] Successfully decoded Uint8Array with JSON:", data);
+          } catch (jsonError) {
+            console.error("[WebSocketWorker] Failed to decode Uint8Array:", {
+              originalData: event.data,
+              jsonError,
+            });
+            this.notifyError({
+              message: "Failed to decode Uint8Array",
+              originalData: event.data,
+              jsonError,
+            });
+            return;
+          }
+        }
+      } else if (typeof event.data === "string") {
+        try {
+          data = JSON.parse(event.data);
+          console.log("[WebSocketWorker] Successfully decoded string data:", data);
+        } catch (error) {
+          console.error("[WebSocketWorker] Failed to parse string data:", error);
           this.notifyError({
-            message: "Failed to decode Uint8Array",
-            originalData: event.data,
-            jsonError,
+            message: "Failed to parse string data",
+            error,
           });
           return;
         }
-      } else if (typeof event.data === "string") {
-        // Handle string data (JSON)
-        data = JSON.parse(event.data);
       } else {
-        // Handle other types of data
         data = event.data;
       }
 
-      // Normalize the payload to use lowercase keys
       data = this.normalizePayload(data);
 
-      // Ensure the data follows the standard event payload structure
       if (!(data.op !== undefined && data.d !== undefined)) {
-        console.warn("[WebSocketWorker] Received non-standard payload:", data);
         data = {
           op: 0,
           d: data,
         };
       }
-
-      console.log("[WebSocketWorker] Message details:", {
-        opCode: data.op,
-        data: data.d,
-      });
 
       const OpCodes = {
         READY: "READY",
@@ -339,7 +325,6 @@ class WebSocketWorkerHandler {
 
       switch (data.op) {
         case OpCodes.READY:
-          console.log("[WebSocketWorker] Received READY event:", data.d);
           this.loading = false;
           this.broadcast({
             type: "ready",
@@ -352,15 +337,11 @@ class WebSocketWorkerHandler {
           break;
 
         case OpCodes.RELATIONSHIP_CREATE:
-          console.log(
-            "[WebSocketWorker] Received RELATIONSHIP_CREATE raw data:",
-            data
-          );
-          if (!data.d || !data.d.id) {
-            console.error(
-              "[WebSocketWorker] Invalid relationship data received:",
-              data
-            );
+        case OpCodes.RELATIONSHIP_UPDATE:
+        case OpCodes.RELATIONSHIP_ACCEPT:
+        case OpCodes.RELATIONSHIP_DELETE:
+          if (!data.d?.id) {
+            console.error("[WebSocketWorker] Invalid relationship data:", data);
             break;
           }
           const relationship = {
@@ -368,127 +349,17 @@ class WebSocketWorkerHandler {
             sender_id: data.d.sender_id,
             recipient_id: data.d.recipient_id,
             created_at: data.d.created_at || new Date().toISOString(),
-            type: "relationshipCreate",
+            type: data.op.toLowerCase(),
             sender: data.d.sender || null,
             recipient: data.d.recipient || null,
           };
-          console.log(
-            "[WebSocketWorker] Raw relationship data:",
-            data.d,
-            "\nNormalized relationship:",
-            relationship
-          );
-
           this.broadcast({
-            type: "relationshipCreate",
+            type: data.op.toLowerCase(),
             payload: relationship,
           });
           break;
 
-        case OpCodes.RELATIONSHIP_UPDATE:
-          console.log(
-            "[WebSocketWorker] Received RELATIONSHIP_UPDATE raw data:",
-            data
-          );
-          if (!data.d || !data.d.id) {
-            console.error(
-              "[WebSocketWorker] Invalid relationship update data received:",
-              data
-            );
-            break;
-          }
-          const updatedRelationship = {
-            id: data.d.id,
-            sender_id: data.d.sender_id,
-            recipient_id: data.d.recipient_id,
-            created_at: data.d.created_at || new Date().toISOString(),
-            type: "relationshipUpdate",
-            sender: data.d.sender || null,
-            recipient: data.d.recipient || null,
-          };
-          console.log(
-            "[WebSocketWorker] Raw relationship update data:",
-            data.d,
-            "\nNormalized relationship:",
-            updatedRelationship
-          );
-
-          this.broadcast({
-            type: "relationshipUpdate",
-            payload: updatedRelationship,
-          });
-          break;
-
-        case OpCodes.RELATIONSHIP_ACCEPT:
-          console.log(
-            "[WebSocketWorker] Received RELATIONSHIP_ACCEPT raw data:",
-            data
-          );
-          if (!data.d || !data.d.id) {
-            console.error(
-              "[WebSocketWorker] Invalid relationship accept data received:",
-              data
-            );
-            break;
-          }
-          const acceptedRelationship = {
-            id: data.d.id,
-            sender_id: data.d.sender_id,
-            recipient_id: data.d.recipient_id,
-            created_at: data.d.created_at || new Date().toISOString(),
-            type: "relationshipAccept",
-            sender: data.d.sender || null,
-            recipient: data.d.recipient || null,
-          };
-          console.log(
-            "[WebSocketWorker] Raw relationship accept data:",
-            data.d,
-            "\nNormalized relationship:",
-            acceptedRelationship
-          );
-
-          this.broadcast({
-            type: "relationshipAccept",
-            payload: acceptedRelationship,
-          });
-          break;
-
-        case OpCodes.RELATIONSHIP_DELETE:
-          console.log(
-            "[WebSocketWorker] Received RELATIONSHIP_DELETE raw data:",
-            data
-          );
-          if (!data.d || !data.d.id) {
-            console.error(
-              "[WebSocketWorker] Invalid relationship delete data received:",
-              data
-            );
-            break;
-          }
-          const deletedRelationship = {
-            id: data.d.id,
-            sender_id: data.d.sender_id,
-            recipient_id: data.d.recipient_id,
-            created_at: data.d.created_at || new Date().toISOString(),
-            type: "relationshipDelete",
-            sender: data.d.sender || null,
-            recipient: data.d.recipient || null,
-          };
-          console.log(
-            "[WebSocketWorker] Raw relationship delete data:",
-            data.d,
-            "\nNormalized relationship:",
-            deletedRelationship
-          );
-
-          this.broadcast({
-            type: "relationshipDelete",
-            payload: deletedRelationship,
-          });
-          break;
-
         case OpCodes.MESSAGE:
-          console.log("[WebSocketWorker] Received MESSAGE:", data.d);
           this.broadcast({
             type: "message",
             payload: data.d,
@@ -496,9 +367,7 @@ class WebSocketWorkerHandler {
           break;
 
         case OpCodes.DISPATCH:
-          console.log("[WebSocketWorker] Received DISPATCH:", data.d);
-          // Handle legacy dispatch events
-          if (data.d && data.d.op) {
+          if (data.d?.op) {
             const messageEvent = new MessageEvent("message", {
               data: data.d,
               lastEventId: "",
@@ -506,6 +375,22 @@ class WebSocketWorkerHandler {
               ports: [],
             });
             this.handleMessage(messageEvent);
+          } else if (data.d?.type === "message_create") {
+            const messageData = {
+              id: data.d.id || "",
+              content: data.d.content || "",
+              author_id: data.d.author_id || data.d.sender_id || "",
+              room_id: data.d.room_id || data.d.channel_id || "",
+              created_at: data.d.created_at || new Date().toISOString(),
+              edited_at: data.d.edited_at || null,
+              attachments: data.d.attachments || [],
+              author: data.d.author || null,
+              type: "message_create"
+            };
+            this.broadcast({
+              type: "message_create",
+              payload: messageData,
+            });
           } else {
             this.broadcast({
               type: "dispatch",
@@ -515,15 +400,8 @@ class WebSocketWorkerHandler {
           break;
 
         case OpCodes.PRESENCE_UPDATE:
-          console.log(
-            "[WebSocketWorker] Received PRESENCE_UPDATE raw data:",
-            data
-          );
-          if (!data.d || !data.d.user_id) {
-            console.error(
-              "[WebSocketWorker] Invalid presence update data received:",
-              data
-            );
+          if (!data.d?.user_id) {
+            console.error("[WebSocketWorker] Invalid presence update data:", data);
             break;
           }
           const presenceUpdate = {
@@ -532,11 +410,6 @@ class WebSocketWorkerHandler {
             status: data.d.status || "Offline",
             custom_status: data.d.custom_status || "",
           };
-          console.log(
-            "[WebSocketWorker] Normalized presence update:",
-            presenceUpdate
-          );
-
           this.broadcast({
             type: "dispatch",
             payload: presenceUpdate,
@@ -548,10 +421,7 @@ class WebSocketWorkerHandler {
           break;
       }
     } catch (error) {
-      console.error(
-        "[WebSocketWorker] Unexpected error handling message:",
-        error
-      );
+      console.error("[WebSocketWorker] Unexpected error handling message:", error);
       this.notifyError(error);
     }
   }
@@ -604,7 +474,7 @@ class WebSocketWorkerHandler {
           Object.entries(payload).map(([key, value]) => [
             key,
             typeof value === "bigint" ? Number(value) : value,
-          ])
+          ]),
         );
 
         const encodedPayload = msgpack.encode(processedPayload);
@@ -638,7 +508,7 @@ class WebSocketWorkerHandler {
 
   private notifyConnectionState(
     connected: boolean,
-    specificPort?: MessagePort
+    specificPort?: MessagePort,
   ) {
     const message = {
       type: "connectionState",
@@ -668,7 +538,7 @@ class WebSocketWorkerHandler {
   private broadcast(message: any) {
     console.log(
       "[WebSocketWorker] Broadcasting message to all ports:",
-      message
+      message,
     );
     this.ports.forEach((port) => {
       try {
@@ -676,7 +546,7 @@ class WebSocketWorkerHandler {
       } catch (error) {
         console.error(
           "[WebSocketWorker] Error broadcasting message to port:",
-          error
+          error,
         );
         // Remove the port if it's broken
         this.removePort(port);

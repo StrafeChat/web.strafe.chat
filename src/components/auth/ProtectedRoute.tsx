@@ -18,11 +18,11 @@ export const ProtectedRoute = (props: { children: JSX.Element }) => {
   const authLoadingDone = createMemo(() => !loading() && assetsLoaded());
   const allDataLoaded = createMemo(
     () =>
-      isAuthenticated() && user() && relationships() && relationshipRequests()
+      isAuthenticated() && user() && relationships() && relationshipRequests(),
   );
 
   const shouldRedirect = createMemo(
-    () => authLoadingDone() && !isAuthenticated()
+    () => authLoadingDone() && !isAuthenticated(),
   );
 
   return (

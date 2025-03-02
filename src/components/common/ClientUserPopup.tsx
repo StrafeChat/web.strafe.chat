@@ -81,7 +81,7 @@ const ClientUserPopup: Component<Props> = (props) => {
     try {
       const success = await updateStatus(
         status,
-        user()?.presence?.custom_status
+        user()?.presence?.custom_status,
       );
       if (success) {
         setShowStatusMenu(false);
@@ -97,7 +97,7 @@ const ClientUserPopup: Component<Props> = (props) => {
   // Handle clicking outside to close
   const handleClickOutside = (e: MouseEvent) => {
     const target = e.target as Node;
-    const clickedTrigger = props.triggerRef?.contains(target);
+    const clickedTrigger = props.triggerRef?.contains(target)
     const clickedPopup = popupRef?.contains(target);
 
     if (!clickedTrigger && !clickedPopup) {
@@ -189,9 +189,7 @@ const ClientUserPopup: Component<Props> = (props) => {
               <div class="absolute -bottom-6 left-2">
                 <div class="relative w-[80px] h-[80px]">
                   <img
-                    src={`${FS_URL}/avatars/${user()?.id}/${
-                      user()?.avatar || "favicon.ico"
-                    }`}
+                    src={`${FS_URL}/avatars/${user()?.id}/${user()?.avatar || "favicon.ico"}`}
                     alt="User avatar"
                     class="w-full h-full rounded-full object-cover border-4 border-background2"
                     style={{ "aspect-ratio": "1/1" }}
@@ -203,6 +201,16 @@ const ClientUserPopup: Component<Props> = (props) => {
                     />
                   </div>
                 </div>
+              </div>
+            </div>
+            {/* Badge Section */}
+            <div class="absolute top-[113px] right-3">
+              <div class="inline-flex items-center gap-1.5 bg-[#111214] px-1.5 py-1 rounded-md">
+                <button class="w-5 h-5 rounded-[4px] flex items-center justify-center group cursor-pointer hover:bg-[#2b2d31] transition-colors">
+                  <svg class="w-3.5 h-3.5 text-[#b5bac1] group-hover:text-[#dbdee1]" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2L8.5 8.5 2 9.8l5 4.9L5.8 22 12 18.5 18.2 22 17 14.7l5-4.9-6.5-1.3z"/>
+                  </svg>
+                </button>
               </div>
             </div>
 
@@ -253,10 +261,10 @@ const ClientUserPopup: Component<Props> = (props) => {
                         getValidStatus(user()?.presence?.status) === "online"
                           ? "bg-green-500"
                           : getValidStatus(user()?.presence?.status) === "idle"
-                          ? "bg-yellow-500"
-                          : getValidStatus(user()?.presence?.status) === "dnd"
-                          ? "bg-red-500"
-                          : "bg-gray-500"
+                            ? "bg-yellow-500"
+                            : getValidStatus(user()?.presence?.status) === "dnd"
+                              ? "bg-red-500"
+                              : "bg-gray-500"
                       }`}
                     />
                     <span class="text-sm">

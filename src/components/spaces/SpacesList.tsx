@@ -14,7 +14,7 @@ const SpacesList: Component = () => {
     if (!currentUser?.id || !currentRelationships) return 0;
 
     return currentRelationships.filter(
-      (rel) => rel.recipient_id === currentUser.id
+      (rel) => rel.recipient_id === currentUser.id,
     ).length;
   });
 

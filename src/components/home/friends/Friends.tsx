@@ -32,7 +32,7 @@ export const Friends: Component = () => {
     if (!currentUser?.id || !currentRelationships) return 0;
 
     return currentRelationships.filter(
-      (rel) => rel.recipient_id === currentUser.id
+      (rel) => rel.recipient_id === currentUser.id,
     ).length;
   });
 
@@ -55,22 +55,25 @@ export const Friends: Component = () => {
   const updateTabSizes = () => {
     requestAnimationFrame(() => {
       setTabSizes(
-        Object.keys(tabRefs).reduce((sizes, tab) => {
-          const ref = tabRefs[tab as TabType];
-          if (ref) {
-            const parent = ref.parentElement;
-            if (!parent) return sizes;
+        Object.keys(tabRefs).reduce(
+          (sizes, tab) => {
+            const ref = tabRefs[tab as TabType];
+            if (ref) {
+              const parent = ref.parentElement;
+              if (!parent) return sizes;
 
-            const width = ref.offsetWidth;
-            const offset = ref.offsetLeft;
+              const width = ref.offsetWidth;
+              const offset = ref.offsetLeft;
 
-            sizes[tab as TabType] = {
-              width,
-              offset,
-            };
-          }
-          return sizes;
-        }, {} as Record<TabType, { width: number; offset: number }>)
+              sizes[tab as TabType] = {
+                width,
+                offset,
+              };
+            }
+            return sizes;
+          },
+          {} as Record<TabType, { width: number; offset: number }>,
+        ),
       );
     });
   };

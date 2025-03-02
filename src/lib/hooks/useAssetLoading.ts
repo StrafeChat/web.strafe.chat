@@ -8,7 +8,7 @@ export const useAssetLoading = () => {
   };
 
   // Track images
-  const images = document.querySelectorAll('img');
+  const images = document.querySelectorAll("img");
   let loadedCount = 0;
 
   const checkAllLoaded = () => {
@@ -17,12 +17,12 @@ export const useAssetLoading = () => {
     }
   };
 
-  images.forEach(img => {
+  images.forEach((img) => {
     if (img.complete) {
       loadedCount++;
       checkAllLoaded();
     } else {
-      img.addEventListener('load', () => {
+      img.addEventListener("load", () => {
         loadedCount++;
         checkAllLoaded();
       });
@@ -30,10 +30,10 @@ export const useAssetLoading = () => {
   });
 
   // Track other assets
-  window.addEventListener('load', handleLoad);
+  window.addEventListener("load", handleLoad);
 
   onCleanup(() => {
-    window.removeEventListener('load', handleLoad);
+    window.removeEventListener("load", handleLoad);
   });
 
   return assetsLoaded;

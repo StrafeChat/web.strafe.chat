@@ -52,7 +52,7 @@ const Modal: Component<ModalProps> = (props) => {
                 {props.children}
               </Motion>
             ) : (
-              <div 
+              <div
                 class="fixed inset-0 overflow-y-auto"
                 onClick={(e) => {
                   if (e.target === e.currentTarget) {
@@ -60,7 +60,7 @@ const Modal: Component<ModalProps> = (props) => {
                   }
                 }}
               >
-                <div 
+                <div
                   class="flex min-h-full items-center justify-center p-4"
                   onClick={(e) => {
                     if (e.target === e.currentTarget) {
@@ -78,9 +78,7 @@ const Modal: Component<ModalProps> = (props) => {
                     }}
                     class="relative w-full max-w-md bg-background2 rounded-lg shadow-xl border border-border overflow-hidden"
                   >
-                    <div class="p-6">
-                      {props.children}
-                    </div>
+                    <div class="p-6">{props.children}</div>
                   </Motion>
                 </div>
               </div>

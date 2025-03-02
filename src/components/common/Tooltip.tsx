@@ -1,4 +1,5 @@
 import { Component, JSX, Show, createSignal } from "solid-js";
+import { useAuth } from "../../lib/providers/auth/AuthProvider";
 import { Portal } from "solid-js/web";
 
 interface TooltipProps {
@@ -10,6 +11,7 @@ interface TooltipProps {
 
 export const Tooltip: Component<TooltipProps> = (props) => {
   const [isVisible, setIsVisible] = createSignal(false);
+  const { isMobile } = useAuth();
   const [tooltipPosition, setTooltipPosition] = createSignal({
     top: 0,
     left: 0,
@@ -29,13 +31,13 @@ export const Tooltip: Component<TooltipProps> = (props) => {
     const gap = 12;
 
     // Make tooltip visible but hidden to measure its dimensions
-    setIsVisible(true);
+    if (!isMobile()) setIsVisible(true);
     requestAnimationFrame(() => {
       const tooltip = document.querySelector("[data-tooltip]") as HTMLElement;
       if (!tooltip) return;
 
       // Hide tooltip while measuring
-      tooltip.style.visibility = 'hidden';
+      tooltip.style.visibility = "hidden";
 
       const tooltipWidth = tooltip.offsetWidth;
       const tooltipHeight = tooltip.offsetHeight;
@@ -86,7 +88,7 @@ export const Tooltip: Component<TooltipProps> = (props) => {
 
       setTooltipPosition({ top, left, stemPosition });
       // Show tooltip after positioning
-      tooltip.style.visibility = 'visible';
+      tooltip.style.visibility = "visible";
     });
   };
 
@@ -111,24 +113,24 @@ export const Tooltip: Component<TooltipProps> = (props) => {
           position === "center"
             ? "top-1/2 -translate-y-1/2"
             : position === "left"
-            ? "top-[10px]"
-            : "bottom-[10px]"
+              ? "top-[10px]"
+              : "bottom-[10px]"
         } border-r-[var(--surface)] border-y-transparent border-l-transparent`;
       case "bottom":
         return `${baseClasses} top-[-16px] ${
           position === "center"
             ? "left-1/2 -translate-x-1/2"
             : position === "left"
-            ? "left-[10px]"
-            : "right-[10px]"
+              ? "left-[10px]"
+              : "right-[10px]"
         } border-b-[var(--surface)] border-x-transparent border-t-transparent`;
       default: // top
         return `${baseClasses} bottom-[-16px] ${
           position === "center"
             ? "left-1/2 -translate-x-1/2"
             : position === "left"
-            ? "left-[10px]"
-            : "right-[10px]"
+              ? "left-[10px]"
+              : "right-[10px]"
         } border-t-[var(--surface)] border-x-transparent border-b-transparent`;
     }
   };
@@ -150,7 +152,7 @@ export const Tooltip: Component<TooltipProps> = (props) => {
             style={{
               top: `${tooltipPosition().top}px`,
               left: `${tooltipPosition().left}px`,
-              visibility: 'hidden', // Start hidden
+              visibility: "hidden", // Start hidden
             }}
           >
             {props.content}

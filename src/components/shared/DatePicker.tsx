@@ -1,13 +1,13 @@
-import { 
-  Component, 
-  createSignal, 
-  onCleanup, 
-  onMount, 
-  Show, 
-  For, 
-  createMemo 
-} from 'solid-js';
-import { useTransContext } from '@mbarzda/solid-i18next';
+import {
+  Component,
+  createSignal,
+  onCleanup,
+  onMount,
+  Show,
+  For,
+  createMemo,
+} from "solid-js";
+import { useTransContext } from "@mbarzda/solid-i18next";
 
 interface DatePickerProps {
   value: Date;
@@ -29,38 +29,38 @@ const DatePicker: Component<DatePickerProps> = (props) => {
 
   // Memoize number formatting
   const formatNumber = createMemo(() => {
-    const savedLang = localStorage.getItem('sc_lang') || 'en_us';
-    return (num: number) => 
-      new Intl.NumberFormat(savedLang.replace('_', '-'), { 
+    const savedLang = localStorage.getItem("sc_lang") || "en_us";
+    return (num: number) =>
+      new Intl.NumberFormat(savedLang.replace("_", "-"), {
         minimumIntegerDigits: 1,
-        useGrouping: false 
+        useGrouping: false,
       }).format(num);
   });
 
   // Memoize months and weekdays to prevent unnecessary re-renders
   const months = createMemo(() => [
-    t('components.datePicker.months.january'),
-    t('components.datePicker.months.february'),
-    t('components.datePicker.months.march'),
-    t('components.datePicker.months.april'),
-    t('components.datePicker.months.may'),
-    t('components.datePicker.months.june'),
-    t('components.datePicker.months.july'),
-    t('components.datePicker.months.august'),
-    t('components.datePicker.months.september'),
-    t('components.datePicker.months.october'),
-    t('components.datePicker.months.november'),
-    t('components.datePicker.months.december')
+    t("components.datePicker.months.january"),
+    t("components.datePicker.months.february"),
+    t("components.datePicker.months.march"),
+    t("components.datePicker.months.april"),
+    t("components.datePicker.months.may"),
+    t("components.datePicker.months.june"),
+    t("components.datePicker.months.july"),
+    t("components.datePicker.months.august"),
+    t("components.datePicker.months.september"),
+    t("components.datePicker.months.october"),
+    t("components.datePicker.months.november"),
+    t("components.datePicker.months.december"),
   ]);
 
   const weekDays = createMemo(() => [
-    t('components.datePicker.weekDays.sunday'),
-    t('components.datePicker.weekDays.monday'),
-    t('components.datePicker.weekDays.tuesday'),
-    t('components.datePicker.weekDays.wednesday'),
-    t('components.datePicker.weekDays.thursday'),
-    t('components.datePicker.weekDays.friday'),
-    t('components.datePicker.weekDays.saturday')
+    t("components.datePicker.weekDays.sunday"),
+    t("components.datePicker.weekDays.monday"),
+    t("components.datePicker.weekDays.tuesday"),
+    t("components.datePicker.weekDays.wednesday"),
+    t("components.datePicker.weekDays.thursday"),
+    t("components.datePicker.weekDays.friday"),
+    t("components.datePicker.weekDays.saturday"),
   ]);
 
   // Memoize format date to prevent unnecessary recalculations
@@ -70,13 +70,13 @@ const DatePicker: Component<DatePickerProps> = (props) => {
       const day = numberFormatter(date.getDate());
       const month = months()[date.getMonth()];
       const year = numberFormatter(date.getFullYear());
-      return t('components.datePicker.dateFormat', { month, day, year });
+      return t("components.datePicker.dateFormat", { month, day, year });
     };
   });
 
   // Memoize years list
-  const years = createMemo(() => 
-    Array.from({ length: 124 }, (_, i) => new Date().getFullYear() - i)
+  const years = createMemo(() =>
+    Array.from({ length: 124 }, (_, i) => new Date().getFullYear() - i),
   );
 
   // Memoize click outside handler
@@ -89,15 +89,17 @@ const DatePicker: Component<DatePickerProps> = (props) => {
   };
 
   onMount(() => {
-    document.addEventListener('mousedown', handleClickOutside);
-    onCleanup(() => document.removeEventListener('mousedown', handleClickOutside));
+    document.addEventListener("mousedown", handleClickOutside);
+    onCleanup(() =>
+      document.removeEventListener("mousedown", handleClickOutside),
+    );
   });
 
   // Optimize date calculations
-  const getDaysInMonth = (month: number, year: number) => 
+  const getDaysInMonth = (month: number, year: number) =>
     new Date(year, month + 1, 0).getDate();
 
-  const getFirstDayOfMonth = (month: number, year: number) => 
+  const getFirstDayOfMonth = (month: number, year: number) =>
     new Date(year, month, 1).getDay();
 
   const handleDateSelect = (day: number) => {
@@ -106,13 +108,17 @@ const DatePicker: Component<DatePickerProps> = (props) => {
     const maxDate = props.maxDate || new Date();
 
     if (newDate >= minDate && newDate <= maxDate) {
-      const utcDate = new Date(Date.UTC(
-        newDate.getFullYear(), 
-        newDate.getMonth(), 
-        newDate.getDate(), 
-        0, 0, 0
-      ));
-      
+      const utcDate = new Date(
+        Date.UTC(
+          newDate.getFullYear(),
+          newDate.getMonth(),
+          newDate.getDate(),
+          0,
+          0,
+          0,
+        ),
+      );
+
       setSelectedDate(newDate);
       props.onChange(newDate, utcDate.toISOString());
       setIsOpen(false);
@@ -163,9 +169,9 @@ const DatePicker: Component<DatePickerProps> = (props) => {
     }
     if (currentMonth() === 0) {
       setCurrentMonth(11);
-      setCurrentYear(prev => prev - 1);
+      setCurrentYear((prev) => prev - 1);
     } else {
-      setCurrentMonth(prev => prev - 1);
+      setCurrentMonth((prev) => prev - 1);
     }
   };
 
@@ -176,9 +182,9 @@ const DatePicker: Component<DatePickerProps> = (props) => {
     }
     if (currentMonth() === 11) {
       setCurrentMonth(0);
-      setCurrentYear(prev => prev + 1);
+      setCurrentYear((prev) => prev + 1);
     } else {
-      setCurrentMonth(prev => prev + 1);
+      setCurrentMonth((prev) => prev + 1);
     }
   };
 
@@ -186,21 +192,21 @@ const DatePicker: Component<DatePickerProps> = (props) => {
   const getCalendarDays = createMemo(() => {
     const daysInMonth = getDaysInMonth(currentMonth(), currentYear());
     const firstDay = getFirstDayOfMonth(currentMonth(), currentYear());
-    const days: { type: 'empty' | 'day', value?: number }[] = [];
+    const days: { type: "empty" | "day"; value?: number }[] = [];
 
     for (let i = 0; i < firstDay; i++) {
-      days.push({ type: 'empty' });
+      days.push({ type: "empty" });
     }
 
     for (let day = 1; day <= daysInMonth; day++) {
-      days.push({ type: 'day', value: day });
+      days.push({ type: "day", value: day });
     }
 
     return days;
   });
 
   return (
-    <div ref={pickerRef} class={`relative ${props.class || ''}`}>
+    <div ref={pickerRef} class={`relative ${props.class || ""}`}>
       <div
         onClick={() => setIsOpen(!isOpen())}
         class="w-full px-4 py-2 border border-border rounded-md cursor-pointer 
@@ -223,8 +229,18 @@ const DatePicker: Component<DatePickerProps> = (props) => {
               class="p-1 rounded-full hover:bg-surface dark:hover:bg-surface-dark
                 transition-transform hover:scale-110 active:scale-95"
             >
-              <svg class="w-6 h-6 text-text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width={2} d="M15 19l-7-7 7-7" />
+              <svg
+                class="w-6 h-6 text-text-primary"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width={2}
+                  d="M15 19l-7-7 7-7"
+                />
               </svg>
             </button>
 
@@ -234,7 +250,7 @@ const DatePicker: Component<DatePickerProps> = (props) => {
                 onClick={toggleMonthPicker}
                 class="text-lg font-semibold hover:text-accent text-text-primary px-2 py-1 rounded
                   hover:bg-surface dark:hover:bg-surface-dark transition-colors"
-                title={t('components.datePicker.selectMonth')}
+                title={t("components.datePicker.selectMonth")}
               >
                 {months()[currentMonth()]}
               </button>
@@ -243,7 +259,7 @@ const DatePicker: Component<DatePickerProps> = (props) => {
                 onClick={toggleYearPicker}
                 class="text-lg font-semibold hover:text-accent text-text-primary px-2 py-1 rounded
                   hover:bg-surface dark:hover:bg-surface-dark transition-colors"
-                title={t('components.datePicker.selectYear')}
+                title={t("components.datePicker.selectYear")}
               >
                 {formatNumber()(currentYear())}
               </button>
@@ -255,8 +271,18 @@ const DatePicker: Component<DatePickerProps> = (props) => {
               class="p-1 rounded-full hover:bg-surface dark:hover:bg-surface-dark
                 transition-transform hover:scale-110 active:scale-95"
             >
-              <svg class="w-6 h-6 text-text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width={2} d="M9 5l7 7-7 7" />
+              <svg
+                class="w-6 h-6 text-text-primary"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width={2}
+                  d="M9 5l7 7-7 7"
+                />
               </svg>
             </button>
           </div>
@@ -275,15 +301,20 @@ const DatePicker: Component<DatePickerProps> = (props) => {
             <div class="grid grid-cols-7 gap-1">
               <For each={getCalendarDays()}>
                 {(day) => {
-                  if (day.type === 'empty') {
+                  if (day.type === "empty") {
                     return <div class="w-10 h-10" />;
                   }
 
-                  const date = new Date(currentYear(), currentMonth(), day.value!);
+                  const date = new Date(
+                    currentYear(),
+                    currentMonth(),
+                    day.value!,
+                  );
                   const minDate = props.minDate || new Date(1900, 0, 1);
                   const maxDate = props.maxDate || new Date();
                   const isDisabled = date < minDate || date > maxDate;
-                  const isSelected = selectedDate() && 
+                  const isSelected =
+                    selectedDate() &&
                     date.getDate() === selectedDate().getDate() &&
                     date.getMonth() === selectedDate().getMonth() &&
                     date.getFullYear() === selectedDate().getFullYear();
@@ -291,10 +322,12 @@ const DatePicker: Component<DatePickerProps> = (props) => {
                   return (
                     <button
                       type="button"
-                      onClick={() => !isDisabled && handleDateSelect(day.value!)}
+                      onClick={() =>
+                        !isDisabled && handleDateSelect(day.value!)
+                      }
                       class={`w-10 h-10 rounded-full flex items-center justify-center text-sm transition-transform
-                        ${isSelected ? 'bg-accent text-white' : 'hover:bg-surface dark:hover:bg-surface-dark text-text-primary'}
-                        ${isDisabled ? 'text-text-disabled cursor-not-allowed' : 'cursor-pointer hover:scale-110 active:scale-95'}
+                        ${isSelected ? "bg-accent text-white" : "hover:bg-surface dark:hover:bg-surface-dark text-text-primary"}
+                        ${isDisabled ? "text-text-disabled cursor-not-allowed" : "cursor-pointer hover:scale-110 active:scale-95"}
                       `}
                       disabled={isDisabled}
                     >
@@ -318,7 +351,7 @@ const DatePicker: Component<DatePickerProps> = (props) => {
                       handleMonthSelect(index());
                     }}
                     class={`p-2 rounded-md text-sm transition-colors
-                      ${currentMonth() === index() ? 'bg-accent text-white' : 'hover:bg-surface dark:hover:bg-surface-dark text-text-primary'}
+                      ${currentMonth() === index() ? "bg-accent text-white" : "hover:bg-surface dark:hover:bg-surface-dark text-text-primary"}
                     `}
                   >
                     {month}
@@ -340,7 +373,7 @@ const DatePicker: Component<DatePickerProps> = (props) => {
                       handleYearSelect(year);
                     }}
                     class={`p-2 rounded-md text-sm transition-colors
-                      ${currentYear() === year ? 'bg-accent text-white' : 'hover:bg-surface dark:hover:bg-surface-dark text-text-primary'}
+                      ${currentYear() === year ? "bg-accent text-white" : "hover:bg-surface dark:hover:bg-surface-dark text-text-primary"}
                     `}
                   >
                     {formatNumber()(year)}

@@ -19,6 +19,7 @@ import { getDirection } from "./lib/utils/direction";
 import { applyCustomStyles } from "./lib/utils/customStyles";
 import { ToastProvider } from "./components/common/Toast";
 import { SettingsProvider } from "./lib/providers/settings/SettingsProvider";
+import RoomView from "./components/chat/RoomView";
 
 const MountApp = (props: ParentProps) => {
   const savedLang = localStorage.getItem("sc_lang") || "en_us";
@@ -72,6 +73,7 @@ const App = () => {
           <Route path="/" component={Home} />
           <Route path="/friends" component={Friends} />
           <Route path="/notes" component={Notes} />
+          <Route path="/rooms/:roomId" component={RoomView} />
         </Route>
       </Router>
     </MountApp>

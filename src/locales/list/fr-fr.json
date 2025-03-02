@@ -42,6 +42,11 @@
     "loading": "Chargement...",
     "unknownError": "Une erreur inconnue s'est produite"
   },
+  "time": {
+    "today": "Aujourd'hui à {{time}}",
+    "yesterday": "Hier à {{time}}",
+    "date": "{{weekday}} à {{time}}"
+  },
   "friends": {
     "title": "Amis",
     "tabs": {

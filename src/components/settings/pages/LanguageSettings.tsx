@@ -18,7 +18,7 @@ const languages: Language[] = [
 const LanguageSettings: Component = () => {
   const [t, { changeLanguage }] = useTransContext();
   const [selectedLanguage, setSelectedLanguage] = createSignal(
-    localStorage.getItem("sc_lang") || "en_us"
+    localStorage.getItem("sc_lang") || "en_us",
   );
 
   const handleLanguageChange = async (code: string) => {

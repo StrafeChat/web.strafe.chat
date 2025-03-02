@@ -33,13 +33,13 @@ export const PendingTab: Component = () => {
     if (!currentUser?.id) return [];
     const rels =
       relationshipRequests()?.filter(
-        (r) => r.recipient_id === currentUser.id
+        (r) => r.recipient_id === currentUser.id,
       ) ?? [];
     console.log(
       "[PendingTab] Incoming relationships:",
       rels,
       "Current user:",
-      currentUser.id
+      currentUser.id,
     );
     return rels;
   });
@@ -97,7 +97,7 @@ export const PendingTab: Component = () => {
         "[PendingTab] Cached users:",
         cachedUsers,
         "User ID:",
-        userId
+        userId,
       );
       const user = cachedUsers[userId];
       console.log(
@@ -105,7 +105,7 @@ export const PendingTab: Component = () => {
         userId,
         user,
         "All users:",
-        Object.keys(cachedUsers)
+        Object.keys(cachedUsers),
       );
       return user;
     });
@@ -155,7 +155,7 @@ export const PendingTab: Component = () => {
           headers: {
             "X-Session-Token": localStorage.getItem("sc_token") || "",
           },
-        }
+        },
       );
 
       if (!response.ok) {
@@ -168,7 +168,7 @@ export const PendingTab: Component = () => {
       const currentRelationships = relationshipRequests();
       if (currentRelationships) {
         const updatedRelationships = currentRelationships.filter(
-          (r) => r.id !== request.id
+          (r) => r.id !== request.id,
         );
         setRelationshipRequests(updatedRelationships);
       }
@@ -188,7 +188,7 @@ export const PendingTab: Component = () => {
           headers: {
             "X-Session-Token": localStorage.getItem("sc_token") || "",
           },
-        }
+        },
       );
 
       if (!response.ok) {
@@ -201,7 +201,7 @@ export const PendingTab: Component = () => {
       const currentRelationships = relationshipRequests();
       if (currentRelationships) {
         const updatedRelationships = currentRelationships.filter(
-          (r) => r.id !== request.id
+          (r) => r.id !== request.id,
         );
         setRelationshipRequests(updatedRelationships);
       }
@@ -221,7 +221,7 @@ export const PendingTab: Component = () => {
           headers: {
             "X-Session-Token": localStorage.getItem("sc_token") || "",
           },
-        }
+        },
       );
 
       if (!response.ok) {
@@ -234,7 +234,7 @@ export const PendingTab: Component = () => {
       const currentRelationships = relationshipRequests();
       if (currentRelationships) {
         const updatedRelationships = currentRelationships.filter(
-          (r) => r.id !== request.id
+          (r) => r.id !== request.id,
         );
         setRelationshipRequests(updatedRelationships);
       }
@@ -291,7 +291,7 @@ export const PendingTab: Component = () => {
               {(request) => {
                 const isIncoming = request.recipient_id === user()?.id;
                 const person = getUserDisplay(
-                  isIncoming ? request.sender_id : request.recipient_id
+                  isIncoming ? request.sender_id : request.recipient_id,
                 );
                 return (
                   <div class="flex flex-col bg-background-secondary p-2 pb-3.5 border-t-2 border-t-border hover:bg-border hover:rounded-lg hover:cursor-pointer">

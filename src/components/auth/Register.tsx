@@ -42,7 +42,7 @@ const Register = () => {
 
     const date = new Date(dateOfBirth());
     const utcDate = new Date(
-      Date.UTC(date.getFullYear(), date.getMonth(), date.getDate())
+      Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()),
     );
     const isoDate = utcDate.toISOString();
 

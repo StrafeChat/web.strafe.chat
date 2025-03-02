@@ -22,7 +22,7 @@ export class UserCache {
   private users: Map<string, CachedUser> = new Map();
   private presenceUpdateCallbacks: ((
     userId: string,
-    presence: { status: string; custom_status: string }
+    presence: { status: string; custom_status: string },
   ) => void)[] = [];
 
   public setUsers(users: { [key: string]: any }) {
@@ -42,8 +42,8 @@ export class UserCache {
   public onPresenceUpdate(
     callback: (
       userId: string,
-      presence: { status: string; custom_status: string }
-    ) => void
+      presence: { status: string; custom_status: string },
+    ) => void,
   ) {
     this.presenceUpdateCallbacks.push(callback);
   }
@@ -51,12 +51,12 @@ export class UserCache {
   public updateUserPresence(
     userId: string,
     status: string,
-    customStatus: string
+    customStatus: string,
   ) {
     console.log("[UserCache] Attempting to update presence for user:", userId);
     console.log(
       "[UserCache] Current users in cache:",
-      Array.from(this.users.keys())
+      Array.from(this.users.keys()),
     );
 
     const user = this.users.get(userId);
@@ -79,7 +79,7 @@ export class UserCache {
       });
     } else {
       console.warn(
-        `[UserCache] Attempted to update presence for non-existent user: ${userId}`
+        `[UserCache] Attempted to update presence for non-existent user: ${userId}`,
       );
     }
   }

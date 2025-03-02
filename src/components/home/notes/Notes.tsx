@@ -45,8 +45,12 @@ export const Notes: Component = () => {
             <path d="M8 12h8" />
             <path d="M8 16h8" />
           </svg>
-          <h2 class="text-xl font-medium mb-2 select-none">Notes Coming Soon</h2>
-          <p class="text-sm select-none">Your personal notes and reminders will appear here</p>
+          <h2 class="text-xl font-medium mb-2 select-none">
+            Notes Coming Soon
+          </h2>
+          <p class="text-sm select-none">
+            Your personal notes and reminders will appear here
+          </p>
         </div>
       </div>
     </div>

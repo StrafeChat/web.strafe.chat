@@ -35,10 +35,7 @@ export const Drawer = ({ isOpen, onClose, children }: DrawerProps) => {
         display: isVisible() ? "block" : "none",
       }}
     >
-      <div
-        class="absolute inset-0 bg-black opacity-50"
-        onClick={onClose}
-      ></div>
+      <div class="absolute inset-0 bg-black opacity-50" onClick={onClose}></div>
       <div class="relative bg-white w-64 h-full shadow-xl overflow-auto">
         {children}
       </div>

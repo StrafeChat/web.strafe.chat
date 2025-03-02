@@ -127,7 +127,9 @@ const UserSettings: Component<UserSettingsProps> = (props) => {
                             isMobile() && setIsSidebarOpen(false);
                           }}
                           class={`w-full px-[10px] py-[6px] rounded-[4px] text-left text-base hover:bg-surface ${
-                            state.activeSection === "account" ? "bg-surface" : ""
+                            state.activeSection === "account"
+                              ? "bg-surface"
+                              : ""
                           } text-text-primary`}
                         >
                           {t("settings.sections.account")}
@@ -138,7 +140,9 @@ const UserSettings: Component<UserSettingsProps> = (props) => {
                             isMobile() && setIsSidebarOpen(false);
                           }}
                           class={`w-full px-[10px] py-[6px] rounded-[4px] text-left text-base hover:bg-surface ${
-                            state.activeSection === "profile" ? "bg-surface" : ""
+                            state.activeSection === "profile"
+                              ? "bg-surface"
+                              : ""
                           } text-text-primary`}
                         >
                           {t("settings.sections.profile")}
@@ -149,7 +153,9 @@ const UserSettings: Component<UserSettingsProps> = (props) => {
                             isMobile() && setIsSidebarOpen(false);
                           }}
                           class={`w-full px-[10px] py-[6px] rounded-[4px] text-left text-base hover:bg-surface ${
-                            state.activeSection === "privacy" ? "bg-surface" : ""
+                            state.activeSection === "privacy"
+                              ? "bg-surface"
+                              : ""
                           } text-text-primary`}
                         >
                           {t("settings.sections.privacy")}
@@ -185,7 +191,9 @@ const UserSettings: Component<UserSettingsProps> = (props) => {
                             isMobile() && setIsSidebarOpen(false);
                           }}
                           class={`w-full px-[10px] py-[6px] rounded-[4px] text-left text-base hover:bg-surface ${
-                            state.activeSection === "language" ? "bg-surface" : ""
+                            state.activeSection === "language"
+                              ? "bg-surface"
+                              : ""
                           } text-text-primary`}
                         >
                           {t("settings.sections.language")}
@@ -196,7 +204,9 @@ const UserSettings: Component<UserSettingsProps> = (props) => {
                             isMobile() && setIsSidebarOpen(false);
                           }}
                           class={`w-full px-[10px] py-[6px] rounded-[4px] text-left text-base hover:bg-surface ${
-                            state.activeSection === "keybinds" ? "bg-surface" : ""
+                            state.activeSection === "keybinds"
+                              ? "bg-surface"
+                              : ""
                           } text-text-primary`}
                         >
                           {t("settings.sections.keybinds")}

@@ -1,5 +1,13 @@
-import { Component, For, Show, createSignal, onCleanup, onMount, createMemo } from 'solid-js';
-import { ChevronDown } from './icons/ChevronDown';
+import {
+  Component,
+  For,
+  Show,
+  createSignal,
+  onCleanup,
+  onMount,
+  createMemo,
+} from "solid-js";
+import { ChevronDown } from "./icons/ChevronDown";
 
 export type DropdownOption<T> = {
   value: T;
@@ -25,15 +33,15 @@ export function Dropdown<T>(props: DropdownProps<T>) {
   };
 
   onMount(() => {
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
   });
 
   onCleanup(() => {
-    document.removeEventListener('mousedown', handleClickOutside);
+    document.removeEventListener("mousedown", handleClickOutside);
   });
 
   const currentOption = createMemo(() =>
-    props.options.find((opt) => opt.value === props.value)
+    props.options.find((opt) => opt.value === props.value),
   );
 
   const handleSelect = (value: T) => {
@@ -59,7 +67,7 @@ export function Dropdown<T>(props: DropdownProps<T>) {
           </Show>
           <div
             class="transition-transform duration-200"
-            classList={{ 'rotate-180': isOpen() }}
+            classList={{ "rotate-180": isOpen() }}
           >
             <ChevronDown />
           </div>

@@ -3,7 +3,7 @@ export const CUSTOM_CSS_KEY = "sc_custom_css";
 export const applyCustomStyles = () => {
   try {
     console.log("[CustomStyles] Starting to apply custom styles");
-    
+
     // Remove any previously added custom style
     const existingStyle = document.getElementById("custom-app-styles");
     if (existingStyle) {

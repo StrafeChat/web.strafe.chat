@@ -38,6 +38,11 @@
     "loading": "Cargando...",
     "unknownError": "Se produjo un error desconocido"
   },
+  "time": {
+    "today": "Hoy a las {{time}}",
+    "yesterday": "Ayer a las {{time}}",
+    "date": "{{weekday}} a las {{time}}"
+  },
   "friends": {
     "title": "Amigos",
     "tabs": {
@@ -76,7 +81,13 @@
     "title": "Mensajes Privados",
     "conversations": "CONVERSACIONES",
     "createPM": "Crear MP",
-    "comingSoon": "Mensajes privados y chats grupales próximamente..."
+    "comingSoon": "Mensajes privados y chats grupales próximamente...",
+    "selectFriends": "Seleccionar Amigos",
+    "searchFriends": "Buscar amigos...",
+    "create": "Crear",
+    "errors": {
+      "selectFriends": "Por favor, selecciona al menos un amigo"
+    }
   },
   "settings": {
     "sections": {

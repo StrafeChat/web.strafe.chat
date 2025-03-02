@@ -14,7 +14,7 @@ const DefaultSettings: Component<DefaultSettingsProps> = (props) => {
         {t(`settings.sections.${props.title}`)}
       </h2>
       <div class="text-text-secondary">
-        {t('settings.default.underDevelopment')}
+        {t("settings.default.underDevelopment")}
       </div>
     </div>
   );

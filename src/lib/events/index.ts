@@ -7,7 +7,7 @@ export const handleWebSocketMessage = async (
   cache: any,
   setRelationshipRequests: (updater: (prev: any[]) => any[]) => void,
   setRelationships: (updater: (prev: string[]) => string[]) => void,
-  currentUserId: string
+  currentUserId: string,
 ) => {
   console.log("[WebSocket] Processing message:", {
     type: data.type,
@@ -23,7 +23,13 @@ export const handleWebSocketMessage = async (
         type: data.type,
         data: data,
       });
-      await handleRelationshipUpdate(data, cache, setRelationshipRequests, setRelationships, currentUserId);
+      await handleRelationshipUpdate(
+        data,
+        cache,
+        setRelationshipRequests,
+        setRelationships,
+        currentUserId,
+      );
       break;
 
     case "presenceUpdate":

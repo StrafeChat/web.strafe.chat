@@ -5,6 +5,7 @@ import {
   createSignal,
   createEffect,
 } from "solid-js";
+import { MessageCache, CachedMessage } from "../../cache/MessageCache";
 
 export type Presence = {
   status: string;
@@ -33,14 +34,20 @@ type CacheContextType = {
   getUser: (id: string) => User | undefined;
   setUser: (user: Partial<User> & { id: string }) => void;
   setUsers: (usersData: Record<string, any>) => void;
+  getMessages: (roomId: string) => CachedMessage[];
+  setMessages: (roomId: string, messages: CachedMessage[]) => void;
+  addMessage: (roomId: string, message: CachedMessage) => void;
+  updateMessage: (roomId: string, messageId: string, updates: Partial<CachedMessage>) => void;
+  deleteMessage: (roomId: string, messageId: string) => void;
 };
 
 const CacheContext = createContext<CacheContextType>();
+const messageCache = new MessageCache();
 
 export const CacheProvider: ParentComponent = (props) => {
   const [users, setUsers] = createSignal<Record<string, User>>({});
 
-  // Listen for user updates
+  // Listen for user updates and message events
   createEffect(() => {
     const handleUserUpdate = (event: CustomEvent) => {
       const userData = event.detail;
@@ -49,12 +56,20 @@ export const CacheProvider: ParentComponent = (props) => {
       }
     };
 
+    const handleMessageCreate = (event: CustomEvent) => {
+      const { roomId, message } = event.detail;
+      if (roomId && message) {
+        console.log("[CacheProvider] Adding message to cache:", message);
+        messageCache.addMessage(roomId, message);
+      }
+    };
+
     window.addEventListener("userUpdate", handleUserUpdate as EventListener);
+    window.addEventListener("messageCreate", handleMessageCreate as EventListener);
+
     return () => {
-      window.removeEventListener(
-        "userUpdate",
-        handleUserUpdate as EventListener
-      );
+      window.removeEventListener("userUpdate", handleUserUpdate as EventListener);
+      window.removeEventListener("messageCreate", handleMessageCreate as EventListener);
     };
   });
 
@@ -116,6 +131,11 @@ export const CacheProvider: ParentComponent = (props) => {
     getUser,
     setUser,
     setUsers: setUsersData,
+    getMessages: (roomId: string) => messageCache.getMessages(roomId),
+    setMessages: (roomId: string, messages: CachedMessage[]) => messageCache.setMessages(roomId, messages),
+    addMessage: (roomId: string, message: CachedMessage) => messageCache.addMessage(roomId, message),
+    updateMessage: (roomId: string, messageId: string, updates: Partial<CachedMessage>) => messageCache.updateMessage(roomId, messageId, updates),
+    deleteMessage: (roomId: string, messageId: string) => messageCache.deleteMessage(roomId, messageId)
   };
 
   return (

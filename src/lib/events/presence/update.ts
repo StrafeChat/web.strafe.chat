@@ -2,11 +2,11 @@ import { PresenceUpdatePayload } from "../../ws/WebSocketClient";
 
 export const handlePresenceUpdate = (
   payload: PresenceUpdatePayload,
-  cache: any
+  cache: any,
 ) => {
   console.log(
     "[PresenceUpdate] Handling presence update with payload:",
-    payload
+    payload,
   );
 
   if (!payload.user_id) {
@@ -30,6 +30,6 @@ export const handlePresenceUpdate = (
   cache.updateUserPresence(
     payload.user_id,
     payload.status,
-    payload.custom_status || ""
+    payload.custom_status || "",
   );
 };

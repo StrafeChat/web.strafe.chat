@@ -65,7 +65,7 @@ export const AllTab: Component = () => {
         }
 
         const isValidUserStatus = (
-          status: string | undefined
+          status: string | undefined,
         ): status is UserStatus => {
           return (
             status === "online" ||
@@ -103,7 +103,7 @@ export const AllTab: Component = () => {
       (friend) =>
         friend.username.toLowerCase().includes(query) ||
         friend.display_name.toLowerCase().includes(query) ||
-        friend.id.toLowerCase().includes(query)
+        friend.id.toLowerCase().includes(query),
     );
   });
 
@@ -130,7 +130,7 @@ export const AllTab: Component = () => {
         <div class="overflow-y-auto flex-1 min-h-0">
           <For
             each={filteredFriends().sort((a, b) =>
-              a.display_name.localeCompare(b.display_name)
+              a.display_name.localeCompare(b.display_name),
             )}
           >
             {(friend) => (

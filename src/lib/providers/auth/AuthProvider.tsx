@@ -11,12 +11,15 @@ import { WebSocketClient } from "../../ws/WebSocketClient";
 import { useCache } from "../cache/CacheProvider";
 import { handleWebSocketMessage } from "../../events";
 import { BASE_URL, WS_URL } from "../../../constants";
+import { RoomWithRecipients } from "../../../types/rooms";
 
 export const API_ENDPOINTS = {
   REGISTER: `${BASE_URL}/auth/register`,
   LOGIN: `${BASE_URL}/auth/login`,
   USER_ME: `${BASE_URL}/users/@me`,
   RELATIONSHIPS: `${BASE_URL}/users/@me/relationships`,
+  CREATE_ROOM: `${BASE_URL}/users/@me/rooms`,
+  ROOM_MESSAGES: (roomId: string) => `${BASE_URL}/rooms/${roomId}/messages`,
 };
 
 const API_HEADERS = {
@@ -53,12 +56,14 @@ type AuthContextType = {
   setRelationships: (relationships: string[]) => void;
   relationshipRequests: () => Relationship[];
   setRelationshipRequests: (requests: Relationship[]) => void;
+  rooms: () => RoomWithRecipients[];
+  setRooms: (rooms: RoomWithRecipients[]) => void;
   login: (credentials: {
     email: string;
     password: string;
   }) => Promise<{ success: boolean; error?: string }>;
   register: (
-    data: RegisterData
+    data: RegisterData,
   ) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
   isAuthenticated: () => boolean;
@@ -66,6 +71,8 @@ type AuthContextType = {
   isMobile: () => boolean;
   wsClient: () => WebSocketClient | null;
   updateStatus: (status?: string, customStatus?: string) => Promise<boolean>;
+  fetchBulkUsers: (userIds: string[]) => Promise<void>;
+  sendMessage: (roomId: string, content: string, nonce?: string) => Promise<{ success: boolean; message?: any; error?: string }>;
 };
 
 type RegisterData = {
@@ -94,6 +101,7 @@ export const AuthProvider: ParentComponent = (props) => {
   const [relationshipRequests, setRelationshipRequests] = createSignal<
     Relationship[]
   >([]);
+  const [rooms, setRooms] = createSignal<RoomWithRecipients[]>([]);
   const [isAuthenticated, setIsAuthenticated] = createSignal(false);
   const [loading, setLoading] = createSignal(true);
   const [isMobile, setIsMobile] = createSignal(window.innerWidth <= 768);
@@ -113,7 +121,7 @@ export const AuthProvider: ParentComponent = (props) => {
   createEffect(() => {
     console.log(
       "[AuthProvider:effect] Current relationships value:",
-      relationships()
+      relationships(),
     );
   });
 
@@ -122,7 +130,7 @@ export const AuthProvider: ParentComponent = (props) => {
   // };
 
   const initializeWebSocket = (
-    token: string = localStorage.getItem("sc_token") || ""
+    token: string = localStorage.getItem("sc_token") || "",
   ) => {
     if (!token) return false;
 
@@ -144,7 +152,7 @@ export const AuthProvider: ParentComponent = (props) => {
     client.onMessage("READY", (data) => {
       console.log(
         "[AuthProvider:READY] Full data payload:",
-        JSON.stringify(data, null, 2)
+        JSON.stringify(data, null, 2),
       );
 
       // Process all data before setting loading to false
@@ -178,7 +186,7 @@ export const AuthProvider: ParentComponent = (props) => {
       if (data.relationships) {
         console.log(
           "[AuthProvider:READY] Setting relationships:",
-          data.relationships
+          data.relationships,
         );
         setRelationships(data.relationships);
       }
@@ -186,7 +194,7 @@ export const AuthProvider: ParentComponent = (props) => {
       if (data.relationship_requests) {
         console.log(
           "[AuthProvider:READY] Setting relationship requests:",
-          data.relationship_requests
+          data.relationship_requests,
         );
         const requests = data.relationship_requests.map((request: any) => ({
           id: request.ID,
@@ -196,9 +204,37 @@ export const AuthProvider: ParentComponent = (props) => {
         }));
         console.log(
           "[AuthProvider:READY] Mapped relationship requests:",
-          requests
+          requests,
         );
         setRelationshipRequests(requests);
+      }
+
+      // Process rooms data if available
+      if (data.rooms) {
+        console.log("[AuthProvider:READY] Setting rooms:", data.rooms);
+        const roomsData = Object.values(data.rooms).map((room: any) => ({
+          id: room.ID,
+          name: room.Name,
+          type: room.Type,
+          recipients: room.Recipients || [],
+          owner_id: room.OwnerID,
+          last_message_id: room.LastMessageID,
+          icon: room.Icon,
+          created_at: room.CreatedAt,
+          updated_at: room.UpdatedAt,
+          recipients_data: room.Recipients?.map((recipientId: string) => 
+            data.users?.[recipientId] ? {
+              id: recipientId,
+              username: data.users[recipientId].Username,
+              discriminator: data.users[recipientId].Discriminator,
+              display_name: data.users[recipientId].DisplayName || data.users[recipientId].Username,
+              avatar: data.users[recipientId].Avatar,
+              presence: data.users[recipientId].Presence,
+            } : null
+          ).filter(Boolean)
+        }));
+        console.log("[AuthProvider:READY] Processed rooms data:", roomsData);
+        setRooms(roomsData);
       }
 
       // Verify all required data is present before removing loading screen
@@ -209,7 +245,7 @@ export const AuthProvider: ParentComponent = (props) => {
 
       // Only set loading to false after all data is processed and verified
       console.log(
-        "[AuthProvider:READY] All data processed and verified, setting loading to false"
+        "[AuthProvider:READY] All data processed and verified, setting loading to false",
       );
       setLoading(false);
     });
@@ -220,7 +256,7 @@ export const AuthProvider: ParentComponent = (props) => {
         cache,
         setRelationshipRequests,
         setRelationships,
-        user()?.id || ""
+        user()?.id || "",
       );
     });
 
@@ -230,7 +266,7 @@ export const AuthProvider: ParentComponent = (props) => {
         cache,
         setRelationshipRequests,
         setRelationships,
-        user()?.id || ""
+        user()?.id || "",
       );
 
       const currentUser = user();
@@ -252,7 +288,7 @@ export const AuthProvider: ParentComponent = (props) => {
         cache,
         setRelationshipRequests,
         setRelationships,
-        user()?.id || ""
+        user()?.id || "",
       );
     });
 
@@ -275,7 +311,7 @@ export const AuthProvider: ParentComponent = (props) => {
   };
 
   const fetchUserData = async (
-    token: string
+    token: string,
   ): Promise<{ success: boolean; error?: string }> => {
     try {
       // Don't set loading to false here, let the WebSocket READY event handle it
@@ -373,7 +409,7 @@ export const AuthProvider: ParentComponent = (props) => {
   };
 
   const register = async (
-    data: RegisterData
+    data: RegisterData,
   ): Promise<{ success: boolean; error?: string }> => {
     try {
       setLoading(true);
@@ -423,7 +459,7 @@ export const AuthProvider: ParentComponent = (props) => {
     const updatedUser = {
       ...currentUser,
       ...Object.fromEntries(
-        Object.entries(userUpdate).filter(([_, value]) => value !== undefined)
+        Object.entries(userUpdate).filter(([_, value]) => value !== undefined),
       ),
     };
 
@@ -452,6 +488,89 @@ export const AuthProvider: ParentComponent = (props) => {
     } catch (error) {
       console.error("Error updating status:", error);
       return false;
+    }
+  };
+
+  // Centralized function to fetch bulk user data
+  const fetchBulkUsers = async (userIds: string[]) => {
+    if (!userIds.length) return;
+    
+    try {
+      // Split into batches of 100 users to respect the API limit
+      for (let i = 0; i < userIds.length; i += 100) {
+        const batch = userIds.slice(i, i + 100);
+        
+        const response = await fetch(`${BASE_URL}/users/bulk`, {
+          method: "GET",
+          headers: {
+            ...API_HEADERS.JSON,
+            ...API_HEADERS.SESSION(),
+          },
+          body: JSON.stringify({ ids: batch })
+        });
+
+        if (!response.ok) {
+          console.error("Failed to fetch user data:", response.status);
+          continue;
+        }
+
+        const userData = await response.json();
+        
+        // Add users to cache
+        if (userData && userData.users) {
+          Object.entries(userData.users).forEach(([userId, userData]: [string, any]) => {
+            cache.setUser({
+              id: userId,
+              username: userData.Username,
+              discriminator: userData.Discriminator,
+              display_name: userData.DisplayName,
+              avatar: userData.Avatar,
+              banner: userData.Banner,
+              presence: userData.Presence ? {
+                status: userData.Presence.status || userData.Presence.Status,
+                custom_status: userData.Presence.custom_status || userData.Presence.CustomStatus
+              } : undefined
+            });
+          });
+        }
+      }
+    } catch (error) {
+      console.error("Error fetching bulk user data:", error);
+    }
+  };
+
+  // Function to send a message to a room
+  const sendMessage = async (roomId: string, content: string) => {
+    try {
+      if (!roomId || !content.trim()) {
+        return { success: false, error: "Room ID and message content are required" };
+      }
+
+      const response = await fetch(API_ENDPOINTS.ROOM_MESSAGES(roomId), {
+        method: "POST",
+        headers: {
+          ...API_HEADERS.JSON,
+          ...API_HEADERS.SESSION(),
+        },
+        body: JSON.stringify({ content }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        return {
+          success: false,
+          error: errorData.message || `Failed to send message: ${response.status}`,
+        };
+      }
+
+      const messageData = await response.json();
+      return { success: true, message: messageData };
+    } catch (error) {
+      console.error("Error sending message:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
     }
   };
 
@@ -488,6 +607,8 @@ export const AuthProvider: ParentComponent = (props) => {
         setRelationshipRequests,
         relationships: () => relationships(),
         setRelationships,
+        rooms: () => rooms(),
+        setRooms,
         login,
         register,
         logout,
@@ -496,6 +617,8 @@ export const AuthProvider: ParentComponent = (props) => {
         isMobile: mobileCheck,
         wsClient: () => wsClient(),
         updateStatus,
+        fetchBulkUsers,
+        sendMessage
       }}
     >
       {props.children}
@@ -505,6 +628,8 @@ export const AuthProvider: ParentComponent = (props) => {
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
-  if (!context) throw new Error("useAuth must be used within an AuthProvider");
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
   return context;
 };

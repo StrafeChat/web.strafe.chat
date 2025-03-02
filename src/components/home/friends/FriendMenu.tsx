@@ -36,7 +36,7 @@ export const FriendMenu: Component<FriendMenuProps> = (props) => {
           headers: {
             "X-Session-Token": localStorage.getItem("sc_token") || "",
           },
-        }
+        },
       );
 
       if (!response.ok) {

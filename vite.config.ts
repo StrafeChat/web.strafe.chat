@@ -3,9 +3,7 @@ import { resolve } from "path";
 import solid from "vite-plugin-solid";
 
 export default defineConfig({
-  plugins: [
-    solid(),
-  ],
+  plugins: [solid()],
   server: {
     port: 3000,
     middlewareMode: false,
@@ -13,17 +11,17 @@ export default defineConfig({
       strict: false,
     },
     headers: {
-      'Service-Worker-Allowed': '/'
-    }
+      "Service-Worker-Allowed": "/",
+    },
   },
   build: {
     target: "esnext",
     rollupOptions: {
       input: {
-        main: resolve(__dirname, 'index.html'),
-        sw: resolve(__dirname, 'public/service-worker.js')
-      }
-    }
+        main: resolve(__dirname, "index.html"),
+        sw: resolve(__dirname, "public/service-worker.js"),
+      },
+    },
   },
   resolve: {
     alias: {

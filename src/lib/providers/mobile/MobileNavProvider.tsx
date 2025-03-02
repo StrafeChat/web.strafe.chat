@@ -1,9 +1,4 @@
-import {
-  ParentProps,
-  createContext,
-  createSignal,
-  useContext,
-} from "solid-js";
+import { ParentProps, createContext, createSignal, useContext } from "solid-js";
 
 type MobileNavContextType = {
   currentView: () => "spaces" | "content";
@@ -16,7 +11,9 @@ type MobileNavContextType = {
 const MobileNavContext = createContext<MobileNavContextType>();
 
 export const MobileNavProvider = (props: ParentProps) => {
-  const [currentView, setCurrentView] = createSignal<"spaces" | "content">("content");
+  const [currentView, setCurrentView] = createSignal<"spaces" | "content">(
+    "content",
+  );
   const [touchStart, setTouchStart] = createSignal(0);
   const [touchEnd, setTouchEnd] = createSignal(0);
 

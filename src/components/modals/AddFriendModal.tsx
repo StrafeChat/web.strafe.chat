@@ -49,7 +49,7 @@ export const AddFriendModal: Component<AddFriendModalProps> = (props) => {
         throw new Error(
           data.code
             ? t(`friends.errors.${data.code}`)
-            : data.message || t("common.unknownError")
+            : data.message || t("common.unknownError"),
         );
       }
 

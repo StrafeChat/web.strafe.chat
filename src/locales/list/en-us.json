@@ -38,6 +38,11 @@
     "loading": "Loading...",
     "unknownError": "An unknown error occurred"
   },
+  "time": {
+    "today": "Today at {{time}}",
+    "yesterday": "Yesterday at {{time}}",
+    "date": "{{weekday}} at {{time}}"
+  },
   "customStatus": {
     "success": "Status updated successfully",
     "error": "Failed to update status",
@@ -205,6 +210,12 @@
     "title": "Private Messages",
     "conversations": "CONVERSATIONS",
     "createPM": "Create PM",
-    "comingSoon": "Private messages and group chats coming soon..."
+    "comingSoon": "Private messages and group chats coming soon...",
+    "selectFriends": "Select Friends",
+    "searchFriends": "Search friends...",
+    "create": "Create PM",
+    "errors": {
+      "selectFriends": "Please select at least one friend."
+    }
   }
 }

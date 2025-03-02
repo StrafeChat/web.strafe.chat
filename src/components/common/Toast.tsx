@@ -23,7 +23,10 @@ export const useToast = () => {
   return context;
 };
 
-export function ToastProvider(props: { children: JSX.Element; usePortal?: boolean }) {
+export function ToastProvider(props: {
+  children: JSX.Element;
+  usePortal?: boolean;
+}) {
   const [toasts, setToasts] = createSignal<Toast[]>([]);
   let toastId = 0;
 
@@ -47,8 +50,8 @@ export function ToastProvider(props: { children: JSX.Element; usePortal?: boolea
                 toast.type === "success"
                   ? "bg-green-500 text-white"
                   : toast.type === "error"
-                  ? "bg-red-500 text-white"
-                  : "bg-blue-500 text-white"
+                    ? "bg-red-500 text-white"
+                    : "bg-blue-500 text-white"
               }`}
             style={{
               animation: "slideIn 0.3s ease-out",
