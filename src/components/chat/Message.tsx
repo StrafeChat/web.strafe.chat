@@ -47,7 +47,7 @@ const Message: Component<MessageProps> = (props) => {
   };
 
   return (
-    <div class={`group flex gap-4 ${props.isCompact ? 'pt-0.5 pb-0.5' : 'mt-4 mb-0.5 p-1'} px-4 hover:bg-surface hover:bg-opacity-10 transition-colors relative w-full ${props.pending && !props.id ? 'opacity-70' : ''}`}>
+    <div class={`group flex gap-4 ${props.isCompact ? 'pt-0.5 pb-0.5' : 'mt-4 mb-0.5 p-1'} px-1 hover:bg-surface hover:bg-opacity-10 transition-colors relative w-full ${props.pending && !props.id ? 'opacity-70' : ''}`}>
       <Show when={!props.isCompact}>
         <div class="flex-shrink-0 mt-1">
           <img
