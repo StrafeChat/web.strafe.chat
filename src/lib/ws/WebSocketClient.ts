@@ -599,6 +599,22 @@ export class WebSocketClient {
 
     if (data.client_user) {
       console.log("[WebSocket] Client user data received:", data.client_user);
+      // Add client user to cache
+      if (this.cache) {
+        console.log("[WebSocket] Adding client user to cache");
+        this.cache.setUser({
+          id: data.client_user.id || data.client_user.ID,
+          username: data.client_user.username || data.client_user.Username,
+          discriminator: data.client_user.discriminator || data.client_user.Discriminator,
+          display_name: data.client_user.display_name || data.client_user.DisplayName || data.client_user.username || data.client_user.Username,
+          avatar: data.client_user.avatar || data.client_user.Avatar,
+          banner: data.client_user.banner || data.client_user.Banner,
+          presence: {
+            status: data.client_user.presence?.status || data.client_user.Presence?.Status || "online",
+            custom_status: data.client_user.presence?.custom_status || data.client_user.Presence?.CustomStatus || ""
+          }
+        });
+      }
     } else {
       console.warn("[WebSocket] No client_user data in READY payload");
     }

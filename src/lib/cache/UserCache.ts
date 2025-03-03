@@ -31,6 +31,37 @@ export class UserCache {
     }
   }
 
+  public setUser(user: any) {
+    console.log("[UserCache] Setting user in cache:", user);
+    if (user && (user.ID || user.id)) {
+      const userId = user.ID || user.id;
+      // Ensure the user object follows the CachedUser interface format
+      const cachedUser: CachedUser = {
+        ID: userId,
+        Username: user.Username || user.username,
+        Discriminator: user.Discriminator || user.discriminator,
+        DisplayName: user.DisplayName || user.display_name || user.Username || user.username,
+        Avatar: user.Avatar || user.avatar,
+        Banner: user.Banner || user.banner,
+        Bot: user.Bot || user.bot,
+        System: user.System || user.system,
+        Flags: user.Flags || user.flags,
+        Presence: user.Presence || {
+          Status: user.presence?.status || "online",
+          CustomStatus: user.presence?.custom_status || ""
+        },
+        presence: user.presence || {
+          status: user.Presence?.Status || "online",
+          custom_status: user.Presence?.CustomStatus || ""
+        }
+      };
+      this.users.set(userId, cachedUser);
+      console.log("[UserCache] User added to cache:", userId);
+    } else {
+      console.warn("[UserCache] Attempted to add user without ID to cache", user);
+    }
+  }
+
   public getUsers(): Map<string, CachedUser> {
     return this.users;
   }
