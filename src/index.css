@@ -23,7 +23,6 @@
 
     --ring: var(--primary);
     --radius: 0.5rem;
-    --vh: 1vh;
   }
 
   .dark {
@@ -37,12 +36,6 @@
     --text-secondary: #aaaaaa;
     --border: #444444;
   }
-
-  @supports (height: 100dvh) {
-    :root {
-      --vh: 1dvh;
-    }
-  }
 }
 
 @layer base {
@@ -50,9 +43,6 @@
   body,
   #root {
     @apply h-full w-full overflow-hidden;
-    height: 100vh; /* Fallback */
-    height: calc(var(--vh) * 100);
-    padding-bottom: env(safe-area-inset-bottom);
   }
   * {
     @apply border-border;
