@@ -124,7 +124,7 @@ export class WebSocketClient {
   private readonly messageHandlers: Map<string, (data: any) => void> = new Map();
   private connectPromise: Promise<boolean> | null = null;
   private readyPromise: Promise<ReadyPayload> | null = null;
-  private connectionStateCallbacks: ((connected: boolean) => void)[] = [];
+  private readonly connectionStateCallbacks: ((connected: boolean) => void)[] = [];
   private connected = false;
   public cache: UserCache;
   private relationships: Record<string, any> = {};
@@ -415,23 +415,10 @@ export class WebSocketClient {
         break;
 
       case "connectionState":
-        console.log("[WebSocket] Connection state update received:", payload);
-        this.connected = payload.connected;
-        this.notifyConnectionState();
-        // This is the key fix - explicitly call the connection state callbacks
-        // to ensure the connection timeout is cleared
-        if (this.connectionStateCallbacks.length > 0) {
-          console.log("[WebSocket] Notifying connection state callbacks directly");
-          // Make a copy of the callbacks to avoid modification during iteration
-          [...this.connectionStateCallbacks].forEach(callback => callback(payload.connected));
-        }
-        break;
-        
       case "connected":
-        console.log("[WebSocket] Connected state update received:", payload);
         this.connected = payload.connected;
         this.notifyConnectionState();
-        if (this.connectPromise) {
+        if (type === "connected" && this.connectPromise) {
           this.connectPromise = Promise.resolve(payload.connected);
         }
         break;
@@ -442,78 +429,30 @@ export class WebSocketClient {
     }
   }
 
-  private async handleRoomCreate(payload: any): Promise<void> {
-    if (!payload || !payload.data) {
-      console.error("[WebSocketClient] Invalid room create payload:", payload);
-      return;
-    }
-
-    const room = payload.data;
-    const currentUserId = this.cache.getCurrentUserId();
-
-    // Check for uncached recipients
-    if (room.recipients && Array.isArray(room.recipients)) {
-      const missingUserIds = room.recipients.filter(
-        (id: string) => id !== currentUserId && !this.cache.getUser(id)
-      );
-
-      if (missingUserIds.length > 0) {
-        try {
-          // Fetch users in batches of 100
-          for (let i = 0; i < missingUserIds.length; i += 100) {
-            const batch = missingUserIds.slice(i, i + 100);
-            const response = await fetch(`${BASE_URL}/users/bulk`, {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'X-Session-Token': this.currentToken || localStorage.getItem('sc_token') || ''
-              },
-              body: JSON.stringify({ ids: batch })
-            });
-
-            if (response.ok) {
-              const users = await response.json() as BulkUserResponse;
-              // Add fetched users to cache
-              if (users && users.users) {
-                Object.entries(users.users).forEach(([userId, user]) => {
-                  this.cache.setUser({
-                    id: userId,
-                    username: user.Username,
-                    discriminator: user.Discriminator,
-                    display_name: user.DisplayName || user.Username,
-                    avatar: user.Avatar,
-                    banner: user.Banner,
-                    presence: {
-                      status: user.Presence?.Status || 'offline',
-                      custom_status: user.Presence?.CustomStatus || ''
-                    }
-                  });
-                });
-              }
-            }
-          }
-
-          // Update recipients_data with cached user information
-          room.recipients_data = room.recipients.map((recipientId: string) => {
-            const userData = this.cache.getUser(recipientId);
-            return userData ? {
-              id: recipientId,
-              username: userData.Username,
-              discriminator: userData.Discriminator,
-              display_name: userData.DisplayName || userData.Username,
-              avatar: userData.Avatar,
-              presence: userData.Presence
-            } : null;
-          }).filter(Boolean);
-
-        } catch (error) {
-          console.error("[WebSocketClient] Error fetching users:", error);
-        }
+  private handleRoomCreate(data: any): void {
+    console.log("[WebSocket] Handling room create:", data);
+    const roomData = data.data || data;
+    if (roomData.id) {
+      console.log("[WebSocket] Dispatching room create event:", roomData);
+      // Dispatch both 'roomCreate' and 'ROOM_CREATE' events to ensure compatibility
+      this.dispatchEvent("roomCreate", {
+        id: roomData.id,
+        name: roomData.name || "",
+        type: roomData.type || 0,
+        recipients: roomData.recipients || [],
+        owner_id: roomData.owner_id || "",
+        last_message_id: roomData.last_message_id || null,
+        icon: roomData.icon || null,
+        created_at: roomData.created_at || new Date().toISOString(),
+        updated_at: roomData.updated_at || null
+      });
+      
+      // Also call the message handler directly to ensure it's processed
+      const roomCreateHandler = this.messageHandlers.get("ROOM_CREATE");
+      if (roomCreateHandler) {
+        roomCreateHandler(roomData);
       }
     }
-
-    // Dispatch the room create event with updated recipients_data
-    this.dispatchEvent('ROOM_CREATE', room);
   }
 
   private handleMessageCreate(data: any): void {
@@ -801,46 +740,12 @@ export class WebSocketClient {
     this.connectPromise = new Promise((resolve) => {
       if (WebSocketClient.isSharedWorkerSupported && this.worker) {
         console.log("[WebSocket] Sending connect message to worker with token");
-        
-        // Set up a timeout to detect connection failures
-        const connectionTimeout = setTimeout(() => {
-          console.warn("[WebSocket] Connection timeout - no response from worker");
-          this.connected = false;
-          this.notifyConnectionState();
-          resolve(false);
-        }, 10000); // 10 second timeout
-
-        // Set up a one-time connection state handler
-        const connectionHandler = (connected: boolean) => {
-          clearTimeout(connectionTimeout);
-          this.connectionStateCallbacks = this.connectionStateCallbacks.filter(cb => cb !== connectionHandler);
-          resolve(connected);
-        };
-        this.connectionStateCallbacks.push(connectionHandler);
-        
-        // Send connect message to worker
-        try {
-          this.worker.port.postMessage({
-            type: "connect",
-            payload: { token },
-          });
-        } catch (error) {
-          console.error("[WebSocket] Error sending connect message to worker:", error);
-          clearTimeout(connectionTimeout);
-          this.connected = false;
-          this.notifyConnectionState();
-          resolve(false);
-        }
+        this.worker.port.postMessage({
+          type: "connect",
+          payload: { token },
+        });
       } else {
         // Direct WebSocket connection
-        // Set up a timeout for direct connection
-        const connectionTimeout = setTimeout(() => {
-          console.warn("[WebSocket] Direct connection timeout");
-          this.connected = false;
-          this.notifyConnectionState();
-          resolve(false);
-        }, 10000); // 10 second timeout
-        
         this.ws.onopen = () => {
           console.log("[WebSocket] Direct connection opened, sending identify");
           const identifyPayload: IdentifyPayload = {
@@ -849,21 +754,12 @@ export class WebSocketClient {
             device: "browser",
           };
 
-          try {
-            this.ws.send(JSON.stringify(identifyPayload));
-            clearTimeout(connectionTimeout);
-            this.connected = true;
-            this.notifyConnectionState();
-            this.startHeartbeat();
-            this.reconnectAttempts = 0;
-            resolve(true);
-          } catch (error) {
-            console.error("[WebSocket] Failed to send identify:", error);
-            clearTimeout(connectionTimeout);
-            this.connected = false;
-            this.notifyConnectionState();
-            resolve(false);
-          }
+          this.ws.send(JSON.stringify(identifyPayload));
+          this.connected = true;
+          this.notifyConnectionState();
+          this.startHeartbeat();
+          this.reconnectAttempts = 0;
+          resolve(true);
         };
       }
     });
@@ -943,22 +839,3 @@ export class WebSocketClient {
     }
   }
 }
-
-interface BulkUserResponse {
-  users: {
-    [key: string]: {
-      ID: string;
-      Username: string;
-      Discriminator: number;
-      DisplayName?: string;
-      Avatar?: string;
-      Banner?: string;
-      Presence?: {
-        Status?: string;
-        CustomStatus?: string;
-      };
-    };
-  };
-}
-
-  
