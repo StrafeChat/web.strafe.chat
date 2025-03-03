@@ -197,7 +197,7 @@ class WebSocketWorkerHandler {
       this.send(payload);
     }
 
-    // Set up heartbeat interval (every 15 seconds)
+    // Set up heartbeat interval (every 15 seconds instead of 45)
     this.heartbeatInterval = setInterval(() => {
       if (this.isConnected()) {
         console.log("[WebSocketWorker] Sending heartbeat");
@@ -206,23 +206,12 @@ class WebSocketWorkerHandler {
           timestamp: Date.now(),
         };
 
-        this.send(payload)
-          .then(() => {
-            // Successfully sent heartbeat, ensure connection state is synced
-            this.notifyConnectionState(true);
-          })
-          .catch((error) => {
-            console.error("[WebSocketWorker] Heartbeat failed:", error);
-            this.notifyConnectionState(false);
-            if (this.currentToken) {
-              this.ws?.close(1000, "Heartbeat failed");
-            }
-          });
-      } else {
-        // If not connected, try to reconnect
-        if (this.currentToken && this.ports.size > 0) {
-          this.scheduleReconnect();
-        }
+        this.send(payload).catch((error) => {
+          console.error("[WebSocketWorker] Heartbeat failed:", error);
+          if (this.currentToken) {
+            this.ws?.close(1000, "Heartbeat failed");
+          }
+        });
       }
     }, 15000) as unknown as number;
   }
@@ -521,31 +510,14 @@ class WebSocketWorkerHandler {
     connected: boolean,
     specificPort?: MessagePort,
   ) {
-    // Send more detailed connection state information
     const message = {
       type: "connectionState",
-      payload: { 
-        connected, 
-        loading: this.loading,
-        readyState: this.ws ? this.ws.readyState : WebSocket.CLOSED,
-        timestamp: Date.now()
-      },
+      payload: { connected, loading: this.loading },
     };
-    
-    console.log("[WebSocketWorker] Notifying connection state:", message.payload);
-    
-    // Also send a simpler 'connected' message for backward compatibility
-    const connectedMessage = {
-      type: "connected",
-      payload: { connected },
-    };
-    
     if (specificPort) {
       specificPort.postMessage(message);
-      specificPort.postMessage(connectedMessage);
     } else {
       this.broadcast(message);
-      this.broadcast(connectedMessage);
     }
   }
 

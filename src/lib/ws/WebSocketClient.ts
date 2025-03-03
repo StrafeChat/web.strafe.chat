@@ -162,7 +162,6 @@ export class WebSocketClient {
       }
     });
 
-    // Try to use SharedWorker if supported
     if (WebSocketClient.isSharedWorkerSupported) {
       // Create or join the coordination channel
       if (!WebSocketClient.workerChannel) {
@@ -194,7 +193,6 @@ export class WebSocketClient {
       }
 
       if (WebSocketClient.activeWorker) {
-        console.log("[WebSocket] Using SharedWorker for WebSocket connection");
         this.worker = WebSocketClient.activeWorker;
         this.worker.port.onmessage = this.handleWorkerMessage.bind(this);
         this.worker.port.start();
@@ -210,136 +208,136 @@ export class WebSocketClient {
           type: "init",
           payload: { url: this.ws.url },
         });
-        return; // Exit early, we're using the worker
       }
     }
 
-    // Fallback to direct WebSocket connection if SharedWorker is not supported or failed
-    console.log(
-      "[WebSocket] Using direct WebSocket connection"
-    );
+    if (!WebSocketClient.isSharedWorkerSupported) {
+      console.log(
+        "[WebSocket] Using direct WebSocket connection (SharedWorker not supported)",
+      );
 
-    this.ws.onopen = () => {
-      console.log("[WebSocket] Direct connection opened");
-      this.connected = true;
-      this.notifyConnectionState();
-    };
+      this.ws.onopen = () => {
+        console.log("[WebSocket] Direct connection opened");
+      };
 
-    this.ws.onmessage = async (event) => {
-      console.log("[WebSocket] Raw message received:", event.data);
-      try {
-        let data: any;
+      // In WebSocketClient.ts, update the ws.onmessage handler:
 
-        if (!event.data) {
-          console.warn("[WebSocket] Received empty message");
-          return;
-        }
-
-        // For binary MessagePack data
-        if (
-          event.data instanceof ArrayBuffer ||
-          event.data instanceof Uint8Array
-        ) {
-          const uint8Array =
-            event.data instanceof ArrayBuffer
-              ? new Uint8Array(event.data)
-              : event.data;
-          try {
-            data = decode(uint8Array);
-            console.log("[WebSocket] Decoded MessagePack data:", data);
-          } catch (msgpackError) {
-            console.error(
-              "[WebSocket] Failed to decode MessagePack:",
-              msgpackError,
-            );
+      this.ws.onmessage = async (event) => {
+        console.log("[WebSocket] Raw message received:", event.data);
+        try {
+          let data: any;
+  
+          if (!event.data) {
+            console.warn("[WebSocket] Received empty message");
             return;
           }
-        }
-        // For Blob data
-        else if (event.data instanceof Blob) {
-          const arrayBuffer = await event.data.arrayBuffer();
-          const uint8Array = new Uint8Array(arrayBuffer);
-          try {
-            data = decode(uint8Array);
-            console.log("[WebSocket] Decoded Blob data:", data);
-          } catch (msgpackError) {
+  
+          // For binary MessagePack data
+          if (
+            event.data instanceof ArrayBuffer ||
+            event.data instanceof Uint8Array
+          ) {
+            const uint8Array =
+              event.data instanceof ArrayBuffer
+                ? new Uint8Array(event.data)
+                : event.data;
             try {
-              const textDecoder = new TextDecoder("utf-8");
-              const jsonString = textDecoder.decode(uint8Array);
-              data = JSON.parse(jsonString);
-              console.log("[WebSocket] Decoded JSON from Blob:", data);
-            } catch (jsonError) {
-              console.error("[WebSocket] Failed to decode message:", {
+              data = decode(uint8Array);
+              console.log("[WebSocket] Decoded MessagePack data:", data);
+            } catch (msgpackError) {
+              console.error(
+                "[WebSocket] Failed to decode MessagePack:",
                 msgpackError,
-                jsonError,
-              });
+              );
               return;
             }
           }
-        }
-        // For string data (JSON)
-        else if (typeof event.data === "string") {
-          try {
-            data = JSON.parse(event.data);
-            console.log("[WebSocket] Parsed JSON string:", data);
-          } catch (error) {
-            console.error("[WebSocket] Failed to parse JSON string:", error);
+          // For Blob data
+          else if (event.data instanceof Blob) {
+            const arrayBuffer = await event.data.arrayBuffer();
+            const uint8Array = new Uint8Array(arrayBuffer);
+            try {
+              data = decode(uint8Array);
+              console.log("[WebSocket] Decoded Blob data:", data);
+            } catch (msgpackError) {
+              try {
+                const textDecoder = new TextDecoder("utf-8");
+                const jsonString = textDecoder.decode(uint8Array);
+                data = JSON.parse(jsonString);
+                console.log("[WebSocket] Decoded JSON from Blob:", data);
+              } catch (jsonError) {
+                console.error("[WebSocket] Failed to decode message:", {
+                  msgpackError,
+                  jsonError,
+                });
+                return;
+              }
+            }
+          }
+          // For string data (JSON)
+          else if (typeof event.data === "string") {
+            try {
+              data = JSON.parse(event.data);
+              console.log("[WebSocket] Parsed JSON string:", data);
+            } catch (error) {
+              console.error("[WebSocket] Failed to parse JSON string:", error);
+              return;
+            }
+          }
+  
+          // Normalize the payload to use lowercase keys
+          data = this.normalizePayload(data);
+  
+          // Ensure the data follows the standard event payload structure
+          if (!(data.op !== undefined && data.d !== undefined)) {
+            console.warn("[WebSocket] Received non-standard payload:", data);
+            data = {
+              op: 0,
+              d: data,
+            };
+          }
+  
+          // Handle READY event specially
+          if (data.op === "READY" || (data.op === 0 && data.t === "READY")) {
+            const readyData = {
+              type: "READY",
+              ...(data.d || data),
+            };
+            console.log("[WebSocket] Processing READY event:", readyData);
+            this.handleReady(readyData);
             return;
           }
-        }
-
-        // Normalize the payload to use lowercase keys
-        data = this.normalizePayload(data);
-
-        // Ensure the data follows the standard event payload structure
-        if (!(data.op !== undefined && data.d !== undefined)) {
-          console.warn("[WebSocket] Received non-standard payload:", data);
-          data = {
-            op: 0,
-            d: data,
-          };
-        }
-
-        // Handle READY event specially
-        if (data.op === "READY" || (data.op === 0 && data.t === "READY")) {
-          const readyData = {
-            type: "READY",
-            ...(data.d || data),
-          };
-          console.log("[WebSocket] Processing READY event:", readyData);
-          this.handleReady(readyData);
-          return;
-        }
-
-        // For other events, use the existing handler
-        if (data.op) {
-          const type = this.mapEventTypeToOpCode(data.op);
-          const handler = this.messageHandlers.get(type);
-          if (handler) {
-            handler(data.d);
-          } else {
-            console.warn("[WebSocket] No handler for message type:", type);
+  
+          // For other events, use the existing handler
+          if (data.op) {
+            const type = this.mapEventTypeToOpCode(data.op);
+            const handler = this.messageHandlers.get(type);
+            if (handler) {
+              handler(data.d);
+            } else {
+              console.warn("[WebSocket] No handler for message type:", type);
+            }
           }
+        } catch (error) {
+          console.error("[WebSocket] Error handling message:", error);
         }
-      } catch (error) {
-        console.error("[WebSocket] Error handling message:", error);
-      }
-    };
+      };
 
-    this.ws.onclose = (event) => {
-      console.log("[WebSocket] Direct connection closed:", event);
-      this.connected = false;
-      this.notifyConnectionState();
-      if (this.currentToken) {
-        this.scheduleReconnect();
-      }
-    };
+      this.ws.onclose = (event) => {
+        console.log("[WebSocket] Direct connection closed:", event);
+        this.connected = false;
+        this.notifyConnectionState();
+        if (this.currentToken) {
+          this.scheduleReconnect();
+        }
+      };
 
-    this.ws.onerror = (error) => {
-      console.error("[WebSocket] Direct connection error:", error);
-      this.connected = false;
-      this.notifyConnectionState();
-    };
+      this.ws.onerror = (error) => {
+        console.error("[WebSocket] Direct connection error:", error);
+        this.connected = false;
+        this.notifyConnectionState();
+      };
+    }
 
     // Listen for presence updates
     this.cache.onPresenceUpdate((userId, presence) => {
@@ -398,32 +396,13 @@ export class WebSocketClient {
   
       case "ready":
         this.handleReady(payload);
-        // When we get a READY event, we're definitely connected
-        this.connected = true;
-        this.notifyConnectionState();
         break;
   
       case "connectionState":
-        console.log("[WebSocket] Connection state update from worker:", payload);
-        const wasConnected = this.connected;
-        this.connected = payload.connected;
-        
-        // Only notify if the state actually changed
-        if (wasConnected !== this.connected) {
-          console.log(`[WebSocket] Connection state changed: ${wasConnected} -> ${this.connected}`);
-          this.notifyConnectionState();
-        }
-        
-        if (this.connectPromise) {
-          this.connectPromise = Promise.resolve(payload.connected);
-        }
-        break;
-      
       case "connected":
-        console.log("[WebSocket] Connected state update from worker:", payload);
         this.connected = payload.connected;
         this.notifyConnectionState();
-        if (this.connectPromise) {
+        if (type === "connected" && this.connectPromise) {
           this.connectPromise = Promise.resolve(payload.connected);
         }
         break;
@@ -837,29 +816,6 @@ export class WebSocketClient {
 
     this.currentToken = token;
     this.connectPromise = new Promise((resolve) => {
-      // Set a timeout to resolve with current connection state if no update received
-      const timeout = setTimeout(() => {
-        console.log("[WebSocket] Connection timeout, resolving with current state:", this.connected);
-        resolve(this.connected);
-      }, 5000);
-
-      // Create a one-time connection state callback
-      const onConnectionChange = (connected: boolean) => {
-        if (connected) {
-          console.log("[WebSocket] Connection established, resolving promise");
-          clearTimeout(timeout);
-          // Remove this callback after it's triggered
-          const index = this.connectionStateCallbacks.indexOf(onConnectionChange);
-          if (index !== -1) {
-            this.connectionStateCallbacks.splice(index, 1);
-          }
-          resolve(true);
-        }
-      };
-
-      // Add the callback to our list
-      this.connectionStateCallbacks.push(onConnectionChange);
-
       if (WebSocketClient.isSharedWorkerSupported && this.worker) {
         console.log("[WebSocket] Sending connect message to worker with token");
         this.worker.port.postMessage({
