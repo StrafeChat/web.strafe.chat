@@ -1,4 +1,4 @@
-import { RelationshipPayload } from "../../../types/relationships";
+import { RelationshipPayload, RelationshipUpdate } from "../../../types/relationships";
 import { BASE_URL } from "../../../constants";
 
 export const handleRelationshipUpdate = async (
@@ -80,6 +80,20 @@ export const handleRelationshipUpdate = async (
             "[RelationshipUpdate] Request already exists:",
             existingRequest,
           );
+        }
+        break;
+
+      case "relationshipUpdate":
+        console.log("[RelationshipUpdate] Updating relationship");
+        const updateIndex = newRelationships.findIndex(
+          (r) =>
+            r.id === payload.id ||
+            (r.sender_id === payload.sender_id &&
+              r.recipient_id === payload.recipient_id),
+        );
+        if (updateIndex !== -1) {
+          newRelationships[updateIndex] = payload;
+          console.log("[RelationshipUpdate] Updated relationship:", payload);
         }
         break;
 

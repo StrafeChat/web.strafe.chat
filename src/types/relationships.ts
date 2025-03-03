@@ -4,7 +4,7 @@ export interface RelationshipPayload {
   recipient_id: string;
   created_at: string;
   updated_at: string;
-  type: "relationshipCreate" | "relationshipAccept" | "relationshipDelete";
+  type: "relationshipCreate" | "relationshipUpdate" | "relationshipAccept" | "relationshipDelete";
 }
 
 export interface Relationship {
@@ -16,5 +16,5 @@ export interface Relationship {
 
 export interface RelationshipUpdate {
   relationship: Relationship;
-  type: "relationshipCreate" | "relationshipAccept" | "relationshipDelete";
+  type: "relationshipCreate" | "relationshipUpdate" | "relationshipAccept" | "relationshipDelete";
 }

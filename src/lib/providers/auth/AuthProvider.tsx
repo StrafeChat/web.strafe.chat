@@ -20,6 +20,8 @@ export const API_ENDPOINTS = {
   RELATIONSHIPS: `${BASE_URL}/users/@me/relationships`,
   CREATE_ROOM: `${BASE_URL}/users/@me/rooms`,
   ROOM_MESSAGES: (roomId: string) => `${BASE_URL}/rooms/${roomId}/messages`,
+  UPDATE_STATUS: `${BASE_URL}/users/@me/status`,
+  BULK_USERS: `${BASE_URL}/users/bulk`,
 };
 
 const API_HEADERS = {
@@ -58,13 +60,8 @@ type AuthContextType = {
   setRelationshipRequests: (requests: Relationship[]) => void;
   rooms: () => RoomWithRecipients[];
   setRooms: (rooms: RoomWithRecipients[]) => void;
-  login: (credentials: {
-    email: string;
-    password: string;
-  }) => Promise<{ success: boolean; error?: string }>;
-  register: (
-    data: RegisterData,
-  ) => Promise<{ success: boolean; error?: string }>;
+  login: (credentials: LoginCredentials) => Promise<AuthResponse>;
+  register: (data: RegisterData) => Promise<AuthResponse>;
   logout: () => void;
   isAuthenticated: () => boolean;
   loading: () => boolean;
@@ -72,7 +69,12 @@ type AuthContextType = {
   wsClient: () => WebSocketClient | null;
   updateStatus: (status?: string, customStatus?: string) => Promise<boolean>;
   fetchBulkUsers: (userIds: string[]) => Promise<void>;
-  sendMessage: (roomId: string, content: string, nonce?: string) => Promise<{ success: boolean; message?: any; error?: string }>;
+  sendMessage: (roomId: string, content: string, nonce?: string) => Promise<MessageResponse>;
+};
+
+type LoginCredentials = {
+  email: string;
+  password: string;
 };
 
 type RegisterData = {
@@ -92,15 +94,24 @@ type Relationship = {
   type?: string;
 };
 
+type AuthResponse = {
+  success: boolean;
+  error?: string;
+};
+
+type MessageResponse = {
+  success: boolean;
+  message?: any;
+  error?: string;
+};
+
 const AuthContext = createContext<AuthContextType>();
 
 export const AuthProvider: ParentComponent = (props) => {
   const cache = useCache();
   const [user, setUser] = createSignal<Clientuser | null>(null);
   const [relationships, setRelationships] = createSignal<string[]>([]);
-  const [relationshipRequests, setRelationshipRequests] = createSignal<
-    Relationship[]
-  >([]);
+  const [relationshipRequests, setRelationshipRequests] = createSignal<Relationship[]>([]);
   const [rooms, setRooms] = createSignal<RoomWithRecipients[]>([]);
   const [isAuthenticated, setIsAuthenticated] = createSignal(false);
   const [loading, setLoading] = createSignal(true);
@@ -109,29 +120,14 @@ export const AuthProvider: ParentComponent = (props) => {
 
   const mobileCheck = createMemo(() => isMobile());
 
+  // Handle window resize for mobile detection
   createEffect(() => {
-    const handleResize = () => {
-      setIsMobile(window.innerWidth <= 768);
-    };
-
+    const handleResize = () => setIsMobile(window.innerWidth <= 768);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   });
 
-  createEffect(() => {
-    console.log(
-      "[AuthProvider:effect] Current relationships value:",
-      relationships(),
-    );
-  });
-
-  // const logError = (context: string, error: unknown) => {
-  //   console.error(`[AuthProvider:${context}]`, error);
-  // };
-
-  const initializeWebSocket = (
-    token: string = localStorage.getItem("sc_token") || "",
-  ) => {
+  const initializeWebSocket = (token: string = localStorage.getItem("sc_token") || "") => {
     if (!token) return false;
 
     const ws = new WebSocket(WS_URL);
@@ -140,226 +136,204 @@ export const AuthProvider: ParentComponent = (props) => {
 
     client.onConnectionStateChange((connected) => {
       console.log("[AuthProvider] WebSocket connection state:", connected);
-      if (!connected) {
-        setLoading(true); // Show loading when connection is lost
-      }
+      if (!connected) setLoading(true);
     });
 
     client.connect(token).catch((error) => {
       console.error("[WebSocket] Failed to connect:", error);
     });
 
-    client.onMessage("READY", (data) => {
-      console.log(
-        "[AuthProvider:READY] Full data payload:",
-        JSON.stringify(data, null, 2),
-      );
-
-      // Process all data before setting loading to false
-      if (data.client_user) {
-        const userData = {
-          id: data.client_user.ID,
-          username: data.client_user.Username,
-          discriminator: data.client_user.Discriminator,
-          display_name:
-            data.client_user.DisplayName || data.client_user.Username,
-          email: data.client_user.Email,
-          avatar: data.client_user.Avatar,
-          banner: data.client_user.Banner,
-          date_of_birth: data.client_user.DateOfBirth,
-          friends: data.client_user.Friends || [],
-          presence: {
-            status: data.client_user.Presence.Status,
-            custom_status: data.client_user.Presence.CustomStatus,
-          },
-        };
-        console.log("[AuthProvider:READY] Setting user data:", userData);
-        setUser(userData);
-        setIsAuthenticated(true);
-      }
-
-      if (data.users) {
-        console.log("[AuthProvider:READY] Setting users in cache:", data.users);
-        cache.setUsers(data.users);
-      }
-
-      if (data.relationships) {
-        console.log(
-          "[AuthProvider:READY] Setting relationships:",
-          data.relationships,
-        );
-        setRelationships(data.relationships);
-      }
-
-      if (data.relationship_requests) {
-        console.log(
-          "[AuthProvider:READY] Setting relationship requests:",
-          data.relationship_requests,
-        );
-        const requests = data.relationship_requests.map((request: any) => ({
-          id: request.ID,
-          sender_id: request.SenderID,
-          recipient_id: request.RecipientID,
-          created_at: request.CreatedAt || new Date().toISOString(),
-        }));
-        console.log(
-          "[AuthProvider:READY] Mapped relationship requests:",
-          requests,
-        );
-        setRelationshipRequests(requests);
-      }
-
-      // Process rooms data if available
-      if (data.rooms) {
-        console.log("[AuthProvider:READY] Setting rooms:", data.rooms);
-        const roomsData = Object.values(data.rooms).map((room: any) => ({
-          id: room.ID,
-          name: room.Name,
-          type: room.Type,
-          recipients: room.Recipients || [],
-          owner_id: room.OwnerID,
-          last_message_id: room.LastMessageID,
-          icon: room.Icon,
-          created_at: room.CreatedAt,
-          updated_at: room.UpdatedAt,
-          recipients_data: room.Recipients?.map((recipientId: string) => 
-            data.users?.[recipientId] ? {
-              id: recipientId,
-              username: data.users[recipientId].Username,
-              discriminator: data.users[recipientId].Discriminator,
-              display_name: data.users[recipientId].DisplayName || data.users[recipientId].Username,
-              avatar: data.users[recipientId].Avatar,
-              presence: data.users[recipientId].Presence,
-            } : null
-          ).filter(Boolean)
-        }));
-        console.log("[AuthProvider:READY] Processed rooms data:", roomsData);
-        setRooms(roomsData);
-      }
-
-      // Verify all required data is present before removing loading screen
-      if (!data.client_user || !data.users) {
-        console.error("[AuthProvider:READY] Missing required data");
-        return;
-      }
-
-      // Only set loading to false after all data is processed and verified
-      console.log(
-        "[AuthProvider:READY] All data processed and verified, setting loading to false",
-      );
-      setLoading(false);
-    });
-
-    client.onMessage("relationshipCreate", (data) => {
-      handleWebSocketMessage(
-        { type: "relationshipCreate", ...data },
-        cache,
-        setRelationshipRequests,
-        setRelationships,
-        user()?.id || "",
-      );
-    });
-
-    client.onMessage("relationshipAccept", (data) => {
-      handleWebSocketMessage(
-        { type: "relationshipAccept", ...data },
-        cache,
-        setRelationshipRequests,
-        setRelationships,
-        user()?.id || "",
-      );
-
-      const currentUser = user();
-      if (currentUser) {
-        const otherUserId =
-          currentUser.id === data.sender_id
-            ? data.recipient_id
-            : data.sender_id;
-        setUser({
-          ...currentUser,
-          friends: [...(currentUser.friends || []), otherUserId],
-        });
-      }
-    });
-
-    client.onMessage("relationshipDelete", (data) => {
-      handleWebSocketMessage(
-        { type: "relationshipDelete", ...data },
-        cache,
-        setRelationshipRequests,
-        setRelationships,
-        user()?.id || "",
-      );
-    });
-
-    // client.onMessage("presence", (data) => {
-    //   console.log("[AuthProvider] Received presence update:", data);
-    //   if (data.user_id === user()?.id) {
-    //     console.log("[AuthProvider] Presence update for self");
-    //     const currentUser = user()!;
-    //     setUser({
-    //       ...currentUser,
-    //       presence: {
-    //         status: data.status,
-    //         custom_status: data.custom_status,
-    //       },
-    //     });
-    //   }
-    // });
-
+    setupWebSocketHandlers(client);
     return true;
   };
 
-  const fetchUserData = async (
-    token: string,
-  ): Promise<{ success: boolean; error?: string }> => {
-    try {
-      // Don't set loading to false here, let the WebSocket READY event handle it
-      const res = await fetch(API_ENDPOINTS.USER_ME, {
-        headers: {
-          ...API_HEADERS.JSON,
-          ...API_HEADERS.SESSION(),
+  const setupWebSocketHandlers = (client: WebSocketClient) => {
+    client.onMessage("READY", handleReadyEvent);
+    client.onMessage("relationshipCreate", handleRelationshipEvent);
+    client.onMessage("relationshipAccept", handleRelationshipAcceptEvent);
+    client.onMessage("relationshipDelete", handleRelationshipEvent);
+    client.onMessage("ROOM_CREATE", handleRoomCreateEvent);
+    client.onMessage("presence", handlePresenceEvent);
+  };
+
+  const handleReadyEvent = (data: any) => {
+    if (data.client_user) {
+      const userData = normalizeUserData(data.client_user);
+      setUser(userData);
+      setIsAuthenticated(true);
+      cache.setUser(userData);
+    }
+
+    if (data.users) {
+      cache.setUsers(data.users);
+    }
+
+    if (data.relationships) {
+      setRelationships(data.relationships);
+    }
+
+    if (data.relationship_requests) {
+      const requests = normalizeRelationshipRequests(data.relationship_requests);
+      setRelationshipRequests(requests);
+    }
+
+    if (data.rooms) {
+      const roomsData = normalizeRoomsData(data.rooms, data.users);
+      setRooms(roomsData);
+    }
+
+    if (!data.client_user || !data.users) {
+      console.error("[AuthProvider:READY] Missing required data");
+      return;
+    }
+
+    setLoading(false);
+  };
+
+  const normalizeUserData = (userData: any): Clientuser => ({
+    id: userData.ID,
+    username: userData.Username,
+    discriminator: userData.Discriminator,
+    display_name: userData.DisplayName || userData.Username,
+    email: userData.Email,
+    avatar: userData.Avatar,
+    banner: userData.Banner,
+    date_of_birth: userData.DateOfBirth,
+    friends: userData.Friends || [],
+    presence: {
+      status: userData.Presence?.Status,
+      custom_status: userData.Presence?.CustomStatus,
+    },
+  });
+
+  const normalizeRelationshipRequests = (requests: any[]): Relationship[] =>
+    requests.map((request) => ({
+      id: request.ID,
+      sender_id: request.SenderID,
+      recipient_id: request.RecipientID,
+      created_at: request.CreatedAt || new Date().toISOString(),
+    }));
+
+  const normalizeRoomsData = (rooms: any, users: any): RoomWithRecipients[] =>
+    Object.values(rooms).map((room: any) => ({
+      id: room.ID,
+      name: room.Name,
+      type: room.Type,
+      recipients: room.Recipients || [],
+      owner_id: room.OwnerID,
+      last_message_id: room.LastMessageID,
+      icon: room.Icon,
+      created_at: room.CreatedAt,
+      updated_at: room.UpdatedAt,
+      recipients_data: room.Recipients?.map((recipientId: string) =>
+        users?.[recipientId] ? {
+          id: recipientId,
+          username: users[recipientId].Username,
+          discriminator: users[recipientId].Discriminator,
+          display_name: users[recipientId].DisplayName || users[recipientId].Username,
+          avatar: users[recipientId].Avatar,
+          presence: users[recipientId].Presence,
+        } : null
+      ).filter(Boolean)
+    }));
+
+  const handleRelationshipEvent = (data: any) => {
+    handleWebSocketMessage(
+      { type: data.type, ...data },
+      cache,
+      setRelationshipRequests,
+      setRelationships,
+      user()?.id || "",
+    );
+  };
+
+  const handleRelationshipAcceptEvent = (data: any) => {
+    handleRelationshipEvent(data);
+    const currentUser = user();
+    if (currentUser) {
+      const otherUserId = currentUser.id === data.sender_id ? data.recipient_id : data.sender_id;
+      setUser({
+        ...currentUser,
+        friends: [...(currentUser.friends || []), otherUserId],
+      });
+    }
+  };
+
+  const handleRoomCreateEvent = (data: any) => {
+    const roomData = data.data || data;
+    const newRoom = {
+      id: roomData.id,
+      name: roomData.name || "",
+      type: roomData.type || 0,
+      recipients: roomData.recipients || [],
+      owner_id: roomData.owner_id || "",
+      last_message_id: roomData.last_message_id || null,
+      icon: roomData.icon || null,
+      created_at: roomData.created_at || new Date().toISOString(),
+      updated_at: roomData.updated_at || null,
+      recipients_data: roomData.recipients?.map((recipientId: string) => {
+        const userData = cache.getUser(recipientId);
+        return userData ? {
+          id: recipientId,
+          username: userData.username,
+          discriminator: userData.discriminator,
+          display_name: userData.display_name || userData.username,
+          avatar: userData.avatar,
+          presence: userData.presence
+        } : null;
+      }).filter(Boolean)
+    };
+    
+    setRooms(prev => [...prev, newRoom]);
+  };
+
+  const handlePresenceEvent = (data: any) => {
+    if (data.user_id === user()?.id) {
+      const currentUser = user()!;
+      const updatedUser = {
+        ...currentUser,
+        presence: {
+          status: data.status,
+          custom_status: data.custom_status,
         },
+      };
+      setUser(updatedUser);
+      cache.setUser({
+        ...currentUser,
+        presence: updatedUser.presence
+      });
+    }
+  };
+
+  const fetchUserData = async (token: string): Promise<AuthResponse> => {
+    try {
+      const res = await fetch(API_ENDPOINTS.USER_ME, {
+        headers: { ...API_HEADERS.JSON, ...API_HEADERS.SESSION() },
       });
 
       if (!res.ok) {
-        setLoading(false); // Only set loading false on error
+        setLoading(false);
         return { success: false, error: "Failed to fetch user data" };
       }
 
       const data = await res.json();
-
-      if (!data || !data.client_user) {
-        setLoading(false); // Only set loading false on error
+      if (!data?.client_user) {
+        setLoading(false);
         return { success: false, error: "Invalid response format" };
       }
 
-      // Process user data
-      const userData = {
-        id: data.client_user.ID,
-        username: data.client_user.Username,
-        discriminator: data.client_user.Discriminator,
-        display_name: data.client_user.DisplayName || data.client_user.Username,
-        email: data.client_user.Email,
-        avatar: data.client_user.Avatar,
-        date_of_birth: data.client_user.DateOfBirth,
-        friends: data.client_user.Friends || [],
-      };
-
+      const userData = normalizeUserData(data.client_user);
       setUser(userData);
 
-      // Process relationships if available
       if (data.relationships) {
         setRelationships(data.relationships);
       }
 
-      // Initialize WebSocket connection
       initializeWebSocket(token);
       setIsAuthenticated(true);
-
       return { success: true };
     } catch (error) {
-      setLoading(false); // Only set loading false on error
+      setLoading(false);
       return {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
@@ -367,37 +341,24 @@ export const AuthProvider: ParentComponent = (props) => {
     }
   };
 
-  const login = async (credentials: {
-    email: string;
-    password: string;
-  }): Promise<{ success: boolean; error?: string }> => {
+  const login = async (credentials: LoginCredentials): Promise<AuthResponse> => {
     try {
       setLoading(true);
-
       const res = await fetch(API_ENDPOINTS.LOGIN, {
         method: "POST",
         headers: API_HEADERS.JSON,
         body: JSON.stringify(credentials),
       });
 
-      if (!res.ok) {
-        return { success: false, error: "Invalid credentials" };
-      }
+      if (!res.ok) return { success: false, error: "Invalid credentials" };
 
-      try {
-        const data = await res.json();
+      const data = await res.json();
+      if (!data?.token) return { success: false, error: "No token in response" };
 
-        if (!data || !data.token) {
-          return { success: false, error: "No token in response" };
-        }
-
-        localStorage.setItem("sc_token", data.token);
-        const result = await fetchUserData(data.token);
-        setIsAuthenticated(result.success);
-        return result;
-      } catch (parseError) {
-        return { success: false, error: "Failed to parse response" };
-      }
+      localStorage.setItem("sc_token", data.token);
+      const result = await fetchUserData(data.token);
+      setIsAuthenticated(result.success);
+      return result;
     } catch (error) {
       return {
         success: false,
@@ -408,9 +369,7 @@ export const AuthProvider: ParentComponent = (props) => {
     }
   };
 
-  const register = async (
-    data: RegisterData,
-  ): Promise<{ success: boolean; error?: string }> => {
+  const register = async (data: RegisterData): Promise<AuthResponse> => {
     try {
       setLoading(true);
       const res = await fetch(API_ENDPOINTS.REGISTER, {
@@ -429,7 +388,6 @@ export const AuthProvider: ParentComponent = (props) => {
 
       const { token } = await res.json();
       localStorage.setItem("sc_token", token);
-
       return await fetchUserData(token);
     } catch (error) {
       return {
@@ -455,7 +413,6 @@ export const AuthProvider: ParentComponent = (props) => {
     const currentUser = user();
     if (!currentUser) return;
 
-    // Only update fields that are present in userUpdate
     const updatedUser = {
       ...currentUser,
       ...Object.fromEntries(
@@ -464,15 +421,16 @@ export const AuthProvider: ParentComponent = (props) => {
     };
 
     setUser(updatedUser);
+    cache.setUser(updatedUser);
   };
 
-  const updateStatus = async (status?: string, customStatus?: string) => {
+  const updateStatus = async (status?: string, customStatus?: string): Promise<boolean> => {
     try {
-      const res = await fetch(`${BASE_URL}/users/@me/status`, {
+      const res = await fetch(API_ENDPOINTS.UPDATE_STATUS, {
         method: "PATCH",
         headers: {
-          "Content-Type": "application/json",
-          "X-Session-Token": localStorage.getItem("sc_token") || "",
+          ...API_HEADERS.JSON,
+          ...API_HEADERS.SESSION(),
         },
         body: JSON.stringify({
           status,
@@ -484,6 +442,7 @@ export const AuthProvider: ParentComponent = (props) => {
 
       const updatedUser = await res.json();
       setUser(updatedUser);
+      cache.setUser(updatedUser);
       return true;
     } catch (error) {
       console.error("Error updating status:", error);
@@ -491,17 +450,15 @@ export const AuthProvider: ParentComponent = (props) => {
     }
   };
 
-  // Centralized function to fetch bulk user data
-  const fetchBulkUsers = async (userIds: string[]) => {
+  const fetchBulkUsers = async (userIds: string[]): Promise<void> => {
     if (!userIds.length) return;
     
     try {
-      // Split into batches of 100 users to respect the API limit
       for (let i = 0; i < userIds.length; i += 100) {
         const batch = userIds.slice(i, i + 100);
         
-        const response = await fetch(`${BASE_URL}/users/bulk`, {
-          method: "GET",
+        const response = await fetch(API_ENDPOINTS.BULK_USERS, {
+          method: "POST",
           headers: {
             ...API_HEADERS.JSON,
             ...API_HEADERS.SESSION(),
@@ -515,9 +472,7 @@ export const AuthProvider: ParentComponent = (props) => {
         }
 
         const userData = await response.json();
-        
-        // Add users to cache
-        if (userData && userData.users) {
+        if (userData?.users) {
           Object.entries(userData.users).forEach(([userId, userData]: [string, any]) => {
             cache.setUser({
               id: userId,
@@ -539,8 +494,7 @@ export const AuthProvider: ParentComponent = (props) => {
     }
   };
 
-  // Function to send a message to a room
-  const sendMessage = async (roomId: string, content: string) => {
+  const sendMessage = async (roomId: string, content: string, nonce?: string): Promise<MessageResponse> => {
     try {
       if (!roomId || !content.trim()) {
         return { success: false, error: "Room ID and message content are required" };
@@ -552,7 +506,7 @@ export const AuthProvider: ParentComponent = (props) => {
           ...API_HEADERS.JSON,
           ...API_HEADERS.SESSION(),
         },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content, nonce }),
       });
 
       if (!response.ok) {
@@ -595,6 +549,7 @@ export const AuthProvider: ParentComponent = (props) => {
     }
   };
 
+  // Initialize authentication on component mount
   initializeAuth();
 
   return (

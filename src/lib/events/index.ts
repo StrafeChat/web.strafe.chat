@@ -17,6 +17,7 @@ export const handleWebSocketMessage = async (
 
   switch (data.type) {
     case "relationshipCreate":
+    case "relationshipUpdate":
     case "relationshipAccept":
     case "relationshipDelete":
       console.log("[WebSocket] Handling relationship event:", {
