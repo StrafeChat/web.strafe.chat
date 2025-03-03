@@ -1,4 +1,5 @@
 import { Component, createMemo, createSignal, Show, For } from "solid-js";
+import DefaultGroupPM from "../shared/icons/DefaultGroupPM";
 import { useParams } from "@solidjs/router";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
 import { useCache } from "../../lib/providers/cache/CacheProvider";
@@ -36,7 +37,7 @@ const RoomView: Component = () => {
   const getRoomName = () => {
     const room = currentRoom();
     if (!room) return "Unknown Chat";
-
+  
     // If room has a name, use it (for group PMs)
     if (room.name) return room.name;
     
@@ -106,9 +107,9 @@ const RoomView: Component = () => {
     // If room has an icon, use it (for group PMs)
     if (room.icon) return `${FS_URL}/icons/${room.id}/${room.icon}`;
     
-    // For group PMs without an icon, use a generic group icon
+    // For group PMs without an icon, use our custom SVG icon component
     if (room.type === RoomType.GROUP_PM) {
-      return `${FS_URL}/avatars/default/group.png`;
+      return null; // Return null to indicate we'll use the DefaultGroupPM component
     }
     
     // For PMs, use the other user's avatar
@@ -183,7 +184,14 @@ const RoomView: Component = () => {
         // Use cached data if available for real-time updates
         const cachedUser = cache.getUser(member.id);
         if (cachedUser) {
-          allMembers.push(cachedUser);
+          allMembers.push({
+            id: cachedUser.id,
+            username: cachedUser.username,
+            discriminator: cachedUser.discriminator,
+            display_name: cachedUser.display_name,
+            avatar: cachedUser.avatar,
+            presence: cachedUser.presence
+          });
         } else {
           allMembers.push(member);
         }
@@ -213,7 +221,14 @@ const RoomView: Component = () => {
       for (const recipientId of room.recipients) {
         const cachedUser = cache.getUser(recipientId);
         if (cachedUser) {
-          allMembers.push(cachedUser);
+          allMembers.push({
+            id: cachedUser.id,
+            username: cachedUser.username,
+            discriminator: cachedUser.discriminator,
+            display_name: cachedUser.display_name,
+            avatar: cachedUser.avatar,
+            presence: cachedUser.presence
+          });
         }
       }
       
@@ -240,12 +255,18 @@ const RoomView: Component = () => {
         <div class="flex items-center gap-2">
           <div class="relative flex-shrink-0 flex items-center">
             <div class="w-8 h-8 rounded-full overflow-hidden">
-              <img
-                src={getRoomAvatar()}
-                alt="Room avatar"
-                class="w-full h-full object-cover"
-                draggable="false"
-              />
+              {roomType() === RoomType.GROUP_PM && !currentRoom()?.icon ? (
+                <div class="w-full h-full bg-surface bg-opacity-20 text-text-primary flex items-center justify-center">
+                  <DefaultGroupPM />
+                </div>
+              ) : (
+                <img
+                  src={getRoomAvatar() || `${FS_URL}/avatars/default/favicon.ico`}
+                  alt="Room avatar"
+                  class="w-full h-full object-cover"
+                  draggable="false"
+                />
+              )}
             </div>
             {roomType() === RoomType.PM && (
               <StatusIndicator

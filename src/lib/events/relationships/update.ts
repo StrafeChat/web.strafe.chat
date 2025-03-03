@@ -1,4 +1,4 @@
-import { RelationshipPayload, RelationshipUpdate } from "../../../types/relationships";
+import { RelationshipPayload } from "../../../types/relationships";
 import { BASE_URL } from "../../../constants";
 
 export const handleRelationshipUpdate = async (

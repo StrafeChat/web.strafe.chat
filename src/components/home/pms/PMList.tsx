@@ -212,7 +212,7 @@ export const PMList: Component = () => {
         </h2>
       </div>
 
-      <div class="flex flex-col gap-1 p-2">
+      <div class="flex flex-col gap-1 p-2 flex-1 overflow-y-auto">
         <A
           href="/"
           class="flex items-center gap-2 p-3 rounded-md hover:bg-surface hover:bg-opacity-10 transition-colors"

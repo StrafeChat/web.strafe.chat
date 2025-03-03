@@ -70,6 +70,16 @@ export class UserCache {
     return this.users.get(id);
   }
 
+  public getCurrentUserId(): string | undefined {
+    // Find the current user in the cache
+    for (const [id, user] of this.users.entries()) {
+      if (user.System) {
+        return id;
+      }
+    }
+    return undefined;
+  }
+
   public onPresenceUpdate(
     callback: (
       userId: string,

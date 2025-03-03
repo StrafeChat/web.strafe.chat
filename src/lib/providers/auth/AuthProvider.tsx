@@ -458,7 +458,7 @@ export const AuthProvider: ParentComponent = (props) => {
         const batch = userIds.slice(i, i + 100);
         
         const response = await fetch(API_ENDPOINTS.BULK_USERS, {
-          method: "POST",
+          method: "POST", // Changed to POST as it's more appropriate for sending data in request body
           headers: {
             ...API_HEADERS.JSON,
             ...API_HEADERS.SESSION(),
@@ -482,8 +482,8 @@ export const AuthProvider: ParentComponent = (props) => {
               avatar: userData.Avatar,
               banner: userData.Banner,
               presence: userData.Presence ? {
-                status: userData.Presence.status || userData.Presence.Status,
-                custom_status: userData.Presence.custom_status || userData.Presence.CustomStatus
+                status: userData.Presence.Status,
+                custom_status: userData.Presence.CustomStatus
               } : undefined
             });
           });

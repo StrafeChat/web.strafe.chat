@@ -655,14 +655,28 @@ class WebSocketWorkerHandler {
     connected: boolean,
     specificPort?: MessagePort
   ) {
+    console.log("[WebSocketWorker] Notifying connection state:", {
+      connected,
+      loading: this.loading,
+      readyState: this.ws?.readyState
+    });
+
     const message = {
       type: "connectionState",
-      payload: { connected, loading: this.loading },
+      payload: {
+        connected,
+        loading: this.loading,
+        readyState: this.ws?.readyState,
+        reconnecting: this.reconnectAttempts > 0
+      },
     };
+
+    // Always broadcast connection state changes to ensure synchronization
+    this.broadcast(message);
+
+    // If a specific port was requested, send an additional direct message
     if (specificPort) {
       specificPort.postMessage(message);
-    } else {
-      this.broadcast(message);
     }
   }
 
