@@ -17,6 +17,7 @@ import { capitalizeStatus } from "../../../lib/utils/status";
 import { CreatePMModal } from "../../modals/CreatePMModal";
 import { RoomType } from "../../../types/roomTypes";
 import { FS_URL } from "../../../constants";
+import { Portal } from "solid-js/web";
 
 export const PMList: Component = () => {
   const { relationshipRequests, user, rooms } = useAuth();
@@ -205,14 +206,14 @@ export const PMList: Component = () => {
   };
 
   return (
-    <div class="flex flex-col h-full bg-background1 rounded-tl-2xl">
-      <div class="p-2 flex flex-col [box-shadow:0_2px_4px_-2px_rgba(0,0,0,0.2)]">
+    <div class="flex flex-col h-full bg-background1 rounded-tl-2xl overflow-hidden">
+      <div class="p-2 flex flex-col [box-shadow:0_2px_4px_-2px_rgba(0,0,0,0.2)] flex-shrink-0">
         <h2 class="text-xl px-3 py-2 font-bold text-text-primary select-none">
           {t("pms.title")}
         </h2>
       </div>
 
-      <div class="flex flex-col gap-1 p-2 flex-1 overflow-y-auto">
+      <div class="flex flex-col gap-1 p-2 flex-1 overflow-y-auto min-h-0 pb-[80px] md:pb-0">
         <A
           href="/"
           class="flex items-center gap-2 p-3 rounded-md hover:bg-surface hover:bg-opacity-10 transition-colors"
@@ -335,7 +336,8 @@ export const PMList: Component = () => {
           </div>
         </Show>
       </div>
-
+      
+      <Show when={window.innerWidth > 768}>      
       <div class="border-t border-border mt-auto">
         <div class="flex items-center bg-background1 pl-1.5 pr-2 py-1 w-full">
           <div class="flex-1 min-w-0 flex items-center overflow-hidden">
@@ -372,29 +374,31 @@ export const PMList: Component = () => {
               </div>
             </div>
           </div>
-          <div class="flex items-center gap-1 flex-shrink-0 ml-2">
-            {/* Client User Popup */}
-            <ClientUserPopup
-              isOpen={showUserPopup()}
-              onClose={() => setShowUserPopup(false)}
-              triggerRef={userProfileTrigger()}
-              customStatus={customStatus()}
-              setCustomStatus={setCustomStatus}
-              customEmoji={customEmoji()}
-              setCustomEmoji={setCustomEmoji}
-            />
-            {/* User Settings Modal */}
-            <Tooltip content={t("settings.sections.user")} position="top">
-              <button
-                class="p-2 text-text-secondary hover:text-text-primary transition-colors rounded-md hover:bg-surface hover:bg-opacity-10"
-                onClick={() => setShowSettings(true)}
-              >
-                <Settings />
-              </button>
-            </Tooltip>
-          </div>
+            <div class="flex items-center gap-1 flex-shrink-0 ml-2">
+              {/* Client User Popup */}
+              <ClientUserPopup
+                isOpen={showUserPopup()}
+                onClose={() => setShowUserPopup(false)}
+                triggerRef={userProfileTrigger()}
+                customStatus={customStatus()}
+                setCustomStatus={setCustomStatus}
+                customEmoji={customEmoji()}
+                setCustomEmoji={setCustomEmoji}
+              />
+              {/* User Settings Modal */}
+              <Tooltip content={t("settings.sections.user")} position="top">
+                <button
+                  class="p-2 text-text-secondary hover:text-text-primary transition-colors rounded-md hover:bg-surface hover:bg-opacity-10"
+                  onClick={() => setShowSettings(true)}
+                >
+                  <Settings />
+                </button>
+              </Tooltip>
+            </div>
         </div>
       </div>
+      </Show>
+      <Portal>
       <UserSettings
         isOpen={showSettings()}
         onClose={() => setShowSettings(false)}
@@ -404,6 +408,7 @@ export const PMList: Component = () => {
         isOpen={showCreatePM()}
         onClose={() => setShowCreatePM(false)}
       />
+      </Portal>
     </div>
   );
 };

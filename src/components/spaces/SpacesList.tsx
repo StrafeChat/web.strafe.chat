@@ -19,7 +19,7 @@ const SpacesList: Component = () => {
   });
 
   return (
-    <div class="flex flex-col items-center h-full py-3 gap-2 bg-[var(--background)]">
+    <div class="flex flex-col items-center h-full py-3 pb-[80px] md:pb-3 gap-2 bg-[var(--background)]">
       {/* Home button */}
       <Tooltip content={"Home"} position="right">
         <button

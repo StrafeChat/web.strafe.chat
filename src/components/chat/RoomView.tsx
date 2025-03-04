@@ -308,25 +308,6 @@ const RoomView: Component = () => {
         {/* Chat area - always visible but resizes based on sidebar */}
         <div 
           class={`${(roomType() === RoomType.GROUP_PM && showMembers() && !isMobile()) ? 'w-[calc(100%-250px)]' : 'w-full'} h-full transition-all duration-300`}
-          onTouchStart={(e) => {
-            // Only enable swipe gestures on mobile
-            if (!isMobile()) return;
-            
-            const touchStartX = e.touches[0].clientX;
-            const handleTouchEnd = (e: TouchEvent) => {
-              const touchEndX = e.changedTouches[0].clientX;
-              const diff = touchEndX - touchStartX;
-              
-              // Only use right swipe to open members list on mobile
-              if (diff > 70 && !showMembers()) { // Right swipe to open
-                setShowMembers(true);
-              }
-              
-              document.removeEventListener('touchend', handleTouchEnd);
-            };
-            
-            document.addEventListener('touchend', handleTouchEnd);
-          }}
         >
           <ChatArea />
         </div>

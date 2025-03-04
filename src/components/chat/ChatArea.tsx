@@ -15,7 +15,7 @@ const ChatArea: Component = () => {
   const [t] = useTransContext();
   const [messageText, setMessageText] = createSignal("");
   const [sending, setSending] = createSignal(false);
-  const [loading, setLoading] = createSignal(true);
+  const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal("");
   const [messages, setMessages] = createSignal<CachedMessage[]>([]);
   // Reference to the messages container for auto-scrolling
@@ -137,54 +137,58 @@ const ChatArea: Component = () => {
   // Fetch messages and set up real-time updates
   createEffect(() => {
     const room = currentRoom();
-    if (!room) return;
-    setLoading(true)
-    // Initial load from cache
-    const cachedMessages = cache.getMessages(room.id);
-    setMessages(processMessages(cachedMessages));
-    
-    // Scroll to bottom immediately after setting messages
-    scrollToBottom();
+    if (!room) {
+      setLoading(false);
+      return;
+    }
 
+    setLoading(true); // Set loading to true at the start of the effect
+    
+    // Initial load from cache and set up cache monitoring
+    const updateFromCache = () => {
+      const cachedMessages = cache.getMessages(room.id);
+      if (cachedMessages.length > 0) {
+        setMessages(processMessages(cachedMessages));
+        setLoading(false); // Reset loading state when we have cached messages
+        scrollToBottom();
+      }
+    };
+
+    // Initial load
+    updateFromCache();
+    
     // Set up event listener for real-time message updates
     const messageCreateHandler = ((event: CustomEvent) => {
       const { roomId, message } = event.detail;
       if (roomId !== room.id) return;
 
       setMessages(prev => {
-        // Create a new array with the existing messages plus the new one
         const updatedMessages = [...prev];
-        
-        // Try to find an existing message with matching ID or nonce
         const existingIndex = updatedMessages.findIndex(m => 
           (message.id && m.id === message.id) || 
           (message.nonce && m.nonce === message.nonce)
         );
 
         if (existingIndex >= 0) {
-          // Update existing message
           updatedMessages[existingIndex] = {
             ...updatedMessages[existingIndex],
             ...message,
-            // Preserve pending state if the new message doesn't have it
             pending: message.pending ?? updatedMessages[existingIndex].pending
           };
         } else {
-          // Add new message
           updatedMessages.push(message);
         }
 
-        // Process the updated messages to ensure proper ordering and deduplication
         return processMessages(updatedMessages);
       });
 
-      // Scroll to bottom immediately for new messages
       scrollToBottom();
     }) as EventListener;
 
     window.addEventListener("messageCreate", messageCreateHandler);
 
     // Fetch messages from API if cache is empty
+    const cachedMessages = cache.getMessages(room.id);
     if (cachedMessages.length === 0) {
       const fetchMessages = async () => {
         try {
@@ -197,26 +201,26 @@ const ChatArea: Component = () => {
           if (!response.ok) throw new Error('Failed to fetch messages');
           const data = await response.json();
           
-          // Store messages in the global cache
           const messages = Array.isArray(data) ? data : data.messages;
           if (Array.isArray(messages)) {
             cache.setMessages(room.id, messages);
             setMessages(processMessages(messages));
-            // Scroll to bottom immediately after setting messages
             scrollToBottom();
           } else {
             console.error('[ChatArea] Unexpected API response format:', data);
+            setError(t('chat.errors.fetchFailed'));
           }
         } catch (err) {
           console.error('Error fetching messages:', err);
           setError(t('chat.errors.fetchFailed'));
+        } finally {
+          setLoading(false); // Always reset loading state after fetch attempt
         }
       };
 
       fetchMessages();
     }
 
-    // Clean up event listener
     onCleanup(() => {
       window.removeEventListener("messageCreate", messageCreateHandler);
     });
@@ -326,7 +330,7 @@ const ChatArea: Component = () => {
   };
 
   return (
-    <div class="flex h-full bg-[var(--background2)] pb-[env(safe-area-inset-bottom)]">
+    <div class="flex h-full bg-[var(--background2)]">
       <div class="flex-1 flex flex-col h-full">
         {/* Messages container */}
         <div 
@@ -334,14 +338,15 @@ const ChatArea: Component = () => {
           ref={messagesContainerRef}
           style={{ "scroll-behavior": "auto" }}
         >
-          <Show when={loading()} fallback={
+          <Show when={loading()} >
             <div class="flex-1 flex flex-col items-center justify-center text-text-secondary select-none">
               <div class="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
               <p class="text-sm">Loading messages...</p>
             </div>
-          }>
-            <Show when={!loading()}>
-              <div class="flex-1 flex flex-col">
+          </Show>
+          <Show when={!loading()}>
+            <div class="flex-1 flex flex-col justify-end">
+              <Show when={messages().length === 0}>
                 <div class="flex flex-col items-center justify-center text-text-secondary select-none py-8">
                   <div class="w-20 h-20 mb-5 bg-primary bg-opacity-10 rounded-full flex items-center justify-center">
                     {/* Robot icon */}
@@ -353,35 +358,35 @@ const ChatArea: Component = () => {
                     This is the beginning of your direct message history with {getRoomName()}.
                   </p>
                 </div>
-                <Show when={messages().length > 0}>
-                  <For each={messages()}>
-                    {(message, index) => {
-                      const prevMessage = index() > 0 ? messages()[index() - 1] : null;
-                      const isCompact = Boolean(
-                        prevMessage && 
-                        prevMessage.author_id === message.author_id && 
-                        message.created_at && prevMessage.created_at && 
-                        new Date(message.created_at).getTime() - new Date(prevMessage.created_at).getTime() < 300000
-                      );
-                  
-                      return (
-                        <Message
-                          id={message.id}
-                          content={message.content}
-                          author_id={message.author_id}
-                          created_at={message.created_at}
-                          edited_at={message.edited_at}
-                          nonce={message.nonce}
-                          pending={message.pending}
-                          error={message.error}
-                          isCompact={isCompact}
-                        />
-                      );
-                    }}
-                  </For>
-                </Show>
-              </div>
-            </Show>
+              </Show>
+              <Show when={messages().length > 0}>
+                <For each={messages()}>
+                  {(message, index) => {
+                    const prevMessage = index() > 0 ? messages()[index() - 1] : null;
+                    const isCompact = Boolean(
+                      prevMessage && 
+                      prevMessage.author_id === message.author_id && 
+                      message.created_at && prevMessage.created_at && 
+                      new Date(message.created_at).getTime() - new Date(prevMessage.created_at).getTime() < 300000
+                    );
+                
+                    return (
+                      <Message
+                        id={message.id}
+                        content={message.content}
+                        author_id={message.author_id}
+                        created_at={message.created_at}
+                        edited_at={message.edited_at}
+                        nonce={message.nonce}
+                        pending={message.pending}
+                        error={message.error}
+                        isCompact={isCompact}
+                      />
+                    );
+                  }}
+                </For>
+              </Show>
+            </div>
           </Show>
         </div>
 
