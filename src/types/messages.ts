@@ -7,6 +7,7 @@ export interface Message {
   embeds?: any[];
   mentions?: string[];
   mention_everyone?: boolean;
+  message_refrences: string[];
   nonce?: string;
   created_at: string;
   updated_at?: string;

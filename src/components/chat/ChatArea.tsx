@@ -10,7 +10,7 @@ import { CachedMessage } from "../../lib/cache/MessageCache";
 
 const ChatArea: Component = () => {
   const params = useParams();
-  const { user, rooms, sendMessage } = useAuth();
+  const { user, rooms, sendMessage, editMessage } = useAuth();
   const cache = useCache();
   const [t] = useTransContext();
   const [messageText, setMessageText] = createSignal("");
@@ -18,8 +18,27 @@ const ChatArea: Component = () => {
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal("");
   const [messages, setMessages] = createSignal<CachedMessage[]>([]);
+  const [replyingTo, setReplyingTo] = createSignal<string[]>([]);
+  const [editingMessageId, setEditingMessageId] = createSignal<string | null>(null);
+  const [editingRoomId, setEditingRoomId] = createSignal<string | null>(null);
   // Reference to the messages container for auto-scrolling
   let messagesContainerRef: HTMLDivElement | undefined;
+
+  // Handle edit message event from Message component
+  createEffect(() => {
+    const handleEditMessage = (event: CustomEvent) => {
+      const { messageId, roomId, content } = event.detail;
+      setEditingMessageId(messageId);
+      setEditingRoomId(roomId);
+      setMessageText(content);
+    };
+
+    window.addEventListener('editMessage', handleEditMessage as EventListener);
+
+    onCleanup(() => {
+      window.removeEventListener('editMessage', handleEditMessage as EventListener);
+    });
+  });
 
   // Helper function to deduplicate and sort messages
   const processMessages = (msgs: CachedMessage[]) => {
@@ -184,9 +203,48 @@ const ChatArea: Component = () => {
 
       scrollToBottom();
     }) as EventListener;
+    
+    // Set up event listener for real-time message deletions
+    const messageDeleteHandler = ((event: CustomEvent) => {
+      const { roomId, messageId } = event.detail;
+      if (roomId !== room.id) return;
+      
+      console.log("[ChatArea] Handling message delete event for message:", messageId);
+      
+      // Remove the deleted message from the messages state
+      setMessages(prev => {
+        const updatedMessages = prev.filter(m => m.id !== messageId);
+        return processMessages(updatedMessages);
+      });
+    }) as EventListener;
 
+    // Set up event listener for real-time message edits
+    const messageEditHandler = ((event: CustomEvent) => {
+      const { roomId, messageId, content, editedAt, authorId } = event.detail;
+      if (roomId !== room.id) return;
+      
+      console.log("[ChatArea] Handling message edit event for message:", messageId);
+      
+      // Update the edited message in the messages state
+      setMessages(prev => {
+        const updatedMessages = prev.map(m => {
+          if (m.id === messageId) {
+            // Update the message with the edited content and timestamp
+            return { 
+              ...m, 
+              content: content,
+              edited_at: editedAt || new Date().toISOString(),
+              author_id: authorId || m.author_id
+            };
+          }
+          return m;
+        });
+        return processMessages(updatedMessages);
+      });
+    }) as EventListener;
     window.addEventListener("messageCreate", messageCreateHandler);
-
+    window.addEventListener("messageDelete", messageDeleteHandler);
+    window.addEventListener("messageEdit", messageEditHandler);
     // Fetch messages from API if cache is empty
     const cachedMessages = cache.getMessages(room.id);
     if (cachedMessages.length === 0) {
@@ -223,6 +281,8 @@ const ChatArea: Component = () => {
 
     onCleanup(() => {
       window.removeEventListener("messageCreate", messageCreateHandler);
+      window.removeEventListener("messageDelete", messageDeleteHandler);
+      window.removeEventListener("messageEdit", messageEditHandler);
     });
   });
 
@@ -237,7 +297,58 @@ const ChatArea: Component = () => {
   });
 
   // Handle sending a message
+  const handleReply = (messageId: string) => {
+    setReplyingTo(prev => [...prev, messageId]);
+  };
+
+  // Handle editing a message (for mobile)  
+  const handleEditMessage = async (inputElement: HTMLDivElement) => {
+    const content = messageText().trim();
+    const messageId = editingMessageId();
+    const roomId = editingRoomId();
+    
+    // Clear any previous errors
+    setError("");
+    
+    // Validate message content
+    if (!content) return;
+    
+    // Validate message ID and room ID
+    if (!messageId || !roomId) {
+      setError(t("chat.errors.invalidEdit"));
+      return;
+    }
+    
+    try {
+      setSending(true);
+      
+      const result = await editMessage(roomId, messageId, content);
+      
+      if (!result.success) {
+        setError(result.error || t("chat.errors.editFailed"));
+      } else {
+        // Clear input field immediately for better UX
+        inputElement.textContent = "";
+        setMessageText("");
+        
+        // Clear editing state
+        setEditingMessageId(null);
+        setEditingRoomId(null);
+      }
+    } catch (err) {
+      console.error("Error editing message:", err);
+      setError(t("chat.errors.editFailed"));
+    } finally {
+      setSending(false);
+    }
+  };
+  
   const handleSendMessage = async (inputElement: HTMLDivElement) => {
+    // If we're in editing mode, handle edit instead
+    if (editingMessageId() && editingRoomId()) {
+      return handleEditMessage(inputElement);
+    }
+    
     const content = messageText().trim();
     const room = currentRoom();
     const currentUser = user();
@@ -284,8 +395,15 @@ const ChatArea: Component = () => {
       
       // Scroll to bottom after sending a message
       setTimeout(scrollToBottom, 100);
+      const messageData = {
+        content,
+        nonce,
+        message_references: replyingTo().length > 0 ? replyingTo() : undefined
+      };
+      const result = await sendMessage(room.id, messageData);
       
-      const result = await sendMessage(room.id, content, nonce);
+      // Clear reply references after sending
+      setReplyingTo([]);
       
       if (result.success && result.message) {
         // Remove the temporary message and add the confirmed one
@@ -330,11 +448,11 @@ const ChatArea: Component = () => {
   };
 
   return (
-    <div class="flex h-full bg-[var(--background2)]">
+    <div class="flex h-full w-full bg-[var(--background2)]">
       <div class="flex-1 flex flex-col h-full">
         {/* Messages container */}
         <div 
-          class="flex-1 overflow-y-auto flex flex-col p-4 scroll-smooth"
+          class="flex-1 overflow-y-auto flex flex-col py-4 scroll-smooth overflow-x-hidden w-full max-w-full"
           ref={messagesContainerRef}
           style={{ "scroll-behavior": "auto" }}
         >
@@ -381,6 +499,9 @@ const ChatArea: Component = () => {
                         pending={message.pending}
                         error={message.error}
                         isCompact={isCompact}
+                        message_references={message.message_references}
+                        room_id={params.roomId}
+                        onReply={handleReply}
                       />
                     );
                   }}
@@ -397,11 +518,54 @@ const ChatArea: Component = () => {
               {error()}
             </div>
           </Show>
-          <div class="bg-[var(--background1)] rounded-lg p-3 flex items-center">
+          <Show when={replyingTo().length > 0}>
+            <div class="mb-2 px-4 py-2 bg-surface bg-opacity-10 rounded-lg text-sm border border-border flex items-center justify-between">
+              <div class="flex items-center gap-2 flex-1 overflow-hidden">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-text-secondary flex-shrink-0" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M7.707 3.293a1 1 0 010 1.414L5.414 7H11a7 7 0 017 7v2a1 1 0 11-2 0v-2a5 5 0 00-5-5H5.414l2.293 2.293a1 1 0 11-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
+                </svg>
+                <span class="text-text-secondary flex-shrink-0">Replying to </span>
+                <div class="flex gap-1 overflow-hidden">
+                  {(() => {
+                    const uniqueAuthors = new Map();
+                    replyingTo().forEach(replyId => {
+                      const replyMessage = messages().find(m => m.id === replyId);
+                      if (replyMessage) {
+                        const authorId = replyMessage.author_id;
+                        if (!uniqueAuthors.has(authorId)) {
+                          const replyAuthor = cache.getUser(authorId);
+                          uniqueAuthors.set(authorId, replyAuthor);
+                        }
+                      }
+                    });
+                    
+                    return Array.from(uniqueAuthors.values()).map((replyAuthor, index) => (
+                      <>
+                        <span class="font-medium text-text-primary truncate">
+                          {replyAuthor?.display_name || replyAuthor?.username || "Unknown User"}
+                        </span>
+                        {index < uniqueAuthors.size - 1 && <span class="text-text-secondary">,</span>}
+                      </>
+                    ));
+                  })()}
+                </div>
+              </div>
+              <button 
+                onClick={() => setReplyingTo([])}
+                class="p-1 hover:bg-surface hover:bg-opacity-20 rounded-full flex-shrink-0"
+                title="Cancel replies"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-text-secondary" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                </svg>
+              </button>
+            </div>
+          </Show>
+          <div class="bg-[var(--background1)] rounded-lg p-3 flex items-start">
             <div
               contentEditable
-              data-placeholder={`Message ${getRoomName()}`}
-              class="bg-transparent w-full focus:outline-none text-text-primary min-h-[20px] [&:empty]:before:content-[attr(data-placeholder)] before:text-text-secondary before:absolute before:pointer-events-none relative"
+              data-placeholder={`${editingMessageId() ? "Edit message" : `Message ${getRoomName()}`}`}
+              class="bg-transparent w-full focus:outline-none text-text-primary min-h-[20px] max-h-[150px] overflow-y-auto whitespace-pre-wrap word-break break-all break-words break-anywhere [&:empty]:before:content-[attr(data-placeholder)] before:text-text-secondary before:absolute before:pointer-events-none relative"
               onInput={(e) => {
                 setMessageText(e.currentTarget.textContent || "");
               }}
@@ -409,21 +573,61 @@ const ChatArea: Component = () => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   handleSendMessage(e.currentTarget);
+                } else if (e.key === 'Escape' && editingMessageId()) {
+                  e.preventDefault();
+                  // Cancel editing
+                  e.currentTarget.textContent = "";
+                  setMessageText("");
+                  setEditingMessageId(null);
+                  setEditingRoomId(null);
                 }
               }}
               aria-disabled={sending()}
               style={{ "pointer-events": sending() ? "none" : "auto" }}
             />
-            <button 
-              onClick={(e) => handleSendMessage(e.currentTarget.previousElementSibling as HTMLDivElement)}
-              disabled={sending()}
-              class="ml-2 p-2 rounded-full bg-primary text-white hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-              title={t("chat.send")}
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-              </svg>
-            </button>
+            <div class="flex items-center gap-1">
+              <Show when={editingMessageId()}>
+                <button
+                  onClick={() => {
+                    setEditingMessageId(null);
+                    setEditingRoomId(null);
+                    const chatInput = document.querySelector('[data-placeholder]') as HTMLDivElement;
+                    if (chatInput) {
+                      chatInput.textContent = "";
+                      const event = new Event('input', { bubbles: true });
+                      chatInput.dispatchEvent(event);
+                    }
+                  }}
+                  class="p-2 rounded-full text-text-secondary hover:bg-surface hover:bg-opacity-20 transition-colors flex-shrink-0"
+                  title={t("common.cancel")}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                  </svg>
+                </button>
+              </Show>
+              <button 
+                onClick={() => {
+                  const inputElement = document.querySelector('[data-placeholder]') as HTMLDivElement;
+                  if (inputElement) {
+                    handleSendMessage(inputElement);
+                  }
+                }}
+                disabled={sending()}
+                class="ml-2 p-2 rounded-full bg-primary text-white hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                title={editingMessageId() ? t("chat.edit") : t("chat.send")}
+              >
+                <Show when={!editingMessageId()} fallback={
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                  </svg>
+                }>
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                  </svg>
+                </Show>
+              </button>
+            </div>
           </div>
         </div>
       </div>

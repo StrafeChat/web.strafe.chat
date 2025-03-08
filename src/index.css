@@ -170,3 +170,14 @@
 .animate-fade-in {
   animation: fadeIn 0.2s ease-out;
 }
+
+@keyframes highlightPulse {
+  0% { background-color: rgba(33, 195, 94, 0.1); }
+  50% { background-color: rgba(33, 195, 94, 0.2); }
+  100% { background-color: rgba(33, 195, 94, 0.1); }
+}
+
+.highlight-message {
+  animation: highlightPulse 1s ease-in-out 2;
+  border-radius: 0.375rem;
+}

@@ -335,6 +335,8 @@ class WebSocketWorkerHandler {
         MESSAGE: "MESSAGE",
         DISPATCH: "DISPATCH",
         PRESENCE_UPDATE: "PRESENCE_UPDATE",
+        MESSAGE_DELETE: "MESSAGE_DELETE",
+        MESSAGE_EDIT: "MESSAGE_EDIT",
       };
 
       switch (data.op) {
@@ -494,6 +496,27 @@ class WebSocketWorkerHandler {
             this.broadcast({
               type: "message_create",
               payload: data.d,
+            });
+          } else if (data.d && data.d.event_type === "MESSAGE_DELETE" && data.d.data) {
+            console.log("[WebSocketWorker] Handling message delete:", data.d);
+            this.broadcast({
+              type: "message_delete",
+              payload: {
+                room_id: data.d.data.room_id,
+                message_id: data.d.data.id
+              }
+            });
+          } else if (data.d && data.d.event_type === "MESSAGE_EDIT" && data.d.data) {
+            console.log("[WebSocketWorker] Handling message edit:", data.d);
+            this.broadcast({
+              type: "message_edit",
+              payload: {
+                room_id: data.d.data.room_id,
+                message_id: data.d.data.id,
+                content: data.d.data.content,
+                edited_at: data.d.data.edited_at,
+                author_id: data.d.data.author_id
+              }
             });
           } else {
             this.broadcast({

@@ -69,7 +69,9 @@ type AuthContextType = {
   wsClient: () => WebSocketClient | null;
   updateStatus: (status?: string, customStatus?: string) => Promise<boolean>;
   fetchBulkUsers: (userIds: string[]) => Promise<void>;
-  sendMessage: (roomId: string, content: string, nonce?: string) => Promise<MessageResponse>;
+  sendMessage: (roomId: string, messageData: { content: string; nonce?: string; message_references?: string[] }) => Promise<MessageResponse>;
+  deleteMessage: (roomId: string, messageId: string) => Promise<{ success: boolean; error?: string; }>;
+  editMessage: (roomId: string, messageId: string, content: string) => Promise<{ success: boolean; message?: any; error?: string; }>;
 };
 
 type LoginCredentials = {
@@ -136,7 +138,7 @@ export const AuthProvider: ParentComponent = (props) => {
 
     client.onConnectionStateChange((connected) => {
       console.log("[AuthProvider] WebSocket connection state:", connected);
-      if (!connected) setLoading(true);
+      if (!connected && !localStorage.getItem("sc_token")) setLoading(true);
     });
 
     client.connect(token).catch((error) => {
@@ -200,10 +202,10 @@ export const AuthProvider: ParentComponent = (props) => {
     banner: userData.Banner,
     date_of_birth: userData.DateOfBirth,
     friends: userData.Friends || [],
-    presence: {
-      status: userData.Presence?.Status,
-      custom_status: userData.Presence?.CustomStatus,
-    },
+    presence: userData.Presence ? {
+      status: userData.Presence.Status || "offline",
+      custom_status: userData.Presence.CustomStatus || "",
+    } : undefined,
   });
 
   const normalizeRelationshipRequests = (requests: any[]): Relationship[] =>
@@ -288,20 +290,30 @@ export const AuthProvider: ParentComponent = (props) => {
   };
 
   const handlePresenceEvent = (data: any) => {
+    const presence = {
+      status: data.status || "offline",
+      custom_status: data.custom_status || ""
+    };
+
     if (data.user_id === user()?.id) {
       const currentUser = user()!;
       const updatedUser = {
         ...currentUser,
-        presence: {
-          status: data.status,
-          custom_status: data.custom_status,
-        },
+        presence
       };
       setUser(updatedUser);
       cache.setUser({
         ...currentUser,
-        presence: updatedUser.presence
+        presence
       });
+    } else {
+      const cachedUser = cache.getUser(data.user_id);
+      if (cachedUser) {
+        cache.setUser({
+          ...cachedUser,
+          presence
+        });
+      }
     }
   };
 
@@ -494,9 +506,9 @@ export const AuthProvider: ParentComponent = (props) => {
     }
   };
 
-  const sendMessage = async (roomId: string, content: string, nonce?: string): Promise<MessageResponse> => {
+  const sendMessage = async (roomId: string, messageData: { content: string; nonce?: string; message_references?: string[] }): Promise<MessageResponse> => {
     try {
-      if (!roomId || !content.trim()) {
+      if (!roomId || !messageData.content.trim()) {
         return { success: false, error: "Room ID and message content are required" };
       }
 
@@ -506,7 +518,7 @@ export const AuthProvider: ParentComponent = (props) => {
           ...API_HEADERS.JSON,
           ...API_HEADERS.SESSION(),
         },
-        body: JSON.stringify({ content, nonce }),
+        body: JSON.stringify(messageData),
       });
 
       if (!response.ok) {
@@ -517,8 +529,8 @@ export const AuthProvider: ParentComponent = (props) => {
         };
       }
 
-      const messageData = await response.json();
-      return { success: true, message: messageData };
+      const responseData = await response.json();
+      return { success: true, message: responseData };
     } catch (error) {
       console.error("Error sending message:", error);
       return {
@@ -534,23 +546,84 @@ export const AuthProvider: ParentComponent = (props) => {
       client.disconnect();
       setWsClient(null);
     }
+    window.removeEventListener("resize", () => setIsMobile(window.innerWidth <= 768));
   });
 
-  const initializeAuth = () => {
-    const token = localStorage.getItem("sc_token");
-    if (token) {
-      initializeWebSocket(token);
-      fetchUserData(token).catch(() => {
-        localStorage.removeItem("sc_token");
+  // Initialize authentication on component mount
+  createEffect(() => {
+    const initializeAuth = () => {
+      const token = localStorage.getItem("sc_token");
+      if (token) {
+        initializeWebSocket(token);
+        fetchUserData(token).catch(() => {
+          localStorage.removeItem("sc_token");
+          setLoading(false);
+        });
+      } else {
         setLoading(false);
+      }
+    };
+    
+    initializeAuth();
+  });
+
+  const deleteMessage = async (roomId: string, messageId: string) => {
+    try {
+      const response = await fetch(`${API_ENDPOINTS.ROOM_MESSAGES(roomId)}/${messageId}`, {
+        method: "DELETE",
+        headers: {
+          ...API_HEADERS.JSON,
+          ...API_HEADERS.SESSION(),
+        },
       });
-    } else {
-      setLoading(false);
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        return {
+          success: false,
+          error: errorData.message || `Failed to delete message: ${response.status}`,
+        };
+      }
+
+      return { success: true };
+    } catch (error) {
+      console.error("Error deleting message:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
     }
   };
 
-  // Initialize authentication on component mount
-  initializeAuth();
+  const editMessage = async (roomId: string, messageId: string, content: string) => {
+    try {
+      const response = await fetch(`${API_ENDPOINTS.ROOM_MESSAGES(roomId)}/${messageId}`, {
+        method: "PATCH",
+        headers: {
+          ...API_HEADERS.JSON,
+          ...API_HEADERS.SESSION(),
+        },
+        body: JSON.stringify({ content }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        return {
+          success: false,
+          error: errorData.message || `Failed to edit message: ${response.status}`,
+        };
+      }
+
+      const responseData = await response.json();
+      return { success: true, message: responseData };
+    } catch (error) {
+      console.error("Error editing message:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Unknown error",
+      };
+    }
+  };
 
   return (
     <AuthContext.Provider
@@ -573,7 +646,9 @@ export const AuthProvider: ParentComponent = (props) => {
         wsClient: () => wsClient(),
         updateStatus,
         fetchBulkUsers,
-        sendMessage
+        sendMessage,
+        deleteMessage,
+        editMessage
       }}
     >
       {props.children}

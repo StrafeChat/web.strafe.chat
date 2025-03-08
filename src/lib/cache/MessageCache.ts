@@ -10,6 +10,7 @@ export interface CachedMessage {
   failed?: boolean;
   pending?: boolean;
   error?: string;
+  message_references?: string[];
   attachments?: Array<{
     id: string;
     filename: string;

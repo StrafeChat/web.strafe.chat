@@ -35,6 +35,7 @@ type CacheContextType = {
   setUser: (user: Partial<User> & { id: string }) => void;
   setUsers: (usersData: Record<string, any>) => void;
   getMessages: (roomId: string) => CachedMessage[];
+  getMessage: (roomId: string, messageId: string) => CachedMessage | undefined;
   setMessages: (roomId: string, messages: CachedMessage[]) => void;
   addMessage: (roomId: string, message: CachedMessage) => void;
   updateMessage: (roomId: string, messageId: string, updates: Partial<CachedMessage>) => void;
@@ -132,6 +133,7 @@ export const CacheProvider: ParentComponent = (props) => {
     setUser,
     setUsers: setUsersData,
     getMessages: (roomId: string) => messageCache.getMessages(roomId),
+    getMessage: (roomId: string, messageId: string) => messageCache.getMessages(roomId).find(m => m.id === messageId || m.nonce === messageId),
     setMessages: (roomId: string, messages: CachedMessage[]) => messageCache.setMessages(roomId, messages),
     addMessage: (roomId: string, message: CachedMessage) => messageCache.addMessage(roomId, message),
     updateMessage: (roomId: string, messageId: string, updates: Partial<CachedMessage>) => messageCache.updateMessage(roomId, messageId, updates),

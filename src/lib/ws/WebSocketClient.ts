@@ -9,7 +9,9 @@ export type PayloadType =
   | "relationshipAccept"
   | "relationshipDelete"
   | "ROOM_CREATE"
-  | "MESSAGE_CREATE";
+  | "MESSAGE_CREATE"
+  | "MESSAGE_DELETE"
+  | "MESSAGE_EDIT";
 
 export interface BasePayload {
   type: PayloadType;
@@ -116,7 +118,9 @@ const EVENT_TYPE_TO_OP_CODE: Record<string, string> = {
   MESSAGE: "MESSAGE",
   PRESENCE_UPDATE: "PRESENCE_UPDATE",
   ROOM_CREATE: "ROOM_CREATE",
-  MESSAGE_CREATE: "MESSAGE_CREATE"
+  MESSAGE_CREATE: "MESSAGE_CREATE",
+  MESSAGE_DELETE: "MESSAGE_DELETE",
+  MESSAGE_EDIT: "MESSAGE_EDIT"
 };
 
 export class WebSocketClient {
@@ -155,6 +159,8 @@ export class WebSocketClient {
     this.onMessage("relationshipDelete", this.handleRelationship.bind(this));
     this.onMessage("PRESENCE_UPDATE", this.handlePresenceUpdate.bind(this));
     this.onMessage("MESSAGE_CREATE", this.handleMessageCreate.bind(this));
+    this.onMessage("MESSAGE_DELETE", this.handleMessageDelete.bind(this));
+    this.onMessage("MESSAGE_EDIT", this.handleMessageEdit.bind(this));
     this.onMessage("ROOM_CREATE", this.handleRoomCreate.bind(this));
     console.log("[WebSocket] Message handlers set up:", [...this.messageHandlers.entries()]);
   }
@@ -397,6 +403,16 @@ export class WebSocketClient {
         }
         break;
 
+      case "message_delete":
+        // Directly call the message delete handler
+        this.handleMessageDelete(payload);
+        break;
+
+      case "message_edit":
+        // Directly call the message edit handler
+        this.handleMessageEdit(payload);
+        break;
+
       case "relationshipCreate":
       case "relationshipUpdate":
       case "relationshipAccept":
@@ -470,9 +486,61 @@ export class WebSocketClient {
           created_at: messageData.created_at || new Date().toISOString(),
           edited_at: messageData.edited_at || null,
           attachments: messageData.attachments || [],
-          author: messageData.author || null
+          author: messageData.author || null,
+          message_refrences: messageData.message_refrences || []
         }
       });
+    }
+  }
+
+  private handleMessageDelete(data: any): void {
+    console.log("[WebSocket] Handling message delete:", data);
+    const messageData = data.data || data;
+    if (messageData.room_id && messageData.message_id) {
+      console.log("[WebSocket] Dispatching message delete event:", messageData);
+      
+      // Dispatch event for UI updates
+      this.dispatchEvent("messageDelete", {
+        roomId: messageData.room_id,
+        messageId: messageData.message_id
+      });
+      
+      // Remove the message from cache
+      if (this.cache) {
+        // Access the MessageCache through the UserCache if available
+        const messageCache = window.messageCache;
+        if (messageCache) {
+          messageCache.deleteMessage(messageData.room_id, messageData.message_id);
+        }
+      }
+    }
+  }
+
+  private handleMessageEdit(data: any): void {
+    console.log("[WebSocket] Handling message edit:", data);
+    const messageData = data.data || data;
+    if (messageData.room_id && messageData.message_id) {
+      console.log("[WebSocket] Dispatching message edit event:", messageData);
+      
+      // Dispatch event for UI updates
+      this.dispatchEvent("messageEdit", {
+        roomId: messageData.room_id,
+        messageId: messageData.message_id,
+        content: messageData.content,
+        editedAt: messageData.edited_at,
+        authorId: messageData.author_id
+      });
+      
+      // Update the message in cache if available
+      if (this.cache) {
+        const messageCache = window.messageCache;
+        if (messageCache) {
+          messageCache.updateMessage(messageData.room_id, messageData.message_id, {
+            content: messageData.content,
+            edited_at: messageData.edited_at
+          });
+        }
+      }
     }
   }
 

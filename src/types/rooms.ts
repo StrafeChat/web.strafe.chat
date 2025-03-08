@@ -15,3 +15,5 @@ export interface Room {
 export interface RoomWithRecipients extends Room {
   recipients_data?: any[];
 }
+
+export { RoomType };
