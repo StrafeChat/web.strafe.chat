@@ -1,4 +1,4 @@
-import { Component, createSignal, createMemo, Show, For } from "solid-js";
+import { Component, createSignal, createMemo, Show, For, onCleanup, createEffect } from "solid-js";
 import { useAuth } from "../../../lib/providers/auth/AuthProvider";
 import { useCache } from "../../../lib/providers/cache/CacheProvider";
 import UserSettings from "../../settings/UserSettings";
@@ -41,13 +41,75 @@ export const PMList: Component = () => {
     ).length;
   });
 
-  // Filter rooms to only show PMs (type 0) and Group PMs (type 1)
+  // Filter rooms to only show PMs (type 0) and Group PMs (type 1) and sort by last_message_id
   const directMessages = createMemo(() => {
     const allRooms = rooms();
+    const currentUser = user();
     if (!allRooms) return [];
     
     // Filter to only include PMs (type 0) and Group PMs (type 1)
-    return allRooms.filter(room => room.type === 0 || room.type === 1);
+    const filteredRooms = allRooms.filter(room => room.type === 0 || room.type === 1);
+    
+    // Sort rooms by last_message_id (snowflakes) in descending order
+    // This ensures newest messages appear at the top
+    const sortedRooms = [...filteredRooms].sort((a, b) => {
+      // If either room doesn't have a last_message_id, handle appropriately
+      if (!a.last_message_id && !b.last_message_id) {
+        // If neither has a last_message_id, sort by created_at date
+        return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
+      }
+      if (!a.last_message_id) return 1; // Push rooms without messages to the bottom
+      if (!b.last_message_id) return -1; // Keep rooms with messages at the top
+      
+      // Snowflakes are strings but can be compared directly as they're time-based
+      // Use localeCompare for consistent string comparison
+      return b.last_message_id.localeCompare(a.last_message_id);
+    });
+    
+    // If user is in DND mode, clear unread counts
+    if (currentUser?.presence?.status === "dnd") {
+      return sortedRooms.map(room => ({ ...room, unread_count: 0 }));
+    }
+    
+    return sortedRooms;
+  });
+  
+  // Set up event listener for message creation to update room order in real-time
+  createEffect(() => {
+    const handleMessageCreate = (event: CustomEvent) => {
+      const { roomId } = event.detail;
+      if (!roomId) return;
+      
+      // Force rooms signal to update by creating a new array
+      // This will trigger the directMessages memo to recalculate
+      const currentRooms = rooms();
+      if (!currentRooms) return;
+      
+      // Find the room that received the message
+      const roomIndex = currentRooms.findIndex(r => r.id === roomId);
+      if (roomIndex === -1) return;
+      
+      // Update the room's last_message_id with the new message id
+      const updatedRoom = {
+        ...currentRooms[roomIndex],
+        last_message_id: event.detail.message.id
+      };
+      
+      // Create a new array with the updated room
+      const updatedRooms = [...currentRooms];
+      updatedRooms[roomIndex] = updatedRoom;
+      
+      // Update the rooms signal
+     
+    };
+    
+    // Add event listener for message creation
+    window.addEventListener("messageCreate", handleMessageCreate as EventListener);
+    
+    // Clean up event listener on component unmount
+    onCleanup(() => {
+      window.removeEventListener("messageCreate", handleMessageCreate as EventListener);
+    });
   });
 
   // Function to fetch user data for uncached group PM members
@@ -287,7 +349,7 @@ export const PMList: Component = () => {
               {(room) => (
                 <A
                   href={`/rooms/${room.id}`}
-                  class="flex items-center gap-2 p-2 rounded-md hover:bg-surface hover:bg-opacity-10 transition-colors"
+                  class="flex items-center gap-2 p-2 rounded-md hover:bg-surface hover:bg-opacity-10 transition-colors relative"
                   activeClass="bg-surface bg-opacity-10"
                 >
                   <div class="relative flex-shrink-0">
@@ -311,6 +373,10 @@ export const PMList: Component = () => {
                         class="border-background1 absolute bottom-[-2] right-[-2]"
                       />
                     )}
+                    {/* Add unread indicator */}
+                    {(room.unread_count ?? 0) > 0 && (
+                      <div class="absolute -top-1 -right-1 bg-red-500 w-[14px] h-[14px] rounded-full border-2 border-background1"></div>
+                    )}
                   </div>
                   <div class="flex-1 min-w-0 overflow-hidden">
                     <div class="text-sm font-medium text-text-primary truncate select-none">
@@ -330,6 +396,14 @@ export const PMList: Component = () => {
                       </div>
                     )}
                   </div>
+                  {/* Show unread count if there are unread messages */}
+                  {(room.unread_count ?? 0) > 0 && (
+                    <div class="ml-auto">
+                      <div class="bg-red-500 text-white text-xs font-medium px-2 py-0.5 rounded-full select-none">
+                        {room.unread_count ?? 0}
+                      </div>
+                    </div>
+                  )}
                 </A>
               )}
             </For>
@@ -412,3 +486,5 @@ export const PMList: Component = () => {
     </div>
   );
 };
+
+export default PMList;

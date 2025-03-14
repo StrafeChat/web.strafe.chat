@@ -42,6 +42,13 @@
     "loading": "Chargement...",
     "unknownError": "Une erreur inconnue s'est produite"
   },
+  "messages": {
+    "delete": {
+      "title": "Supprimer le message",
+      "confirmation": "Êtes-vous sûr de vouloir supprimer ce message ?",
+      "confirm": "Supprimer"
+    }
+  },
   "time": {
     "today": "Aujourd'hui à {{time}}",
     "yesterday": "Hier à {{time}}",

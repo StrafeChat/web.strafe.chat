@@ -2,15 +2,19 @@ import { Component, createMemo, createSignal, Show, For, createEffect, onCleanup
 import { useParams } from "@solidjs/router";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
 import { useCache } from "../../lib/providers/cache/CacheProvider";
-import { BASE_URL } from "../../constants";
+import { BASE_URL, FS_URL } from "../../constants";
 import { RoomType } from "../../types/roomTypes";
 import { useTransContext } from "@mbarzda/solid-i18next";
 import Message from "./Message";
 import { CachedMessage } from "../../lib/cache/MessageCache";
+import DateDivider from "./DateDivider";
+import UnreadDivider from "./UnreadDivider";
+
+
 
 const ChatArea: Component = () => {
   const params = useParams();
-  const { user, rooms, sendMessage, editMessage } = useAuth();
+  const { user, rooms, sendMessage, editMessage, isMobile, sendTypingIndicator, unreadMessages, setUnreadMessages, markMessagesAsRead } = useAuth();
   const cache = useCache();
   const [t] = useTransContext();
   const [messageText, setMessageText] = createSignal("");
@@ -21,8 +25,44 @@ const ChatArea: Component = () => {
   const [replyingTo, setReplyingTo] = createSignal<string[]>([]);
   const [editingMessageId, setEditingMessageId] = createSignal<string | null>(null);
   const [editingRoomId, setEditingRoomId] = createSignal<string | null>(null);
+  const [typingUsers, setTypingUsers] = createSignal<{id: string, timestamp: number}[]>([]);
+  // Get unread messages for the current room
+  const currentRoomUnreadMessages = createMemo(() => {
+    const allUnreads = unreadMessages();
+    return allUnreads[params.roomId] || [];
+  });
+
+  // Handle unread header visibility
+  const delayedHeaderVisibility = () => {
+    if (currentRoomUnreadMessages().length === 0) return;
+    
+    setShowUnreadHeader(true);
+    
+    // Set a timeout to hide the header after 3 seconds
+    const timeoutId = setTimeout(() => {
+      setShowUnreadHeader(false);
+    }, 3000);
+    
+    // Clean up timeout if component unmounts
+    onCleanup(() => clearTimeout(timeoutId));
+  };
+
+  // Effect to handle unread messages when they become visible
+  createEffect(() => {
+    const roomId = params.roomId;
+    if (messages().length > 0 && currentRoomUnreadMessages().length > 0) {
+      // Mark messages as read immediately
+      markMessagesAsRead(roomId);
+      // Show the header with delay
+      delayedHeaderVisibility();
+    }
+  });
+  // Check if we're on mobile
   // Reference to the messages container for auto-scrolling
   let messagesContainerRef: HTMLDivElement | undefined;
+
+  // Reference to the chat input element
+  let chatInputRef: HTMLDivElement | undefined;
 
   // Handle edit message event from Message component
   createEffect(() => {
@@ -33,51 +73,154 @@ const ChatArea: Component = () => {
       setMessageText(content);
     };
 
+    // Handle typing indicator events
+    const handleTypingIndicator = (event: CustomEvent) => {
+      const { roomId, userId } = event.detail;
+      const currentRoomId = params.roomId;
+      
+      // Only process typing indicators for the current room
+      if (roomId !== currentRoomId) return;
+      
+      // Don't show typing indicators for the current user
+      const currentUserId = user()?.id;
+      if (userId === currentUserId) return;
+      
+      // Add or update the typing user
+      setTypingUsers(prev => {
+        // Remove this user if they're already in the list
+        const filtered = prev.filter(u => u.id !== userId);
+        
+        // Add the user with the current timestamp
+        return [...filtered, { id: userId, timestamp: Date.now() }];
+      });
+      
+      // Remove typing indicator after 6 seconds of inactivity
+      setTimeout(() => {
+        setTypingUsers(prev => prev.filter(u => 
+          !(u.id === userId && Date.now() - u.timestamp > 6000)
+        ));
+      }, 6000);
+    };
+
     window.addEventListener('editMessage', handleEditMessage as EventListener);
+    window.addEventListener('typingIndicator', handleTypingIndicator as EventListener);
 
     onCleanup(() => {
       window.removeEventListener('editMessage', handleEditMessage as EventListener);
+      window.removeEventListener('typingIndicator', handleTypingIndicator as EventListener);
     });
   });
+
+  // Set up MutationObserver to monitor chat input content changes
+  createEffect(() => {
+    if (!chatInputRef) return;
+    
+    // Create a MutationObserver to watch for content changes
+    const observer = new MutationObserver(() => {
+      // Configure observer to watch for text and node changes
+      observer.observe(chatInputRef, {
+        childList: true,
+        subtree: true,
+        characterData: true
+      });
+      
+      // Force reflow and empty check
+      chatInputRef?.offsetHeight;
+      const isEmpty = !chatInputRef?.textContent || chatInputRef.textContent.trim() === "";
+      chatInputRef.classList.toggle('empty', isEmpty);
+      setMessageText(chatInputRef.textContent || "");
+    });
+    
+    // Start observing the chat input for changes
+    observer.observe(chatInputRef, { 
+      childList: true,
+      characterData: true,
+      subtree: true 
+    });
+    
+    // Clean up the observer when component is unmounted
+    onCleanup(() => {
+      observer.disconnect();
+    });
+  });
+
+  // Helper function to check if a message is the first unread message
+  const isFirstUnread = (message: CachedMessage) => {
+    const unreads = currentRoomUnreadMessages();
+    if (unreads.length === 0) return false;
+    return message.id === unreads[0];
+  };
+
+  // Helper function to group messages by date
+  const groupMessagesByDate = (messages: CachedMessage[]) => {
+    const groups: { date: Date; messages: CachedMessage[] }[] = [];
+    
+    messages.forEach((message) => {
+      if (!message.created_at) return;
+      
+      const messageDate = new Date(message.created_at);
+      messageDate.setHours(0, 0, 0, 0);
+      
+      const existingGroup = groups.find(group => 
+        group.date.getTime() === messageDate.getTime()
+      );
+      
+      if (existingGroup) {
+        existingGroup.messages.push(message);
+      } else {
+        groups.push({
+          date: messageDate,
+          messages: [message]
+        });
+      }
+    });
+    
+    return groups.sort((a, b) => a.date.getTime() - b.date.getTime());
+  };
 
   // Helper function to deduplicate and sort messages
   const processMessages = (msgs: CachedMessage[]) => {
     // Create a map to store unique messages, prioritizing server IDs over nonces
     const messageMap = new Map<string, CachedMessage>();
     
-    // Process messages in reverse chronological order to ensure newer versions take precedence
-    [...msgs].reverse().forEach(msg => {
-      const key = msg.id || msg.nonce;
-      if (!key) return;
-
-      // If we already have this message (by ID or nonce), only update if the new one is confirmed
-      const existing = messageMap.get(key);
-      if (existing) {
-        // Server messages (with ID) take precedence over pending messages
-        if (msg.id && !existing.id) {
-          messageMap.set(key, msg);
-        }
-        // For pending messages, keep the existing one to avoid flicker
-        if (msg.pending && !existing.pending) {
-          return;
-        }
-      } else {
+    // First pass: Process messages with server IDs
+    msgs.forEach(msg => {
+      if (msg.id) {
+        const key = msg.id;
+        // Always prefer the most recent version of a message with an ID
         messageMap.set(key, msg);
       }
     });
-
-    // Convert back to array and sort by timestamp
-    return Array.from(messageMap.values()).sort((a, b) => {
-      const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
-      const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
-      if (dateA === dateB) {
-        // If timestamps are equal, prioritize confirmed messages
-        if (a.id && !b.id) return 1;
-        if (!a.id && b.id) return -1;
-        return 0;
+    
+    // Second pass: Process messages with only nonces (pending messages)
+    msgs.forEach(msg => {
+      if (!msg.id && msg.nonce) {
+        const key = msg.nonce;
+        // Only add if we don't already have a server version of this message
+        const existing = Array.from(messageMap.values()).find(m => m.nonce === msg.nonce);
+        if (!existing) {
+          messageMap.set(key, msg);
+        }
       }
-      return dateA - dateB;
     });
+    
+    // Log the processed messages for debugging
+    console.log(`[ChatArea] Processed ${messageMap.size} unique messages from ${msgs.length} total`);
+    
+    // Convert back to array and sort by timestamp
+    return Array.from(messageMap.values())
+      .filter(msg => !msg.deleted) // Filter out any messages marked as deleted
+      .sort((a, b) => {
+        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        if (dateA === dateB) {
+          // If timestamps are equal, prioritize confirmed messages
+          if (a.id && !b.id) return 1;
+          if (!a.id && b.id) return -1;
+          return 0;
+        }
+        return dateA - dateB;
+      });
   };
 
   // Function to scroll to the bottom of the messages container
@@ -181,6 +324,11 @@ const ChatArea: Component = () => {
       const { roomId, message } = event.detail;
       if (roomId !== room.id) return;
 
+      console.log("[ChatArea] Received message create event:", message);
+      
+      // Clear typing indicator for the message author
+      setTypingUsers(prev => prev.filter(u => u.id !== message.author_id));
+      
       setMessages(prev => {
         const updatedMessages = [...prev];
         const existingIndex = updatedMessages.findIndex(m => 
@@ -189,19 +337,27 @@ const ChatArea: Component = () => {
         );
 
         if (existingIndex >= 0) {
+          // Update existing message
           updatedMessages[existingIndex] = {
             ...updatedMessages[existingIndex],
             ...message,
             pending: message.pending ?? updatedMessages[existingIndex].pending
           };
+          console.log("[ChatArea] Updated existing message:", updatedMessages[existingIndex]);
         } else {
+          // Add new message
           updatedMessages.push(message);
+          console.log("[ChatArea] Added new message:", message);
         }
 
-        return processMessages(updatedMessages);
+        // Process and return updated messages
+        const processed = processMessages(updatedMessages);
+        console.log("[ChatArea] Processed messages count:", processed.length);
+        return processed;
       });
 
-      scrollToBottom();
+      // Scroll to bottom after message update
+      setTimeout(scrollToBottom, 50);
     }) as EventListener;
     
     // Set up event listener for real-time message deletions
@@ -213,9 +369,21 @@ const ChatArea: Component = () => {
       
       // Remove the deleted message from the messages state
       setMessages(prev => {
+        // Filter out the deleted message
         const updatedMessages = prev.filter(m => m.id !== messageId);
-        return processMessages(updatedMessages);
+        console.log("[ChatArea] Removed message with ID:", messageId);
+        console.log("[ChatArea] Messages count after deletion:", updatedMessages.length);
+        
+        // Process and return updated messages
+        const processed = processMessages(updatedMessages);
+        return processed;
       });
+      
+      // Force a refresh from cache after a short delay
+      setTimeout(() => {
+        const cachedMessages = cache.getMessages(room.id);
+        setMessages(processMessages([...cachedMessages]));
+      }, 100);
     }) as EventListener;
 
     // Set up event listener for real-time message edits
@@ -230,17 +398,31 @@ const ChatArea: Component = () => {
         const updatedMessages = prev.map(m => {
           if (m.id === messageId) {
             // Update the message with the edited content and timestamp
-            return { 
+            const updatedMessage = { 
               ...m, 
               content: content,
               edited_at: editedAt || new Date().toISOString(),
               author_id: authorId || m.author_id
             };
+            console.log("[ChatArea] Updated message content:", updatedMessage);
+            return updatedMessage;
           }
           return m;
         });
-        return processMessages(updatedMessages);
+        
+        // Process and return updated messages
+        const processed = processMessages(updatedMessages);
+        console.log("[ChatArea] Processed edited messages count:", processed.length);
+        return processed;
       });
+      
+      // Force a re-render after a short delay to ensure UI updates
+      setTimeout(() => {
+        const cachedMessages = cache.getMessages(room.id);
+        if (cachedMessages.length > 0) {
+          setMessages(processMessages([...cachedMessages]));
+        }
+      }, 100);
     }) as EventListener;
     window.addEventListener("messageCreate", messageCreateHandler);
     window.addEventListener("messageDelete", messageDeleteHandler);
@@ -374,6 +556,21 @@ const ChatArea: Component = () => {
       setSending(true);
       const nonce = Math.random().toString(36).substring(2, 15);
       
+      // Remove current user from typing users when sending a message
+      if (currentUser?.id) {
+        setTypingUsers(prev => prev.filter(u => u.id !== currentUser.id));
+      }
+      
+      // Clear unread messages for this room when user sends a message
+      // This is the user interaction that should clear the unread state
+      if (room.id && currentRoomUnreadMessages().length > 0) {
+        setUnreadMessages((prev: { [roomId: string]: string[] }) => {
+          const newState = { ...prev };
+          delete newState[room.id];
+          return newState;
+        });
+      }
+      
       // Add temporary message to cache with optimistic update
       const tempMessage = {
         id: undefined,
@@ -391,7 +588,11 @@ const ChatArea: Component = () => {
       
       // Clear input field immediately for better UX
       inputElement.textContent = "";
+      inputElement.classList.add("empty");
       setMessageText("");
+      
+      // Reset the lastTypingTime when sending a message
+      inputElement.dataset.lastTypingTime = "0";
       
       // Scroll to bottom after sending a message
       setTimeout(scrollToBottom, 100);
@@ -464,6 +665,9 @@ const ChatArea: Component = () => {
           </Show>
           <Show when={!loading()}>
             <div class="flex-1 flex flex-col justify-end">
+              <Show when={showUnreadHeader()}>
+                <UnreadDivider />
+              </Show>
               <Show when={messages().length === 0}>
                 <div class="flex flex-col items-center justify-center text-text-secondary select-none py-8">
                   <div class="w-20 h-20 mb-5 bg-primary bg-opacity-10 rounded-full flex items-center justify-center">
@@ -478,33 +682,42 @@ const ChatArea: Component = () => {
                 </div>
               </Show>
               <Show when={messages().length > 0}>
-                <For each={messages()}>
-                  {(message, index) => {
-                    const prevMessage = index() > 0 ? messages()[index() - 1] : null;
-                    const isCompact = Boolean(
-                      prevMessage && 
-                      prevMessage.author_id === message.author_id && 
-                      message.created_at && prevMessage.created_at && 
-                      new Date(message.created_at).getTime() - new Date(prevMessage.created_at).getTime() < 300000
-                    );
-                
-                    return (
-                      <Message
-                        id={message.id}
-                        content={message.content}
-                        author_id={message.author_id}
-                        created_at={message.created_at}
-                        edited_at={message.edited_at}
-                        nonce={message.nonce}
-                        pending={message.pending}
-                        error={message.error}
-                        isCompact={isCompact}
-                        message_references={message.message_references}
-                        room_id={params.roomId}
-                        onReply={handleReply}
-                      />
-                    );
-                  }}
+                <For each={groupMessagesByDate(messages())}>
+                  {(group) => (
+                    <>
+                      <DateDivider date={group.date} />
+                      <For each={group.messages}>
+                        {(message, index) => {
+                          const prevMessage = index() > 0 ? group.messages[index() - 1] : null;
+                          const isCompact = Boolean(
+                            prevMessage && 
+                            prevMessage.author_id === message.author_id && 
+                            message.created_at && prevMessage.created_at && 
+                            new Date(message.created_at).getTime() - new Date(prevMessage.created_at).getTime() < 300000
+                          );
+                          return (
+                            <>
+                              {isFirstUnread(message) && <UnreadDivider />}
+                              <Message
+                                id={message.id}
+                                content={message.content}
+                                author_id={message.author_id}
+                                created_at={message.created_at}
+                                edited_at={message.edited_at}
+                                nonce={message.nonce}
+                                pending={message.pending}
+                                error={message.error}
+                                isCompact={isCompact}
+                                message_references={message.message_references}
+                                room_id={params.roomId}
+                                onReply={handleReply}
+                              />
+                            </>
+                          );
+                        }}
+                      </For>
+                    </>
+                  )}
                 </For>
               </Show>
             </div>
@@ -512,7 +725,7 @@ const ChatArea: Component = () => {
         </div>
 
         {/* Message input area */}
-        <div class="p-4">
+        <div class="p-4 pt-8 relative" style={!isMobile() ? "margin-bottom: 24px;" : ""}>
           <Show when={error()}>
             <div class="mb-2 px-4 py-3 bg-red-500/5 text-red-500 rounded-lg text-sm font-medium border border-red-500/10 shadow-sm">
               {error()}
@@ -561,13 +774,116 @@ const ChatArea: Component = () => {
               </button>
             </div>
           </Show>
-          <div class="bg-[var(--background1)] rounded-lg p-3 flex items-start">
+          {/* Typing indicators for mobile - positioned absolutely */}
+          <Show when={isMobile() && typingUsers().length > 0}>
+            <div class="absolute -top-4 left-0 right-0 px-3 py-2 text-text-secondary text-sm flex items-center gap-2">
+              <div class="flex -space-x-2 mr-1">
+                <For each={typingUsers().slice(0, 3)}>
+                  {(typingUser) => {
+                    const user = cache.getUser(typingUser.id);
+                    return (
+                      <div class="w-6 h-6 rounded-full bg-primary flex-shrink-0 overflow-hidden border border-background2">
+                        {user?.avatar ? (
+                          <img 
+                            src={`${FS_URL}/avatars/${user.id}/${user.avatar || "favicon.ico"}`} 
+                            alt={user.display_name || user.username} 
+                            class="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div class="w-full h-full flex items-center justify-center bg-primary text-white text-xs font-medium">
+                            {(user?.display_name || user?.username || "?").charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }}
+                </For>
+              </div>
+              <div class="flex-1 truncate">
+                {(() => {
+                  const users = typingUsers().slice(0, 3).map(tu => {
+                    const user = cache.getUser(tu.id);
+                    return user?.display_name || user?.username || "Someone";
+                  });
+                  
+                  if (typingUsers().length > 3) {
+                    return "Several users are typing...";
+                  } else if (users.length === 3) {
+                    return `${users[0]}, ${users[1]}, and ${users[2]} are typing...`;
+                  } else if (users.length === 2) {
+                    return `${users[0]} and ${users[1]} are typing...`;
+                  } else {
+                    return `${users[0]} is typing...`;
+                  }
+                })()}
+              </div>
+              <div class="typing-indicator flex-shrink-0">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+          </Show>
+          <div class="bg-[var(--background1)] rounded-lg p-2 flex items-center relative absolute" style={isMobile() ? "border-radius: 0" : ""}>
             <div
               contentEditable
+              ref={chatInputRef}
               data-placeholder={`${editingMessageId() ? "Edit message" : `Message ${getRoomName()}`}`}
-              class="bg-transparent w-full focus:outline-none text-text-primary min-h-[20px] max-h-[150px] overflow-y-auto whitespace-pre-wrap word-break break-all break-words break-anywhere [&:empty]:before:content-[attr(data-placeholder)] before:text-text-secondary before:absolute before:pointer-events-none relative"
+              class="bg-transparent w-full focus:outline-none text-text-primary min-h-[20px] max-h-[120px] overflow-y-auto whitespace-pre-wrap word-break break-all break-words break-anywhere relative empty:before:content-[attr(data-placeholder)] empty:before:text-text-secondary empty:before:absolute empty:before:left-0 empty:before:top-0 empty:before:pointer-events-none empty:before:transition-opacity empty:before:duration-100 empty:before:ease-in-out flex items-center empty"
+              onPaste={(e) => {
+                e.preventDefault();
+            
+                const text = e.clipboardData?.getData('text/plain') || '';
+
+                const selection = window.getSelection();
+                if (selection && selection.rangeCount > 0) {
+                  const range = selection.getRangeAt(0);
+                  range.deleteContents();
+                  range.insertNode(document.createTextNode(text));
+    
+                  range.collapse(false);
+                  selection.removeAllRanges();
+                  selection.addRange(range);
+
+                  const inputEvent = new Event('input', { bubbles: true });
+                  e.currentTarget.dispatchEvent(inputEvent);
+                }
+              }}
               onInput={(e) => {
-                setMessageText(e.currentTarget.textContent || "");
+                const text = e.currentTarget.textContent || "";
+                setMessageText(text);
+                
+                // Toggle empty class based on content
+                // Check both raw content length and trimmed content to ensure placeholder shows correctly
+                if (text.length === 0 || text.trim() === "") {
+                  e.currentTarget.classList.add("empty");
+                  // Force a reflow to ensure the placeholder appears immediately
+                  void e.currentTarget.offsetHeight;
+                } else {
+                  e.currentTarget.classList.remove("empty");
+                }
+                
+                // Send typing indicator to backend after second character is typed
+                if (text.length >= 2 && !editingMessageId()) {
+                  const currentTime = Date.now();
+                  const lastTypingTime = e.currentTarget.dataset.lastTypingTime ? parseInt(e.currentTarget.dataset.lastTypingTime) : 0;
+                  
+                  // Only send typing indicator if 7 seconds have passed since the last one
+                  if (currentTime - lastTypingTime > 7000) {
+                    const roomId = params.roomId;
+                    const currentUserId = user()?.id;
+                    
+                    if (roomId && currentUserId) {
+                      // Send typing indicator via the API
+                      sendTypingIndicator(roomId).catch(err => {
+                        console.error("[ChatArea] Failed to send typing indicator:", err);
+                      });
+                      
+                      // Update last typing time
+                      e.currentTarget.dataset.lastTypingTime = currentTime.toString();
+                    }
+                  }
+                }
               }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -629,10 +945,56 @@ const ChatArea: Component = () => {
               </button>
             </div>
           </div>
+          
+          {/* Typing indicators for desktop - positioned below the text input */}
+          <Show when={!isMobile() && typingUsers().length > 0}>
+            <div class="px-2 py-2 text-text-secondary text-sm flex items-center absolute gap-2">
+              <div class="flex -space-x-2 mr-1">
+                <For each={typingUsers().slice(0, 3)}>
+                  {(typingUser) => {
+                    const user = cache.getUser(typingUser.id);
+                    return (
+                      <div class="w-6 h-6 rounded-full bg-primary flex-shrink-0 overflow-hidden border border-background2">
+                        {user?.avatar ? (
+                          <img 
+                            src={`${FS_URL}/avatars/${user.id}/${user.avatar || "favicon.ico"}`} 
+                            alt={user.display_name || user.username} 
+                            class="w-full h-full object-cover"
+                          />
+                        ) : (
+                          <div class="w-full h-full flex items-center justify-center bg-primary text-white text-xs font-medium">
+                            {(user?.display_name || user?.username || "?").charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  }}
+                </For>
+              </div>
+              <div class="flex-1 truncate">
+                {(() => {
+                  const users = typingUsers().slice(0, 3).map(tu => {
+                    const user = cache.getUser(tu.id);
+                    return user?.display_name || user?.username || "Someone";
+                  });
+                  
+                  if (typingUsers().length > 3) {
+                    return "Several users are typing...";
+                  } else if (users.length === 3) {
+                    return `${users[0]}, ${users[1]}, and ${users[2]} are typing...`;
+                  } else if (users.length === 2) {
+                    return `${users[0]} and ${users[1]} are typing...`;
+                  } else {
+                    return `${users[0]} is typing...`;
+                  }
+                })()}
+              </div>
+            </div>
+          </Show>
         </div>
       </div>
     </div>
   );
 };
 
-export default ChatArea;
+export default ChatArea;const [showUnreadHeader, setShowUnreadHeader] = createSignal(false);

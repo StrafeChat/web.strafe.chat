@@ -494,8 +494,8 @@ class WebSocketWorkerHandler {
           // Check if this is a message with the new nested data structure
           if (data.d && data.d.event_type === "MESSAGE_CREATE" && data.d.data) {
             this.broadcast({
-              type: "message_create",
-              payload: data.d,
+              type: "MESSAGE_CREATE",
+              payload: data.d.data
             });
           } else if (data.d && data.d.event_type === "MESSAGE_DELETE" && data.d.data) {
             console.log("[WebSocketWorker] Handling message delete:", data.d);

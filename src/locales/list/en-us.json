@@ -38,6 +38,13 @@
     "loading": "Loading...",
     "unknownError": "An unknown error occurred"
   },
+  "messages": {
+    "delete": {
+      "title": "Delete Message",
+      "confirmation": "Are you sure you want to delete this message?",
+      "confirm": "Delete"
+    }
+  },
   "time": {
     "today": "Today at {{time}}",
     "yesterday": "Yesterday at {{time}}",

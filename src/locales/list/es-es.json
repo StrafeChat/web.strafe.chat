@@ -38,6 +38,13 @@
     "loading": "Cargando...",
     "unknownError": "Se produjo un error desconocido"
   },
+  "messages": {
+    "delete": {
+      "title": "Eliminar mensaje",
+      "confirmation": "¿Estás seguro de que quieres eliminar este mensaje?",
+      "confirm": "Eliminar"
+    }
+  },
   "time": {
     "today": "Hoy a las {{time}}",
     "yesterday": "Ayer a las {{time}}",

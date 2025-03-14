@@ -11,7 +11,9 @@ export type PayloadType =
   | "ROOM_CREATE"
   | "MESSAGE_CREATE"
   | "MESSAGE_DELETE"
-  | "MESSAGE_EDIT";
+  | "MESSAGE_EDIT"
+  | "TYPING_START"
+  | "TYPING_INDICATOR";
 
 export interface BasePayload {
   type: PayloadType;
@@ -120,7 +122,9 @@ const EVENT_TYPE_TO_OP_CODE: Record<string, string> = {
   ROOM_CREATE: "ROOM_CREATE",
   MESSAGE_CREATE: "MESSAGE_CREATE",
   MESSAGE_DELETE: "MESSAGE_DELETE",
-  MESSAGE_EDIT: "MESSAGE_EDIT"
+  MESSAGE_EDIT: "MESSAGE_EDIT",
+  TYPING_START: "TYPING_INDICATOR",
+  TYPING_INDICATOR: "TYPING_INDICATOR"
 };
 
 export class WebSocketClient {
@@ -162,7 +166,7 @@ export class WebSocketClient {
     this.onMessage("MESSAGE_DELETE", this.handleMessageDelete.bind(this));
     this.onMessage("MESSAGE_EDIT", this.handleMessageEdit.bind(this));
     this.onMessage("ROOM_CREATE", this.handleRoomCreate.bind(this));
-    console.log("[WebSocket] Message handlers set up:", [...this.messageHandlers.entries()]);
+    this.onMessage("TYPING_INDICATOR", this.handleTypingIndicator.bind(this));    console.log("[WebSocket] Message handlers set up:", [...this.messageHandlers.entries()]);
   }
 
   private setupReadyPromise(): void {
@@ -280,6 +284,22 @@ export class WebSocketClient {
         });
       }
     });
+  }
+
+ private handleTypingIndicator(data: any): void {
+    console.log("[WebSocket] Handling typing indicator:", data);
+    const typingData = data.data || data;
+    
+    if (typingData.room_id && typingData.user_id) {
+      console.log("[WebSocket] Dispatching typing indicator event:", typingData);
+      
+      // Dispatch event for UI updates
+      this.dispatchEvent("typingIndicator", {
+        roomId: typingData.room_id,
+        userId: typingData.user_id,
+        createdAt: typingData.created_at || new Date().toISOString()
+      });
+    }
   }
 
   private async handleDirectMessage(event: MessageEvent): Promise<void> {
@@ -411,6 +431,11 @@ export class WebSocketClient {
       case "message_edit":
         // Directly call the message edit handler
         this.handleMessageEdit(payload);
+        break;
+       
+        case "typing_indicator":
+        // Directly call the typing indicator handler
+        this.handleTypingIndicator(payload);
         break;
 
       case "relationshipCreate":

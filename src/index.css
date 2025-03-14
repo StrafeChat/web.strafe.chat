@@ -2,6 +2,43 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Typing indicator animation */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+}
+
+.typing-indicator span {
+  height: 4px;
+  width: 4px;
+  margin: 0 1px;
+  background-color: currentColor;
+  border-radius: 50%;
+  display: inline-block;
+  opacity: 0.6;
+}
+
+.typing-indicator span:nth-child(1) {
+  animation: bounce 1s infinite 0.1s;
+}
+
+.typing-indicator span:nth-child(2) {
+  animation: bounce 1s infinite 0.2s;
+}
+
+.typing-indicator span:nth-child(3) {
+  animation: bounce 1s infinite 0.3s;
+}
+
+@keyframes bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
 @layer base {
   :root {
     --primary: #21c35e;

@@ -45,6 +45,16 @@ type CacheContextType = {
 const CacheContext = createContext<CacheContextType>();
 const messageCache = new MessageCache();
 
+// Make messageCache globally accessible for WebSocketClient
+declare global {
+  interface Window {
+    messageCache: MessageCache;
+  }
+}
+
+// Expose messageCache globally
+window.messageCache = messageCache;
+
 export const CacheProvider: ParentComponent = (props) => {
   const [users, setUsers] = createSignal<Record<string, User>>({});
 
@@ -65,12 +75,22 @@ export const CacheProvider: ParentComponent = (props) => {
       }
     };
 
+    const handleMessageDelete = (event: CustomEvent) => {
+      const { roomId, messageId } = event.detail;
+      if (roomId && messageId) {
+        console.log("[CacheProvider] Deleting message from cache:", { roomId, messageId });
+        messageCache.deleteMessage(roomId, messageId);
+      }
+    };
+
     window.addEventListener("userUpdate", handleUserUpdate as EventListener);
     window.addEventListener("messageCreate", handleMessageCreate as EventListener);
+    window.addEventListener("messageDelete", handleMessageDelete as EventListener);
 
     return () => {
       window.removeEventListener("userUpdate", handleUserUpdate as EventListener);
       window.removeEventListener("messageCreate", handleMessageCreate as EventListener);
+      window.removeEventListener("messageDelete", handleMessageDelete as EventListener);
     };
   });
 

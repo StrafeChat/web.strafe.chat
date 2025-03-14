@@ -6,11 +6,13 @@ import {
   ParentComponent,
   createMemo,
   onCleanup,
+  onMount,
 } from "solid-js";
 import { WebSocketClient } from "../../ws/WebSocketClient";
 import { useCache } from "../cache/CacheProvider";
 import { handleWebSocketMessage } from "../../events";
 import { BASE_URL, WS_URL } from "../../../constants";
+import { api } from "../../api";
 import { RoomWithRecipients } from "../../../types/rooms";
 
 export const API_ENDPOINTS = {
@@ -22,6 +24,7 @@ export const API_ENDPOINTS = {
   ROOM_MESSAGES: (roomId: string) => `${BASE_URL}/rooms/${roomId}/messages`,
   UPDATE_STATUS: `${BASE_URL}/users/@me/status`,
   BULK_USERS: `${BASE_URL}/users/bulk`,
+  TYPING_INDICATOR: (roomId: string) => `${BASE_URL}/rooms/${roomId}/typing`,
 };
 
 const API_HEADERS = {
@@ -70,8 +73,13 @@ type AuthContextType = {
   updateStatus: (status?: string, customStatus?: string) => Promise<boolean>;
   fetchBulkUsers: (userIds: string[]) => Promise<void>;
   sendMessage: (roomId: string, messageData: { content: string; nonce?: string; message_references?: string[] }) => Promise<MessageResponse>;
+  sendTypingIndicator: (roomId: string) => Promise<void>;
   deleteMessage: (roomId: string, messageId: string) => Promise<{ success: boolean; error?: string; }>;
   editMessage: (roomId: string, messageId: string, content: string) => Promise<{ success: boolean; message?: any; error?: string; }>;
+  unreadMessages: () => { [roomId: string]: string[] };
+  setUnreadMessages: (unreads: { [roomId: string]: string[] } | ((prev: { [roomId: string]: string[] }) => { [roomId: string]: string[] })) => void;
+  fetchUnreadMessages: (roomId: string) => Promise<void>;
+  markMessagesAsRead: (roomId: string) => Promise<void>;
 };
 
 type LoginCredentials = {
@@ -119,6 +127,7 @@ export const AuthProvider: ParentComponent = (props) => {
   const [loading, setLoading] = createSignal(true);
   const [isMobile, setIsMobile] = createSignal(window.innerWidth <= 768);
   const [wsClient, setWsClient] = createSignal<WebSocketClient | null>(null);
+  const [unreadMessages, setUnreadMessages] = createSignal<{ [roomId: string]: string[] }>({});
 
   const mobileCheck = createMemo(() => isMobile());
 
@@ -156,6 +165,7 @@ export const AuthProvider: ParentComponent = (props) => {
     client.onMessage("relationshipDelete", handleRelationshipEvent);
     client.onMessage("ROOM_CREATE", handleRoomCreateEvent);
     client.onMessage("presence", handlePresenceEvent);
+    client.onMessage("MESSAGE_CREATE", handleMessageCreateEvent);
   };
 
   const handleReadyEvent = (data: any) => {
@@ -182,6 +192,25 @@ export const AuthProvider: ParentComponent = (props) => {
     if (data.rooms) {
       const roomsData = normalizeRoomsData(data.rooms, data.users);
       setRooms(roomsData);
+    }
+
+    // Handle unread messages from READY event
+    if (data.unread_messages) {
+      console.log("[AuthProvider] Received unread messages in READY event:", data.unread_messages);
+      setUnreadMessages(data.unread_messages);
+      
+      // Update room unread counts based on unread messages
+      if (data.rooms) {
+        setRooms(rooms => {
+          return rooms.map(room => {
+            const roomUnreads = data.unread_messages?.[room.id] || [];
+            return {
+              ...room,
+              unread_count: roomUnreads.length
+            };
+          });
+        });
+      }
     }
 
     if (!data.client_user || !data.users) {
@@ -289,6 +318,24 @@ export const AuthProvider: ParentComponent = (props) => {
     setRooms(prev => [...prev, newRoom]);
   };
 
+  const sendTypingIndicator = async (roomId: string): Promise<void> => {
+    try {
+      const response = await fetch(API_ENDPOINTS.TYPING_INDICATOR(roomId), {
+        method: 'POST',
+        headers: {
+          ...API_HEADERS.JSON,
+          ...API_HEADERS.SESSION(),
+        }
+      });
+
+      if (!response.ok) {
+        console.error('[AuthProvider] Failed to send typing indicator:', await response.text());
+      }
+    } catch (error) {
+      console.error('[AuthProvider] Error sending typing indicator:', error);
+    }
+  };
+
   const handlePresenceEvent = (data: any) => {
     const presence = {
       status: data.status || "offline",
@@ -319,16 +366,7 @@ export const AuthProvider: ParentComponent = (props) => {
 
   const fetchUserData = async (token: string): Promise<AuthResponse> => {
     try {
-      const res = await fetch(API_ENDPOINTS.USER_ME, {
-        headers: { ...API_HEADERS.JSON, ...API_HEADERS.SESSION() },
-      });
-
-      if (!res.ok) {
-        setLoading(false);
-        return { success: false, error: "Failed to fetch user data" };
-      }
-
-      const data = await res.json();
+      const data = await api.users.me();
       if (!data?.client_user) {
         setLoading(false);
         return { success: false, error: "Invalid response format" };
@@ -356,15 +394,7 @@ export const AuthProvider: ParentComponent = (props) => {
   const login = async (credentials: LoginCredentials): Promise<AuthResponse> => {
     try {
       setLoading(true);
-      const res = await fetch(API_ENDPOINTS.LOGIN, {
-        method: "POST",
-        headers: API_HEADERS.JSON,
-        body: JSON.stringify(credentials),
-      });
-
-      if (!res.ok) return { success: false, error: "Invalid credentials" };
-
-      const data = await res.json();
+      const data = await api.auth.login(credentials);
       if (!data?.token) return { success: false, error: "No token in response" };
 
       localStorage.setItem("sc_token", data.token);
@@ -384,23 +414,13 @@ export const AuthProvider: ParentComponent = (props) => {
   const register = async (data: RegisterData): Promise<AuthResponse> => {
     try {
       setLoading(true);
-      const res = await fetch(API_ENDPOINTS.REGISTER, {
-        method: "POST",
-        headers: API_HEADERS.JSON,
-        body: JSON.stringify(data),
-      });
+      const response = await api.auth.register(data);
+      if (!response?.token) return { success: false, error: "No token in response" };
 
-      if (!res.ok) {
-        const errorData = await res.json();
-        return {
-          success: false,
-          error: errorData.error || `Registration failed: ${res.status}`,
-        };
-      }
-
-      const { token } = await res.json();
-      localStorage.setItem("sc_token", token);
-      return await fetchUserData(token);
+      localStorage.setItem("sc_token", response.token);
+      const result = await fetchUserData(response.token);
+      setIsAuthenticated(result.success);
+      return result;
     } catch (error) {
       return {
         success: false,
@@ -566,6 +586,21 @@ export const AuthProvider: ParentComponent = (props) => {
     
     initializeAuth();
   });
+  
+  // Set up global functions for WebSocketClient to access
+  onMount(() => {
+    window.getCurrentRooms = () => rooms();
+    window.getCurrentUser = () => user();
+    // ... existing code...
+    window.setUnreadMessages = (unreads: ((prev: { [roomId: string]: string[] }) => { [roomId: string]: string[] }) | { [roomId: string]: string[] }) => {
+      console.log("[AuthProvider] Setting unread messages:", unreads);
+      if (typeof unreads === 'function') {
+        setUnreadMessages(prev => unreads(prev));
+      } else {
+        setUnreadMessages(unreads);
+      }
+    };
+  });
 
   const deleteMessage = async (roomId: string, messageId: string) => {
     try {
@@ -625,6 +660,134 @@ export const AuthProvider: ParentComponent = (props) => {
     }
   };
 
+  // Handle new message events to update unread messages
+  const handleMessageCreateEvent = (data: any) => {
+    const messageData = data.data || data;
+    if (!messageData.room_id || !messageData.id) return;
+    
+    const currentUser = user();
+    if (!currentUser) return;
+    
+    // Check if user is currently viewing this room
+    const currentLocation = window.location.pathname;
+    const isViewingThisRoom = currentLocation.includes(`/rooms/${messageData.room_id}`);
+    
+    // Create a normalized message object
+    const normalizedMessage = {
+      id: messageData.id,
+      content: messageData.content || "",
+      author_id: messageData.author_id || messageData.sender_id || "",
+      room_id: messageData.room_id,
+      created_at: messageData.created_at || new Date().toISOString(),
+      edited_at: messageData.edited_at || null,
+      attachments: messageData.attachments || [],
+    };
+    
+    // Add message to cache
+    if (window.messageCache) {
+      console.log("[AuthProvider] Adding message to cache:", normalizedMessage);
+      window.messageCache.addMessage(messageData.room_id, normalizedMessage);
+    }
+    
+    // Dispatch messageCreate event for UI components to listen to
+    // This is critical for real-time updates in the ChatArea component
+    console.log("[AuthProvider] Dispatching messageCreate event");
+    window.dispatchEvent(new CustomEvent("messageCreate", {
+      detail: {
+        roomId: messageData.room_id,
+        message: normalizedMessage
+      }
+    }));
+    
+    // Don't mark as unread if user is viewing this room or in DND mode
+    if (isViewingThisRoom || currentUser.presence?.status === "dnd") return;
+    
+    // Update unread messages
+    setUnreadMessages((prev: { [roomId: string]: string[] }) => {
+      const updated = { ...prev };
+      if (!updated[messageData.room_id]) {
+        updated[messageData.room_id] = [];
+      }
+      
+      // Add the message ID if it's not already in the list
+      if (!updated[messageData.room_id].includes(messageData.id)) {
+        updated[messageData.room_id] = [...updated[messageData.room_id], messageData.id];
+      }
+      
+      return updated;
+    });
+    
+    // Update room unread count
+    setRooms((rooms: RoomWithRecipients[]) => {
+      return rooms.map(room => {
+        if (room.id === messageData.room_id) {
+          return {
+            ...room,
+            unread_count: (room.unread_count || 0) + 1,
+            last_message_id: messageData.id
+          };
+        }
+        return room;
+      });
+    });
+  };
+
+  const fetchUnreadMessages = async (roomId: string): Promise<void> => {
+    try {
+      const response = await fetch(`${BASE_URL}/rooms/${roomId}/unreads`, {
+        headers: {
+          ...API_HEADERS.JSON,
+          ...API_HEADERS.SESSION(),
+        },
+      });
+      if (response.ok) {
+        const unreads = await response.json();
+        setUnreadMessages(prev => ({
+          ...prev,
+          [roomId]: unreads.map((u: any) => u.message_id)
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to fetch unread messages:', error);
+    }
+  };
+
+  const markMessagesAsRead = async (roomId: string): Promise<void> => {
+    try {
+      // Use the ack endpoint to acknowledge messages in a room
+      await fetch(`${BASE_URL}/rooms/${roomId}/ack`, {
+        method: 'POST',
+        headers: {
+          ...API_HEADERS.JSON,
+          ...API_HEADERS.SESSION(),
+        },
+      });
+      
+      // Clear unread messages for this room
+      setUnreadMessages((prev: { [roomId: string]: string[] }) => {
+        const updated = { ...prev };
+        delete updated[roomId];
+        return updated;
+      });
+
+      // Also update the room's unread_count to 0
+      setRooms((rooms: RoomWithRecipients[]) => {
+        return rooms.map((room: RoomWithRecipients) => {
+          if (room.id === roomId) {
+            return {
+              ...room,
+              unread_count: 0
+            };
+          }
+          return room;
+        });
+      });
+
+    } catch (error) {
+      console.error('Failed to mark messages as read:', error);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -648,8 +811,14 @@ export const AuthProvider: ParentComponent = (props) => {
         fetchBulkUsers,
         sendMessage,
         deleteMessage,
-        editMessage
+        editMessage,
+        unreadMessages: () => unreadMessages(),
+        setUnreadMessages,
+        fetchUnreadMessages,
+        markMessagesAsRead,
+        sendTypingIndicator,
       }}
+      data-auth-provider
     >
       {props.children}
     </AuthContext.Provider>
@@ -663,3 +832,5 @@ export const useAuth = () => {
   }
   return context;
 };
+
+// ...existing code ...

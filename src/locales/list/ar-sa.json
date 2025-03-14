@@ -46,7 +46,12 @@
     }
   },
   "messages": {
-    "privateMessages": "الرسائل الخاصة"
+    "privateMessages": "الرسائل الخاصة",
+    "delete": {
+      "title": "حذف الرسالة",
+      "confirmation": "هل أنت متأكد أنك تريد حذف هذه الرسالة؟",
+      "confirm": "حذف"
+    }
   },
   "navigation": {
     "home": "الرئيسية",
