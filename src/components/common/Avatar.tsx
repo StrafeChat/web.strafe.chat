@@ -54,7 +54,7 @@ export const Avatar: Component<AvatarProps> = (props) => {
     <img
       src={getAvatarUrl()}
       alt={props.alt || "User avatar"}
-      class={`rounded-full object-cover ${getSizeClass()} ${props.class || ""}`}
+      class={`rounded-full  object-cover ${getSizeClass()} ${props.class || ""}`}
       onError={handleError}
       onClick={props.onClick}
     />
