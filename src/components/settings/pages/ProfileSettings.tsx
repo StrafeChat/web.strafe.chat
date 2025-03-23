@@ -1,6 +1,7 @@
 import { Component, createSignal, Show } from "solid-js";
 import { useAuth } from "../../../lib/providers/auth/AuthProvider";
 import { useTransContext } from "@mbarzda/solid-i18next";
+import { Avatar } from "../../common/Avatar";
 import { useToast } from "../../common/Toast";
 import { BASE_URL, FS_URL } from "../../../constants";
 
@@ -175,15 +176,12 @@ const ProfileSettings: Component = () => {
           <div class="flex flex-col md:flex-row items-center md:items-start gap-4">
             <div class="relative group">
               <div class="relative w-20 h-20">
-                <img
-                  src={
-                    user()?.avatar
-                      ? `${FS_URL}/avatars/${user()?.id}/${user()?.avatar}`
-                      : "https://cdn.discordapp.com/avatars/529815278456930314/718130faa9edf64dc453e04ee63fa1fe.png?format=webp&quality=lossless&width=897&height=897"
-                  }
+                <Avatar
+                  userId={user()?.id || ""}
+                  avatar={user()?.avatar}
                   alt={t("settings.profile.avatar.alt")}
-                  class="w-full h-full rounded-full object-cover"
-                  style={{ "aspect-ratio": "1/1" }}
+                  size="xl"
+                  class="w-full h-full"
                 />
               </div>
               <label

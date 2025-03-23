@@ -9,6 +9,7 @@ import Message from "./Message";
 import { CachedMessage } from "../../lib/cache/MessageCache";
 import DateDivider from "./DateDivider";
 import UnreadDivider from "./UnreadDivider";
+import { Avatar } from "../common/Avatar";
 
 
 
@@ -783,17 +784,18 @@ const ChatArea: Component = () => {
                     const user = cache.getUser(typingUser.id);
                     return (
                       <div class="w-6 h-6 rounded-full bg-primary flex-shrink-0 overflow-hidden border border-background2">
-                        {user?.avatar ? (
-                          <img 
-                            src={`${FS_URL}/avatars/${user.id}/${user.avatar || "favicon.ico"}`} 
+                        {user ? (
+                          <Avatar 
+                            userId={user.id}
+                            avatar={user.avatar}
                             alt={user.display_name || user.username} 
-                            class="w-full h-full object-cover"
+                            class="w-full h-full"
+                            size="sm"
                           />
                         ) : (
-                          <div class="w-full h-full flex items-center justify-center bg-primary text-white text-xs font-medium">
-                            {(user?.display_name || user?.username || "?").charAt(0).toUpperCase()}
-                          </div>
-                        )}
+                          <div class="w-full h-full bg-background2"></div> 
+                        )
+                        }
                       </div>
                     );
                   }}
@@ -955,17 +957,18 @@ const ChatArea: Component = () => {
                     const user = cache.getUser(typingUser.id);
                     return (
                       <div class="w-6 h-6 rounded-full bg-primary flex-shrink-0 overflow-hidden border border-background2">
-                        {user?.avatar ? (
-                          <img 
-                            src={`${FS_URL}/avatars/${user.id}/${user.avatar || "favicon.ico"}`} 
+                        {user ? (
+                          <Avatar 
+                            userId={user.id}
+                            avatar={user.avatar}
                             alt={user.display_name || user.username} 
-                            class="w-full h-full object-cover"
+                            class="w-full h-full"
+                            size="sm"
                           />
                         ) : (
-                          <div class="w-full h-full flex items-center justify-center bg-primary text-white text-xs font-medium">
-                            {(user?.display_name || user?.username || "?").charAt(0).toUpperCase()}
-                          </div>
-                        )}
+                          <div class="w-full h-full bg-background2"></div> 
+                        )
+                        }
                       </div>
                     );
                   }}

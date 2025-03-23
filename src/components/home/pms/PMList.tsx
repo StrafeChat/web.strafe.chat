@@ -41,32 +41,23 @@ export const PMList: Component = () => {
     ).length;
   });
 
-  // Filter rooms to only show PMs (type 0) and Group PMs (type 1) and sort by last_message_id
   const directMessages = createMemo(() => {
     const allRooms = rooms();
     const currentUser = user();
     if (!allRooms) return [];
     
-    // Filter to only include PMs (type 0) and Group PMs (type 1)
     const filteredRooms = allRooms.filter(room => room.type === 0 || room.type === 1);
     
-    // Sort rooms by last_message_id (snowflakes) in descending order
-    // This ensures newest messages appear at the top
     const sortedRooms = [...filteredRooms].sort((a, b) => {
-      // If either room doesn't have a last_message_id, handle appropriately
       if (!a.last_message_id && !b.last_message_id) {
-        // If neither has a last_message_id, sort by created_at date
         return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
       }
-      if (!a.last_message_id) return 1; // Push rooms without messages to the bottom
-      if (!b.last_message_id) return -1; // Keep rooms with messages at the top
-      
-      // Snowflakes are strings but can be compared directly as they're time-based
-      // Use localeCompare for consistent string comparison
+      if (!a.last_message_id) return 1;
+      if (!b.last_message_id) return -1; 
+      console.log(a.last_message_id, b.last_message_id)
       return b.last_message_id.localeCompare(a.last_message_id);
     });
     
-    // If user is in DND mode, clear unread counts
     if (currentUser?.presence?.status === "dnd") {
       return sortedRooms.map(room => ({ ...room, unread_count: 0 }));
     }
@@ -74,22 +65,17 @@ export const PMList: Component = () => {
     return sortedRooms;
   });
   
-  // Set up event listener for message creation to update room order in real-time
   createEffect(() => {
     const handleMessageCreate = (event: CustomEvent) => {
       const { roomId } = event.detail;
       if (!roomId) return;
       
-      // Force rooms signal to update by creating a new array
-      // This will trigger the directMessages memo to recalculate
       const currentRooms = rooms();
       if (!currentRooms) return;
       
-      // Find the room that received the message
       const roomIndex = currentRooms.findIndex(r => r.id === roomId);
       if (roomIndex === -1) return;
       
-      // Update the room's last_message_id with the new message id
       const updatedRoom = {
         ...currentRooms[roomIndex],
         last_message_id: event.detail.message.id
@@ -196,14 +182,16 @@ export const PMList: Component = () => {
       // Find the recipient that isn't the current user
       const recipient = room.recipients_data.find((r: { id: string | undefined; }) => r.id !== currentUserId);
       if (recipient) {
-        return `${FS_URL}/avatars/${recipient.id}/${recipient.avatar || "favicon.ico"}`;
+        return `${FS_URL}/avatars/${recipient.id}/${recipient.avatar || "default.webp"}`;
       }
       // Fallback to first recipient if we can't find a non-current user
       const firstRecipient = room.recipients_data[0];
-      return `${FS_URL}/avatars/${firstRecipient.id}/${firstRecipient.avatar || "favicon.ico"}`;
+      return `${FS_URL}/avatars/${firstRecipient.id}/${firstRecipient.avatar || "default.webp"}`;
     }
     
-    return `${FS_URL}/avatars/default/favicon.ico`;
+    // Use userId/default.webp instead of default/favicon.ico
+    const currentUserId = user()?.id || "default";
+    return `${FS_URL}/avatars/${currentUserId}/default.webp`;
   };
 
   // Helper function to get room status (for PMs)
@@ -424,7 +412,7 @@ export const PMList: Component = () => {
                 <div class="relative w-8 h-8">
                   <img
                     src={`${FS_URL}/avatars/${user()?.id}/${
-                      user()?.avatar || "favicon.ico"
+                      user()?.avatar || "default.webp"
                     }`}
                     alt="User avatar"
                     draggable="false"

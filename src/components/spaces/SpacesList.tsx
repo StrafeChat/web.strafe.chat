@@ -60,14 +60,16 @@ const SpacesList: Component = () => {
       // Find the recipient that isn't the current user
       const recipient = room.recipients_data.find((r: any) => r.id !== currentUserId);
       if (recipient) {
-        return `${FS_URL}/avatars/${recipient.id}/${recipient.avatar || "favicon.ico"}`;
+        return `${FS_URL}/avatars/${recipient.id}/${recipient.avatar || "default.webp"}`;
       }
       // Fallback to first recipient if we can't find a non-current user
       const firstRecipient = room.recipients_data[0];
-      return `${FS_URL}/avatars/${firstRecipient.id}/${firstRecipient.avatar || "favicon.ico"}`;
+      return `${FS_URL}/avatars/${firstRecipient.id}/${firstRecipient.avatar || "default.webp"}`;
     }
     
-    return `${FS_URL}/avatars/default/favicon.ico`;
+    // Use userId/default.webp instead of default/favicon.ico
+    const currentUserId = user()?.id || "default";
+    return `${FS_URL}/avatars/${currentUserId}/default.webp`;
   };
 
   return (

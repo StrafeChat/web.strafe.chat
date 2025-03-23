@@ -7,6 +7,7 @@ import {
   createSignal,
   Setter,
 } from "solid-js";
+import { Avatar } from "./Avatar";
 import { FS_URL } from "../../constants";
 import { UserStatus } from "./StatusIndicator";
 import { StatusIndicator } from "./StatusIndicator";
@@ -189,7 +190,7 @@ const ClientUserPopup: Component<Props> = (props) => {
               <div class="absolute -bottom-6 left-2">
                 <div class="relative w-[80px] h-[80px]">
                   <img
-                    src={`${FS_URL}/avatars/${user()?.id}/${user()?.avatar || "favicon.ico"}`}
+                    src={`${FS_URL}/avatars/${user()?.id}/${user()?.avatar || "default.webp"}`}
                     alt="User avatar"
                     class="w-full h-full rounded-full object-cover border-4 border-background2"
                     style={{ "aspect-ratio": "1/1" }}

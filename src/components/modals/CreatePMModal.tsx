@@ -152,7 +152,7 @@ export const CreatePMModal: Component<CreatePMModalProps> = (props) => {
                     <div class="flex items-center gap-3">
                       <div class="relative flex-shrink-0">
                         <img
-                          src={`${FS_URL}/avatars/${friend.id}/${friend.avatar || "favicon.ico"}`}
+                          src={`${FS_URL}/avatars/${friend.id}/${friend.avatar || "default.webp"}`}
                           alt={`${friend.display_name}'s avatar`}
                           class="w-8 h-8 rounded-full object-cover"
                         />

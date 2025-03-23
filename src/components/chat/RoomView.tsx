@@ -6,6 +6,7 @@ import { useCache } from "../../lib/providers/cache/CacheProvider";
 // import { useTransContext } from "@mbarzda/solid-i18next";
 import { StatusIndicator, UserStatus } from "../common/StatusIndicator";
 import { FS_URL } from "../../constants";
+import { Avatar } from "../common/Avatar";
 import { RoomType } from "../../types/roomTypes";
 import ChatArea from "./ChatArea";
 import { Tooltip } from "../common/Tooltip";
@@ -102,7 +103,7 @@ const RoomView: Component = () => {
   // Helper function to get room avatar
   const getRoomAvatar = () => {
     const room = currentRoom();
-    if (!room) return `${FS_URL}/avatars/default/favicon.ico`;
+    if (!room) return `${FS_URL}/avatars/default/default.webp`;
 
     // If room has an icon, use it (for group PMs)
     if (room.icon) return `${FS_URL}/icons/${room.id}/${room.icon}`;
@@ -118,14 +119,15 @@ const RoomView: Component = () => {
       // Find the recipient that isn't the current user
       const recipient = room.recipients_data.find((r) => r.id !== currentUserId);
       if (recipient) {
-        return `${FS_URL}/avatars/${recipient.id}/${recipient.avatar || "favicon.ico"}`;
+        return `${FS_URL}/avatars/${recipient.id}/${recipient.avatar || "default.webp"}`;
       }
       // Fallback to first recipient if we can't find a non-current user
       const firstRecipient = room.recipients_data[0];
-      return `${FS_URL}/avatars/${firstRecipient.id}/${firstRecipient.avatar || "favicon.ico"}`;
+      return `${FS_URL}/avatars/${firstRecipient.id}/${firstRecipient.avatar || "default.webp"}`;
     }
     
-    return `${FS_URL}/avatars/default/favicon.ico`;
+    const currentUserId = user()?.id || "default";
+    return `${FS_URL}/avatars/${currentUserId}/default.webp`;
   };
 
   // Helper function to get room status (for PMs)
@@ -260,12 +262,28 @@ const RoomView: Component = () => {
                   <DefaultGroupPM />
                 </div>
               ) : (
-                <img
-                  src={getRoomAvatar() || `${FS_URL}/avatars/default/favicon.ico`}
-                  alt="Room avatar"
-                  class="w-full h-full object-cover"
-                  draggable="false"
-                />
+                <Show
+                  when={getRoomAvatar()}
+                  fallback={
+                    <Avatar
+                      userId="default"
+                      avatar="default.webp"
+                      alt="Room avatar"
+                    />
+                  }
+                >
+                  <img
+                    src={getRoomAvatar()!}
+                    alt="Room avatar"
+                    class="w-full h-full object-cover"
+                    draggable="false"
+                    onError={(e) => {
+                      // Use the actual user ID instead of "default"
+                      const userId = user()?.id || "default";
+                      e.currentTarget.src = `${FS_URL}/avatars/${userId}/default.webp`;
+                    }}
+                  />
+                </Show>
               )}
             </div>
             {roomType() === RoomType.PM && (
@@ -341,11 +359,11 @@ const RoomView: Component = () => {
                   <div class="flex items-center gap-2 p-2 rounded-md hover:bg-surface hover:bg-opacity-10 transition-colors">
                     <div class="relative flex-shrink-0">
                       <div class="w-8 h-8 rounded-full overflow-hidden">
-                        <img
-                          src={`${FS_URL}/avatars/${member.id}/${member.avatar || "favicon.ico"}`}
+                        <Avatar
+                          userId={member.id}
+                          avatar={member.avatar}
                           alt={`${member.display_name || member.username}'s avatar`}
-                          class="w-full h-full object-cover"
-                          draggable="false"
+                          size="sm"
                         />
                       </div>
                       <StatusIndicator

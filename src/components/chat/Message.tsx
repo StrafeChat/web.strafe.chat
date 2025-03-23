@@ -1,5 +1,6 @@
 import { Component, createMemo, For, Show, createSignal, onCleanup, createEffect } from "solid-js";
 import { FS_URL } from "../../constants";
+import { Avatar } from "../common/Avatar";
 import { useCache } from "../../lib/providers/cache/CacheProvider";
 import { useTransContext } from "@mbarzda/solid-i18next";
 import { Tooltip } from "../common/Tooltip";
@@ -365,7 +366,7 @@ const Message: Component<MessageProps> = (props) => {
                                   
                   <div class="flex-shrink-0 ml-12">
                     <img
-                      src={`${FS_URL}/avatars/${ref.author_id}/${ref.avatar || "favicon.ico"}`}
+                      src={`${FS_URL}/avatars/${ref.author_id}/${ref.avatar || "default.webp"}`}
                       alt="Referenced user avatar"
                       class="w-4 h-4 rounded-full"
                     />
@@ -382,10 +383,10 @@ const Message: Component<MessageProps> = (props) => {
         <div class="flex gap-3 w-full overflow-hidden ${props.pending && !props.id ? 'opacity-70' : ''}" id={`message-${props.id}`}>
           <Show when={!shouldShowCompact}>
             <div class="flex-shrink-0 mt-1">
-              <img
-                src={`${FS_URL}/avatars/${props.author_id}/${author()?.avatar || "favicon.ico"}`}
+              <Avatar
+                userId={props.author_id}
+                avatar={author()?.avatar}
                 alt="Avatar"
-                class="w-10 h-10 rounded-full"
               />
             </div>
           </Show>
