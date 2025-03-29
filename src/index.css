@@ -193,19 +193,27 @@
     transform 200ms ease-in;
 }
 
+/* Message animations */
 @keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-.animate-fade-in {
-  animation: fadeIn 0.2s ease-out;
+@keyframes fadeOut {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-10px); }
+}
+
+.message-wrapper {
+  transition: opacity 0.2s ease-in-out, transform 0.2s ease-in-out;
+}
+
+.message-wrapper.fade-in {
+  animation: fadeIn 0.2s ease-out forwards;
+}
+
+.message-wrapper.fade-out {
+  animation: fadeOut 0.2s ease-in forwards;
 }
 
 @keyframes highlightPulse {
@@ -217,4 +225,41 @@
 .highlight-message {
   animation: highlightPulse 1s ease-in-out 2;
   border-radius: 0.375rem;
+}
+
+/* Message Transitions */
+.message {
+  transition: all 0.3s ease-in-out;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.message.slide-in {
+  animation: slideIn 0.3s ease-in-out;
+}
+
+.message.fade-update {
+  animation: fadeUpdate 0.3s ease-in-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeUpdate {
+  0% {
+    opacity: 0.5;
+    background-color: rgba(255, 255, 255, 0.05);
+  }
+  100% {
+    opacity: 1;
+    background-color: transparent;
+  }
 }

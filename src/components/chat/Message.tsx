@@ -1,6 +1,5 @@
 import { Component, createMemo, For, Show, createSignal, onCleanup, createEffect } from "solid-js";
 import { FS_URL } from "../../constants";
-import { Avatar } from "../common/Avatar";
 import { useCache } from "../../lib/providers/cache/CacheProvider";
 import { useTransContext } from "@mbarzda/solid-i18next";
 import { Tooltip } from "../common/Tooltip";
@@ -8,6 +7,8 @@ import { useAuth } from "../../lib/providers/auth/AuthProvider";
 import { RoomType } from "../../types/rooms";
 import ConfirmModal from "../modals/ConfirmModal";
 import { Portal } from "solid-js/web";
+import { renderMessageWithEmojis } from "../../lib/utils/emojiUtils";
+import { useUserSettings } from "../../lib/providers/userSettings/UserSettingsProvider";
 
 interface MessageProps {
   id: string | undefined;
@@ -260,9 +261,14 @@ const Message: Component<MessageProps> = (props) => {
     const isToday = date.toDateString() === now.toDateString();
     const isYesterday = date.toDateString() === yesterday.toDateString();
     
+    const { appearance } = useUserSettings();
+    // Access the reactive appearance function to get the latest settings
+    const use24HourFormat = appearance().use24HourFormat;
+    
     const time = date.toLocaleTimeString([], {
       hour: "2-digit",
-      minute: "2-digit"
+      minute: "2-digit",
+      hour12: !use24HourFormat
     });
     
     if (isToday) {
@@ -273,6 +279,38 @@ const Message: Component<MessageProps> = (props) => {
       const weekday = date.toLocaleDateString(undefined, { weekday: "long" });
       return t("time.date", { weekday: weekday, time: time });
     }
+  };
+  
+  const formatTimeOnly = (timestamp: string | undefined) => {
+    if (!timestamp) return "";
+    
+    const date = new Date(timestamp);
+    const { appearance } = useUserSettings();
+    // Access the reactive appearance function to get the latest settings
+    const use24HourFormat = appearance().use24HourFormat;
+    
+    return date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: !use24HourFormat
+    });
+  };
+  
+  const formatFullDate = (timestamp: string | undefined) => {
+    if (!timestamp) return "";
+    
+    const date = new Date(timestamp);
+    const { appearance } = useUserSettings();
+    // Access the reactive appearance function to get the latest settings
+    const use24HourFormat = appearance().use24HourFormat;
+    
+    const time = date.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: !use24HourFormat
+    });
+    
+    return `${date.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} ${time}`;
   };
 
   return (
@@ -366,7 +404,7 @@ const Message: Component<MessageProps> = (props) => {
                                   
                   <div class="flex-shrink-0 ml-12">
                     <img
-                      src={`${FS_URL}/avatars/${ref.author_id}/${ref.avatar || "default.webp"}`}
+                      src={`${FS_URL}/avatars/${ref.author_id}/${ref.avatar || "favicon.ico"}`}
                       alt="Referenced user avatar"
                       class="w-4 h-4 rounded-full"
                     />
@@ -383,14 +421,21 @@ const Message: Component<MessageProps> = (props) => {
         <div class="flex gap-3 w-full overflow-hidden ${props.pending && !props.id ? 'opacity-70' : ''}" id={`message-${props.id}`}>
           <Show when={!shouldShowCompact}>
             <div class="flex-shrink-0 mt-1">
-              <Avatar
-                userId={props.author_id}
-                avatar={author()?.avatar}
+              <img
+                src={`${FS_URL}/avatars/${props.author_id}/${author()?.avatar || "favicon.ico"}`}
                 alt="Avatar"
+                class="w-10 h-10 rounded-full"
               />
             </div>
           </Show>
-          <div class={`flex-1 min-w-0 flex flex-col justify-center ${shouldShowCompact ? 'ml-[52px]' : ''}`}>
+          <div class={`flex-1 min-w-0 flex flex-col justify-center ${shouldShowCompact ? 'ml-[52px]' : ''} relative`}>
+            <Show when={shouldShowCompact}>  
+              <div class="text-xs text-text-secondary whitespace-nowrap flex-shrink-0 absolute left-[-52px] top-[50%] transform translate-y-[-50%] w-10 text-center opacity-0 group-hover:opacity-100 transition-opacity">
+                <Tooltip position="top" content={formatFullDate(props.created_at)}>
+                  <span>{formatTimeOnly(props.created_at)}</span>
+                </Tooltip>
+              </div>
+            </Show>
             <Show when={!shouldShowCompact}>
               <div class="flex items-center gap-2 overflow-hidden">
                 <div class="flex items-baseline gap-2 overflow-hidden">
@@ -414,7 +459,9 @@ const Message: Component<MessageProps> = (props) => {
             </Show>
             <Show when={!isEditing()}>
               <div class="text-text-primary break-all break-words whitespace-pre-wrap overflow-hidden max-w-full">
-                {props.content}
+                {renderMessageWithEmojis(props.content).map(part => (
+                  <span class={`${part.isEmoji ? 'inline-block' : ''} ${part.isLarge ? 'text-3xl' : ''}`}>{part.text}</span>
+                ))}
                 <Show when={props.edited_at}>
                   <span class="text-xs text-text-secondary ml-1 whitespace-nowrap">(edited)</span>
                 </Show>

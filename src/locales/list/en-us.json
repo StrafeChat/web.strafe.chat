@@ -72,6 +72,8 @@
       "language": "Language",
       "logout": "Log Out"
     },
+    "version": "Version",
+    "report_issue": "Report an Issue",
     "account": {
       "title": "Account",
       "description": "Update your account",

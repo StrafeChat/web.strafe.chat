@@ -18,6 +18,7 @@ import { CreatePMModal } from "../../modals/CreatePMModal";
 import { RoomType } from "../../../types/roomTypes";
 import { FS_URL } from "../../../constants";
 import { Portal } from "solid-js/web";
+import { Avatar } from "../../common/Avatar"
 
 export const PMList: Component = () => {
   const { relationshipRequests, user, rooms } = useAuth();
@@ -333,7 +334,7 @@ export const PMList: Component = () => {
           }
         >
           <div class="flex flex-col gap-1">
-            <For each={directMessages()}>
+            <For each={directMessages().sort((a, b) => Number(a.last_message_id) - Number(b.last_message_id))}>
               {(room) => (
                 <A
                   href={`/rooms/${room.id}`}
@@ -347,11 +348,11 @@ export const PMList: Component = () => {
                           <DefaultGroupPM />
                         </div>
                       ) : (
-                        <img
-                          src={getRoomAvatar(room) || undefined}
+                        <Avatar
+                          userId={room.recipients_data.find((r: { id: string | undefined; }) => r.id !== user()?.id)?.id || room.recipients_data[0]?.id || "default"}
+                          avatar={room.recipients_data.find((r: { id: string | undefined; }) => r.id !== user()?.id)?.avatar || room.recipients_data[0]?.avatar}
                           alt="Room avatar"
-                          class="w-full h-full object-cover"
-                          draggable="false"
+                          class="w-full h-full"
                         />
                       )}
                     </div>
@@ -410,15 +411,12 @@ export const PMList: Component = () => {
             >
               <div class="relative flex items-center flex-shrink-0">
                 <div class="relative w-8 h-8">
-                  <img
-                    src={`${FS_URL}/avatars/${user()?.id}/${
-                      user()?.avatar || "default.webp"
-                    }`}
-                    alt="User avatar"
-                    draggable="false"
-                    class="w-full h-full rounded-full object-cover"
-                    style={{ "aspect-ratio": "1/1" }}
-                  />
+                <Avatar
+                userId={user()?.id!}
+                size="sm"
+                avatar={user()?.avatar}
+                alt="Avatar"
+              />
                 </div>
                 <StatusIndicator
                   status={(user()?.presence?.status || "offline") as UserStatus}

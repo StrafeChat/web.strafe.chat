@@ -151,7 +151,7 @@ export function ThemeSwitcher() {
   };
 
   return (
-    <div class="flex flex-col gap-4 p-4 rounded-lg bg-surface h-[calc(100vh-150px)] overflow-y-auto hide-scrollbar">
+    <div class="flex flex-col gap-4 p-4 rounded-lg bg-surface h-[400px] overflow-y-auto hide-scrollbar">
       <h2 class="text-lg font-semibold text-text-primary top-0 bg-surface z-10">
         Theme Settings
       </h2>

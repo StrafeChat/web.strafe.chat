@@ -9,7 +9,9 @@ import Message from "./Message";
 import { CachedMessage } from "../../lib/cache/MessageCache";
 import DateDivider from "./DateDivider";
 import UnreadDivider from "./UnreadDivider";
-import { Avatar } from "../common/Avatar";
+import { EmojiPicker } from "../shared/EmojiPicker";
+import { useUserSettings } from "../../lib/providers/userSettings/UserSettingsProvider";
+
 
 
 
@@ -18,6 +20,7 @@ const ChatArea: Component = () => {
   const { user, rooms, sendMessage, editMessage, isMobile, sendTypingIndicator, unreadMessages, setUnreadMessages, markMessagesAsRead } = useAuth();
   const cache = useCache();
   const [t] = useTransContext();
+  const { userSettings } = useUserSettings();
   const [messageText, setMessageText] = createSignal("");
   const [sending, setSending] = createSignal(false);
   const [loading, setLoading] = createSignal(false);
@@ -27,14 +30,31 @@ const ChatArea: Component = () => {
   const [editingMessageId, setEditingMessageId] = createSignal<string | null>(null);
   const [editingRoomId, setEditingRoomId] = createSignal<string | null>(null);
   const [typingUsers, setTypingUsers] = createSignal<{id: string, timestamp: number}[]>([]);
+  const [showEmojiPicker, setShowEmojiPicker] = createSignal(false);
+  const [emojiPickerPosition, setEmojiPickerPosition] = createSignal({ top: 0, left: 0 });
+  const [fileInputRef, setFileInputRef] = createSignal<HTMLInputElement>();
   // Get unread messages for the current room
   const currentRoomUnreadMessages = createMemo(() => {
     const allUnreads = unreadMessages();
     return allUnreads[params.roomId] || [];
   });
 
+  // Delayed acknowledgment function
+  // const delayedAcknowledgment = (roomId: string) => {
+  //   // Only proceed if there are unread messages
+  //   if (currentRoomUnreadMessages().length === 0) return;
+  
+  //   // Set a timeout to mark messages as read after 3 seconds
+  //   const timeoutId = setTimeout(() => {
+  //     markMessagesAsRead(roomId);
+  //   }, 3000);
+  
+  //   // Clean up timeout if component unmounts
+  //   onCleanup(() => clearTimeout(timeoutId));
+  // };
+
   // Handle unread header visibility
-  const delayedHeaderVisibility = () => {
+  const delayedHeaderVisibility = (_roomId: string) => {
     if (currentRoomUnreadMessages().length === 0) return;
     
     setShowUnreadHeader(true);
@@ -55,7 +75,7 @@ const ChatArea: Component = () => {
       // Mark messages as read immediately
       markMessagesAsRead(roomId);
       // Show the header with delay
-      delayedHeaderVisibility();
+      delayedHeaderVisibility(roomId);
     }
   });
   // Check if we're on mobile
@@ -117,7 +137,7 @@ const ChatArea: Component = () => {
     if (!chatInputRef) return;
     
     // Create a MutationObserver to watch for content changes
-    const observer = new MutationObserver(() => {
+    const observer = new MutationObserver((_mutations) => {
       // Configure observer to watch for text and node changes
       observer.observe(chatInputRef, {
         childList: true,
@@ -726,7 +746,7 @@ const ChatArea: Component = () => {
         </div>
 
         {/* Message input area */}
-        <div class="p-4 pt-8 relative" style={!isMobile() ? "margin-bottom: 24px;" : ""}>
+        <div class="px-4 pb-4 relative" style={!isMobile() ? "margin-bottom: 24px;" : ""}>
           <Show when={error()}>
             <div class="mb-2 px-4 py-3 bg-red-500/5 text-red-500 rounded-lg text-sm font-medium border border-red-500/10 shadow-sm">
               {error()}
@@ -777,25 +797,24 @@ const ChatArea: Component = () => {
           </Show>
           {/* Typing indicators for mobile - positioned absolutely */}
           <Show when={isMobile() && typingUsers().length > 0}>
-            <div class="absolute -top-4 left-0 right-0 px-3 py-2 text-text-secondary text-sm flex items-center gap-2">
+            <div class="absolute -top-8 left-0 right-0 px-3 py-2 text-text-secondary text-sm flex items-center gap-2">
               <div class="flex -space-x-2 mr-1">
                 <For each={typingUsers().slice(0, 3)}>
                   {(typingUser) => {
                     const user = cache.getUser(typingUser.id);
                     return (
                       <div class="w-6 h-6 rounded-full bg-primary flex-shrink-0 overflow-hidden border border-background2">
-                        {user ? (
-                          <Avatar 
-                            userId={user.id}
-                            avatar={user.avatar}
+                        {user?.avatar ? (
+                          <img 
+                            src={`${FS_URL}/avatars/${user.id}/${user.avatar || "favicon.ico"}`} 
                             alt={user.display_name || user.username} 
-                            class="w-full h-full"
-                            size="sm"
+                            class="w-full h-full object-cover"
                           />
                         ) : (
-                          <div class="w-full h-full bg-background2"></div> 
-                        )
-                        }
+                          <div class="w-full h-full flex items-center justify-center bg-primary text-white text-xs font-medium">
+                            {(user?.display_name || user?.username || "?").charAt(0).toUpperCase()}
+                          </div>
+                        )}
                       </div>
                     );
                   }}
@@ -827,6 +846,33 @@ const ChatArea: Component = () => {
             </div>
           </Show>
           <div class="bg-[var(--background1)] rounded-lg p-2 flex items-center relative absolute" style={isMobile() ? "border-radius: 0" : ""}>
+            {/* File attachment button */}
+            <button
+              onClick={() => {
+                if (fileInputRef()) {
+                  fileInputRef()?.click();
+                }
+              }}
+              class="p-2 rounded-full text-text-secondary hover:bg-surface hover:bg-opacity-20 transition-colors flex-shrink-0 mr-1"
+              title={t("chat.attachFile") || "Attach file"}
+              disabled={sending() || editingMessageId() !== null}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                <path fill-rule="evenodd" d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z" clip-rule="evenodd" />
+              </svg>
+            </button>
+            <input
+              type="file"
+              ref={setFileInputRef}
+              class="hidden"
+              multiple
+              onChange={(e) => {
+                // File attachment logic will be implemented in the future
+                console.log("Files selected:", e.currentTarget.files);
+                // Reset the input to allow selecting the same file again
+                e.currentTarget.value = "";
+              }}
+            />
             <div
               contentEditable
               ref={chatInputRef}
@@ -904,6 +950,23 @@ const ChatArea: Component = () => {
               style={{ "pointer-events": sending() ? "none" : "auto" }}
             />
             <div class="flex items-center gap-1">
+              {/* Emoji picker button */}
+              <button
+                onClick={(e) => {
+                  const rect = e.currentTarget.getBoundingClientRect();
+                  setEmojiPickerPosition({
+                    top: rect.top - 450, // Position above the button
+                    left: rect.left - 320 + rect.width // Align right edge with button
+                  });
+                  setShowEmojiPicker(!showEmojiPicker());
+                }}
+                class="p-2 rounded-full text-text-secondary hover:bg-surface hover:bg-opacity-20 transition-colors flex-shrink-0"
+                title={t("chat.emojiPicker") || "Emoji picker"}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a1 1 0 10-1.415-1.414 3 3 0 01-4.242 0 1 1 0 00-1.415 1.414 5 5 0 007.072 0z" clip-rule="evenodd" />
+                </svg>
+              </button>
               <Show when={editingMessageId()}>
                 <button
                   onClick={() => {
@@ -924,29 +987,79 @@ const ChatArea: Component = () => {
                   </svg>
                 </button>
               </Show>
-              <button 
-                onClick={() => {
-                  const inputElement = document.querySelector('[data-placeholder]') as HTMLDivElement;
-                  if (inputElement) {
-                    handleSendMessage(inputElement);
-                  }
-                }}
-                disabled={sending()}
-                class="ml-2 p-2 rounded-full bg-primary text-white hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
-                title={editingMessageId() ? t("chat.edit") : t("chat.send")}
-              >
-                <Show when={!editingMessageId()} fallback={
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                  </svg>
-                }>
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-                  </svg>
-                </Show>
-              </button>
+              <Show when={messageText().trim() !== "" || userSettings().appearance.alwaysShowSendButton || isMobile() || editingMessageId()}>
+                <button 
+                  onClick={() => {
+                    const inputElement = document.querySelector('[data-placeholder]') as HTMLDivElement;
+                    if (inputElement) {
+                      handleSendMessage(inputElement);
+                    }
+                  }}
+                  disabled={sending()}
+                  class="ml-2 p-2 rounded-full bg-primary text-white hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex-shrink-0"
+                  title={editingMessageId() ? t("chat.edit") : t("chat.send")}
+                >
+                  <Show when={!editingMessageId()} fallback={
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                    </svg>
+                  }>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                    </svg>
+                  </Show>
+                </button>
+              </Show>
             </div>
           </div>
+          
+          {/* Emoji Picker Portal */}
+          <Show when={showEmojiPicker()}>
+            <EmojiPicker
+              position={emojiPickerPosition()}
+              onSelect={(emojiShortcode) => {
+                const chatInput = document.querySelector('[data-placeholder]') as HTMLDivElement;
+                if (chatInput) {
+                  // Always focus the input first to ensure consistent behavior
+                  chatInput.focus();
+                  
+                  // Insert emoji shortcode at cursor position
+                  const selection = window.getSelection();
+                  if (selection && selection.rangeCount > 0 && chatInput.contains(selection.anchorNode)) {
+                    // If selection is within the chat input
+                    const range = selection.getRangeAt(0);
+                    range.deleteContents();
+                    range.insertNode(document.createTextNode(emojiShortcode));
+                    
+                    // Move cursor after the inserted emoji shortcode
+                    range.collapse(false);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                  } else {
+                    // If no valid selection in the input, append to the end
+                    chatInput.textContent = (chatInput.textContent || '') + emojiShortcode;
+                    
+                    // Move cursor to the end
+                    const range = document.createRange();
+                    const sel = window.getSelection();
+                    range.selectNodeContents(chatInput);
+                    range.collapse(false);
+                    sel?.removeAllRanges();
+                    sel?.addRange(range);
+                  }
+                  
+                  // Remove empty class if needed
+                  chatInput.classList.remove('empty');
+                  
+                  // Trigger input event to update state
+                  const inputEvent = new Event('input', { bubbles: true });
+                  chatInput.dispatchEvent(inputEvent);
+                }
+                setShowEmojiPicker(false);
+              }}
+              onClose={() => setShowEmojiPicker(false)}
+            />
+          </Show>
           
           {/* Typing indicators for desktop - positioned below the text input */}
           <Show when={!isMobile() && typingUsers().length > 0}>
@@ -957,18 +1070,17 @@ const ChatArea: Component = () => {
                     const user = cache.getUser(typingUser.id);
                     return (
                       <div class="w-6 h-6 rounded-full bg-primary flex-shrink-0 overflow-hidden border border-background2">
-                        {user ? (
-                          <Avatar 
-                            userId={user.id}
-                            avatar={user.avatar}
+                        {user?.avatar ? (
+                          <img 
+                            src={`${FS_URL}/avatars/${user.id}/${user.avatar || "favicon.ico"}`} 
                             alt={user.display_name || user.username} 
-                            class="w-full h-full"
-                            size="sm"
+                            class="w-full h-full object-cover"
                           />
                         ) : (
-                          <div class="w-full h-full bg-background2"></div> 
-                        )
-                        }
+                          <div class="w-full h-full flex items-center justify-center bg-primary text-white text-xs font-medium">
+                            {(user?.display_name || user?.username || "?").charAt(0).toUpperCase()}
+                          </div>
+                        )}
                       </div>
                     );
                   }}

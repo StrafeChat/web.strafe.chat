@@ -40,7 +40,7 @@ export const DeleteMessageModal: Component<DeleteMessageModalProps> = (props) =>
             <button
               type="button"
               onClick={props.onConfirm}
-              class="px-4 py-2.5 bg-[#da373c] hover:bg-[#da373c]/90 text-white rounded-md transition-colors disabled:opacity-50 font-medium"
+              class="px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-md transition-colors disabled:opacity-50 font-medium focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2 focus:ring-offset-background1"
             >
               {t("messages.delete.confirm")}
             </button>

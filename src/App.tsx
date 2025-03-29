@@ -19,6 +19,7 @@ import { getDirection } from "./lib/utils/direction";
 import { applyCustomStyles } from "./lib/utils/customStyles";
 import { ToastProvider } from "./components/common/Toast";
 import { SettingsProvider } from "./lib/providers/settings/SettingsProvider";
+import { UserSettingsProvider } from "./lib/providers/userSettings/UserSettingsProvider";
 import RoomView from "./components/chat/RoomView";
 
 const MountApp = (props: ParentProps) => {
@@ -52,7 +53,9 @@ const MountApp = (props: ParentProps) => {
             <CacheProvider>
               <AuthProvider>
                 <SettingsProvider>
-                  <div class="h-[100dvh] w-full overflow-hidden">{props.children}</div>
+                  <UserSettingsProvider>
+                    <div class="h-[100dvh] w-full overflow-hidden">{props.children}</div>
+                  </UserSettingsProvider>
                 </SettingsProvider>
               </AuthProvider>
             </CacheProvider>
