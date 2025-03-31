@@ -81,6 +81,31 @@ const RoomView: Component = () => {
       }
       
       // For regular PMs
+      // First check if we have recipients array to find the other user ID
+      if (room.type === RoomType.PM && room.recipients && room.recipients.length > 0) {
+        const currentUserId = user()?.id;
+        // Find the recipient ID that isn't the current user
+        const otherRecipientId = room.recipients.find((id) => id !== currentUserId);
+        
+        if (otherRecipientId) {
+          // Try to get user from cache first
+          const cachedUser = cache.getUser(otherRecipientId);
+          if (cachedUser) {
+            return cachedUser.display_name || cachedUser.username;
+          }
+          
+          // If not in cache, look in recipients_data
+          const recipientData = room.recipients_data.find((r) => r.id === otherRecipientId);
+          if (recipientData) {
+            return recipientData.display_name || recipientData.username;
+          }
+          
+          // If we have the ID but no data yet, show loading state
+          return "Loading...";
+        }
+      }
+      
+      // Fallback to searching recipients_data if recipients array isn't available
       // First try to find a recipient that isn't the current user
       const otherRecipient = room.recipients_data.find((r) => r.id !== currentUserId);
       
@@ -93,7 +118,13 @@ const RoomView: Component = () => {
         return otherRecipient.display_name || otherRecipient.username;
       }
       
-      // If somehow we couldn't find any non-current users (shouldn't happen), use first recipient
+      // If somehow we couldn't find any non-current users, show loading state
+      // This prevents showing the current user temporarily
+      if (room.type === RoomType.PM) {
+        return "Loading...";
+      }
+      
+      // Last resort fallback
       return room.recipients_data[0].display_name || room.recipients_data[0].username;
     }
     

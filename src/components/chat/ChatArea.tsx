@@ -298,6 +298,31 @@ const ChatArea: Component = () => {
       // For regular PMs
       if (room.type === RoomType.PM) {
         const currentUserId = user()?.id;
+        
+        // First check if we have recipients array to find the other user ID
+        if (room.recipients && room.recipients.length > 0) {
+          // Find the recipient ID that isn't the current user
+          const otherRecipientId = room.recipients.find((id) => id !== currentUserId);
+          
+          if (otherRecipientId) {
+            // Try to get user from cache first
+            const cachedUser = cache.getUser(otherRecipientId);
+            if (cachedUser) {
+              return cachedUser.display_name || cachedUser.username;
+            }
+            
+            // If not in cache, look in recipients_data
+            const recipientData = room.recipients_data.find((r) => r.id === otherRecipientId);
+            if (recipientData) {
+              return recipientData.display_name || recipientData.username;
+            }
+            
+            // If we have the ID but no data yet, show loading state
+            return "Loading...";
+          }
+        }
+        
+        // Fallback to searching recipients_data if recipients array isn't available
         // Find any recipient that isn't the current user, regardless of position in array
         const recipient = room.recipients_data.find((r) => r.id !== currentUserId);
         if (recipient) {
@@ -308,6 +333,10 @@ const ChatArea: Component = () => {
           }
           return recipient.display_name || recipient.username;
         }
+        
+        // If somehow we couldn't find any non-current users, show loading state
+        // This prevents showing the current user temporarily
+        return "Loading...";
       }
       
       // Fallback to first recipient if we can't find a non-current user
@@ -632,6 +661,7 @@ const ChatArea: Component = () => {
         const updatedMessages = messages().filter(m => m.nonce !== nonce);
         const confirmedMessage = {
           ...result.message,
+          id: result.message.id, // Ensure ID is explicitly set
           created_at: result.message.created_at || new Date().toISOString(),
           pending: false,
           error: undefined
@@ -641,6 +671,24 @@ const ChatArea: Component = () => {
         cache.addMessage(room.id, confirmedMessage); // Add the confirmed message
         // Then update the local state
         setMessages(processMessages([...updatedMessages, confirmedMessage]));
+        
+        // Dispatch messageCreate event to update the PM list
+        // This ensures the room list is updated when sending messages
+        window.dispatchEvent(new CustomEvent("messageCreate", {
+          detail: {
+            roomId: room.id,
+            message: confirmedMessage
+          }
+        }));
+        
+        // Dispatch messageCreate event to update the PM list
+        // This ensures the room list is updated when sending messages
+        window.dispatchEvent(new CustomEvent("messageCreate", {
+          detail: {
+            roomId: room.id,
+            message: confirmedMessage
+          }
+        }));
       } else {
         // Mark message as failed and show error
         const errorMessage = result.error || t("chat.errors.sendFailed");

@@ -11,9 +11,54 @@
       "password": "Mot de passe",
       "submit": "Se connecter",
       "needAccount": "Besoin d'un compte ? S'inscrire",
+      "forgotPassword": "Mot de passe oublié ?",
       "error": {
         "emptyFields": "Veuillez remplir tous les champs",
         "invalidCredentials": "Identifiants invalides"
+      }
+    },
+    "passwordReset": {
+      "title": "Réinitialiser le mot de passe",
+      "subtitle": "Entrez votre email pour recevoir un code de réinitialisation",
+      "email": "Email",
+      "submit": "Envoyer le code",
+      "backToLogin": "Retour à la connexion",
+      "success": "Code de réinitialisation envoyé à votre email",
+      "checkEmail": "Veuillez vérifier votre email pour le code de réinitialisation",
+      "error": {
+        "emailRequired": "Veuillez entrer votre adresse email",
+        "generic": "Échec de l'envoi du code. Veuillez réessayer."
+      }
+    },
+    "passwordResetVerify": {
+      "title": "Vérifier le code",
+      "subtitle": "Entrez le code de vérification envoyé à votre email",
+      "email": "Email",
+      "code": "Code de vérification",
+      "submit": "Vérifier le code",
+      "backToReset": "Retour à la réinitialisation",
+      "success": "Code vérifié avec succès",
+      "error": {
+        "codeRequired": "Veuillez entrer le code de vérification",
+        "generic": "Code de vérification invalide ou expiré",
+        "invalidLink": "Lien de réinitialisation invalide ou expiré"
+      }
+    },
+    "passwordResetComplete": {
+      "title": "Définir un nouveau mot de passe",
+      "subtitle": "Créez un nouveau mot de passe pour votre compte",
+      "password": "Nouveau mot de passe",
+      "confirmPassword": "Confirmer le nouveau mot de passe",
+      "submit": "Réinitialiser le mot de passe",
+      "success": "Mot de passe réinitialisé avec succès",
+      "error": {
+        "emptyFields": "Veuillez remplir tous les champs",
+        "passwordMismatch": "Les mots de passe ne correspondent pas",
+        "passwordTooShort": "Le mot de passe doit comporter au moins 8 caractères",
+        "passwordNotComplex": "Le mot de passe doit contenir des majuscules, des minuscules et des chiffres",
+        "invalidOrExpiredCode": "Code de vérification invalide ou expiré",
+        "invalidLink": "Lien de réinitialisation invalide ou expiré",
+        "generic": "Échec de la réinitialisation du mot de passe. Veuillez réessayer."
       }
     },
     "register": {

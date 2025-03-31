@@ -8,7 +8,7 @@ import en from "./locales/list/en-us.json";
 import es from "./locales/list/es-es.json";
 import fr from "./locales/list/fr-fr.json";
 import ar from "./locales/list/ar-sa.json";
-import { ParentProps, createEffect } from "solid-js";
+import { ParentProps, createEffect, lazy } from "solid-js";
 import Login from "./components/auth/Login";
 import Register from "./components/auth/Register";
 import { Interface } from "./components/shared/Interface";
@@ -72,6 +72,9 @@ const App = () => {
       <Router>
         <Route path="/login" component={Login} />
         <Route path="/register" component={Register} />
+        <Route path="/password-reset" component={lazy(() => import('./components/auth/PasswordReset'))} />
+        <Route path="/password-reset/verify" component={lazy(() => import('./components/auth/PasswordResetVerify'))} />
+        <Route path="/password-reset/complete" component={lazy(() => import('./components/auth/PasswordResetComplete'))} />
         <Route path="/" component={Interface as never}>
           <Route path="/" component={Home} />
           <Route path="/friends" component={Friends} />

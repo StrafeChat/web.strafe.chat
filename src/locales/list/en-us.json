@@ -7,9 +7,54 @@
       "password": "Password",
       "submit": "Sign In",
       "needAccount": "Need an account? Register",
+      "forgotPassword": "Forgot Password?",
       "error": {
         "emptyFields": "Please fill in all fields",
         "invalidCredentials": "Invalid credentials"
+      }
+    },
+    "passwordReset": {
+      "title": "Reset Password",
+      "subtitle": "Enter your email to receive a password reset code",
+      "email": "Email",
+      "submit": "Send Reset Code",
+      "backToLogin": "Back to Login",
+      "success": "Reset code sent to your email",
+      "checkEmail": "Please check your email for the reset code",
+      "error": {
+        "emailRequired": "Please enter your email address",
+        "generic": "Failed to send reset code. Please try again."
+      }
+    },
+    "passwordResetVerify": {
+      "title": "Verify Reset Code",
+      "subtitle": "Enter the verification code sent to your email",
+      "email": "Email",
+      "code": "Verification Code",
+      "submit": "Verify Code",
+      "backToReset": "Back to Reset",
+      "success": "Code verified successfully",
+      "error": {
+        "codeRequired": "Please enter the verification code",
+        "generic": "Invalid or expired verification code",
+        "invalidLink": "Invalid or expired reset link"
+      }
+    },
+    "passwordResetComplete": {
+      "title": "Set New Password",
+      "subtitle": "Create a new password for your account",
+      "password": "New Password",
+      "confirmPassword": "Confirm New Password",
+      "submit": "Reset Password",
+      "success": "Password reset successfully",
+      "error": {
+        "emptyFields": "Please fill in all fields",
+        "passwordMismatch": "Passwords do not match",
+        "passwordTooShort": "Password must be at least 8 characters",
+        "passwordNotComplex": "Password must contain uppercase, lowercase, and numbers",
+        "invalidOrExpiredCode": "Invalid or expired verification code",
+        "invalidLink": "Invalid or expired reset link",
+        "generic": "Failed to reset password. Please try again."
       }
     },
     "register": {

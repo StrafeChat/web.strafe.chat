@@ -54,9 +54,18 @@ export const PMList: Component = () => {
         return new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime();
       }
       if (!a.last_message_id) return 1;
-      if (!b.last_message_id) return -1; 
-      console.log(a.last_message_id, b.last_message_id)
-      return b.last_message_id.localeCompare(a.last_message_id);
+      if (!b.last_message_id) return -1;
+      
+      // Snowflake IDs are time-based, so we can compare them numerically
+      // Convert to BigInt for proper numerical comparison of large IDs
+      try {
+        const aId = BigInt(a.last_message_id);
+        const bId = BigInt(b.last_message_id);
+        return Number(bId - aId); // Convert back to number for the sort function
+      } catch (e) {
+        // Fallback to string comparison if BigInt conversion fails
+        return b.last_message_id.localeCompare(a.last_message_id);
+      }
     });
     
     if (currentUser?.presence?.status === "dnd") {
@@ -77,17 +86,30 @@ export const PMList: Component = () => {
       const roomIndex = currentRooms.findIndex(r => r.id === roomId);
       if (roomIndex === -1) return;
       
+      // Get the room that needs to be updated
+      const roomToUpdate = currentRooms[roomIndex];
+      
+      // Update both last_message_id and updated_at to ensure proper sorting
       const updatedRoom = {
-        ...currentRooms[roomIndex],
-        last_message_id: event.detail.message.id
+        ...roomToUpdate,
+        last_message_id: event.detail.message.id,
+        updated_at: new Date().toISOString() // Update the timestamp for sorting
       };
       
-      // Create a new array with the updated room
-      const updatedRooms = [...currentRooms];
-      updatedRooms[roomIndex] = updatedRoom;
+      // Create a new array without the room that received a message
+      const filteredRooms = currentRooms.filter(r => r.id !== roomId);
       
-      // Update the rooms signal
-     
+      // Add the updated room at the beginning to ensure it appears at the top
+      // This is critical for real-time sorting of rooms with new messages
+      const updatedRooms = [updatedRoom, ...filteredRooms];
+      
+      // Update the rooms signal with the new array
+      // This will trigger the directMessages memo to recalculate
+      const { setRooms } = useAuth();
+      setRooms(updatedRooms);
+      
+      // Force a re-render by logging (helps with debugging)
+      console.log(`[PMList] Room ${roomId} moved to top after new message ${event.detail.message.id}`);
     };
     
     // Add event listener for message creation
@@ -334,7 +356,7 @@ export const PMList: Component = () => {
           }
         >
           <div class="flex flex-col gap-1">
-            <For each={directMessages().sort((a, b) => Number(a.last_message_id) - Number(b.last_message_id))}>
+            <For each={directMessages()}>
               {(room) => (
                 <A
                   href={`/rooms/${room.id}`}

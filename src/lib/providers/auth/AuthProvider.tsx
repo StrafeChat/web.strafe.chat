@@ -18,6 +18,9 @@ import { RoomWithRecipients } from "../../../types/rooms";
 export const API_ENDPOINTS = {
   REGISTER: `${BASE_URL}/auth/register`,
   LOGIN: `${BASE_URL}/auth/login`,
+  PASSWORD_RESET: `${BASE_URL}/auth/password-reset`,
+  PASSWORD_RESET_VERIFY: `${BASE_URL}/auth/password-reset/verify`,
+  PASSWORD_RESET_COMPLETE: `${BASE_URL}/auth/password-reset/complete`,
   USER_ME: `${BASE_URL}/users/@me`,
   RELATIONSHIPS: `${BASE_URL}/users/@me/relationships`,
   CREATE_ROOM: `${BASE_URL}/users/@me/rooms`,
@@ -247,23 +250,23 @@ export const AuthProvider: ParentComponent = (props) => {
 
   const normalizeRoomsData = (rooms: any, users: any): RoomWithRecipients[] =>
     Object.values(rooms).map((room: any) => ({
-      id: room.ID,
-      name: room.Name,
-      type: room.Type,
-      recipients: room.Recipients || [],
-      owner_id: room.OwnerID,
-      last_message_id: room.LastMessageID,
-      icon: room.Icon,
-      created_at: room.CreatedAt,
-      updated_at: room.UpdatedAt,
-      recipients_data: room.Recipients?.map((recipientId: string) =>
+      id: room.ID || room.id,
+      name: room.Name || room.name || "",
+      type: room.Type || room.type || 0,
+      recipients: room.Recipients || room.recipients || [],
+      owner_id: room.OwnerID || room.owner_id || "",
+      last_message_id: room.LastMessageID || room.LastMessageId || room.last_message_id || null,
+      icon: room.Icon || room.icon || null,
+      created_at: room.CreatedAt || room.created_at || new Date().toISOString(),
+      updated_at: room.UpdatedAt || room.updated_at || null,
+      recipients_data: (room.Recipients || room.recipients || [])?.map((recipientId: string) =>
         users?.[recipientId] ? {
           id: recipientId,
-          username: users[recipientId].Username,
-          discriminator: users[recipientId].Discriminator,
-          display_name: users[recipientId].DisplayName || users[recipientId].Username,
-          avatar: users[recipientId].Avatar,
-          presence: users[recipientId].Presence,
+          username: users[recipientId].Username || users[recipientId].username,
+          discriminator: users[recipientId].Discriminator || users[recipientId].discriminator,
+          display_name: (users[recipientId].DisplayName || users[recipientId].display_name || users[recipientId].Username || users[recipientId].username),
+          avatar: users[recipientId].Avatar || users[recipientId].avatar,
+          presence: users[recipientId].Presence || users[recipientId].presence,
         } : null
       ).filter(Boolean)
     }));

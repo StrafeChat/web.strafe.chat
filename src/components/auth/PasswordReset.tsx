@@ -1,31 +1,53 @@
 import { createSignal } from "solid-js";
 import { useNavigate } from "@solidjs/router";
-import { useAuth } from "../../lib/providers/auth/AuthProvider";
 import { useTransContext } from "@mbarzda/solid-i18next";
 import { LanguageSelector } from "../shared/LanguageSelector";
+import { API_ENDPOINTS } from "../../lib/providers/auth/AuthProvider";
 
-const Login = () => {
+const PasswordReset = () => {
   const [email, setEmail] = createSignal("");
-  const [password, setPassword] = createSignal("");
   const [error, setError] = createSignal("");
-  const { login, isMobile } = useAuth();
+  const [success, setSuccess] = createSignal("");
+  const [loading, setLoading] = createSignal(false);
   const [t] = useTransContext();
   const navigate = useNavigate();
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
     setError("");
+    setSuccess("");
 
-    if (!email() || !password()) {
-      setError(t("auth.login.error.emptyFields"));
+    if (!email()) {
+      setError(t("auth.passwordReset.error.emailRequired"));
       return;
     }
 
-    const result = await login({ email: email(), password: password() });
-    if (result.success) {
-      navigate("/", { replace: true });
-    } else {
-      setError(result.error || t("auth.login.error.invalidCredentials"));
+    setLoading(true);
+
+    try {
+      const response = await fetch(API_ENDPOINTS.PASSWORD_RESET, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ email: email() }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setSuccess(t("auth.passwordReset.success") + " " + t("auth.passwordReset.checkEmail"));
+        // Navigate to verify page after a short delay to allow user to read the success message
+        setTimeout(() => {
+          navigate(`/password-reset/verify?email=${encodeURIComponent(email())}`);
+        }, 2000);
+      } else {
+        setError(data.error || t("auth.passwordReset.error.generic"));
+      }
+    } catch (err) {
+      setError(t("auth.passwordReset.error.generic"));
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -70,19 +92,13 @@ const Login = () => {
         <LanguageSelector />
       </div>
 
-      <div
-        class={
-          isMobile()
-            ? "w-full max-w-md mx-auto bg-[#24283b]/95 backdrop-blur-sm rounded-lg shadow-lg shadow-black/20 p-6 border border-[#414868] relative z-10"
-            : "w-full max-w-md bg-[#24283b]/95 backdrop-blur-sm rounded-lg shadow-lg shadow-black/20 p-8 border border-[#414868] relative z-10"
-        }
-      >
+      <div class="w-full max-w-md bg-[#24283b]/95 backdrop-blur-sm rounded-lg shadow-lg shadow-black/20 p-8 border border-[#414868] relative z-10">
         <div class="space-y-1.5">
           <h2 class="text-2xl font-bold text-left text-white">
-            {t("auth.login.title")}
+            {t("auth.passwordReset.title")}
           </h2>
           <p class="text-sm text-left text-gray-300 pb-5">
-            {t("auth.login.subtitle")}
+            {t("auth.passwordReset.subtitle")}
           </p>
 
           <form onSubmit={handleSubmit} class="space-y-4">
@@ -91,7 +107,7 @@ const Login = () => {
                 for="email"
                 class="block text-sm font-medium mb-2 text-gray-300"
               >
-                {t("auth.login.email")}
+                {t("auth.passwordReset.email")}
               </label>
               <input
                 type="email"
@@ -102,43 +118,21 @@ const Login = () => {
               />
             </div>
 
-            <div>
-              <label
-                for="password"
-                class="block text-sm font-medium mb-2 text-gray-300"
-              >
-                {t("auth.login.password")}
-              </label>
-              <input
-                type="password"
-                id="password"
-                value={password()}
-                onInput={(e) => setPassword(e.currentTarget.value)}
-                class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
-
             <button
               type="submit"
-              class="w-full py-2 px-4 bg-primary rounded-md hover:opacity-90 transition-opacity text-white"
+              disabled={loading()}
+              class="w-full py-2 px-4 bg-primary rounded-md hover:opacity-90 transition-opacity text-white disabled:opacity-50"
             >
-              {t("auth.login.submit")}
+              {loading() ? t("common.loading") : t("auth.passwordReset.submit")}
             </button>
 
-            <div class="flex justify-between text-left">
+            <div class="text-left">
               <button
                 type="button"
-                onClick={() => navigate("/register")}
+                onClick={() => navigate("/login")}
                 class="text-sm hover:underline text-gray-300"
               >
-                {t("auth.login.needAccount")}
-              </button>
-              <button
-                type="button"
-                onClick={() => navigate("/password-reset")}
-                class="text-sm hover:underline text-gray-300"
-              >
-                {t("auth.login.forgotPassword")}
+                {t("auth.passwordReset.backToLogin")}
               </button>
             </div>
           </form>
@@ -147,10 +141,15 @@ const Login = () => {
               {error()}
             </div>
           )}
+          {success() && (
+            <div class="bg-green-500/20 text-green-200 px-4 py-3 rounded-md">
+              {success()}
+            </div>
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-export default Login;
+export default PasswordReset;

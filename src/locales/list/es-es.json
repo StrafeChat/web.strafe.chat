@@ -7,9 +7,54 @@
       "password": "Contraseña",
       "submit": "Iniciar sesión",
       "needAccount": "¿Necesitas una cuenta? Regístrate",
+      "forgotPassword": "¿Olvidaste tu contraseña?",
       "error": {
         "emptyFields": "Por favor, rellena todos los campos",
         "invalidCredentials": "Credenciales inválidas"
+      }
+    },
+    "passwordReset": {
+      "title": "Restablecer Contraseña",
+      "subtitle": "Ingresa tu correo electrónico para recibir un código de restablecimiento",
+      "email": "Correo electrónico",
+      "submit": "Enviar Código",
+      "backToLogin": "Volver al Inicio de Sesión",
+      "success": "Código de restablecimiento enviado a tu correo",
+      "checkEmail": "Por favor, revisa tu correo para el código de restablecimiento",
+      "error": {
+        "emailRequired": "Por favor, ingresa tu dirección de correo electrónico",
+        "generic": "Error al enviar el código. Por favor, inténtalo de nuevo."
+      }
+    },
+    "passwordResetVerify": {
+      "title": "Verificar Código",
+      "subtitle": "Ingresa el código de verificación enviado a tu correo",
+      "email": "Correo electrónico",
+      "code": "Código de Verificación",
+      "submit": "Verificar Código",
+      "backToReset": "Volver a Restablecer",
+      "success": "Código verificado correctamente",
+      "error": {
+        "codeRequired": "Por favor, ingresa el código de verificación",
+        "generic": "Código de verificación inválido o expirado",
+        "invalidLink": "Enlace de restablecimiento inválido o expirado"
+      }
+    },
+    "passwordResetComplete": {
+      "title": "Establecer Nueva Contraseña",
+      "subtitle": "Crea una nueva contraseña para tu cuenta",
+      "password": "Nueva Contraseña",
+      "confirmPassword": "Confirmar Nueva Contraseña",
+      "submit": "Restablecer Contraseña",
+      "success": "Contraseña restablecida correctamente",
+      "error": {
+        "emptyFields": "Por favor, rellena todos los campos",
+        "passwordMismatch": "Las contraseñas no coinciden",
+        "passwordTooShort": "La contraseña debe tener al menos 8 caracteres",
+        "passwordNotComplex": "La contraseña debe contener mayúsculas, minúsculas y números",
+        "invalidOrExpiredCode": "Código de verificación inválido o expirado",
+        "invalidLink": "Enlace de restablecimiento inválido o expirado",
+        "generic": "Error al restablecer la contraseña. Por favor, inténtalo de nuevo."
       }
     },
     "register": {
