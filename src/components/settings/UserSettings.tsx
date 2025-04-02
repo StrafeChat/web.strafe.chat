@@ -10,6 +10,7 @@ import ProfileSettings from "./pages/ProfileSettings";
 import AppearanceSettings from "./pages/AppearanceSettings";
 import DefaultSettings from "./pages/DefaultSettings";
 import LanguageSettings from "./pages/LanguageSettings";
+import SessionsSettings from "./pages/SessionsSettings";
 import { ToastProvider } from "../common/Toast";
 
 interface UserSettingsProps {
@@ -26,6 +27,7 @@ const UserSettings: Component<UserSettingsProps> = (props) => {
   const sections = [
     "account",
     "profile",
+    "sessions",
     "privacy",
     "notifications",
     "appearance",
@@ -53,6 +55,8 @@ const UserSettings: Component<UserSettingsProps> = (props) => {
         return <AccountSettings />;
       case "profile":
         return <ProfileSettings />;
+      case "sessions":
+        return <SessionsSettings />;
       case "appearance":
         return <AppearanceSettings />;
       case "language":
@@ -147,6 +151,19 @@ const UserSettings: Component<UserSettingsProps> = (props) => {
                           } text-text-primary`}
                         >
                           {t("settings.sections.profile")}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setActiveSection("sessions");
+                            isMobile() && setIsSidebarOpen(false);
+                          }}
+                          class={`w-full px-[10px] py-[6px] rounded-[4px] text-left text-base hover:bg-surface ${
+                            state.activeSection === "sessions"
+                              ? "bg-surface"
+                              : ""
+                          } text-text-primary`}
+                        >
+                          {t("settings.sections.sessions")}
                         </button>
                         <button
                           onClick={() => {

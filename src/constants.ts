@@ -5,4 +5,4 @@ export const FS_URL =
 export const WS_URL =
   import.meta.env.WEBSOCKET_URL || "ws://localhost:8080/events?format=msgpack";
 
-export const APP_VERSION = "0.1.0-INDEV";
+export const APP_VERSION = "0.1.2-INDEV";

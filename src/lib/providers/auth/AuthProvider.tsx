@@ -28,6 +28,7 @@ export const API_ENDPOINTS = {
   UPDATE_STATUS: `${BASE_URL}/users/@me/status`,
   BULK_USERS: `${BASE_URL}/users/bulk`,
   TYPING_INDICATOR: (roomId: string) => `${BASE_URL}/rooms/${roomId}/typing`,
+  SESSIONS: `${BASE_URL}/users/@me/sessions`,
 };
 
 const API_HEADERS = {

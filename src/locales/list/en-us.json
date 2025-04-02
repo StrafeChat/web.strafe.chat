@@ -107,6 +107,7 @@
       "app": "App Settings",
       "account": "Account",
       "profile": "Profile",
+      "sessions": "Sessions",
       "privacy": "Privacy & Safety",
       "appearance": "Appearance",
       "accessibility": "Accessibility",
@@ -162,6 +163,36 @@
     "language": {
       "title": "Language",
       "description": "Select your language"
+    },
+    "sessions": {
+      "title": "Sessions",
+      "description": "Manage your active login sessions",
+      "current": "Current",
+      "lastActive": "Last active {{time}}",
+      "ipAddress": "IP",
+      "logout": "Logout",
+      "logoutOthers": "Logout of all other sessions",
+      "noSessions": "No active sessions found",
+      "device": {
+        "android": "Android",
+        "ios": "iOS",
+        "windows": "Windows",
+        "mac": "Mac",
+        "linux": "Linux",
+        "unknown": "Unknown device"
+      },
+      "browser": {
+        "unknown": "Unknown browser"
+      },
+      "success": {
+        "loggedOut": "Session logged out successfully",
+        "loggedOutAll": "All other sessions logged out successfully"
+      },
+      "error": {
+        "fetchFailed": "Failed to fetch sessions",
+        "logoutFailed": "Failed to logout session",
+        "logoutAllFailed": "Failed to logout all other sessions"
+      }
     },
     "default": {
       "underDevelopment": "This section is under development."

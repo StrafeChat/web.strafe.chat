@@ -1,5 +1,5 @@
 import { API_ENDPOINTS } from "./providers/auth/AuthProvider";
-import { UserMeResponse, LoginResponse, RegisterResponse, BulkUsersResponse, UpdateStatusResponse } from "../types/api";
+import { UserMeResponse, LoginResponse, RegisterResponse, BulkUsersResponse, UpdateStatusResponse, SessionsResponse } from "../types/api";
 
 type RequestOptions = {
   method?: string;
@@ -51,6 +51,17 @@ export const api = {
       apiRequest<RegisterResponse>(API_ENDPOINTS.REGISTER, {
         method: "POST",
         body: data,
+      }),
+  },
+  sessions: {
+    list: () => apiRequest<SessionsResponse>(API_ENDPOINTS.SESSIONS),
+    revoke: (token: string) =>
+      apiRequest(`${API_ENDPOINTS.SESSIONS}/${token}`, {
+        method: "DELETE",
+      }),
+    revokeAll: () =>
+      apiRequest(`${API_ENDPOINTS.SESSIONS}`, {
+        method: "DELETE",
       }),
   },
   users: {

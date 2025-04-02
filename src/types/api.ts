@@ -50,3 +50,16 @@ export type BulkUsersResponse = {
 };
 
 export type UpdateStatusResponse = Clientuser;
+
+export type SessionsResponse = {
+  sessions: Array<{
+    token: string;
+    user_id: string;
+    ip: string;
+    user_agent: string;
+    trusted: boolean;
+    created_at: string;
+    expires_at: string;
+    current: boolean;
+  }>;
+};
