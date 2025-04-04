@@ -6,13 +6,15 @@ import {
   createEffect,
   createSignal,
 } from "solid-js";
-import { useAuth } from "../../../../lib/providers/auth/AuthProvider";
+import { useAuth, API_ENDPOINTS } from "../../../../lib/providers/auth/AuthProvider";
 import { useCache } from "../../../../lib/providers/cache/CacheProvider";
 import { Tooltip } from "../../../common/Tooltip";
 import { FriendSearch } from "../FriendSearch";
 import { FS_URL } from "../../../../constants";
 import { StatusIndicator, UserStatus } from "../../../common/StatusIndicator";
 import { FriendMenu } from "../FriendMenu";
+import { useNavigate } from "@solidjs/router";
+import { RoomWithRecipients } from "../../../../types/rooms";
 
 type FriendData = {
   id: string;
@@ -25,9 +27,11 @@ type FriendData = {
 };
 
 export const AllTab: Component = () => {
-  const { user, relationships } = useAuth();
+  const { user, relationships, rooms, setRooms } = useAuth();
   const cache = useCache();
   const [searchQuery, setSearchQuery] = createSignal("");
+  const navigate = useNavigate();
+  const [isCreatingPM, setIsCreatingPM] = createSignal(false);
 
   console.log("[AllTab:Initial] Auth context loaded");
 
@@ -111,6 +115,103 @@ export const AllTab: Component = () => {
     console.log("[AllTab:effect] Current friends list:", friends());
   });
 
+  // Function to handle message button click
+  const handleMessageClick = async (friendId: string) => {
+    if (isCreatingPM()) return;
+    
+    try {
+      setIsCreatingPM(true);
+      console.log("[AllTab:handleMessageClick] Attempting to message friend:", friendId);
+      
+      // First check if a PM already exists with this friend in the cache
+      const allRooms = rooms();
+      if (allRooms) {
+        // Look for a direct PM (type 0) with this friend
+        // More thorough check that handles different recipient array configurations
+        const existingPM = allRooms.find(room => {
+          // Must be a PM type
+          if (room.type !== 0) return false;
+          
+          // Must have recipients array
+          if (!room.recipients) return false;
+          
+          // For PMs, we're looking for a room where the friend is the only other recipient
+          // This handles both cases: when recipients has only the friend, or when it has both users
+          return room.recipients.includes(friendId) && 
+                 (room.recipients.length === 1 || 
+                  (room.recipients.length === 2 && room.recipients.some(id => id !== friendId)));
+        });
+        
+        if (existingPM) {
+          console.log("[AllTab:handleMessageClick] Found existing PM in cache:", existingPM.id);
+          navigate(`/rooms/${existingPM.id}`);
+          return;
+        }
+      }
+      
+      // No existing PM found in cache, try to create a new one
+      console.log("[AllTab:handleMessageClick] Creating new PM with friend:", friendId);
+      
+      const response = await fetch(API_ENDPOINTS.CREATE_ROOM, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Session-Token": localStorage.getItem("sc_token") || "",
+        },
+        body: JSON.stringify({
+          recipients: [friendId],
+          is_group: false,
+        }),
+      });
+      
+      const responseData = await response.json();
+      
+      if (response.status === 409) {
+        // Room already exists but wasn't in our cache
+        console.log("[AllTab:handleMessageClick] Room already exists (409):", responseData);
+        
+        if (responseData.room && responseData.room.id) {
+          // Navigate to the existing room
+          navigate(`/rooms/${responseData.room.id}`);
+          
+          // Add the room to our cache
+          setRooms((prev: RoomWithRecipients[]) => {
+            // Check if room is already in the cache to avoid duplicates
+            if (prev.some(r => r.id === responseData.room.id)) {
+              return prev;
+            }
+            return [...prev, responseData.room] as RoomWithRecipients[];
+          });
+          return;
+        } else if (responseData.id) {
+          // Some API responses might include the ID directly
+          navigate(`/rooms/${responseData.id}`);
+          return;
+        } else {
+          // If we can't extract a room ID, navigate to the rooms page
+          console.error("[AllTab:handleMessageClick] Couldn't extract room ID from 409 response");
+          navigate('/rooms');
+          return;
+        }
+      } else if (!response.ok) {
+        console.error("[AllTab:handleMessageClick] Error creating PM:", responseData);
+        throw new Error(responseData.message || "Failed to create conversation");
+      }
+      
+      console.log("[AllTab:handleMessageClick] Created new PM:", responseData);
+      
+      // Navigate to the newly created PM
+      navigate(`/rooms/${responseData.id}`);
+      
+    } catch (error) {
+      console.error("[AllTab:handleMessageClick] Error:", error);
+      // If there's an error, navigate to the rooms page instead of undefined
+      navigate('/rooms');
+    } finally {
+      setIsCreatingPM(false);
+    }
+  };
+
   return (
     <div class="p-4 px-7 flex flex-col h-full overflow-hidden">
       <FriendSearch onSearch={setSearchQuery} />
@@ -170,7 +271,14 @@ export const AllTab: Component = () => {
                   </div>
                   <div class="flex gap-2">
                     <Tooltip content="Message" position="top">
-                      <button class="p-2 rounded-full transition-colors bg-border hover:bg-[rgba(68,68,68,0.4)]">
+                      <button 
+                        class="p-2 rounded-full transition-colors bg-border hover:bg-[rgba(68,68,68,0.4)]"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleMessageClick(friend.id);
+                        }}
+                        disabled={isCreatingPM()}
+                      >
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
                           class="w-5 h-5"

@@ -12,9 +12,6 @@ import UnreadDivider from "./UnreadDivider";
 import { EmojiPicker } from "../shared/EmojiPicker";
 import { useUserSettings } from "../../lib/providers/userSettings/UserSettingsProvider";
 
-
-
-
 const ChatArea: Component = () => {
   const params = useParams();
   const { user, rooms, sendMessage, editMessage, isMobile, sendTypingIndicator, unreadMessages, setUnreadMessages, markMessagesAsRead } = useAuth();
@@ -33,6 +30,7 @@ const ChatArea: Component = () => {
   const [showEmojiPicker, setShowEmojiPicker] = createSignal(false);
   const [emojiPickerPosition, setEmojiPickerPosition] = createSignal({ top: 0, left: 0 });
   const [fileInputRef, setFileInputRef] = createSignal<HTMLInputElement>();
+  const [showUnreadHeader, setShowUnreadHeader] = createSignal(false);
   // Get unread messages for the current room
   const currentRoomUnreadMessages = createMemo(() => {
     const allUnreads = unreadMessages();
@@ -1160,4 +1158,4 @@ const ChatArea: Component = () => {
   );
 };
 
-export default ChatArea;const [showUnreadHeader, setShowUnreadHeader] = createSignal(false);
+export default ChatArea;

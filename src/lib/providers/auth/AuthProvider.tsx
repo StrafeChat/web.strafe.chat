@@ -66,7 +66,7 @@ type AuthContextType = {
   relationshipRequests: () => Relationship[];
   setRelationshipRequests: (requests: Relationship[]) => void;
   rooms: () => RoomWithRecipients[];
-  setRooms: (rooms: RoomWithRecipients[]) => void;
+  setRooms: (rooms: RoomWithRecipients[] | ((prev: RoomWithRecipients[]) => RoomWithRecipients[])) => void;
   login: (credentials: LoginCredentials) => Promise<AuthResponse>;
   register: (data: RegisterData) => Promise<AuthResponse>;
   logout: () => void;
@@ -595,7 +595,6 @@ export const AuthProvider: ParentComponent = (props) => {
   onMount(() => {
     window.getCurrentRooms = () => rooms();
     window.getCurrentUser = () => user();
-    // ... existing code...
     window.setUnreadMessages = (unreads: ((prev: { [roomId: string]: string[] }) => { [roomId: string]: string[] }) | { [roomId: string]: string[] }) => {
       console.log("[AuthProvider] Setting unread messages:", unreads);
       if (typeof unreads === 'function') {
@@ -836,5 +835,3 @@ export const useAuth = () => {
   }
   return context;
 };
-
-// ...existing code ...
