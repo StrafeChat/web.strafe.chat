@@ -7,7 +7,7 @@ import { useAuth } from "../../lib/providers/auth/AuthProvider";
 import { RoomType } from "../../types/rooms";
 import ConfirmModal from "../modals/ConfirmModal";
 import { Portal } from "solid-js/web";
-import { renderMessageWithEmojis } from "../../lib/utils/emojiUtils";
+import { parseMarkdown } from "../../lib/utils/markdownUtils";
 import { useUserSettings } from "../../lib/providers/userSettings/UserSettingsProvider";
 
 interface MessageProps {
@@ -458,10 +458,9 @@ const Message: Component<MessageProps> = (props) => {
               </div>
             </Show>
             <Show when={!isEditing()}>
-              <div class="text-text-primary break-all break-words whitespace-pre-wrap overflow-hidden max-w-full">
-                {renderMessageWithEmojis(props.content).map(part => (
-                  <span class={`${part.isEmoji ? 'inline-block' : ''} ${part.isLarge ? 'text-3xl' : ''}`}>{part.text}</span>
-                ))}
+              <div class="text-text-primary break-all break-words whitespace-pre-wrap overflow-hidden max-w-full markdown-content">
+                {/* Always use markdown parser which now handles emojis internally */}
+                <div innerHTML={parseMarkdown(props.content)} />
                 <Show when={props.edited_at}>
                   <span class="text-xs text-text-secondary ml-1 whitespace-nowrap">(edited)</span>
                 </Show>

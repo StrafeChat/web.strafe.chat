@@ -1,0 +1,178 @@
+/* Syntax highlighting styles for code blocks */
+
+/* Base styles for highlighted code */
+.hljs {
+  display: block;
+  overflow-x: auto;
+  padding: 0.5em;
+  color: #ffffff;
+  background: transparent;
+  font-family: 'Fira Code', 'Consolas', 'Monaco', 'Courier New', monospace;
+  line-height: 1.5;
+  text-shadow: 0 1px 1px rgba(0, 0, 0, 0.3);
+}
+
+/* Code block container - already styled in markdown.css */
+.markdown-pre {
+  position: relative;
+}
+
+/* Add language indicator to code blocks */
+.markdown-pre::before {
+  content: attr(data-language);
+  position: absolute;
+  top: 0;
+  right: 0;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: rgba(255, 255, 255, 0.9);
+  background-color: rgba(0, 0, 0, 0.4);
+  border-bottom-left-radius: 0.375rem;
+  border-top-right-radius: 0.375rem;
+  opacity: 0.9;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* Keyword */
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-built_in,
+.hljs-name,
+.hljs-tag {
+  color: #e9a7ff;
+  font-weight: 500;
+}
+
+/* String */
+.hljs-string,
+.hljs-title,
+.hljs-section,
+.hljs-attribute,
+.hljs-literal,
+.hljs-template-tag,
+.hljs-template-variable,
+.hljs-type,
+.hljs-addition {
+  color: #b8ff80;
+}
+
+/* Comment */
+.hljs-comment,
+.hljs-quote,
+.hljs-deletion,
+.hljs-meta {
+  color: #8a8f99;
+  font-style: italic;
+}
+
+/* Number, boolean */
+.hljs-number,
+.hljs-boolean {
+  color: #ff9d45;
+}
+
+/* Variables, parameters */
+.hljs-variable,
+.hljs-params,
+.hljs-class,
+.hljs-function {
+  color: #ff7b85;
+}
+
+/* Operator */
+.hljs-operator,
+.hljs-punctuation {
+  color: #abb2bf;
+}
+
+/* Property */
+.hljs-property {
+  color: #66d9e8;
+}
+
+/* Important */
+.hljs-important {
+  font-weight: bold;
+}
+
+/* Emphasis */
+.hljs-emphasis {
+  font-style: italic;
+}
+
+/* Custom scrollbar for code blocks */
+.markdown-pre::-webkit-scrollbar {
+  height: 8px;
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 4px;
+}
+
+.markdown-pre::-webkit-scrollbar-thumb {
+  background-color: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.markdown-pre::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(255, 255, 255, 0.3);
+}
+
+/* Copy button for code blocks */
+.markdown-pre .copy-button {
+  position: absolute;
+  top: 50%;
+  right: 1rem;
+  transform: translateY(-50%);
+  background-color: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 0.25rem;
+  color: rgba(255, 255, 255, 0.8);
+  padding: 0.25rem;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.2s ease, background-color 0.2s ease;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+}
+
+.markdown-pre:hover .copy-button {
+  opacity: 1;
+}
+
+.markdown-pre .copy-button:hover {
+  background-color: rgba(0, 0, 0, 0.7);
+  color: rgba(255, 255, 255, 1);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.markdown-pre .copy-button.copied {
+  background-color: rgba(39, 174, 96, 0.5);
+  color: rgba(255, 255, 255, 1);
+  border-color: rgba(39, 174, 96, 0.6);
+}
+
+/* Line numbers for code blocks (optional) */
+.markdown-pre.with-line-numbers {
+  padding-left: 3.5rem;
+  counter-reset: line;
+}
+
+.markdown-pre.with-line-numbers code {
+  position: relative;
+}
+
+.markdown-pre.with-line-numbers code::before {
+  content: counter(line);
+  counter-increment: line;
+  position: absolute;
+  left: -3rem;
+  width: 2.5rem;
+  color: var(--text-secondary);
+  opacity: 0.5;
+  text-align: right;
+}

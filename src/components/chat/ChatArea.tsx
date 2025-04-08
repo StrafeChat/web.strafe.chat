@@ -11,6 +11,7 @@ import DateDivider from "./DateDivider";
 import UnreadDivider from "./UnreadDivider";
 import { EmojiPicker } from "../shared/EmojiPicker";
 import { useUserSettings } from "../../lib/providers/userSettings/UserSettingsProvider";
+import { hasUnclosedCodeBlock, updateCodeBlockIndicator } from "../../lib/utils/codeBlockUtils";
 
 const ChatArea: Component = () => {
   const params = useParams();
@@ -957,6 +958,10 @@ const ChatArea: Component = () => {
                   e.currentTarget.classList.remove("empty");
                 }
                 
+                // Check for unclosed code blocks and update visual indicator
+                const hasUnclosed = hasUnclosedCodeBlock(text);
+                updateCodeBlockIndicator(e.currentTarget, hasUnclosed);
+                
                 // Send typing indicator to backend after second character is typed
                 if (text.length >= 2 && !editingMessageId()) {
                   const currentTime = Date.now();
@@ -980,9 +985,40 @@ const ChatArea: Component = () => {
                 }
               }}
               onKeyDown={(e) => {
+                // Check if we're inside an unclosed code block
+                const text = e.currentTarget.textContent || "";
+                const isInUnclosedCodeBlock = hasUnclosedCodeBlock(text);
+                
+                // Update visual indicator
+                updateCodeBlockIndicator(e.currentTarget, isInUnclosedCodeBlock);
+                
                 if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSendMessage(e.currentTarget);
+                  if (isInUnclosedCodeBlock) {
+                    // Inside unclosed code block, insert new line instead of sending
+                    e.preventDefault();
+                    
+                    // Insert a new line at cursor position
+                    const selection = window.getSelection();
+                    if (selection && selection.rangeCount > 0) {
+                      const range = selection.getRangeAt(0);
+                      const newLine = document.createTextNode("\n");
+                      range.insertNode(newLine);
+                      
+                      // Move cursor after the inserted newline
+                      range.setStartAfter(newLine);
+                      range.setEndAfter(newLine);
+                      selection.removeAllRanges();
+                      selection.addRange(range);
+                      
+                      // Trigger input event to update state
+                      const inputEvent = new Event('input', { bubbles: true });
+                      e.currentTarget.dispatchEvent(inputEvent);
+                    }
+                  } else {
+                    // Not in code block, proceed with normal send
+                    e.preventDefault();
+                    handleSendMessage(e.currentTarget);
+                  }
                 } else if (e.key === 'Escape' && editingMessageId()) {
                   e.preventDefault();
                   // Cancel editing

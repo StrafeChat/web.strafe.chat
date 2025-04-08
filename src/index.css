@@ -1,3 +1,8 @@
+/* Import markdown styles */
+@import './lib/utils/markdown.css';
+/* Import syntax highlighting styles */
+@import './lib/utils/highlight.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -262,4 +267,22 @@
     opacity: 1;
     background-color: transparent;
   }
+}
+
+/* Code block input styling */
+.in-code-block {
+  border-left: 3px solid var(--primary) !important;
+  padding-left: 8px !important;
+  background-color: rgba(33, 195, 94, 0.05) !important;
+}
+
+.in-code-block::after {
+  content: 'Code block - press Enter for new line, Shift+Enter to send';
+  position: absolute;
+  bottom: -22px;
+  left: 0;
+  font-size: 11px;
+  color: var(--primary);
+  opacity: 0.8;
+  pointer-events: none;
 }
