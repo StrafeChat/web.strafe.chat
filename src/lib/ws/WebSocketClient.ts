@@ -244,6 +244,21 @@ export class WebSocketClient {
 
     this.ws.onopen = () => {
       console.log("[WebSocket] Direct connection opened");
+      // Send identify immediately on open
+      this.sendIdentify(this.currentToken!)
+        .then(() => {
+          console.log("[WebSocket] Identify sent successfully");
+          this.connected = true;
+          this.notifyConnectionState();
+          // Start heartbeat after successful identify
+          this.startHeartbeat();
+          this.reconnectAttempts = 0;
+        })
+        .catch((error) => {
+          console.error("[WebSocket] Failed to send identify:", error);
+          this.connected = false;
+          this.notifyConnectionState();
+        });
     };
 
     this.ws.onmessage = this.handleDirectMessage.bind(this);
@@ -252,6 +267,7 @@ export class WebSocketClient {
       console.log("[WebSocket] Direct connection closed:", event);
       this.connected = false;
       this.notifyConnectionState();
+      this.stopHeartbeat();
       if (this.currentToken) {
         this.scheduleReconnect();
       }
@@ -319,34 +335,45 @@ export class WebSocketClient {
       data = this.normalizePayload(data);
 
       // Ensure the data follows the standard event payload structure
-      if (!(data.op !== undefined && data.d !== undefined)) {
+      if (!(data.op !== undefined && data.d !== undefined) && 
+          !(data.type !== undefined)) {
         console.warn("[WebSocket] Received non-standard payload:", data);
-        data = {
-          op: 0,
-          d: data,
-        };
+        if (data.op !== undefined) {
+          data = {
+            type: this.mapEventTypeToOpCode(data.op),
+            ...data
+          };
+        } else {
+          data = {
+            op: 0,
+            type: data.type || 'UNKNOWN',
+            d: data,
+          };
+        }
       }
 
+      // Extract actual payload data - different formats might exist
+      const actualData = data.d || data;
+      const eventType = data.type || (data.t || this.mapEventTypeToOpCode(data.op));
+
       // Handle READY event specially
-      if (data.op === "READY" || (data.op === 0 && data.t === "READY")) {
+      if (eventType === "READY") {
         const readyData = {
           type: "READY",
-          ...(data.d || data),
+          ...actualData,
         };
         console.log("[WebSocket] Processing READY event:", readyData);
         this.handleReady(readyData);
         return;
       }
 
-      // For other events, use the existing handler
-      if (data.op) {
-        const type = this.mapEventTypeToOpCode(data.op);
-        const handler = this.messageHandlers.get(type);
-        if (handler) {
-          handler(data.d);
-        } else {
-          console.warn("[WebSocket] No handler for message type:", type);
-        }
+      // Process other event types
+      const handler = this.messageHandlers.get(eventType);
+      if (handler) {
+        console.log(`[WebSocket] Processing ${eventType} event:`, actualData);
+        handler(actualData);
+      } else {
+        console.warn("[WebSocket] No handler for message type:", eventType);
       }
     } catch (error) {
       console.error("[WebSocket] Error handling message:", error);
@@ -930,5 +957,21 @@ export class WebSocketClient {
     for (const callback of this.connectionStateCallbacks) {
       callback(this.connected);
     }
+  }
+
+  private async sendIdentify(token: string): Promise<void> {
+    if (!token) {
+      throw new Error("No token provided for identify");
+    }
+    
+    console.log("[WebSocket] Sending identify with token:", token.substring(0, 10) + "...");
+    
+    const payload: IdentifyPayload = {
+      type: "IDENTIFY",
+      token: token,
+      device: navigator.userAgent
+    };
+    
+    return this.send(payload);
   }
 }

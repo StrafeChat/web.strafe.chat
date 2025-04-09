@@ -7,6 +7,7 @@ interface ModalProps {
   onClose?: () => void;
   type?: "default" | "full";
   children: JSX.Element;
+  hideCloseButton?: boolean;
 }
 
 const Modal: Component<ModalProps> = (props) => {
@@ -78,7 +79,17 @@ const Modal: Component<ModalProps> = (props) => {
                     }}
                     class="relative w-full max-w-md bg-background2 rounded-lg shadow-xl border border-border overflow-hidden"
                   >
-                    <div class="p-6">{props.children}</div>
+                    <div class="p-6">
+                      {props.children}
+                      {!props.hideCloseButton && props.onClose && (
+                        <button
+                          class="absolute top-4 right-4 text-text-secondary hover:text-text-primary"
+                          onClick={props.onClose}
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
                   </Motion>
                 </div>
               </div>

@@ -4,7 +4,7 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "vite --host",
     "build": "vite build",
     "preview": "vite preview"
   },
@@ -16,9 +16,12 @@
     "@solidjs/router": "^0.15.1",
     "@types/bun": "^1.1.11",
     "@types/highlight.js": "^10.1.0",
+    "caniuse-lite": "^1.0.30001712",
     "date-fns": "^4.1.0",
     "framer-motion": "^11.12.0",
     "highlight.js": "^11.11.1",
+    "isomorphic-dompurify": "^2.23.0",
+    "marked": "^15.0.8",
     "path": "^0.12.7",
     "solid-js": "^1.9.1",
     "solid-motionone": "^1.0.2",

@@ -458,12 +458,12 @@ const Message: Component<MessageProps> = (props) => {
               </div>
             </Show>
             <Show when={!isEditing()}>
-              <div class="text-text-primary break-all break-words whitespace-pre-wrap overflow-hidden max-w-full markdown-content">
-                {/* Always use markdown parser which now handles emojis internally */}
-                <div innerHTML={parseMarkdown(props.content)} />
-                <Show when={props.edited_at}>
-                  <span class="text-xs text-text-secondary ml-1 whitespace-nowrap">(edited)</span>
-                </Show>
+              <div 
+                class="text-text-primary max-w-full message-content whitespace-pre-wrap overflow-hidden overflow-wrap-anywhere"
+                data-edited={props.edited_at ? "true" : undefined}
+                style="word-break: break-word; overflow-wrap: break-word;"
+              >
+                <span innerHTML={parseMarkdown(props.content.replace(/\n\s*\n/g, '\n&nbsp;\n'))} />
               </div>
             </Show>
             <Show when={isEditing()}>

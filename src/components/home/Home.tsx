@@ -65,12 +65,12 @@ export const Home: Component = () => {
             <p class="mb-4 text-sm md:text-base">
               {t("home.cards.donateDescription")}
             </p>
-            <button
-              class="w-full md:w-auto bg-accent text-text-primary px-4 py-2 rounded hover:bg-secondary-dark transition-colors"
-              onClick={() => window.open("https://ko-fi.com/bryden", "_blank")}
+            <a
+              href="https://ko-fi.com/bryden"
+              class="inline-block w-full md:w-auto bg-accent text-text-primary px-4 py-2 rounded hover:bg-secondary-dark transition-colors text-center"
             >
               {t("home.cards.supportUs")}
-            </button>
+            </a>
           </div>
           <div class="bg-surface p-4 md:p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow">
             <h3 class="text-lg md:text-xl font-semibold mb-2">

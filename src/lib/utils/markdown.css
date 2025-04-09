@@ -34,6 +34,9 @@
 .markdown-link {
   color: var(--primary);
   text-decoration: none;
+  cursor: pointer;
+  position: relative;
+  display: inline-block;
 }
 
 .markdown-link:hover {

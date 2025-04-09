@@ -44,7 +44,10 @@ renderer.del = function({ tokens }: Tokens.Del): string {
 
 // Override link renderer to add click handler for confirmation modal
 renderer.link = function({ href, title, tokens }: Tokens.Link): string {
-  return `<a href="javascript:void(0)" data-href="${href}" onclick="window.handleMarkdownLink(this)" class="markdown-link" ${title ? `title="${title}"` : ''}>${this.parser.parseInline(tokens)}</a>`;
+  console.log("Rendering link:", href);
+  // Create a standard link without any special click handling
+  // The LinkConfirmationHandler component will handle all link clicks
+  return `<a href="${href}" class="markdown-link text-primary" ${title ? `title="${title}"` : ''}>${this.parser.parseInline(tokens)}</a>`;
 };
 
 // Override code block renderer with syntax highlighting

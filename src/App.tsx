@@ -8,8 +8,7 @@ import en from "./locales/list/en-us.json";
 import es from "./locales/list/es-es.json";
 import fr from "./locales/list/fr-fr.json";
 import ar from "./locales/list/ar-sa.json";
-import { ParentProps, createEffect, lazy, onMount } from "solid-js";
-import { setupLinkHandler } from "./lib/utils/linkHandler";
+import { ParentProps, createEffect, lazy } from "solid-js";
 import Login from "./components/auth/Login";
 import Register from "./components/auth/Register";
 import { Interface } from "./components/shared/Interface";
@@ -22,6 +21,8 @@ import { ToastProvider } from "./components/common/Toast";
 import { SettingsProvider } from "./lib/providers/settings/SettingsProvider";
 import { UserSettingsProvider } from "./lib/providers/userSettings/UserSettingsProvider";
 import RoomView from "./components/chat/RoomView";
+import { ModalProvider } from "./lib/providers/modal/ModalProvider";
+import LinkConfirmationHandler from "./components/LinkConfirmationHandler";
 
 const MountApp = (props: ParentProps) => {
   const savedLang = localStorage.getItem("sc_lang") || "en_us";
@@ -55,7 +56,10 @@ const MountApp = (props: ParentProps) => {
               <AuthProvider>
                 <SettingsProvider>
                   <UserSettingsProvider>
-                    <div class="h-[100dvh] w-full overflow-hidden">{props.children}</div>
+                    <ModalProvider>
+                      <LinkConfirmationHandler />
+                      <div class="h-[100dvh] w-full overflow-hidden">{props.children}</div>
+                    </ModalProvider>
                   </UserSettingsProvider>
                 </SettingsProvider>
               </AuthProvider>
@@ -68,10 +72,8 @@ const MountApp = (props: ParentProps) => {
 };
 
 const App = () => {
-  onMount(() => {
-    // Setup markdown link handler
-    setupLinkHandler();
-  });
+  // We're using the LinkConfirmationHandler component
+  // which handles all link clicks in the application
 
   return (
     <MountApp>

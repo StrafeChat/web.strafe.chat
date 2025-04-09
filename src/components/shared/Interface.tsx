@@ -1,4 +1,4 @@
-import { JSX, createSignal} from "solid-js";
+import { JSX, createSignal, onMount } from "solid-js";
 import SpacesList from "../spaces/SpacesList";
 import RoomsList from "../spaces/rooms/RoomsList";
 import { ProtectedRoute } from "../auth/ProtectedRoute";
@@ -12,24 +12,42 @@ export const Interface = (props: { children: JSX.Element }) => {
   const location = useLocation();
   const { isMobile } = useAuth();
   const [showSettings, setShowSettings] = createSignal(false)
+  const [isSidebarVisible, setIsSidebarVisible] = createSignal(true);
+
   const showRoomsList = () => location.pathname.startsWith("/spaces");
-  // Show bottom nav on mobile except when in rooms, spaces, or viewing a PM chat (but not the list)
+
+  const handleScroll = () => {
+    const container = document.querySelector(".snap-x");
+    if (container) {
+      setIsSidebarVisible(container.scrollLeft === 0);
+    }
+  };
+
+  // Show bottom nav on mobile when sidebar is visible
   const showBottomNav = () => {
     if (!isMobile()) return false;
-    // Show bottom nav when viewing sidebar on mobile, hide when viewing chat content
-    if (location.pathname.startsWith("/rooms/")) {
-      const container = document.querySelector(".snap-x");
-      if (container) {
-        return container.scrollLeft < container.clientWidth / 2;
-      }
+    if (location.pathname.startsWith("/rooms")) {
+      return isSidebarVisible();
     }
     return true;
   };
 
+  onMount(() => {
+    const container = document.querySelector(".snap-x");
+    if (container) {
+      container.addEventListener('scroll', handleScroll);
+    }
+    return () => {
+      if (container) {
+        container.removeEventListener('scroll', handleScroll);
+      }
+    };
+  });
+
   return (
     <ProtectedRoute>
       <div class="flex h-screen bg-background text-text-primary overflow-hidden">
-        <div class="flex md:flex-1 w-screen overflow-x-auto snap-x snap-mandatory scroll-smooth hide-scrollbar pb-14 md:pb-0">
+        <div class={`flex md:flex-1 w-screen overflow-x-auto snap-x snap-mandatory scroll-smooth hide-scrollbar ${showBottomNav() ? 'pb-14' : ''} md:pb-0`}>
           {/* First snap point - Lists */}
           <div class="flex w-[calc(92px+15rem)] md:w-auto flex-none snap-start">
             <div class="w-[72px] h-screen flex-none">

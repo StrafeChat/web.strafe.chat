@@ -1,32 +1,13 @@
-import { useModal } from "../providers/modal/ModalProvider";
-import LinkConfirmModal from "../../components/modals/LinkConfirmModal";
-import { Component, JSX } from "solid-js";
+// Simple link handler that serves as a compatibility layer
+// The actual functionality has been moved to the LinkConfirmationHandler component
+// which provides a custom modal instead of the browser's built-in confirm dialog
 
-declare global {
-  interface Window {
-    handleMarkdownLink: (element: HTMLAnchorElement) => void;
-  }
-}
+// IMPORTANT: This handler is completely disabled to prevent duplicate modals
+// All link handling is now done by the LinkConfirmationHandler component
 
 export function setupLinkHandler() {
-//   const { openModal, closeModal } = useModal();
-
-  window.handleMarkdownLink = (element: HTMLAnchorElement) => {
-    const href = element.getAttribute("data-href");
-    if (!href) return;
-
-    // Sanitize the URL to prevent malicious links
-    try {
-      new URL(href);
-    } catch {
-      console.error("Invalid URL:", href);
-      return;
-    }
-
-    // Only allow http/https protocols
-    if (!href.startsWith("http://") && !href.startsWith("https://")) {
-      console.error("Invalid protocol:", href);
-      return;
-    }
-  };
+  // This function is completely disabled to prevent duplicate modals
+  console.log("Link handler is completely disabled. Using LinkConfirmationHandler component instead.");
+  
+  // DO NOT add any event listeners here - they would conflict with LinkConfirmationHandler
 }

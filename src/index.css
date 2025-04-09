@@ -35,6 +35,23 @@
   animation: bounce 1s infinite 0.3s;
 }
 
+
+
+.message-content p, 
+.message-content div {
+  display: inline;
+}
+
+
+.message-content[data-edited="true"]::after {
+  content: " (edited)";
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-left: 0.25rem;
+  white-space: nowrap;
+}
+
+
 @keyframes bounce {
   0%, 100% {
     transform: translateY(0);
