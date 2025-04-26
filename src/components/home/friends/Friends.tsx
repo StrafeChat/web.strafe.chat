@@ -19,7 +19,7 @@ import { Tooltip } from "../../common/Tooltip";
 
 type TabType = "online" | "all" | "pending" | "blocked";
 
-export const Friends: Component = () => {
+const Friends: Component = () => {
   const [t] = useTransContext();
   const { relationshipRequests, user } = useAuth();
   useModal();
@@ -221,3 +221,5 @@ export const Friends: Component = () => {
     </div>
   );
 };
+
+export default Friends;

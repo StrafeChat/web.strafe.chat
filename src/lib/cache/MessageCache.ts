@@ -25,14 +25,20 @@ export class MessageCache {
   private messages: Map<string, Map<string, CachedMessage>> = new Map();
   private messageUpdateCallbacks: ((roomId: string, message: CachedMessage) => void)[] = [];
   private deletedMessageIds: Map<string, Set<string>> = new Map(); // Track deleted message IDs by room
-  private readonly MAX_MESSAGES_PER_ROOM = 50;
+  private readonly MAX_MESSAGES_PER_ROOM = 100; // Increased from 50 to 100
   private readonly DELETED_MESSAGES_STORAGE_KEY = 'sc_deleted_messages';
+  // Track the oldest and newest message IDs for each room
+  private oldestMessageIds: Map<string, string> = new Map();
+  private newestMessageIds: Map<string, string> = new Map();
+  // Track if we've reached the beginning or end of message history
+  private reachedBeginning: Map<string, boolean> = new Map();
+  private reachedEnd: Map<string, boolean> = new Map();
 
   constructor() {
     this.loadDeletedMessagesFromStorage();
   }
 
-  public setMessages(roomId: string, messages: CachedMessage[]) {
+  public setMessages(roomId: string, messages: CachedMessage[], position: 'newer' | 'older' | 'replace' = 'replace') {
     if (!this.messages.has(roomId)) {
       this.messages.set(roomId, new Map());
     }
@@ -47,7 +53,50 @@ export class MessageCache {
       }
     });
     
-    messages.forEach(message => {
+    // If this is a replacement, clear existing messages
+    if (position === 'replace') {
+      roomMessages.clear();
+      this.reachedBeginning.set(roomId, false);
+      this.reachedEnd.set(roomId, false);
+    }
+    
+    // Sort messages by creation date to ensure correct order
+    const sortedMessages = [...messages].sort((a, b) => {
+      const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+      const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+      return dateA - dateB;
+    });
+    
+    // If we received fewer messages than requested, we've reached a boundary
+    if (sortedMessages.length < 50) {
+      if (position === 'older') {
+        this.reachedBeginning.set(roomId, true);
+      } else if (position === 'newer') {
+        this.reachedEnd.set(roomId, true);
+      }
+    }
+    
+    // Update oldest/newest message IDs if applicable
+    if (sortedMessages.length > 0) {
+      const firstMessage = sortedMessages[0];
+      const lastMessage = sortedMessages[sortedMessages.length - 1];
+      
+      if (position === 'older' || position === 'replace') {
+        const firstMessageId = firstMessage.id || '';
+        if (firstMessageId) {
+          this.oldestMessageIds.set(roomId, firstMessageId);
+        }
+      }
+      
+      if (position === 'newer' || position === 'replace') {
+        const lastMessageId = lastMessage.id || '';
+        if (lastMessageId) {
+          this.newestMessageIds.set(roomId, lastMessageId);
+        }
+      }
+    }
+    
+    sortedMessages.forEach(message => {
       const messageId = message.id || message.nonce || '';
       // Only add messages that haven't been deleted
       if (messageId && !deletedIds.has(messageId)) {
@@ -59,9 +108,27 @@ export class MessageCache {
 
     // Trim messages if they exceed the limit
     if (roomMessages.size > this.MAX_MESSAGES_PER_ROOM) {
-      const messagesToDelete = Array.from(roomMessages.entries())
-        .slice(0, roomMessages.size - this.MAX_MESSAGES_PER_ROOM);
-      messagesToDelete.forEach(([key]) => roomMessages.delete(key));
+      // If we're adding older messages, remove newer ones
+      if (position === 'older') {
+        const messagesToDelete = Array.from(roomMessages.entries())
+          .sort((a, b) => {
+            const dateA = a[1].created_at ? new Date(a[1].created_at).getTime() : 0;
+            const dateB = b[1].created_at ? new Date(b[1].created_at).getTime() : 0;
+            return dateB - dateA; // Sort newest first
+          })
+          .slice(0, roomMessages.size - this.MAX_MESSAGES_PER_ROOM);
+        messagesToDelete.forEach(([key]) => roomMessages.delete(key));
+      } else {
+        // Otherwise remove older messages
+        const messagesToDelete = Array.from(roomMessages.entries())
+          .sort((a, b) => {
+            const dateA = a[1].created_at ? new Date(a[1].created_at).getTime() : 0;
+            const dateB = b[1].created_at ? new Date(b[1].created_at).getTime() : 0;
+            return dateA - dateB; // Sort oldest first
+          })
+          .slice(0, roomMessages.size - this.MAX_MESSAGES_PER_ROOM);
+        messagesToDelete.forEach(([key]) => roomMessages.delete(key));
+      }
     }
   }
 
@@ -199,5 +266,31 @@ export class MessageCache {
     this.messages.clear();
     this.deletedMessageIds.clear();
     localStorage.removeItem(this.DELETED_MESSAGES_STORAGE_KEY);
+  }
+
+  // Get the oldest message ID for a room
+  public getOldestMessageId(roomId: string): string | undefined {
+    return this.oldestMessageIds.get(roomId);
+  }
+
+  // Get the newest message ID for a room
+  public getNewestMessageId(roomId: string): string | undefined {
+    return this.newestMessageIds.get(roomId);
+  }
+
+  // Check if we've reached the beginning of message history
+  public hasReachedBeginning(roomId: string): boolean {
+    return this.reachedBeginning.get(roomId) || false;
+  }
+
+  // Check if we've reached the end of message history
+  public hasReachedEnd(roomId: string): boolean {
+    return this.reachedEnd.get(roomId) || false;
+  }
+
+  // Reset the reached flags for a room
+  public resetReachedFlags(roomId: string): void {
+    this.reachedBeginning.set(roomId, false);
+    this.reachedEnd.set(roomId, false);
   }
 }

@@ -49,6 +49,8 @@
   color: var(--text-secondary);
   margin-left: 0.25rem;
   white-space: nowrap;
+  display: inline;
+  vertical-align: baseline;
 }
 
 

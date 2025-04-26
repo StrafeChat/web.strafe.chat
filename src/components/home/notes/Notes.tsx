@@ -1,6 +1,6 @@
 import { Component } from "solid-js";
 
-export const Notes: Component = () => {
+const Notes: Component = () => {
   return (
     <div class="h-full w-full bg-background2 select-none">
       <div class="flex flex-col h-full">
@@ -56,3 +56,5 @@ export const Notes: Component = () => {
     </div>
   );
 };
+
+export default Notes;

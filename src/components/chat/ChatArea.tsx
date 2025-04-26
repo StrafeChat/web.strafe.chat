@@ -1,17 +1,25 @@
-import { Component, createMemo, createSignal, Show, For, createEffect, onCleanup } from "solid-js";
+import {
+  Component,
+  createEffect,
+  createMemo,
+  createSignal,
+  For,
+  onCleanup,
+  Show,
+} from "solid-js";
 import { useParams } from "@solidjs/router";
-import { useAuth } from "../../lib/providers/auth/AuthProvider";
-import { useCache } from "../../lib/providers/cache/CacheProvider";
-import { BASE_URL, FS_URL } from "../../constants";
-import { RoomType } from "../../types/roomTypes";
-import { useTransContext } from "@mbarzda/solid-i18next";
 import Message from "./Message";
+import { useTransContext } from "@mbarzda/solid-i18next";
+import { useCache } from "../../lib/providers/cache/CacheProvider";
+import { useAuth } from "../../lib/providers/auth/AuthProvider";
+import { BASE_URL, FS_URL } from "../../constants";
 import { CachedMessage } from "../../lib/cache/MessageCache";
-import DateDivider from "./DateDivider";
-import UnreadDivider from "./UnreadDivider";
-import { EmojiPicker } from "../shared/EmojiPicker";
 import { useUserSettings } from "../../lib/providers/userSettings/UserSettingsProvider";
 import { hasUnclosedCodeBlock, updateCodeBlockIndicator } from "../../lib/utils/codeBlockUtils";
+import { RoomType } from "../../types/rooms";
+import { EmojiPicker } from "../shared/EmojiPicker";
+import DateDivider from "./DateDivider";
+import UnreadDivider from "./UnreadDivider";
 
 const ChatArea: Component = () => {
   const params = useParams();
@@ -28,29 +36,26 @@ const ChatArea: Component = () => {
   const [editingMessageId, setEditingMessageId] = createSignal<string | null>(null);
   const [editingRoomId, setEditingRoomId] = createSignal<string | null>(null);
   const [typingUsers, setTypingUsers] = createSignal<{id: string, timestamp: number}[]>([]);
+  const [isLoadingOlder, setIsLoadingOlder] = createSignal(false);
+  const [isLoadingNewer, setIsLoadingNewer] = createSignal(false);
+  const [shouldScrollToBottom, setShouldScrollToBottom] = createSignal(true);
+  const [hasScrolledUp, setHasScrolledUp] = createSignal(false);
   const [showEmojiPicker, setShowEmojiPicker] = createSignal(false);
   const [emojiPickerPosition, setEmojiPickerPosition] = createSignal({ top: 0, left: 0 });
   const [fileInputRef, setFileInputRef] = createSignal<HTMLInputElement>();
+  const [hasReachedBeginning, setHasReachedBeginning] = createSignal(false);
+  const [hasReachedEnd, setHasReachedEnd] = createSignal(false);
   const [showUnreadHeader, setShowUnreadHeader] = createSignal(false);
+  const [loadingOlderPhase, setLoadingOlderPhase] = createSignal<'idle' | 'loading' | 'positioning'>('idle');
+  const previouslyScrolledUp = { current: false };
+  const initiallyFetchedRooms = { current: new Set<string>() };
+  const newerMessagesFetchCount = { current: 0 };
+
   // Get unread messages for the current room
   const currentRoomUnreadMessages = createMemo(() => {
     const allUnreads = unreadMessages();
     return allUnreads[params.roomId] || [];
   });
-
-  // Delayed acknowledgment function
-  // const delayedAcknowledgment = (roomId: string) => {
-  //   // Only proceed if there are unread messages
-  //   if (currentRoomUnreadMessages().length === 0) return;
-  
-  //   // Set a timeout to mark messages as read after 3 seconds
-  //   const timeoutId = setTimeout(() => {
-  //     markMessagesAsRead(roomId);
-  //   }, 3000);
-  
-  //   // Clean up timeout if component unmounts
-  //   onCleanup(() => clearTimeout(timeoutId));
-  // };
 
   // Handle unread header visibility
   const delayedHeaderVisibility = (_roomId: string) => {
@@ -76,92 +81,6 @@ const ChatArea: Component = () => {
       // Show the header with delay
       delayedHeaderVisibility(roomId);
     }
-  });
-  // Check if we're on mobile
-  // Reference to the messages container for auto-scrolling
-  let messagesContainerRef: HTMLDivElement | undefined;
-
-  // Reference to the chat input element
-  let chatInputRef: HTMLDivElement | undefined;
-
-  // Handle edit message event from Message component
-  createEffect(() => {
-    const handleEditMessage = (event: CustomEvent) => {
-      const { messageId, roomId, content } = event.detail;
-      setEditingMessageId(messageId);
-      setEditingRoomId(roomId);
-      setMessageText(content);
-    };
-
-    // Handle typing indicator events
-    const handleTypingIndicator = (event: CustomEvent) => {
-      const { roomId, userId } = event.detail;
-      const currentRoomId = params.roomId;
-      
-      // Only process typing indicators for the current room
-      if (roomId !== currentRoomId) return;
-      
-      // Don't show typing indicators for the current user
-      const currentUserId = user()?.id;
-      if (userId === currentUserId) return;
-      
-      // Add or update the typing user
-      setTypingUsers(prev => {
-        // Remove this user if they're already in the list
-        const filtered = prev.filter(u => u.id !== userId);
-        
-        // Add the user with the current timestamp
-        return [...filtered, { id: userId, timestamp: Date.now() }];
-      });
-      
-      // Remove typing indicator after 6 seconds of inactivity
-      setTimeout(() => {
-        setTypingUsers(prev => prev.filter(u => 
-          !(u.id === userId && Date.now() - u.timestamp > 6000)
-        ));
-      }, 6000);
-    };
-
-    window.addEventListener('editMessage', handleEditMessage as EventListener);
-    window.addEventListener('typingIndicator', handleTypingIndicator as EventListener);
-
-    onCleanup(() => {
-      window.removeEventListener('editMessage', handleEditMessage as EventListener);
-      window.removeEventListener('typingIndicator', handleTypingIndicator as EventListener);
-    });
-  });
-
-  // Set up MutationObserver to monitor chat input content changes
-  createEffect(() => {
-    if (!chatInputRef) return;
-    
-    // Create a MutationObserver to watch for content changes
-    const observer = new MutationObserver((_mutations) => {
-      // Configure observer to watch for text and node changes
-      observer.observe(chatInputRef, {
-        childList: true,
-        subtree: true,
-        characterData: true
-      });
-      
-      // Force reflow and empty check
-      chatInputRef?.offsetHeight;
-      const isEmpty = !chatInputRef?.textContent || chatInputRef.textContent.trim() === "";
-      chatInputRef.classList.toggle('empty', isEmpty);
-      setMessageText(chatInputRef.textContent || "");
-    });
-    
-    // Start observing the chat input for changes
-    observer.observe(chatInputRef, { 
-      childList: true,
-      characterData: true,
-      subtree: true 
-    });
-    
-    // Clean up the observer when component is unmounted
-    onCleanup(() => {
-      observer.disconnect();
-    });
   });
 
   // Helper function to check if a message is the first unread message
@@ -198,8 +117,10 @@ const ChatArea: Component = () => {
     return groups.sort((a, b) => a.date.getTime() - b.date.getTime());
   };
 
-  // Helper function to deduplicate and sort messages
-  const processMessages = (msgs: CachedMessage[]) => {
+  // Process messages to ensure they're sorted correctly
+  const processMessages = (msgs: CachedMessage[]): CachedMessage[] => {
+    if (!msgs || msgs.length === 0) return [];
+    
     // Create a map to store unique messages, prioritizing server IDs over nonces
     const messageMap = new Map<string, CachedMessage>();
     
@@ -241,16 +162,6 @@ const ChatArea: Component = () => {
         }
         return dateA - dateB;
       });
-  };
-
-  // Function to scroll to the bottom of the messages container
-  const scrollToBottom = () => {
-    if (messagesContainerRef) {
-      // Use requestAnimationFrame to ensure DOM is ready
-      requestAnimationFrame(() => {
-        messagesContainerRef.scrollTop = messagesContainerRef.scrollHeight;
-      });
-    }
   };
 
   // Get the current room based on the roomId parameter
@@ -345,15 +256,88 @@ const ChatArea: Component = () => {
     return "Unknown Chat";
   };
 
-  // Fetch messages and set up real-time updates
+  // Component did mount effect
+  createEffect(() => {
+    // Initialize the message layout once it's mounted
+    // This sets up the initial state and scroll behavior
+    const initializeMessages = async () => {
+      if (!params.roomId || !cache) return;
+      
+      setMessages(processMessages(cache.getMessages(params.roomId)));
+      
+      // After the first render, check if we need to fetch messages
+      if (!initiallyFetchedRooms.current.has(params.roomId)) {
+        initiallyFetchedRooms.current.add(params.roomId);
+        
+        // Set the initial loading state
+        setLoading(true);
+        
+        try {
+          // Fetch messages for the room
+          const response = await fetch(`${BASE_URL}/rooms/${params.roomId}/messages`, {
+            headers: {
+              "X-Session-Token": localStorage.getItem('sc_token') || ""
+            }
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Failed to fetch messages: ${response.status}`);
+          }
+          
+          const data = await response.json();
+          
+          // Check if the response contains messages directly or in a nested structure
+          const fetchedMessages = Array.isArray(data) ? data : 
+                        data.messages ? data.messages : 
+                        data.success && data.messages ? data.messages : [];
+          
+          // Add fetched messages to cache
+          cache.setMessages(params.roomId, fetchedMessages);
+          
+          // Process and set the messages
+          const processedMessages = processMessages(cache.getMessages(params.roomId));
+          setMessages(processedMessages);
+          
+          // Auto-scroll to bottom after the initial message load
+          setShouldScrollToBottom(true);
+          
+          // Set flags based on the number of messages received
+          if (fetchedMessages.length === 0 || fetchedMessages.length < 50) {
+            setHasReachedBeginning(true);
+          }
+          setHasReachedEnd(true); // Assume we're at the most recent messages
+        } catch (err) {
+          console.error("Error fetching messages:", err);
+          setError("Failed to load messages. Please try again later.");
+        } finally {
+          setLoading(false);
+        }
+      } else {
+        // If we've already fetched the room before, just scroll to bottom
+        setShouldScrollToBottom(true);
+      }
+    };
+    
+    initializeMessages();
+  });
+
+  // Handle new messages
+  createEffect(() => {
+    const msgs = messages();
+    
+    // If we have messages and should scroll to bottom, do it
+    if (msgs.length > 0 && shouldScrollToBottom() && !hasScrolledUp()) {
+      scrollToBottom();
+    }
+  });
+
+  // Set up real-time updates
   createEffect(() => {
     const room = currentRoom();
     if (!room) {
       setLoading(false);
       return;
     }
-
-    setLoading(true); // Set loading to true at the start of the effect
     
     // Initial load from cache and set up cache monitoring
     const updateFromCache = () => {
@@ -364,7 +348,7 @@ const ChatArea: Component = () => {
         scrollToBottom();
       }
     };
-
+    
     // Initial load
     updateFromCache();
     
@@ -424,14 +408,12 @@ const ChatArea: Component = () => {
         console.log("[ChatArea] Messages count after deletion:", updatedMessages.length);
         
         // Process and return updated messages
-        const processed = processMessages(updatedMessages);
-        return processed;
+        return processMessages(updatedMessages);
       });
       
       // Force a refresh from cache after a short delay
       setTimeout(() => {
-        const cachedMessages = cache.getMessages(room.id);
-        setMessages(processMessages([...cachedMessages]));
+        setMessages(processMessages(cache.getMessages(room.id)));
       }, 100);
     }) as EventListener;
 
@@ -467,18 +449,18 @@ const ChatArea: Component = () => {
       
       // Force a re-render after a short delay to ensure UI updates
       setTimeout(() => {
-        const cachedMessages = cache.getMessages(room.id);
-        if (cachedMessages.length > 0) {
-          setMessages(processMessages([...cachedMessages]));
-        }
+        setMessages(processMessages(cache.getMessages(room.id)));
       }, 100);
     }) as EventListener;
     window.addEventListener("messageCreate", messageCreateHandler);
     window.addEventListener("messageDelete", messageDeleteHandler);
     window.addEventListener("messageEdit", messageEditHandler);
-    // Fetch messages from API if cache is empty
+    
+    // Only fetch messages from API if cache is empty AND we haven't already fetched them
+    // This prevents double fetching when the room changes
     const cachedMessages = cache.getMessages(room.id);
-    if (cachedMessages.length === 0) {
+    if (cachedMessages.length === 0 && !initiallyFetchedRooms.current.has(room.id)) {
+      initiallyFetchedRooms.current.add(room.id);
       const fetchMessages = async () => {
         try {
           const response = await fetch(`${BASE_URL}/rooms/${room.id}/messages`, {
@@ -490,7 +472,9 @@ const ChatArea: Component = () => {
           if (!response.ok) throw new Error('Failed to fetch messages');
           const data = await response.json();
           
-          const messages = Array.isArray(data) ? data : data.messages;
+          const messages = Array.isArray(data) ? data : 
+                          data.messages ? data.messages : 
+                          data.success && data.messages ? data.messages : [];
           if (Array.isArray(messages)) {
             cache.setMessages(room.id, messages);
             setMessages(processMessages(messages));
@@ -517,63 +501,474 @@ const ChatArea: Component = () => {
     });
   });
 
-  // Effect to scroll to bottom when messages change
+  // Handle watch for room changes
   createEffect(() => {
-    // This will trigger whenever messages() changes
-    const currentMessages = messages();
-    if (currentMessages.length > 0) {
-      // Use requestAnimationFrame to ensure smooth scrolling
-      requestAnimationFrame(scrollToBottom);
+    const roomId = params.roomId;
+    if (roomId) {
+      // Reset state for the new room
+      setMessages([]);
+      setError("");
+      setHasScrolledUp(false);
+      setShouldScrollToBottom(true);
+      setHasReachedBeginning(false);
+      setHasReachedEnd(false);
+      
+      // Check if we already have messages in cache
+      const cachedMessages = cache.getMessages(roomId);
+      if (cachedMessages.length > 0) {
+        // If we have cached messages, use them and don't show loading
+        setLoading(false);
+        setMessages(processMessages(cachedMessages));
+        setTimeout(scrollToBottom, 100);
+      } else {
+        // Check if we've already fetched this room before (even if it was empty)
+        if (initiallyFetchedRooms.current.has(roomId)) {
+          // We've already fetched this room and it was empty, so don't show loading
+          setLoading(false);
+        } else {
+          // Only show loading and fetch if we don't have cached messages and haven't fetched before
+          setLoading(true);
+          
+          // Fetch messages for the new room
+          initiallyFetchedRooms.current.add(roomId);
+          fetchInitialMessages(roomId);
+        }
+      }
     }
   });
 
-  // Handle sending a message
-  const handleReply = (messageId: string) => {
-    setReplyingTo(prev => [...prev, messageId]);
-  };
-
-  // Handle editing a message (for mobile)  
-  const handleEditMessage = async (inputElement: HTMLDivElement) => {
-    const content = messageText().trim();
-    const messageId = editingMessageId();
-    const roomId = editingRoomId();
-    
-    // Clear any previous errors
-    setError("");
-    
-    // Validate message content
-    if (!content) return;
-    
-    // Validate message ID and room ID
-    if (!messageId || !roomId) {
-      setError(t("chat.errors.invalidEdit"));
-      return;
+  // Effect to scroll to bottom when messages change
+  createEffect(() => {
+    // This will trigger whenever messages() changes
+    if (shouldScrollToBottom() && chatContainerRef) {
+      chatContainerRef.scrollTop = chatContainerRef.scrollHeight;
     }
+  });
+
+  // Fetch older messages (for infinite scrolling)
+  const fetchOlderMessages = async () => {
+    if (!params.roomId || loadingOlderPhase() !== 'idle' || hasReachedBeginning()) return;
     
     try {
-      setSending(true);
+      // Step 1: Capture the current scroll state and freeze the UI
+      setLoadingOlderPhase('loading');
       
-      const result = await editMessage(roomId, messageId, content);
-      
-      if (!result.success) {
-        setError(result.error || t("chat.errors.editFailed"));
-      } else {
-        // Clear input field immediately for better UX
-        inputElement.textContent = "";
-        setMessageText("");
-        
-        // Clear editing state
-        setEditingMessageId(null);
-        setEditingRoomId(null);
+      const chatContainer = chatContainerRef;
+      if (!chatContainer) {
+        setLoadingOlderPhase('idle');
+        return;
       }
+      
+      // Take a screenshot of the current view by measuring visible elements
+      const visibleRect = chatContainer.getBoundingClientRect();
+      const visibleTop = visibleRect.top;
+      const visibleHeight = visibleRect.height;
+      
+      // Find all visible message elements
+      const allMessageElements = Array.from(chatContainer.querySelectorAll('.message-container'));
+      const visibleMessages = allMessageElements.filter(el => {
+        const rect = el.getBoundingClientRect();
+        // Check if the element is at least partially visible
+        return (rect.bottom >= visibleTop && rect.top <= visibleTop + visibleHeight);
+      });
+      
+      if (visibleMessages.length === 0) {
+        setLoadingOlderPhase('idle');
+        return;
+      }
+      
+      // Get the first visible message for reference
+      const firstVisibleMessage = visibleMessages[0];
+      const firstVisibleRect = firstVisibleMessage.getBoundingClientRect();
+      const firstVisibleOffsetTop = firstVisibleRect.top - visibleTop;
+      const firstVisibleMessageId = firstVisibleMessage.getAttribute('data-message-id');
+      
+      // Disable scrolling completely during the operation
+      const originalOverflow = chatContainer.style.overflow;
+      chatContainer.style.overflow = 'hidden';
+      
+      // Get the oldest message ID for the API request
+      const oldestMessageId = cache.getOldestMessageId(params.roomId);
+      if (!oldestMessageId) {
+        // Restore original state and exit
+        chatContainer.style.overflow = originalOverflow;
+        setHasReachedBeginning(true);
+        setLoadingOlderPhase('idle');
+        return;
+      }
+      
+      // Step 2: Fetch new messages while UI is frozen
+      const response = await fetch(`${BASE_URL}/rooms/${params.roomId}/messages?before=${oldestMessageId}`, {
+        headers: {
+          "X-Session-Token": localStorage.getItem('sc_token') || ""
+        }
+      });
+      
+      if (!response.ok) {
+        // Restore original state and exit
+        chatContainer.style.overflow = originalOverflow;
+        setLoadingOlderPhase('idle');
+        throw new Error(`Failed to fetch older messages: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Check if the response contains messages
+      const fetchedMessages = Array.isArray(data) ? data : 
+                    data.messages ? data.messages : 
+                    data.success && data.messages ? data.messages : [];
+      
+      if (fetchedMessages.length === 0) {
+        // No new messages, restore original state and exit
+        chatContainer.style.overflow = originalOverflow;
+        setHasReachedBeginning(true);
+        setLoadingOlderPhase('idle');
+        return;
+      }
+      
+      // Step 3: Enter positioning phase - UI will remain frozen
+      setLoadingOlderPhase('positioning');
+      
+      // Add new messages to cache
+      cache.setMessages(params.roomId, fetchedMessages, 'older');
+      
+      // Process and update messages
+      const newMessages = processMessages(cache.getMessages(params.roomId));
+      setMessages(newMessages);
+      
+      // Disable auto-scrolling to bottom
+      setShouldScrollToBottom(false);
+      
+      // Step 4: After render, restore exact scroll position
+      setTimeout(() => {
+        try {
+          // First try to find the same message by ID
+          if (firstVisibleMessageId) {
+            const sameMessage = document.querySelector(`[data-message-id="${firstVisibleMessageId}"]`);
+            if (sameMessage) {
+              // Calculate where this element should be positioned
+              const newRect = sameMessage.getBoundingClientRect();
+              const newVisibleTop = chatContainer.getBoundingClientRect().top;
+              const targetTop = newVisibleTop + firstVisibleOffsetTop;
+              const adjustment = newRect.top - targetTop;
+              
+              // Apply precise scroll adjustment
+              chatContainer.scrollTop = chatContainer.scrollTop + adjustment;
+            }
+          }
+        } catch (err) {
+          console.error("Error restoring scroll position:", err);
+        } finally {
+          // Always restore scrolling and UI state
+          chatContainer.style.overflow = originalOverflow;
+          setLoadingOlderPhase('idle');
+          setHasReachedBeginning(fetchedMessages.length < 50);
+        }
+      }, 50);
+      
     } catch (err) {
-      console.error("Error editing message:", err);
-      setError(t("chat.errors.editFailed"));
-    } finally {
-      setSending(false);
+      console.error("Error fetching older messages:", err);
+      if (chatContainerRef) {
+        chatContainerRef.style.overflow = 'auto';
+      }
+      setLoadingOlderPhase('idle');
     }
   };
-  
+
+  // Fetch newer messages (for infinite scrolling)
+  const fetchNewerMessages = async () => {
+    if (!params.roomId || isLoadingNewer() || hasReachedEnd()) return;
+    
+    try {
+      setIsLoadingNewer(true);
+      
+      const newestMessageId = cache.getNewestMessageId(params.roomId);
+      if (!newestMessageId) {
+        setHasReachedEnd(true);
+        return;
+      }
+      
+      // Use the 'after' parameter without any specific ordering
+      const response = await fetch(`${BASE_URL}/rooms/${params.roomId}/messages?after=${newestMessageId}`, {
+        headers: {
+          "X-Session-Token": localStorage.getItem('sc_token') || ""
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch newer messages: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Check if the response contains messages directly or in a nested structure
+      const messages = Array.isArray(data) ? data : 
+                      data.messages ? data.messages : 
+                      data.success && data.messages ? data.messages : [];
+      
+      if (messages.length > 0) {
+        // Add newer messages to cache
+        cache.setMessages(params.roomId, messages, 'newer');
+        setMessages(processMessages(cache.getMessages(params.roomId)));
+        newerMessagesFetchCount.current++;
+      } else {
+        setHasReachedEnd(true);
+      }
+    } catch (err) {
+      console.error("Error fetching newer messages:", err);
+    } finally {
+      setIsLoadingNewer(false);
+    }
+  };
+
+  // Fetch initial messages for a room
+  const fetchInitialMessages = async (roomId: string) => {
+    if (!roomId) return;
+    
+    try {
+      setLoading(true);
+      setError("");
+      
+      const response = await fetch(`${BASE_URL}/rooms/${roomId}/messages`, {
+        headers: {
+          "X-Session-Token": localStorage.getItem('sc_token') || ""
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch messages: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Check if the response contains messages directly or in a nested structure
+      const messages = Array.isArray(data) ? data : 
+                      data.messages ? data.messages : 
+                      data.success && data.messages ? data.messages : [];
+      
+      // Always set loading to false, even for empty rooms
+      setLoading(false);
+      
+      if (messages.length > 0) {
+        // Add messages to cache
+        cache.setMessages(roomId, messages, 'replace');
+        setMessages(processMessages(messages));
+      } else {
+        console.log("No messages found or empty response:", data);
+        // Don't set an error for empty messages, just show an empty chat
+        setMessages([]);
+      }
+    } catch (err) {
+      console.error("Error fetching messages:", err);
+      setError("Failed to load messages. Please try again.");
+      setLoading(false);
+    } finally {
+      // After initial load, scroll to bottom
+      setTimeout(() => {
+        scrollToBottom();
+      }, 100);
+    }
+  };
+
+  // Function to scroll to the bottom of the messages container
+  const scrollToBottom = () => {
+    if (!chatContainerRef) return;
+    
+    // Use a sequence of requestAnimationFrame calls to ensure DOM is fully rendered
+    requestAnimationFrame(() => {
+      // First attempt
+      chatContainerRef.scrollTo({
+        top: chatContainerRef.scrollHeight,
+        behavior: 'auto' // Use 'auto' instead of 'smooth' to prevent visual glitches
+      });
+      
+      // Second attempt after a short delay to catch any post-render layout shifts
+      setTimeout(() => {
+        requestAnimationFrame(() => {
+          chatContainerRef.scrollTo({
+            top: chatContainerRef.scrollHeight,
+            behavior: 'auto'
+          });
+        });
+      }, 50);
+      
+      // Final attempt after DOM has fully settled
+      setTimeout(() => {
+        requestAnimationFrame(() => {
+          chatContainerRef.scrollTo({
+            top: chatContainerRef.scrollHeight,
+            behavior: 'auto'
+          });
+        });
+      }, 150);
+    });
+  };
+
+  // Handle scrolling in the messages container
+  const handleScroll = (e: Event) => {
+    if (!chatContainerRef) return;
+    
+    const target = e.target as HTMLDivElement;
+    const { scrollTop, scrollHeight, clientHeight } = target;
+    
+    // Determine if we're at the bottom of the chat
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 20;
+    
+    // Update auto-scroll behavior based on position
+    setShouldScrollToBottom(isAtBottom);
+    
+    // Update scrolled up state
+    setHasScrolledUp(!isAtBottom);
+    
+    // Load older messages when near the top
+    if (scrollTop < 200 && loadingOlderPhase() === 'idle' && !hasReachedBeginning()) {
+      fetchOlderMessages();
+    }
+    
+    // Load newer messages when near the bottom
+    if (isAtBottom && !isLoadingNewer() && !hasReachedEnd() && hasScrolledUp()) {
+      fetchNewerMessages();
+    }
+    
+    // Update previous scroll state
+    previouslyScrolledUp.current = hasScrolledUp();
+  };
+
+  // Check if we're on mobile
+  // Reference to the messages container for auto-scrolling
+  let chatContainerRef: HTMLDivElement | undefined;
+
+  // Reference to the chat input element
+  let chatInputRef: HTMLDivElement | undefined;
+
+  // Function to handle message reply
+  const handleReply = (messageId: string) => {
+    if (messageId) {
+      setReplyingTo((prev) => {
+        if (prev.includes(messageId)) {
+          return prev.filter((id) => id !== messageId);
+        } else {
+          return [...prev, messageId];
+        }
+      });
+    }
+  };
+
+  // Function to handle message edit
+  const handleEdit = (message: CachedMessage) => {
+    if (message.id) {
+      setEditingMessageId(message.id);
+      setEditingRoomId(params.roomId);
+      setMessageText(message.content || "");
+    }
+  };
+
+  // Function to handle message delete
+  const handleDelete = (messageId: string) => {
+    if (messageId) {
+      // Call the API to delete the message
+      cache.deleteMessage(params.roomId, messageId);
+    }
+  };
+
+  // Handle edit message event from Message component
+  createEffect(() => {
+    const handleEditMessage = (event: CustomEvent) => {
+      const { messageId, roomId } = event.detail;
+      setEditingMessageId(messageId);
+      setEditingRoomId(roomId);
+    };
+
+    window.addEventListener("edit-message", handleEditMessage as EventListener);
+    onCleanup(() => {
+      window.removeEventListener("edit-message", handleEditMessage as EventListener);
+    });
+  });
+
+  // Handle reply to message event from Message component
+  createEffect(() => {
+    const handleReplyToMessage = (event: CustomEvent) => {
+      const { messageId } = event.detail;
+      handleReply(messageId);
+    };
+
+    window.addEventListener("reply-to-message", handleReplyToMessage as EventListener);
+    onCleanup(() => {
+      window.removeEventListener("reply-to-message", handleReplyToMessage as EventListener);
+    });
+  });
+
+  // Handle typing indicator events
+  createEffect(() => {
+    const handleTypingIndicator = (event: CustomEvent) => {
+      const { roomId, userId } = event.detail;
+      const currentRoomId = params.roomId;
+      
+      // Only process typing indicators for the current room
+      if (roomId !== currentRoomId) return;
+      
+      // Don't show typing indicators for the current user
+      const currentUserId = user()?.id;
+      if (userId === currentUserId) return;
+      
+      // Add or update the typing user
+      setTypingUsers(prev => {
+        // Remove this user if they're already in the list
+        const filtered = prev.filter(u => u.id !== userId);
+        
+        // Add the user with the current timestamp
+        return [...filtered, { id: userId, timestamp: Date.now() }];
+      });
+      
+      // Remove typing indicator after 6 seconds of inactivity
+      setTimeout(() => {
+        setTypingUsers(prev => prev.filter(u => 
+          !(u.id === userId && Date.now() - u.timestamp > 6000)
+        ));
+      }, 6000);
+    };
+
+    window.addEventListener('typingIndicator', handleTypingIndicator as EventListener);
+
+    onCleanup(() => {
+      window.removeEventListener('typingIndicator', handleTypingIndicator as EventListener);
+    });
+  });
+
+  // Set up MutationObserver to monitor chat input content changes
+  createEffect(() => {
+    if (!chatInputRef) return;
+    
+    // Create a MutationObserver to watch for content changes
+    const observer = new MutationObserver((_mutations) => {
+      // Configure observer to watch for text and node changes
+      observer.observe(chatInputRef, {
+        childList: true,
+        subtree: true,
+        characterData: true
+      });
+      
+      // Force reflow and empty check
+      chatInputRef?.offsetHeight;
+      const isEmpty = !chatInputRef?.textContent || chatInputRef.textContent.trim() === "";
+      chatInputRef.classList.toggle('empty', isEmpty);
+      setMessageText(chatInputRef.textContent || "");
+    });
+    
+    // Start observing the chat input for changes
+    observer.observe(chatInputRef, { 
+      childList: true,
+      characterData: true,
+      subtree: true 
+    });
+    
+    // Clean up the observer when component is unmounted
+    onCleanup(() => {
+      observer.disconnect();
+    });
+  });
+
+  // Handle sending a message
   const handleSendMessage = async (inputElement: HTMLDivElement) => {
     // If we're in editing mode, handle edit instead
     if (editingMessageId() && editingRoomId()) {
@@ -613,7 +1008,7 @@ const ChatArea: Component = () => {
       // Clear unread messages for this room when user sends a message
       // This is the user interaction that should clear the unread state
       if (room.id && currentRoomUnreadMessages().length > 0) {
-        setUnreadMessages((prev: { [roomId: string]: string[] }) => {
+        setUnreadMessages((prev) => {
           const newState = { ...prev };
           delete newState[room.id];
           return newState;
@@ -679,15 +1074,6 @@ const ChatArea: Component = () => {
             message: confirmedMessage
           }
         }));
-        
-        // Dispatch messageCreate event to update the PM list
-        // This ensures the room list is updated when sending messages
-        window.dispatchEvent(new CustomEvent("messageCreate", {
-          detail: {
-            roomId: room.id,
-            message: confirmedMessage
-          }
-        }));
       } else {
         // Mark message as failed and show error
         const errorMessage = result.error || t("chat.errors.sendFailed");
@@ -716,21 +1102,114 @@ const ChatArea: Component = () => {
     }
   };
 
+  const handleEditMessage = async (inputElement: HTMLDivElement) => {
+    const content = messageText().trim();
+    const messageId = editingMessageId();
+    const roomId = editingRoomId();
+    
+    // Clear any previous errors
+    setError("");
+    
+    // Validate message content
+    if (!content) return;
+    
+    // Validate message ID and room ID
+    if (!messageId || !roomId) {
+      setError(t("chat.errors.invalidEdit"));
+      return;
+    }
+    
+    try {
+      setSending(true);
+      
+      const result = await editMessage(roomId, messageId, content);
+      
+      if (!result.success) {
+        setError(result.error || t("chat.errors.editFailed"));
+      } else {
+        // Clear input field immediately for better UX
+        inputElement.textContent = "";
+        setMessageText("");
+        
+        // Clear editing state
+        setEditingMessageId(null);
+        setEditingRoomId(null);
+      }
+    } catch (err) {
+      console.error("Error editing message:", err);
+      setError(t("chat.errors.editFailed"));
+    } finally {
+      setSending(false);
+    }
+  };
+  
+  const handleSendOrEdit = () => {
+    if (!chatInputRef) return;
+    
+    if (editingMessageId() && editingRoomId()) {
+      handleEditMessage(chatInputRef);
+    } else {
+      handleSendMessage(chatInputRef);
+    }
+  };
+
   return (
     <div class="flex h-full w-full bg-[var(--background2)]">
       <div class="flex-1 flex flex-col h-full">
         {/* Messages container */}
         <div 
-          class="flex-1 overflow-y-auto flex flex-col py-4 scroll-smooth overflow-x-hidden w-full max-w-full"
-          ref={messagesContainerRef}
+          class="flex-1 overflow-y-auto flex flex-col py-4 scroll-smooth overflow-x-hidden w-full max-w-full relative"
+          ref={chatContainerRef}
           style={{ "scroll-behavior": "auto" }}
+          onScroll={handleScroll}
         >
-          <Show when={loading()} >
+          {/* Loading overlay to prevent visual glitches */}
+          <Show when={loadingOlderPhase() !== 'idle'}>
+            <div 
+              class="absolute inset-0 z-50" 
+              style={{
+                "pointer-events": loadingOlderPhase() === 'positioning' ? "auto" : "none",
+                "background-color": "transparent"
+              }}
+            >
+              <Show when={loadingOlderPhase() === 'loading'}>
+                <div class="flex justify-center items-start pt-4">
+                  <div class="bg-surface py-1 px-3 rounded-full flex items-center shadow-md">
+                    <div class="animate-pulse rounded-full h-4 w-4 bg-primary mr-2"></div>
+                    <div class="text-text-secondary text-sm">Loading...</div>
+                  </div>
+                </div>
+              </Show>
+            </div>
+          </Show>
+          {/* Chat beginning header */}
+          <Show when={hasReachedBeginning() || (!loading() && messages().length === 0)}>
+            <div class="flex flex-col items-center justify-center p-4 mb-4 bg-surface rounded-md mx-4 chat-beginning-header">
+              <h3 class="text-xl font-semibold text-text-primary mb-1">
+                {t("chat.beginningOf")} {currentRoom()?.name || t("chat.conversation")}
+              </h3>
+              <p class="text-text-secondary text-sm">
+                {t("chat.beginningOfDescription")}
+              </p>
+            </div>
+          </Show>
+
+          {/* Loading indicator for older messages */}
+          <Show when={loadingOlderPhase() === 'loading'}>
+            <div class="flex justify-center py-2">
+              <div class="animate-pulse rounded-full h-6 w-6 border-b-2 border-text-primary"></div>
+              <div class="ml-2 text-text-secondary">Loading older messages...</div>
+            </div>
+          </Show>
+          
+          {/* Messages */}
+          <Show when={loading()}>
             <div class="flex-1 flex flex-col items-center justify-center text-text-secondary select-none">
               <div class="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
               <p class="text-sm">Loading messages...</p>
             </div>
           </Show>
+          
           <Show when={!loading()}>
             <div class="flex-1 flex flex-col justify-end">
               <Show when={showUnreadHeader()}>
@@ -740,6 +1219,9 @@ const ChatArea: Component = () => {
                 <div class="flex flex-col items-center justify-center text-text-secondary select-none py-8">
                   <div class="w-20 h-20 mb-5 bg-primary bg-opacity-10 rounded-full flex items-center justify-center">
                     {/* Robot icon */}
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                    </svg>
                   </div>
                   <h2 class="text-lg font-medium mb-2 text-text-primary select-none">
                     {getRoomName()}
@@ -766,20 +1248,24 @@ const ChatArea: Component = () => {
                           return (
                             <>
                               {isFirstUnread(message) && <UnreadDivider />}
-                              <Message
-                                id={message.id}
-                                content={message.content}
-                                author_id={message.author_id}
-                                created_at={message.created_at}
-                                edited_at={message.edited_at}
-                                nonce={message.nonce}
-                                pending={message.pending}
-                                error={message.error}
-                                isCompact={isCompact}
-                                message_references={message.message_references}
-                                room_id={params.roomId}
-                                onReply={handleReply}
-                              />
+                              <div class="message-container" data-message-id={message.id || message.nonce || ""}>
+                                <Message
+                                  id={message.id}
+                                  content={message.content}
+                                  author_id={message.author_id}
+                                  created_at={message.created_at}
+                                  edited_at={message.edited_at}
+                                  nonce={message.nonce}
+                                  pending={message.pending}
+                                  error={message.error}
+                                  isCompact={isCompact}
+                                  message_references={message.message_references}
+                                  room_id={params.roomId}
+                                  onReply={handleReply}
+                                  onEdit={() => handleEdit(message)}
+                                  onDelete={() => message.id ? handleDelete(message.id) : undefined}
+                                />
+                              </div>
                             </>
                           );
                         }}
@@ -791,7 +1277,6 @@ const ChatArea: Component = () => {
             </div>
           </Show>
         </div>
-
         {/* Message input area */}
         <div class="px-4 pb-4 relative" style={!isMobile() ? "margin-bottom: 24px;" : ""}>
           <Show when={error()}>
@@ -999,20 +1484,21 @@ const ChatArea: Component = () => {
                     
                     // Insert a new line at cursor position
                     const selection = window.getSelection();
-                    if (selection && selection.rangeCount > 0) {
+                    const chatInput = e.currentTarget;
+                    if (selection && selection.rangeCount > 0 && chatInput.contains(selection.anchorNode)) {
+                      // If selection is within the chat input
                       const range = selection.getRangeAt(0);
                       const newLine = document.createTextNode("\n");
                       range.insertNode(newLine);
                       
                       // Move cursor after the inserted newline
-                      range.setStartAfter(newLine);
-                      range.setEndAfter(newLine);
+                      range.collapse(false);
                       selection.removeAllRanges();
                       selection.addRange(range);
                       
                       // Trigger input event to update state
                       const inputEvent = new Event('input', { bubbles: true });
-                      e.currentTarget.dispatchEvent(inputEvent);
+                      chatInput.dispatchEvent(inputEvent);
                     }
                   } else {
                     // Not in code block, proceed with normal send
@@ -1087,7 +1573,7 @@ const ChatArea: Component = () => {
                     </svg>
                   }>
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                      <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
+                      <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
                     </svg>
                   </Show>
                 </button>
@@ -1128,6 +1614,9 @@ const ChatArea: Component = () => {
                     range.collapse(false);
                     sel?.removeAllRanges();
                     sel?.addRange(range);
+
+                    const inputEvent = new Event('input', { bubbles: true });
+                    chatInput.dispatchEvent(inputEvent);
                   }
                   
                   // Remove empty class if needed

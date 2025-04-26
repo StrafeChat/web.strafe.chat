@@ -10,6 +10,7 @@ import { Avatar } from "../common/Avatar";
 import { RoomType } from "../../types/roomTypes";
 import ChatArea from "./ChatArea";
 import { Tooltip } from "../common/Tooltip";
+import UserPopupMenu from "../common/UserPopupMenu";
 
 const RoomView: Component = () => {
   const params = useParams();
@@ -223,6 +224,7 @@ const RoomView: Component = () => {
             discriminator: cachedUser.discriminator,
             display_name: cachedUser.display_name,
             avatar: cachedUser.avatar,
+            banner: cachedUser.banner,
             presence: cachedUser.presence
           });
         } else {
@@ -260,6 +262,7 @@ const RoomView: Component = () => {
             discriminator: cachedUser.discriminator,
             display_name: cachedUser.display_name,
             avatar: cachedUser.avatar,
+            banner: cachedUser.banner,
             presence: cachedUser.presence
           });
         }
@@ -280,6 +283,19 @@ const RoomView: Component = () => {
   // State to control the visibility of the members sidebar
   // Default to true for desktop, false for mobile
   const [showMembers, setShowMembers] = createSignal(!isMobile());
+
+  // Add state for user popup menu for members
+  const [userPopupOpen, setUserPopupOpen] = createSignal(false);
+  const [userPopupTrigger, setUserPopupTrigger] = createSignal<HTMLElement | undefined>();
+  const [selectedUserId, setSelectedUserId] = createSignal<string | null>(null);
+
+  // Handler for clicking a member in the sidebar
+  const handleMemberClick = (e: MouseEvent, id: string) => {
+    console.log('Clicked member:', id, roomMembers().find(member => member.id === id)?.username);
+    setSelectedUserId(id);
+    setUserPopupTrigger(e.currentTarget as HTMLElement);
+    setUserPopupOpen(true);
+  };
 
   return (
     <div class="h-full w-full flex flex-col bg-background2">
@@ -387,7 +403,15 @@ const RoomView: Component = () => {
             <div class="p-2">
               <For each={roomMembers()}>
                 {(member) => (
-                  <div class="flex items-center gap-2 p-2 rounded-md hover:bg-surface hover:bg-opacity-10 transition-colors">
+                  <div
+                    class="flex items-center gap-2 p-2 rounded-md hover:bg-surface hover:bg-opacity-10 transition-colors cursor-pointer"
+                    onClick={(e) => {
+                      console.log('Clicked member:', member.id, member.username);
+                      setSelectedUserId(member.id);
+                      setUserPopupTrigger(e.currentTarget as HTMLElement);
+                      setUserPopupOpen(true);
+                    }}
+                  >
                     <div class="relative flex-shrink-0">
                       <div class="w-8 h-8 rounded-full overflow-hidden">
                         <Avatar
@@ -415,6 +439,13 @@ const RoomView: Component = () => {
                   </div>
                 )}
               </For>
+              <UserPopupMenu
+                isOpen={userPopupOpen()}
+                onClose={() => setUserPopupOpen(false)}
+                triggerRef={userPopupTrigger()}
+                userId={selectedUserId() || ""}
+                placement={userPopupTrigger()?.closest('.room-member-list') ? "left" : "right"}
+              />
             </div>
           </div>
         </Show>

@@ -9,18 +9,12 @@ import es from "./locales/list/es-es.json";
 import fr from "./locales/list/fr-fr.json";
 import ar from "./locales/list/ar-sa.json";
 import { ParentProps, createEffect, lazy } from "solid-js";
-import Login from "./components/auth/Login";
-import Register from "./components/auth/Register";
 import { Interface } from "./components/shared/Interface";
-import { Home } from "./components/home/Home";
-import { Friends } from "./components/home/friends/Friends";
-import { Notes } from "./components/home/notes/Notes";
 import { getDirection } from "./lib/utils/direction";
 import { applyCustomStyles } from "./lib/utils/customStyles";
 import { ToastProvider } from "./components/common/Toast";
 import { SettingsProvider } from "./lib/providers/settings/SettingsProvider";
 import { UserSettingsProvider } from "./lib/providers/userSettings/UserSettingsProvider";
-import RoomView from "./components/chat/RoomView";
 import { ModalProvider } from "./lib/providers/modal/ModalProvider";
 import LinkConfirmationHandler from "./components/LinkConfirmationHandler";
 
@@ -72,22 +66,20 @@ const MountApp = (props: ParentProps) => {
 };
 
 const App = () => {
-  // We're using the LinkConfirmationHandler component
-  // which handles all link clicks in the application
 
   return (
     <MountApp>
       <Router>
-        <Route path="/login" component={Login} />
-        <Route path="/register" component={Register} />
+        <Route path="/login" component={lazy(() => import('./components/auth/Login'))} />
+        <Route path="/register" component={lazy(() => import('./components/auth/Register'))} />
         <Route path="/password-reset" component={lazy(() => import('./components/auth/PasswordReset'))} />
         <Route path="/password-reset/verify" component={lazy(() => import('./components/auth/PasswordResetVerify'))} />
         <Route path="/password-reset/complete" component={lazy(() => import('./components/auth/PasswordResetComplete'))} />
         <Route path="/" component={Interface as never}>
-          <Route path="/" component={Home} />
-          <Route path="/friends" component={Friends} />
-          <Route path="/notes" component={Notes} />
-          <Route path="/rooms/:roomId" component={RoomView} />
+          <Route path="/" component={lazy(() => import('./components/home/Home'))} />
+          <Route path="/friends" component={lazy(() => import('./components/home/friends/Friends'))} />
+          <Route path="/notes" component={lazy(() => import('./components/home/notes/Notes'))} />
+          <Route path="/rooms/:roomId" component={lazy(() => import('./components/chat/RoomView'))} />
         </Route>
       </Router>
     </MountApp>

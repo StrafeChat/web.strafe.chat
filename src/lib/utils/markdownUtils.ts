@@ -109,6 +109,20 @@ const processUnderlines = (text: string): string => {
 };
 
 /**
+ * Escapes HTML tags in text to display them as plain text
+ * @param text The text to escape HTML in
+ * @returns Text with HTML tags escaped
+ */
+const escapeHtml = (text: string): string => {
+  return text
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+};
+
+/**
  * Process emojis in text and wrap them in appropriate spans for styling
  * @param text The text to process
  * @returns Text with emojis wrapped in spans
@@ -142,8 +156,11 @@ const processEmojisForMarkdown = (text: string): string => {
 export const parseMarkdown = (text: string): string => {
   if (!text) return '';
   
-  // Process Discord-style underlines first
-  let processedText = processUnderlines(text);
+  // Escape HTML tags first to display them as plain text
+  let processedText = escapeHtml(text);
+  
+  // Process Discord-style underlines
+  processedText = processUnderlines(processedText);
   
   // Process emojis next
   processedText = processEmojisForMarkdown(processedText);

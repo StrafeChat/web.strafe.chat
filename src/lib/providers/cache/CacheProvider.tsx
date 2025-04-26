@@ -19,6 +19,7 @@ export type User = {
   display_name?: string;
   avatar?: string;
   banner?: string;
+  badges?: string[];
   bot?: boolean;
   system?: boolean;
   bio?: string;
@@ -36,10 +37,15 @@ type CacheContextType = {
   setUsers: (usersData: Record<string, any>) => void;
   getMessages: (roomId: string) => CachedMessage[];
   getMessage: (roomId: string, messageId: string) => CachedMessage | undefined;
-  setMessages: (roomId: string, messages: CachedMessage[]) => void;
+  setMessages: (roomId: string, messages: CachedMessage[], position?: 'newer' | 'older' | 'replace') => void;
   addMessage: (roomId: string, message: CachedMessage) => void;
   updateMessage: (roomId: string, messageId: string, updates: Partial<CachedMessage>) => void;
   deleteMessage: (roomId: string, messageId: string) => void;
+  getOldestMessageId: (roomId: string) => string | undefined;
+  getNewestMessageId: (roomId: string) => string | undefined;
+  hasReachedBeginning: (roomId: string) => boolean;
+  hasReachedEnd: (roomId: string) => boolean;
+  resetReachedFlags: (roomId: string) => void;
 };
 
 const CacheContext = createContext<CacheContextType>();
@@ -130,10 +136,12 @@ export const CacheProvider: ParentComponent = (props) => {
             discriminator: userData.Discriminator,
             display_name: userData.DisplayName || userData.Username,
             avatar: userData.Avatar,
-            presence: {
+            banner: userData.Banner,
+            badges: userData.Badges,
+            presence: userData.Presence ? {
               status: userData.Presence.Status,
               custom_status: userData.Presence.CustomStatus,
-            },
+            } : undefined,
           };
         } else {
           console.warn("[CacheProvider] Skipping invalid user data:", userData);
@@ -154,10 +162,15 @@ export const CacheProvider: ParentComponent = (props) => {
     setUsers: setUsersData,
     getMessages: (roomId: string) => messageCache.getMessages(roomId),
     getMessage: (roomId: string, messageId: string) => messageCache.getMessages(roomId).find(m => m.id === messageId || m.nonce === messageId),
-    setMessages: (roomId: string, messages: CachedMessage[]) => messageCache.setMessages(roomId, messages),
+    setMessages: (roomId: string, messages: CachedMessage[], position?: 'newer' | 'older' | 'replace') => messageCache.setMessages(roomId, messages, position),
     addMessage: (roomId: string, message: CachedMessage) => messageCache.addMessage(roomId, message),
     updateMessage: (roomId: string, messageId: string, updates: Partial<CachedMessage>) => messageCache.updateMessage(roomId, messageId, updates),
-    deleteMessage: (roomId: string, messageId: string) => messageCache.deleteMessage(roomId, messageId)
+    deleteMessage: (roomId: string, messageId: string) => messageCache.deleteMessage(roomId, messageId),
+    getOldestMessageId: (roomId: string) => messageCache.getOldestMessageId(roomId),
+    getNewestMessageId: (roomId: string) => messageCache.getNewestMessageId(roomId),
+    hasReachedBeginning: (roomId: string) => messageCache.hasReachedBeginning(roomId),
+    hasReachedEnd: (roomId: string) => messageCache.hasReachedEnd(roomId),
+    resetReachedFlags: (roomId: string) => messageCache.resetReachedFlags(roomId),
   };
 
   return (

@@ -9,6 +9,7 @@ import ConfirmModal from "../modals/ConfirmModal";
 import { Portal } from "solid-js/web";
 import { parseMarkdown } from "../../lib/utils/markdownUtils";
 import { useUserSettings } from "../../lib/providers/userSettings/UserSettingsProvider";
+import UserPopupMenu from "../common/UserPopupMenu";
 
 interface MessageProps {
   id: string | undefined;
@@ -23,6 +24,8 @@ interface MessageProps {
   message_references?: string[];
   room_id?: string;
   onReply?: (messageId: string) => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
 }
 
 const Message: Component<MessageProps> = (props) => {
@@ -313,118 +316,34 @@ const Message: Component<MessageProps> = (props) => {
     return `${date.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} ${time}`;
   };
 
+  // Popup state for user menu
+  const [userPopupOpen, setUserPopupOpen] = createSignal(false);
+  const [userPopupTrigger, setUserPopupTrigger] = createSignal<HTMLElement | undefined>();
+
+  // Handler for clicking the author name/avatar (now inline, not extra row)
+  const handleAuthorClick = (e: MouseEvent) => {
+    setUserPopupTrigger(e.currentTarget as HTMLElement);
+    setUserPopupOpen(true);
+  };
+
   return (
     <>
       <div class={`flex flex-col ${shouldShowCompact ? 'mt-1' : 'mt-5'} group hover:bg-surface hover:bg-opacity-10 transition-colors px-4 w-full relative`}>
-        <div class="absolute right-3 top-0 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity bg-background1 rounded-lg shadow-lg z-10 flex">
-          <Tooltip position="top" content="Reply">
-            <button
-              onClick={handleReply}
-              class="p-2 rounded hover:bg-surface hover:bg-opacity-20 text-text-secondary hover:text-text-primary transition-colors"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path fill-rule="evenodd" d="M7.707 3.293a1 1 0 010 1.414L5.414 7H11a7 7 0 017 7v2a1 1 0 11-2 0v-2a5 5 0 00-5-5H5.414l2.293 2.293a1 1 0 11-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clip-rule="evenodd" />
-              </svg>
-            </button>
-          </Tooltip>
-          
-          <Show when={canEdit() && !isEditing() && !isDeleting()}>
-            <Tooltip position="top" content="Edit">
-              <button
-                onClick={handleEdit}
-                class="p-2 rounded hover:bg-surface hover:bg-opacity-20 text-text-secondary hover:text-text-primary transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
-                </svg>
-              </button>
-            </Tooltip>
-          </Show>
-          
-          <Show when={canDelete() && !isDeleting() && !isEditing()}>
-            <Tooltip position="top" content="Delete">
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                class="p-2 rounded hover:bg-surface hover:bg-opacity-20 text-text-secondary hover:text-red-500 transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
-                </svg>
-              </button>
-            </Tooltip>
-          </Show>
-          
-          <Show when={isEditing()}>
-            <Tooltip position="top" content="Save">
-              <button
-                onClick={handleEdit}
-                class="p-2 rounded hover:bg-surface hover:bg-opacity-20 text-text-secondary hover:text-green-500 transition-colors"
-                disabled={isEditLoading()}
-              >
-                <Show when={!isEditLoading()}>
-                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fill-rule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clip-rule="evenodd" />
-                  </svg>
-                </Show>
-                <Show when={isEditLoading()}>
-                  <div class="h-5 w-5 border-2 border-t-transparent border-primary rounded-full animate-spin"></div>
-                </Show>
-              </button>
-            </Tooltip>
-            
-            <Tooltip position="top" content="Cancel">
-              <button
-                onClick={handleCancelEdit}
-                class="p-2 rounded hover:bg-surface hover:bg-opacity-20 text-text-secondary hover:text-red-500 transition-colors"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
-                </svg>
-              </button>
-            </Tooltip>
-          </Show>
-          
-          <Show when={isDeleting()}>
-            <div class="p-2 rounded text-text-secondary">
-              <div class="h-5 w-5 border-2 border-t-transparent border-primary rounded-full animate-spin"></div>
-            </div>
-          </Show>
-        </div>
-        <Show when={props.message_references && props.message_references.length > 0}>
-          <div class="relative">
-            <For each={referencedMessages()}>
-              {(ref) => (
-                <div 
-                  class="flex items-center gap-2 py-1 px-2 cursor-pointer transition-colors relative hover:bg-surface hover:bg-opacity-10"
-                  onClick={() => scrollToMessage(ref.id)}
-                >
-                  {/* Bent reply line with proper alignment */}
-                  <div class="absolute left-4 top-0 w-[2px] h-[calc(100%)] bg-surface opacity-50"></div>
-                  <div class="absolute left-4 top-[50%] w-[8px] h-[2px] bg-surface opacity-50"></div>
-                                  
-                  <div class="flex-shrink-0 ml-12">
-                    <img
-                      src={`${FS_URL}/avatars/${ref.author_id}/${ref.avatar || "favicon.ico"}`}
-                      alt="Referenced user avatar"
-                      class="w-4 h-4 rounded-full"
-                    />
-                  </div>
-                  <div class="flex items-center gap-1 ml-[-4px] flex-1 min-w-0 overflow-hidden">
-                    <span class="font-medium text-xs flex-shrink-0">{ref.author}</span>
-                    <span class="text-text-secondary text-xs truncate max-w-[200px]">{ref.content || "[Message unavailable]"}</span>
-                  </div>
-                </div>
-              )}
-            </For>
-          </div>
-        </Show>
+        {/* User popup menu (kept here, but trigger is inline) */}
+        <UserPopupMenu
+          isOpen={userPopupOpen()}
+          onClose={() => setUserPopupOpen(false)}
+          triggerRef={userPopupTrigger()}
+          userId={props.author_id}
+        />
         <div class="flex gap-3 w-full overflow-hidden ${props.pending && !props.id ? 'opacity-70' : ''}" id={`message-${props.id}`}>
           <Show when={!shouldShowCompact}>
             <div class="flex-shrink-0 mt-1">
               <img
                 src={`${FS_URL}/avatars/${props.author_id}/${author()?.avatar || "favicon.ico"}`}
                 alt="Avatar"
-                class="w-10 h-10 rounded-full"
+                class="w-10 h-10 rounded-full cursor-pointer hover:ring-2 hover:ring-primary"
+                onClick={handleAuthorClick}
               />
             </div>
           </Show>
@@ -439,7 +358,10 @@ const Message: Component<MessageProps> = (props) => {
             <Show when={!shouldShowCompact}>
               <div class="flex items-center gap-2 overflow-hidden">
                 <div class="flex items-baseline gap-2 overflow-hidden">
-                  <span class="font-medium text-text-primary truncate">
+                  <span
+                    class="font-medium text-text-primary truncate cursor-pointer hover:underline"
+                    onClick={handleAuthorClick}
+                  >
                     {author()?.display_name || author()?.username || "Unknown User"}
                   </span>
                   <span class="text-xs text-text-secondary whitespace-nowrap flex-shrink-0">

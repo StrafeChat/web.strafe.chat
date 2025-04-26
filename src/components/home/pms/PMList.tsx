@@ -16,12 +16,11 @@ import DefaultGroupPM from "../../shared/icons/DefaultGroupPM";
 import { capitalizeStatus } from "../../../lib/utils/status";
 import { CreatePMModal } from "../../modals/CreatePMModal";
 import { RoomType } from "../../../types/roomTypes";
-import { FS_URL } from "../../../constants";
 import { Portal } from "solid-js/web";
-import { Avatar } from "../../common/Avatar"
+import { Avatar } from "../../common/Avatar";
 
-export const PMList: Component = () => {
-  const { relationshipRequests, user, rooms } = useAuth();
+export const PMList: Component = () => {              
+  const { user, rooms, setRooms, relationshipRequests } = useAuth();
   const cache = useCache();
   const [t] = useTransContext();
   const [showSettings, setShowSettings] = createSignal(false);
@@ -34,11 +33,11 @@ export const PMList: Component = () => {
 
   const pendingCount = createMemo(() => {
     const currentUser = user();
-    const currentRelationships = relationshipRequests();
-    if (!currentUser?.id || !currentRelationships) return 0;
+    const requests = relationshipRequests();
+    if (!currentUser?.id) return 0;
 
-    return currentRelationships.filter(
-      (rel) => rel.recipient_id === currentUser.id,
+    return requests.filter(
+      (rel: { recipient_id: string }) => rel.recipient_id === currentUser.id,
     ).length;
   });
 
@@ -105,7 +104,6 @@ export const PMList: Component = () => {
       
       // Update the rooms signal with the new array
       // This will trigger the directMessages memo to recalculate
-      const { setRooms } = useAuth();
       setRooms(updatedRooms);
       
       // Force a re-render by logging (helps with debugging)
@@ -189,34 +187,6 @@ export const PMList: Component = () => {
     return "Unknown Chat";
   };
 
-  // Helper function to get room avatar
-  const getRoomAvatar = (room: any) => {
-    // If room has an icon, use it (for group PMs)
-    if (room.icon) return `${FS_URL}/icons/${room.id}/${room.icon}`;
-    
-    // For group PMs without an icon, use our custom SVG icon component
-    if (room.type === RoomType.GROUP_PM) {
-      return null; // Return null to indicate we'll use the DefaultGroupPM component
-    }
-    
-    // For PMs, use the other user's avatar
-    if (room.recipients_data && room.recipients_data.length > 0) {
-      const currentUserId = user()?.id;
-      // Find the recipient that isn't the current user
-      const recipient = room.recipients_data.find((r: { id: string | undefined; }) => r.id !== currentUserId);
-      if (recipient) {
-        return `${FS_URL}/avatars/${recipient.id}/${recipient.avatar || "default.webp"}`;
-      }
-      // Fallback to first recipient if we can't find a non-current user
-      const firstRecipient = room.recipients_data[0];
-      return `${FS_URL}/avatars/${firstRecipient.id}/${firstRecipient.avatar || "default.webp"}`;
-    }
-    
-    // Use userId/default.webp instead of default/favicon.ico
-    const currentUserId = user()?.id || "default";
-    return `${FS_URL}/avatars/${currentUserId}/default.webp`;
-  };
-
   // Helper function to get room status (for PMs)
   const getRoomStatus = (room: any) => {
     // Only show status indicators for direct PMs (type 0), not group PMs (type 1)
@@ -277,6 +247,37 @@ export const PMList: Component = () => {
     }
     return "";
   };
+
+  // Helper function to get room avatar
+  // Commented out as it's not currently used but may be needed in the future
+  /*
+  const getRoomAvatar = (room: any) => {
+    // If room has an icon, use it (for group PMs)
+    if (room.icon) return `${BASE_URL}/icons/${room.id}/${room.icon}`;
+    
+    // For group PMs without an icon, use our custom SVG icon component
+    if (room.type === RoomType.GROUP_PM) {
+      return null; // Return null to indicate we'll use the DefaultGroupPM component
+    }
+    
+    // For PMs, use the other user's avatar
+    if (room.recipients_data && room.recipients_data.length > 0) {
+      const currentUserId = user()?.id;
+      // Find the recipient that isn't the current user
+      const recipient = room.recipients_data.find((r: { id: string | undefined; }) => r.id !== currentUserId);
+      if (recipient) {
+        return `${BASE_URL}/avatars/${recipient.id}/${recipient.avatar || "default.webp"}`;
+      }
+      // Fallback to first recipient if we can't find a non-current user
+      const firstRecipient = room.recipients_data[0];
+      return `${BASE_URL}/avatars/${firstRecipient.id}/${firstRecipient.avatar || "default.webp"}`;
+    }
+    
+    // Use userId/default.webp instead of default/favicon.ico
+    const currentUserId = user()?.id || "default";
+    return `${BASE_URL}/avatars/${currentUserId}/default.webp`;
+  };
+  */
 
   return (
     <div class="flex flex-col h-full bg-background1 rounded-tl-2xl overflow-hidden">
