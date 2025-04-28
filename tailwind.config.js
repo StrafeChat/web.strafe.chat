@@ -53,21 +53,9 @@ module.exports = {
           "20%,50%": { opacity: "0" },
         },
         "draw-checkmark": {
-        "0%": {
-          strokeDashoffset: "24", 
-          transform: "scale(1.1)", 
-          opacity: 0
-        },
-        "50%": {
-          strokeDashoffset: "12", 
-          transform: "scale(1.05)", 
-          opacity: 1
-        },
-        "100%": {
-          strokeDashoffset: "0", 
-          transform: "scale(1)", 
-          opacity: 1
-        },
+          "0%": { strokeDashoffset: "24" },
+          "60%": { strokeDashoffset: "0" },
+          "100%": { strokeDashoffset: "0" },
         },
         fadein: {
           "0%": { opacity: "0" },

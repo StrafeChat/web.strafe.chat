@@ -17,7 +17,6 @@ export const AnimatedCheckbox: Component<AnimatedCheckboxProps> = (props) => {
     if (props.checked !== state.checked) {
       setState({ checked: props.checked, animating: true });
       
-
       setTimeout(() => {
         setState({ animating: false });
       }, 850);
@@ -40,12 +39,10 @@ export const AnimatedCheckbox: Component<AnimatedCheckboxProps> = (props) => {
       class={`relative w-6 h-6 cursor-pointer ${props.class || ""}`}
       onClick={handleClick}
     >
-      {/* Circle background */}
       <div
         class={`w-full h-full rounded-full transition-all duration-300 ${state.checked ? "bg-green-500 scale-[1.05]" : "bg-background border-2 border-border hover:border-green-500/50 hover:scale-[1.02]"}`}
       ></div>
       
-      {/* Checkmark */}
       <svg
         class={`absolute inset-0 w-full h-full p-1 transition-opacity duration-300 ${state.checked ? "opacity-100" : "opacity-0"}`}
         viewBox="0 0 24 24"
@@ -59,7 +56,7 @@ export const AnimatedCheckbox: Component<AnimatedCheckboxProps> = (props) => {
           stroke-linecap="round"
           stroke-linejoin="round"
           stroke-dasharray="24"
-          stroke-dashoffset={state.animating && state.checked ? "0" : "24"}
+          stroke-dashoffset={state.animating && state.checked ? "0" : state.checked ? "0" : "24"}
           class={state.animating && state.checked ? "animate-draw-checkmark" : ""}
         />
       </svg>
