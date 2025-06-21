@@ -1,4 +1,4 @@
-import { Component, createSignal, Show } from "solid-js";
+import { Component, createSignal, Show, createEffect } from "solid-js";
 import { useAuth } from "../../../lib/providers/auth/AuthProvider";
 import { useTransContext } from "@mbarzda/solid-i18next";
 import { Avatar } from "../../common/Avatar";
@@ -10,8 +10,40 @@ const ProfileSettings: Component = () => {
   const [t] = useTransContext();
   const [uploading, setUploading] = createSignal(false);
   const [uploadingBanner, setUploadingBanner] = createSignal(false);
+  const [bio, setBio] = createSignal("");
+  const [originalBio, setOriginalBio] = createSignal("");
 
   const { showToast } = useToast();
+
+  createEffect(() => {
+    if (user()?.bio) {
+      setBio(user()?.bio);
+      setOriginalBio(user()?.bio);
+    }
+  });
+
+  const handleBioSave = async () => {
+    try {
+      const res = await fetch(`${BASE_URL}/users/@me/bio`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Session-Token": `${localStorage.getItem("sc_token")}`,
+        },
+        body: JSON.stringify({ bio: bio() }),
+      });
+
+      if (!res.ok) throw new Error("Failed to update bio");
+
+      const updatedUser = await res.json();
+      updateUser(updatedUser);
+      setOriginalBio(bio());
+      showToast(t("settings.profile.bio.success"), "success");
+    } catch (error) {
+      console.error("Bio update error:", error);
+      showToast(t("settings.profile.bio.error"), "error");
+    }
+  };
 
   const handleAvatarUpload = async (event: Event) => {
     const input = event.target as HTMLInputElement;
@@ -211,6 +243,31 @@ const ProfileSettings: Component = () => {
                 {String(user()?.discriminator).padStart(4, "0")}
               </p>
             </div>
+          </div>
+
+          {/* Bio Section */}
+          <div class="flex flex-col gap-2">
+            <label for="bio" class="text-sm font-medium text-text-primary">
+              {t("settings.profile.bio.title")}
+            </label>
+            <textarea
+              id="bio"
+              value={bio()}
+              onInput={(e) => setBio(e.currentTarget.value)}
+              class="w-full p-2 bg-background2 border border-border rounded-md focus:outline-none focus:ring-2 focus:ring-primary"
+              rows="4"
+              maxLength="190"
+            />
+            <Show when={bio() !== originalBio()}>
+              <div class="flex justify-end">
+                <button
+                  onClick={handleBioSave}
+                  class="px-4 py-2 bg-primary text-white rounded-md hover:bg-primary-dark transition-colors"
+                >
+                  {t("common.save")}
+                </button>
+              </div>
+            </Show>
           </div>
 
           {/* Rest of the profile settings */}

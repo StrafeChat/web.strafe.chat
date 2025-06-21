@@ -137,6 +137,7 @@ export const CacheProvider: ParentComponent = (props) => {
             display_name: userData.DisplayName || userData.Username,
             avatar: userData.Avatar,
             banner: userData.Banner,
+            bio: userData.Bio,
             badges: userData.Badges,
             presence: userData.Presence ? {
               status: userData.Presence.Status,

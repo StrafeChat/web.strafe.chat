@@ -7,6 +7,7 @@ export interface CachedUser {
   Banner?: string;
   Bot?: boolean;
   System?: boolean;
+  Bio?: string;
   Flags?: number;
   Presence?: {
     Status: string;
@@ -43,6 +44,7 @@ export class UserCache {
         DisplayName: user.DisplayName || user.display_name || user.Username || user.username,
         Avatar: user.Avatar || user.avatar,
         Banner: user.Banner || user.banner,
+        Bio: user.Bio || user.bio,
         Bot: user.Bot || user.bot,
         System: user.System || user.system,
         Flags: user.Flags || user.flags,

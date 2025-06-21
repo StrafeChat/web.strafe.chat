@@ -81,7 +81,11 @@
   "common": {
     "cancel": "Cancel",
     "loading": "Loading...",
-    "unknownError": "An unknown error occurred"
+    "unknownError": "An unknown error occurred",
+    "search": "Search",
+    "save": "Save",
+    "confirm": "Confirm",
+    "add": "Add"
   },
   "messages": {
     "delete": {
@@ -154,6 +158,11 @@
           "invalidType": "Invalid file type. Please upload an image.",
           "uploadFailed": "Failed to upload banner"
         }
+      },
+      "bio": {
+        "title": "About Me",
+        "success": "Bio updated successfully!",
+        "error": "Failed to update bio."
       }
     },
     "appearance": {
