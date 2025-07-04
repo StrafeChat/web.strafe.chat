@@ -104,7 +104,7 @@ export const GroupManagementModal: Component<GroupManagementModalProps> = (props
         const formData = new FormData();
         formData.append('icon', iconFile()!);
         
-        const response = await fetch(`https://${FS_URL}/api/v1/rooms/${props.room.id}/icon`, {
+        const response = await fetch(`${FS_URL}/api/v1/rooms/${props.room.id}/icon`, {
           method: 'POST',
           headers: {
             'X-Session-Token': localStorage.getItem('sc_token') || '',
