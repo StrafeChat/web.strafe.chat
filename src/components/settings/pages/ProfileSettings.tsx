@@ -46,7 +46,7 @@ const ProfileSettings: Component = () => {
         method: "POST",
         body: formData,
         headers: {
-          Authorization: `${localStorage.getItem("sc_token")}`,
+          "X-Session-Token": `${localStorage.getItem("sc_token")}`,
         },
       });
 
@@ -96,7 +96,7 @@ const ProfileSettings: Component = () => {
         method: "POST",
         body: formData,
         headers: {
-          Authorization: `${localStorage.getItem("sc_token")}`,
+          "X-Session-Token": `${localStorage.getItem("sc_token")}`,
         },
       });
 
