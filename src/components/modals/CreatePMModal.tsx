@@ -9,6 +9,7 @@ import {
 } from "../../components/common/StatusIndicator";
 import { FS_URL } from "../../constants";
 import { FriendSearch } from "../home/friends/FriendSearch";
+import { AnimatedCheckbox } from "../../components/common/AnimatedCheckbox";
 
 interface Friend {
   id: string;
@@ -176,10 +177,9 @@ export const CreatePMModal: Component<CreatePMModalProps> = (props) => {
                         </span>
                       </div>
                     </div>
-                    <input
-                      type="checkbox"
+                    <AnimatedCheckbox
                       checked={selectedFriends().includes(friend.id)}
-                      class="w-5 h-5 rounded-md border-2 border-border text-accent focus:ring-2 focus:ring-accent focus:ring-offset-0 bg-background transition-colors"
+                      class="w-6 h-6"
                     />
                   </div>
                 )}

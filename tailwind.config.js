@@ -52,6 +52,11 @@ module.exports = {
           "0%,70%,100%": { opacity: "1" },
           "20%,50%": { opacity: "0" },
         },
+        "draw-checkmark": {
+          "0%": { strokeDashoffset: "24" },
+          "60%": { strokeDashoffset: "0" },
+          "100%": { strokeDashoffset: "0" },
+        },
         fadein: {
           "0%": { opacity: "0" },
           "100%": { opacity: "1" },
@@ -93,6 +98,7 @@ module.exports = {
         "collapsible-down": "collapsible-down 0.2s ease-out",
         "collapsible-up": "collapsible-up 0.2s ease-out",
         "caret-blink": "caret-blink 1.25s ease-out infinite",
+        "draw-checkmark": "draw-checkmark 0.8s ease-out forwards",
         fadein: "fadein 200ms ease-out forwards",
         fadeout: "fadeout 200ms ease-in forwards",
         slidein: "slidein 200ms ease-out forwards",
