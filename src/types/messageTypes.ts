@@ -33,3 +33,31 @@ export interface Message {
   /** Whether the message is unread */
   unread?: boolean;
 }
+
+/**
+ * Enum for different message types
+ */
+export enum MessageType {
+  /** Regular user message */
+  USER = 0,
+  /** System-generated message */
+  SYSTEM = 1
+}
+
+/**
+ * Enum for different system message types
+ */
+export enum SystemMessageType {
+  /** Member was added to the room */
+  MEMBER_ADDED = "MEMBER_ADDED",
+  /** Member was removed from the room */
+  MEMBER_REMOVED = "MEMBER_REMOVED",
+  /** Room name was changed */
+  ROOM_NAME_CHANGED = "ROOM_NAME_CHANGED",
+  /** Room topic was changed */
+  ROOM_TOPIC_CHANGED = "ROOM_TOPIC_CHANGED",
+  /** Room icon was changed */
+  ROOM_ICON_CHANGED = "ROOM_ICON_CHANGED",
+  /** Ownership was transferred */
+  OWNERSHIP_TRANSFERRED = "OWNERSHIP_TRANSFERRED"
+}

@@ -1,9 +1,10 @@
 import { Component, createSignal, createMemo, Show, For, onCleanup, createEffect } from "solid-js";
 import { useAuth } from "../../../lib/providers/auth/AuthProvider";
 import { useCache } from "../../../lib/providers/cache/CacheProvider";
+import { useMobileNav } from "../../../lib/providers/mobile/MobileNavProvider";
 import UserSettings from "../../settings/UserSettings";
 import ClientUserPopup from "../../common/ClientUserPopup";
-import { A } from "@solidjs/router";
+import { A, useNavigate, useLocation } from "@solidjs/router";
 import { Tooltip } from "../../common/Tooltip";
 import { useTransContext } from "@mbarzda/solid-i18next";
 import { StatusIndicator, UserStatus } from "../../common/StatusIndicator";
@@ -13,6 +14,7 @@ import Notes from "../../shared/icons/Notes";
 import PlusSmall from "../../shared/icons/PlusSmall";
 import Settings from "../../shared/icons/Settings";
 import DefaultGroupPM from "../../shared/icons/DefaultGroupPM";
+import { FS_URL } from "../../../constants";
 import { capitalizeStatus } from "../../../lib/utils/status";
 import { CreatePMModal } from "../../modals/CreatePMModal";
 import { RoomType } from "../../../types/roomTypes";
@@ -20,7 +22,10 @@ import { Portal } from "solid-js/web";
 import { Avatar } from "../../common/Avatar";
 
 export const PMList: Component = () => {              
-  const { user, rooms, setRooms, relationshipRequests } = useAuth();
+  const { user, rooms, setRooms, relationshipRequests, isMobile } = useAuth();
+  const { setCurrentView } = useMobileNav();
+  const navigate = useNavigate();
+  const location = useLocation();
   const cache = useCache();
   const [t] = useTransContext();
   const [showSettings, setShowSettings] = createSignal(false);
@@ -30,6 +35,11 @@ export const PMList: Component = () => {
   const [customStatus, setCustomStatus] = createSignal("");
   const [customEmoji, setCustomEmoji] = createSignal("");
   const [showCreatePM, setShowCreatePM] = createSignal(false);
+
+  // Helper function to check if a room is currently active
+  const isRoomActive = (roomId: string) => {
+    return location.pathname === `/rooms/${roomId}`;
+  };
 
   const pendingCount = createMemo(() => {
     const currentUser = user();
@@ -359,10 +369,16 @@ export const PMList: Component = () => {
           <div class="flex flex-col gap-1">
             <For each={directMessages()}>
               {(room) => (
-                <A
-                  href={`/rooms/${room.id}`}
-                  class="flex items-center gap-2 p-2 rounded-md hover:bg-surface hover:bg-opacity-10 transition-colors relative"
-                  activeClass="bg-surface bg-opacity-10"
+                <div
+                  class={`flex items-center gap-2 p-2 rounded-md hover:bg-surface hover:bg-opacity-10 transition-colors relative cursor-pointer ${
+                    isRoomActive(room.id) ? 'bg-surface bg-opacity-10' : ''
+                  }`}
+                  onClick={() => {
+                    navigate(`/rooms/${room.id}`);
+                    if (isMobile()) {
+                      setCurrentView("content");
+                    }
+                  }}
                 >
                   <div class="relative flex-shrink-0">
                     <div class="w-8 h-8 rounded-full overflow-hidden">
@@ -370,6 +386,13 @@ export const PMList: Component = () => {
                         <div class="w-full h-full bg-surface bg-opacity-20 text-text-primary flex items-center justify-center">
                           <DefaultGroupPM />
                         </div>
+                      ) : room.type === RoomType.GROUP_PM && room.icon ? (
+                        <img
+                          src={`${FS_URL}/icons/${room.id}/${room.icon}`}
+                          alt="Room icon"
+                          class="w-full h-full object-cover"
+                          draggable="false"
+                        />
                       ) : (
                         <Avatar
                           userId={room.recipients_data.find((r: { id: string | undefined; }) => r.id !== user()?.id)?.id || room.recipients_data[0]?.id || "default"}
@@ -404,7 +427,7 @@ export const PMList: Component = () => {
                       </div>
                     ) : room.type === RoomType.GROUP_PM && (
                       <div class="text-xs text-text-secondary truncate select-none">
-                        {room.recipients ? room.recipients.length : 0} Members
+                        {room.topic && room.topic.trim() ? room.topic : `${room.recipients ? room.recipients.length : 0} Members`}
                       </div>
                     )}
                   </div>
@@ -416,7 +439,7 @@ export const PMList: Component = () => {
                       </div>
                     </div>
                   )}
-                </A>
+                </div>
               )}
             </For>
           </div>

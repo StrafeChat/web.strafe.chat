@@ -10,6 +10,8 @@ export type UserMeResponse = {
     DateOfBirth?: string;
     Avatar?: string;
     Banner?: string;
+    Bio?: string;
+    AboutMe?: string;
     Friends?: string[];
     Presence?: {
       Status: string;
@@ -42,6 +44,8 @@ export type BulkUsersResponse = {
     DisplayName?: string;
     Avatar?: string;
     Banner?: string;
+    Bio?: string;
+    AboutMe?: string;
     Presence?: {
       Status: string;
       CustomStatus: string;

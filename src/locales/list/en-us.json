@@ -194,6 +194,10 @@
         "logoutAllFailed": "Failed to logout all other sessions"
       }
     },
+    "privacy": {
+      "title": "Privacy & Safety",
+      "description": "Control your privacy and safety settings"
+    },
     "default": {
       "underDevelopment": "This section is under development."
     }

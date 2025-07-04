@@ -2,6 +2,7 @@ import { ThemeProvider } from "./lib/providers/theme/ThemeProvider";
 import { ContextMenuProvider } from "./lib/providers/context/ContextMenuProvider";
 import { AuthProvider } from "./lib/providers/auth/AuthProvider";
 import { CacheProvider } from "./lib/providers/cache/CacheProvider";
+import { MobileNavProvider } from "./lib/providers/mobile/MobileNavProvider";
 import { TransProvider } from "@mbarzda/solid-i18next";
 import { Router, Route } from "@solidjs/router";
 import en from "./locales/list/en-us.json";
@@ -47,16 +48,18 @@ const MountApp = (props: ParentProps) => {
         <ToastProvider>
           <ContextMenuProvider>
             <CacheProvider>
-              <AuthProvider>
-                <SettingsProvider>
-                  <UserSettingsProvider>
-                    <ModalProvider>
-                      <LinkConfirmationHandler />
-                      <div class="h-[100dvh] w-full overflow-hidden">{props.children}</div>
-                    </ModalProvider>
-                  </UserSettingsProvider>
-                </SettingsProvider>
-              </AuthProvider>
+              <UserSettingsProvider>
+                <AuthProvider>
+                  <MobileNavProvider>
+                    <SettingsProvider>
+                      <ModalProvider>
+                        <LinkConfirmationHandler />
+                        <div class="h-[100dvh] w-full overflow-hidden">{props.children}</div>
+                      </ModalProvider>
+                    </SettingsProvider>
+                  </MobileNavProvider>
+                </AuthProvider>
+              </UserSettingsProvider>
             </CacheProvider>
           </ContextMenuProvider>
         </ToastProvider>

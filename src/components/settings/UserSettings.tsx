@@ -11,6 +11,7 @@ import AppearanceSettings from "./pages/AppearanceSettings";
 import DefaultSettings from "./pages/DefaultSettings";
 import LanguageSettings from "./pages/LanguageSettings";
 import SessionsSettings from "./pages/SessionsSettings";
+import PrivacySettings from "./pages/PrivacySettings";
 import { ToastProvider } from "../common/Toast";
 
 interface UserSettingsProps {
@@ -57,6 +58,8 @@ const UserSettings: Component<UserSettingsProps> = (props) => {
         return <ProfileSettings />;
       case "sessions":
         return <SessionsSettings />;
+      case "privacy":
+        return <PrivacySettings />;
       case "appearance":
         return <AppearanceSettings />;
       case "language":

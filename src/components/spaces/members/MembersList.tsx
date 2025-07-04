@@ -5,7 +5,7 @@ import UserPopupMenu from "../../common/UserPopupMenu";
 import { FS_URL } from "../../../constants";
 
 const MembersList: Component = () => {
-  const { rooms, user } = useAuth();
+  const { rooms } = useAuth();
   const cache = useCache();
   const [userPopupOpen, setUserPopupOpen] = createSignal(false);
   const [userPopupTrigger, setUserPopupTrigger] = createSignal<HTMLElement | undefined>();
@@ -30,7 +30,11 @@ const MembersList: Component = () => {
       <Show when={members().length > 0}>
         <For each={members()}>{(member: any) => (
           <div
-            class="flex items-center gap-3 py-2 px-2 rounded hover:bg-surface hover:bg-opacity-10 cursor-pointer transition-colors"
+            class={`flex items-center gap-3 py-2 px-2 rounded hover:bg-surface hover:bg-opacity-10 cursor-pointer transition-colors ${
+              userPopupOpen() && selectedUserId() === member.id 
+                ? 'bg-surface bg-opacity-20' 
+                : ''
+            }`}
             onClick={e => handleUserClick(e, member.id)}
           >
             <img

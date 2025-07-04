@@ -18,12 +18,14 @@ marked.setOptions({
  */
 const renderer = new marked.Renderer();
 
-// Override heading renderer to mach  style
+// Override heading renderer to match style
 renderer.heading = function({ tokens, depth }: Tokens.Heading): string {
   // Discord only supports h1, h2, and h3
   const headingLevel = depth > 3 ? 3 : depth;
-  // Convert tokens back to text
-  const text = this.parser.parseInline(tokens);
+  // Convert tokens back to text and handle line break markers
+  let text = this.parser.parseInline(tokens);
+  // Remove any line break markers from headings
+  text = text.replace(/{{LINEBREAK}}/g, ' ');
   return `<h${headingLevel} class="markdown-heading markdown-h${headingLevel}">${text}</h${headingLevel}>`;
 };
 
@@ -89,9 +91,12 @@ renderer.listitem = function(item: Tokens.ListItem): string {
   return `<li class="markdown-listitem">${item.text}</li>`;
 };
 
-// Override paragraph renderer
+// Override paragraph renderer to handle line breaks
 renderer.paragraph = function({ tokens }: Tokens.Paragraph): string {
-  return `<p class="markdown-paragraph">${this.parser.parseInline(tokens)}</p>`;
+  const content = this.parser.parseInline(tokens);
+  // Convert our special line break markers to actual line breaks
+  const processedContent = content.replace(/{{LINEBREAK}}/g, '\n');
+  return `<p class="markdown-paragraph">${processedContent}</p>`;
 };
 
 // Apply the custom renderer
@@ -165,11 +170,30 @@ export const parseMarkdown = (text: string): string => {
   // Process emojis next
   processedText = processEmojisForMarkdown(processedText);
   
+  // Preserve original line breaks and spacing
+  // First, handle headings specially - don't add line break markers to heading lines
+  const lines = processedText.split('\n');
+  const processedLines = lines.map((line, index) => {
+    // Check if this line is a heading (starts with #)
+    if (line.trim().match(/^#{1,6}\s/)) {
+      return line; // Keep heading lines as-is
+    }
+    // For non-heading lines, check if we need to add line break marker
+    const nextLine = lines[index + 1];
+    if (nextLine !== undefined && nextLine.trim() !== '') {
+      return line + '{{LINEBREAK}}';
+    }
+    return line;
+  });
+  processedText = processedLines.join('\n');
+  // Keep double line breaks for paragraph separation
+  processedText = processedText.replace(/\n\s*\n/g, '\n\n');
+  
   // Parse markdown
   const parsedHtml = marked.parse(processedText);
   
   // Sanitize the HTML to prevent XSS attacks
-  const sanitizedHtml = DOMPurify.sanitize(parsedHtml.toString(), {
+  let sanitizedHtml = DOMPurify.sanitize(parsedHtml.toString(), {
     ALLOWED_TAGS: [
       'h1', 'h2', 'h3', 'a', 'p', 'br', 'strong', 'em', 'del', 'span',
       'pre', 'code', 'blockquote', 'ul', 'ol', 'li', 'img', 'button'
@@ -180,6 +204,9 @@ export const parseMarkdown = (text: string): string => {
     ],
     ALLOW_DATA_ATTR: true
   });
+  
+  // Convert any remaining line break markers to actual newlines
+  sanitizedHtml = sanitizedHtml.replace(/{{LINEBREAK}}/g, '\n');
   
   // Initialize code block utilities in the next tick to ensure DOM is updated
   setTimeout(() => {

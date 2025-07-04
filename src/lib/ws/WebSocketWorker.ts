@@ -492,12 +492,15 @@ class WebSocketWorkerHandler {
         case OpCodes.MESSAGE:
           console.log("[WebSocketWorker] Received MESSAGE:", data.d);
           // Check if this is a message with the new nested data structure
-          if (data.d && data.d.event_type === "MESSAGE_CREATE" && data.d.data) {
+          if (data.d && (data.d.type === "MESSAGE_CREATE" || data.d.event_type === "MESSAGE_CREATE") && data.d.data) {
             this.broadcast({
-              type: "MESSAGE_CREATE",
-              payload: data.d.data
+              type: "message_create",
+              payload: {
+                type: "MESSAGE_CREATE",
+                data: data.d.data
+              }
             });
-          } else if (data.d && data.d.event_type === "MESSAGE_DELETE" && data.d.data) {
+          } else if (data.d && (data.d.type === "MESSAGE_DELETE" || data.d.event_type === "MESSAGE_DELETE") && data.d.data) {
             console.log("[WebSocketWorker] Handling message delete:", data.d);
             this.broadcast({
               type: "message_delete",
@@ -506,7 +509,7 @@ class WebSocketWorkerHandler {
                 message_id: data.d.data.id
               }
             });
-          } else if (data.d && data.d.event_type === "MESSAGE_EDIT" && data.d.data) {
+          } else if (data.d && (data.d.type === "MESSAGE_EDIT" || data.d.event_type === "MESSAGE_EDIT") && data.d.data) {
             console.log("[WebSocketWorker] Handling message edit:", data.d);
             this.broadcast({
               type: "message_edit",
@@ -539,9 +542,51 @@ class WebSocketWorkerHandler {
             this.handleMessage(messageEvent);
           } 
           // Handle room creation events with nested data structure
-          else if (data.d && data.d.event_type === "ROOM_CREATE" && data.d.data) {
+          else if (data.d && (data.d.type === "ROOM_CREATE" || data.d.event_type === "ROOM_CREATE") && data.d.data) {
             this.broadcast({
               type: "roomCreate",
+              payload: data.d,
+            });
+          }
+          // Handle room update events
+          else if (data.d && (data.d.type === "ROOM_UPDATE" || data.d.event_type === "ROOM_UPDATE") && data.d.data) {
+            this.broadcast({
+              type: "roomUpdate",
+              payload: data.d,
+            });
+          }
+          // Handle room delete events
+          else if (data.d && (data.d.type === "ROOM_DELETE" || data.d.event_type === "ROOM_DELETE") && data.d.data) {
+            this.broadcast({
+              type: "roomDelete",
+              payload: data.d,
+            });
+          }
+          // Handle room member add events
+          else if (data.d && (data.d.type === "ROOM_MEMBER_ADD" || data.d.event_type === "ROOM_MEMBER_ADD") && data.d.data) {
+            this.broadcast({
+              type: "roomMemberAdd",
+              payload: data.d,
+            });
+          }
+          // Handle room member remove events
+          else if (data.d && (data.d.type === "ROOM_MEMBER_REMOVE" || data.d.event_type === "ROOM_MEMBER_REMOVE") && data.d.data) {
+            this.broadcast({
+              type: "roomMemberRemove",
+              payload: data.d,
+            });
+          }
+          // Handle room ownership transfer events
+          else if (data.d && (data.d.type === "ROOM_OWNERSHIP_TRANSFER" || data.d.event_type === "ROOM_OWNERSHIP_TRANSFER") && data.d.data) {
+            this.broadcast({
+              type: "roomOwnershipTransfer",
+              payload: data.d,
+            });
+          }
+          // Handle room icon change events
+          else if (data.d && (data.d.type === "ROOM_ICON_CHANGED" || data.d.event_type === "ROOM_ICON_CHANGED") && data.d.data) {
+            this.broadcast({
+              type: "roomUpdate",
               payload: data.d,
             });
           } else {

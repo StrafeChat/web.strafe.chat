@@ -7,10 +7,8 @@ import {
   createSignal,
   Setter,
 } from "solid-js";
-import { Avatar } from "./Avatar";
 import { FS_URL } from "../../constants";
-import { UserStatus } from "./StatusIndicator";
-import { StatusIndicator } from "./StatusIndicator";
+import { UserStatus, StatusIndicator } from "./StatusIndicator";
 import { Portal } from "solid-js/web";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
 import { useSettings } from "../../lib/providers/settings/SettingsProvider";

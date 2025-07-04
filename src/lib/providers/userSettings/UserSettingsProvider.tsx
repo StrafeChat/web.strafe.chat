@@ -14,6 +14,9 @@ interface UserSettings {
     timeFormat: string;
     use24HourFormat: boolean;
   };
+  privacy: {
+    sendTypingIndicators: boolean;
+  };
 }
 
 interface UserSettingsContextType {
@@ -22,10 +25,14 @@ interface UserSettingsContextType {
   updateUserSettings: (settings: Partial<UserSettings>) => void;
   toggleAlwaysShowSendButton: () => void;
   toggleTimeFormat: () => void;
+  toggleSendTypingIndicators: () => void;
   appearance: () => {
     alwaysShowSendButton: boolean;
     timeFormat: string;
     use24HourFormat: boolean;
+  };
+  privacy: () => {
+    sendTypingIndicators: boolean;
   };
 }
 
@@ -34,6 +41,9 @@ const defaultUserSettings: UserSettings = {
     alwaysShowSendButton: false,
     timeFormat: "12h",
     use24HourFormat: false,
+  },
+  privacy: {
+    sendTypingIndicators: true,
   },
 };
 
@@ -94,6 +104,16 @@ export const UserSettingsProvider: ParentComponent = (props) => {
     });
   };
 
+  const toggleSendTypingIndicators = () => {
+    setUserSettings((prev) => ({
+      ...prev,
+      privacy: {
+        ...prev.privacy,
+        sendTypingIndicators: !prev.privacy.sendTypingIndicators,
+      },
+    }));
+  };
+
   return (
     <UserSettingsContext.Provider
       value={{
@@ -102,7 +122,9 @@ export const UserSettingsProvider: ParentComponent = (props) => {
         updateUserSettings,
         toggleAlwaysShowSendButton,
         toggleTimeFormat,
+        toggleSendTypingIndicators,
         appearance: () => userSettings().appearance,
+        privacy: () => userSettings().privacy,
       }}
     >
       {props.children}

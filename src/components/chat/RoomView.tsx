@@ -5,12 +5,14 @@ import { useAuth } from "../../lib/providers/auth/AuthProvider";
 import { useCache } from "../../lib/providers/cache/CacheProvider";
 // import { useTransContext } from "@mbarzda/solid-i18next";
 import { StatusIndicator, UserStatus } from "../common/StatusIndicator";
-import { FS_URL } from "../../constants";
+import { BASE_URL, FS_URL } from "../../constants";
 import { Avatar } from "../common/Avatar";
 import { RoomType } from "../../types/roomTypes";
 import ChatArea from "./ChatArea";
 import { Tooltip } from "../common/Tooltip";
 import UserPopupMenu from "../common/UserPopupMenu";
+import { GroupManagementModal } from "../modals/GroupManagementModal";
+import { AddMemberModal } from "../modals/AddMemberModal";
 
 const RoomView: Component = () => {
   const params = useParams();
@@ -289,13 +291,117 @@ const RoomView: Component = () => {
   const [userPopupTrigger, setUserPopupTrigger] = createSignal<HTMLElement | undefined>();
   const [selectedUserId, setSelectedUserId] = createSignal<string | null>(null);
 
-  // Handler for clicking a member in the sidebar
-  const handleMemberClick = (e: MouseEvent, id: string) => {
-    console.log('Clicked member:', id, roomMembers().find(member => member.id === id)?.username);
-    setSelectedUserId(id);
-    setUserPopupTrigger(e.currentTarget as HTMLElement);
-    setUserPopupOpen(true);
+  // Add state for group management modal
+  const [showGroupManagement, setShowGroupManagement] = createSignal(false);
+  const [showAddMember, setShowAddMember] = createSignal(false);
+  const [contextMenuOpen, setContextMenuOpen] = createSignal(false);
+  const [contextMenuPosition, setContextMenuPosition] = createSignal({ x: 0, y: 0 });
+  const [contextMenuMember, setContextMenuMember] = createSignal<string | null>(null);
+  const [removingMember, setRemovingMember] = createSignal(false);
+
+  // Handle member context menu
+  const handleMemberRightClick = (event: MouseEvent, memberId: string) => {
+    event.preventDefault();
+    
+    // Context menu dimensions (fixed)
+    const menuWidth = 200;
+    const menuHeight = 150; // Approximate height for menu items
+    
+    // Get viewport dimensions
+    const viewportWidth = window.innerWidth;
+    const viewportHeight = window.innerHeight;
+    
+    // Calculate initial position
+    let x = event.clientX;
+    let y = event.clientY;
+    
+    // Adjust x position if menu would overflow right edge
+    if (x + menuWidth > viewportWidth) {
+      x = viewportWidth - menuWidth - 10; // 10px padding from edge
+    }
+    
+    // Adjust y position if menu would overflow bottom edge
+    if (y + menuHeight > viewportHeight) {
+      y = viewportHeight - menuHeight - 10; // 10px padding from edge
+    }
+    
+    // Ensure minimum distance from edges
+    x = Math.max(10, x);
+    y = Math.max(10, y);
+    
+    setContextMenuPosition({ x, y });
+    setContextMenuMember(memberId);
+    setContextMenuOpen(true);
   };
+
+  // Handle removing a member
+  const handleRemoveMember = async (memberId: string) => {
+    setRemovingMember(true);
+    setContextMenuOpen(false);
+    
+    try {
+      const response = await fetch(`${BASE_URL}/rooms/${params.roomId}/members`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          "X-Session-Token": localStorage.getItem("sc_token") || "",
+        },
+        body: JSON.stringify({ user_id: memberId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to remove member');
+      }
+
+      // Optionally show a success message or refresh the room data
+    } catch (err) {
+      console.error('Failed to remove member:', err);
+      // Optionally show an error message
+    } finally {
+      setRemovingMember(false);
+      setContextMenuMember(null);
+    }
+  };
+
+  // Handle transferring ownership
+  const [transferringOwnership, setTransferringOwnership] = createSignal(false);
+  
+  const handleTransferOwnership = async (newOwnerId: string) => {
+    setTransferringOwnership(true);
+    setContextMenuOpen(false);
+    
+    try {
+      const response = await fetch(`${BASE_URL}/rooms/${params.roomId}/transfer-ownership`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          "X-Session-Token": localStorage.getItem("sc_token") || "",
+        },
+        body: JSON.stringify({ new_owner_id: newOwnerId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to transfer ownership');
+      }
+
+      // Optionally show a success message
+    } catch (err) {
+      console.error('Failed to transfer ownership:', err);
+      // Optionally show an error message
+    } finally {
+       setTransferringOwnership(false);
+       setContextMenuMember(null);
+     }
+   };
+
+  // Close context menu when clicking outside
+  const handleClickOutside = () => {
+    setContextMenuOpen(false);
+    setContextMenuMember(null);
+  };
+
 
   return (
     <div class="h-full w-full flex flex-col bg-background2">
@@ -343,28 +449,70 @@ const RoomView: Component = () => {
           <div class="flex flex-col justify-center">
             <h2 class="text-sm font-semibold text-text-primary">{getRoomName()}</h2>
             <Show when={roomType() === RoomType.GROUP_PM}>
-              <p class="text-xs text-text-secondary">
-                {recipientCount()} Members
-              </p>
+              <Show 
+                when={currentRoom()?.topic && currentRoom()?.topic.trim()}
+                fallback={
+                  <p class="text-xs text-text-secondary">
+                    {recipientCount()} Members
+                  </p>
+                }
+              >
+                <p class="text-xs text-text-secondary truncate max-w-[200px]">
+                  {currentRoom()?.topic}
+                </p>
+              </Show>
             </Show>
           </div>
         </div>
         
-        {/* Add members toggle button for group PMs */}
+        {/* Group PM controls */}
         <Show when={roomType() === RoomType.GROUP_PM}>
-     <Tooltip content={showMembers() ? "Hide Member List" : "Show Member List"} position="bottom">
-          <button 
-            onClick={() => setShowMembers(!showMembers())}
-            class="p-2 rounded-md hover:bg-surface hover:bg-opacity-10 transition-colors text-text-secondary hover:text-text-primary"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-              <circle cx="9" cy="7" r="4" />
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-            </svg>
-          </button>
-        </Tooltip>
+          <div class="flex items-center gap-2">
+            {/* Add Member - available to all members */}
+            <Tooltip content="Add Member" position="bottom">
+              <button 
+                onClick={() => setShowAddMember(true)}
+                class="p-2 rounded-md hover:bg-surface hover:bg-opacity-10 transition-colors text-text-secondary hover:text-text-primary"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <line x1="19" y1="8" x2="19" y2="14" />
+                  <line x1="22" y1="11" x2="16" y2="11" />
+                </svg>
+              </button>
+            </Tooltip>
+            
+            {/* Owner-only controls */}
+            <Show when={currentRoom()?.owner_id === user()?.id}>
+              <Tooltip content="Group Settings" position="bottom">
+                <button 
+                  onClick={() => setShowGroupManagement(true)}
+                  class="p-2 rounded-md hover:bg-surface hover:bg-opacity-10 transition-colors text-text-secondary hover:text-text-primary"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="3" />
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                  </svg>
+                </button>
+              </Tooltip>
+            </Show>
+            
+            {/* Member list toggle - available to all members */}
+            <Tooltip content={showMembers() ? "Hide Member List" : "Show Member List"} position="bottom">
+              <button 
+                onClick={() => setShowMembers(!showMembers())}
+                class="p-2 rounded-md hover:bg-surface hover:bg-opacity-10 transition-colors text-text-secondary hover:text-text-primary"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+              </button>
+            </Tooltip>
+          </div>
         </Show>
       </div>
       
@@ -380,7 +528,7 @@ const RoomView: Component = () => {
         {/* Members sidebar - conditionally visible based on showMembers state */}
         <Show when={roomType() === RoomType.GROUP_PM}>
           <div 
-            class={`bg-[var(--background1)] overflow-y-auto shadow-lg transition-all pl-.5 duration-300 ${isMobile() ? 'fixed inset-0 z-50' : 'relative h-full w-[250px]'}`}
+            class={`room-member-list bg-[var(--background1)] overflow-y-auto shadow-lg transition-all pl-.5 duration-300 ${isMobile() ? 'fixed inset-0 z-50' : 'relative h-full w-[250px]'}`}
             style={{ 
               display: (!showMembers()) ? 'none' : 'block'
             }}
@@ -404,13 +552,18 @@ const RoomView: Component = () => {
               <For each={roomMembers()}>
                 {(member) => (
                   <div
-                    class="flex items-center gap-2 p-2 rounded-md hover:bg-surface hover:bg-opacity-10 transition-colors cursor-pointer"
+                    class={`flex items-center gap-2 p-2 rounded-md hover:bg-surface hover:bg-opacity-10 transition-colors cursor-pointer ${
+                      userPopupOpen() && selectedUserId() === member.id 
+                        ? 'bg-surface bg-opacity-20' 
+                        : ''
+                    }`}
                     onClick={(e) => {
                       console.log('Clicked member:', member.id, member.username);
                       setSelectedUserId(member.id);
                       setUserPopupTrigger(e.currentTarget as HTMLElement);
                       setUserPopupOpen(true);
                     }}
+                    onContextMenu={(e) => handleMemberRightClick(e, member.id)}
                   >
                     <div class="relative flex-shrink-0">
                       <div class="w-8 h-8 rounded-full overflow-hidden">
@@ -427,8 +580,18 @@ const RoomView: Component = () => {
                       />
                     </div>
                     <div class="flex-1 min-w-0 overflow-hidden">
-                      <div class="text-sm font-medium text-text-primary truncate">
-                        {member.display_name || member.username}
+                      <div class="flex items-center gap-1">
+                        <div class="text-sm font-medium text-text-primary truncate">
+                          {member.display_name || member.username}
+                        </div>
+                        {/* Crown icon for group owner */}
+                         <Show when={currentRoom()?.owner_id === member.id}>
+                           <Tooltip content="Group Owner" position="top">
+                             <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-yellow-500 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
+                               <path d="M2 18h20v2H2v-2zm1.15-12L7 8l5-6 5 6 3.85-2L22 18H2l1.15-12z" />
+                             </svg>
+                           </Tooltip>
+                         </Show>
                       </div>
                       <div class="text-xs text-text-secondary truncate">
                         {member.presence?.status === "offline" ? "Offline" : 
@@ -450,6 +613,94 @@ const RoomView: Component = () => {
           </div>
         </Show>
       </div>
+      
+      {/* Group Management Modal */}
+      <Show when={currentRoom()}>
+        <GroupManagementModal
+          isOpen={showGroupManagement()}
+          onClose={() => setShowGroupManagement(false)}
+          room={currentRoom()!}
+        />
+      </Show>
+      
+      {/* Add Member Modal */}
+      <Show when={currentRoom()}>
+        <AddMemberModal
+          isOpen={showAddMember()}
+          onClose={() => setShowAddMember(false)}
+          room={currentRoom()!}
+        />
+      </Show>
+      
+      {/* Member Context Menu */}
+      <Show when={contextMenuOpen()}>
+        <div 
+          class="fixed inset-0 z-50"
+          onClick={handleClickOutside}
+        >
+          <div 
+            class="absolute bg-background2 border border-surface rounded-md shadow-lg py-1 w-[200px]"
+            style={{
+              left: `${contextMenuPosition().x}px`,
+              top: `${contextMenuPosition().y}px`
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Context menu options */}
+            {roomType() === RoomType.GROUP_PM && (
+              <>
+                {/* Options for group owners when right-clicking other members */}
+                {currentRoom()?.owner_id === user()?.id && contextMenuMember() !== user()?.id && (
+                  <>
+                    <button
+                      class="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-surface hover:bg-opacity-10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={() => contextMenuMember() && handleTransferOwnership(contextMenuMember()!)}
+                      disabled={transferringOwnership()}
+                    >
+                      {transferringOwnership() ? 'Transferring...' : 'Transfer Ownership'}
+                    </button>
+                    <button
+                      class="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-surface hover:bg-opacity-10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={() => contextMenuMember() && handleRemoveMember(contextMenuMember()!)}
+                      disabled={removingMember()}
+                    >
+                      {removingMember() ? 'Removing...' : 'Remove from Group'}
+                    </button>
+                  </>
+                )}
+                
+                {/* Leave group option when right-clicking yourself */}
+                {contextMenuMember() === user()?.id && (
+                  <button
+                    class="w-full px-3 py-2 text-left text-sm text-red-400 hover:bg-surface hover:bg-opacity-10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    onClick={() => contextMenuMember() && handleRemoveMember(contextMenuMember()!)}
+                    disabled={removingMember()}
+                  >
+                    {removingMember() ? 'Leaving...' : 'Leave Group'}
+                  </button>
+                )}
+                
+                {/* Divider */}
+                <div class="border-t border-surface my-1"></div>
+                
+                {/* Copy User ID - always available */}
+                <button
+                  class="w-full px-3 py-2 text-left text-sm text-text-primary hover:bg-surface hover:bg-opacity-10 transition-colors"
+                  onClick={() => {
+                    if (contextMenuMember()) {
+                      navigator.clipboard.writeText(contextMenuMember()!);
+                      setContextMenuOpen(false);
+                      setContextMenuMember(null);
+                    }
+                  }}
+                >
+                  Copy User ID
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+      </Show>
     </div>
   );
 };

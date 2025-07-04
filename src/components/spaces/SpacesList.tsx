@@ -1,7 +1,7 @@
 import { Component, createMemo, Show, For } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
-import { useCache } from "../../lib/providers/cache/CacheProvider";
+import { useMobileNav } from "../../lib/providers/mobile/MobileNavProvider";
 import { Tooltip } from "../common/Tooltip";
 import { FS_URL } from "../../constants";
 import { RoomType } from "../../types/roomTypes";
@@ -10,8 +10,8 @@ import DefaultGroupPM from "../shared/icons/DefaultGroupPM";
 
 const SpacesList: Component = () => {
   const navigate = useNavigate();
-  const { relationshipRequests, user, rooms } = useAuth();
-  const cache = useCache();
+  const { relationshipRequests, user, rooms, isMobile } = useAuth();
+  const { setCurrentView } = useMobileNav();
 
   const unreadCount = createMemo(() => {
     const currentUser = user();
@@ -106,7 +106,12 @@ const SpacesList: Component = () => {
               <Tooltip content={`Unread messages in ${room.name || 'chat'}`} position="right">
                 <button 
                   class="w-10 h-10 rounded-full relative overflow-hidden border-2 border-surface hover:border-accent transition-all"
-                  onClick={() => navigate(`/rooms/${room.id}`)}
+                  onClick={() => {
+                    navigate(`/rooms/${room.id}`);
+                    if (isMobile()) {
+                      setCurrentView("content");
+                    }
+                  }}
                 >
                   {room.type === RoomType.GROUP_PM && !room.icon ? (
                     <div class="w-full h-full bg-surface bg-opacity-20 text-text-primary flex items-center justify-center">

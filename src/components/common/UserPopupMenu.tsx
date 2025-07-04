@@ -6,12 +6,12 @@ import {
   onMount,
   createEffect,
 } from "solid-js";
-import { Avatar } from "./Avatar";
 import { FS_URL } from "../../constants";
 import { StatusIndicator } from "./StatusIndicator";
 import { Portal } from "solid-js/web";
 import { useCache } from "../../lib/providers/cache/CacheProvider";
-import { UserBadges } from "./UserBadges";
+
+
 
 interface UserPopupMenuProps {
   isOpen: boolean;
@@ -59,29 +59,44 @@ const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
   // Calculate position relative to trigger element
   const getPopupStyle = () => {
     if (!props.triggerRef) return {};
+
     const rect = props.triggerRef.getBoundingClientRect();
-    const popupWidth = 320;
+    const popupWidth = 300;
     const gap = 10;
-    let left: number;
-    let top = rect.top + rect.height / 2 - 80; // vertically center popup avatar
-    if (props.placement === "left") {
+    
+    // Position to the right of the trigger element
+    let left = rect.right + gap;
+    
+    // Check if popup would go off the right edge of screen
+    if (left + popupWidth > window.innerWidth - gap) {
+      // Position to the left of the trigger instead
       left = rect.left - popupWidth - gap;
-      // Ensure popup is fully to the left, not overlapping the trigger
-      if (left < gap) left = gap;
-    } else {
-      left = rect.right + gap;
-      if (left + popupWidth > window.innerWidth - gap) {
-        left = window.innerWidth - popupWidth - gap;
+      // Ensure it doesn't go off the left edge
+      if (left < gap) {
+        left = gap;
       }
     }
-    // Clamp top if popup would go offscreen
-    if (top < gap) top = gap;
-    if (top + 200 > window.innerHeight - gap) top = window.innerHeight - 200 - gap;
+    
+    // Vertical positioning - align top of popup with top of trigger
+     let top = rect.top;
+     
+     // Check if popup would go off the top of screen
+     if (top < gap) {
+       top = gap;
+     }
+     
+     // Check if popup would go off the bottom of screen
+     const estimatedPopupHeight = 300; // Approximate popup height
+     if (top + estimatedPopupHeight > window.innerHeight - gap) {
+       // Reposition from bottom
+       top = window.innerHeight - estimatedPopupHeight - gap;
+       if (top < gap) top = gap;
+     }
+
     return {
       left: `${left}px`,
       top: `${top}px`,
-      width: `${popupWidth}px`,
-      maxHeight: `calc(100vh - 40px)`
+      maxHeight: `${Math.min(400, window.innerHeight - top - gap)}px`,
     };
   };
 
@@ -90,14 +105,10 @@ const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
       <Show when={props.isOpen && props.triggerRef && user()}>
         <Portal>
           <div
-            class="fixed inset-0 bg-black bg-opacity-0 z-40"
-            onClick={props.onClose}
-          />
-          <div
             ref={popupRef}
-            class="fixed z-50 bg-background2 rounded-lg shadow-lg overflow-hidden animate-fade-in"
+            class="fixed z-50 bg-background2 rounded-lg shadow-lg w-[300px] overflow-hidden animate-fade-in"
             style={getPopupStyle()}
-            onClick={e => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
           >
             {/* Banner & Avatar */}
             <div class="h-[100px] relative">
@@ -114,12 +125,11 @@ const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
               </Show>
               <div class="absolute -bottom-6 left-2">
                 <div class="relative w-[80px] h-[80px]">
-                  <Avatar
-                    userId={user()?.id}
-                    avatar={user()?.avatar}
-                    alt={user()?.display_name || user()?.username}
-                    size="xl"
-                    class="border-4 border-background2"
+                  <img
+                    src={`${FS_URL}/avatars/${user()?.id}/${user()?.avatar || "default.webp"}`}
+                    alt="User avatar"
+                    class="w-full h-full rounded-full object-cover border-4 border-background2"
+                    style={{ "aspect-ratio": "1/1" }}
                   />
                   <div class="absolute bottom-0.5 right-0.5">
                     <StatusIndicator
@@ -130,6 +140,16 @@ const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
                 </div>
               </div>
             </div>
+            {/* Badge Section */}
+            <div class="absolute top-[113px] right-3">
+              <div class="inline-flex items-center gap-1.5 bg-[#111214] px-1.5 py-1 rounded-md">
+                <button class="w-5 h-5 rounded-[4px] flex items-center justify-center group cursor-pointer hover:bg-[#2b2d31] transition-colors">
+                  <svg class="w-3.5 h-3.5 text-[#b5bac1] group-hover:text-[#dbdee1]" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2L8.5 8.5 2 9.8l5 4.9L5.8 22 12 18.5 18.2 22 17 14.7l5-4.9-6.5-1.3z"/>
+                  </svg>
+                </button>
+              </div>
+            </div>
             {/* User Info */}
             <div class="mt-4 p-4">
               <div class="font-semibold text-lg">{user()?.display_name}</div>
@@ -137,14 +157,16 @@ const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
                 {user()?.username}#
                 {String(user()?.discriminator).padStart(4, "0")}
               </div>
-              {/* Badges */}
-              <Show when={user()?.badges && user()?.badges.length > 0}>
-                <UserBadges badges={user()?.badges.map((id: string) => ({ id, name: id, icon: undefined }))} />
-              </Show>
-              {/* About Me */}
-              <Show when={user()?.about_me}>
-                <div class="mt-3 px-2 py-2 rounded bg-surface bg-opacity-10 text-text-primary whitespace-pre-line text-sm">
-                  {user()?.about_me}
+
+              {/* About Me Section */}
+              <Show when={(user()?.about_me || user()?.AboutMe) && (user()?.about_me || user()?.AboutMe)?.trim().length > 0}>
+                <div class="w-full pt-4">
+                  <div class="w-full px-3 py-2 bg-surface bg-opacity-5 rounded-md">
+                    <div class="text-xs font-semibold text-text-secondary mb-2 uppercase tracking-wide">About Me</div>
+                    <div class="text-sm text-text-primary whitespace-pre-wrap break-words">
+                      {user()?.about_me || user()?.AboutMe}
+                    </div>
+                  </div>
                 </div>
               </Show>
             </div>

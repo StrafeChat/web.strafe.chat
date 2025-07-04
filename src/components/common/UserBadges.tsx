@@ -11,12 +11,22 @@ interface UserBadgesProps {
   badges: Badge[] | undefined;
 }
 
-// Example badge icon mapping (replace with your own as needed)
+// Badge icon mapping for user flags
 const BADGE_ICONS: Record<string, { icon: string; name: string }> = {
+  "founder": { icon: "/assets/badges/founder.svg", name: "Founder" },
+  "platform_admin": { icon: "/assets/badges/platform_admin.svg", name: "Platform Admin" },
+  "platform_mod": { icon: "/assets/badges/platform_mod.svg", name: "Platform Moderator" },
+  "contributor": { icon: "/assets/badges/contributor.svg", name: "Contributor" },
+  "translator": { icon: "/assets/badges/translator.svg", name: "Translator" },
+  "bug_reporter": { icon: "/assets/badges/bug_reporter.svg", name: "Bug Reporter" },
+  "early_supporter": { icon: "/assets/badges/early_supporter.svg", name: "Early Supporter" },
+  "supporter": { icon: "/assets/badges/supporter.svg", name: "Supporter" },
+  "early_adopter": { icon: "/assets/badges/early_adopter.svg", name: "Early Adopter" },
+  "bot_developer": { icon: "/assets/badges/bot_developer.svg", name: "Bot Developer" },
+  // Legacy badges
   "staff": { icon: "/assets/badges/staff.svg", name: "Staff" },
   "verified": { icon: "/assets/badges/verified.svg", name: "Verified" },
   "bug_hunter": { icon: "/assets/badges/bug_hunter.svg", name: "Bug Hunter" },
-  // Add more badges as needed
 };
 
 export const UserBadges: Component<UserBadgesProps> = (props) => (

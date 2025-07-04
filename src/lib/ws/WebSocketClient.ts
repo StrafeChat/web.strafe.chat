@@ -9,6 +9,7 @@ export type PayloadType =
   | "relationshipAccept"
   | "relationshipDelete"
   | "ROOM_CREATE"
+  | "ROOM_UPDATE"
   | "MESSAGE_CREATE"
   | "MESSAGE_DELETE"
   | "MESSAGE_EDIT"
@@ -120,6 +121,7 @@ const EVENT_TYPE_TO_OP_CODE: Record<string, string> = {
   MESSAGE: "MESSAGE",
   PRESENCE_UPDATE: "PRESENCE_UPDATE",
   ROOM_CREATE: "ROOM_CREATE",
+  ROOM_UPDATE: "ROOM_UPDATE",
   MESSAGE_CREATE: "MESSAGE_CREATE",
   MESSAGE_DELETE: "MESSAGE_DELETE",
   MESSAGE_EDIT: "MESSAGE_EDIT",
@@ -164,8 +166,12 @@ export class WebSocketClient {
     this.onMessage("PRESENCE_UPDATE", this.handlePresenceUpdate.bind(this));
     this.onMessage("MESSAGE_CREATE", this.handleMessageCreate.bind(this));
     this.onMessage("MESSAGE_DELETE", this.handleMessageDelete.bind(this));
-    this.onMessage("MESSAGE_EDIT", this.handleMessageEdit.bind(this));
+    // MESSAGE_EDIT is handled by AuthProvider to avoid conflicts
     this.onMessage("ROOM_CREATE", this.handleRoomCreate.bind(this));
+    this.onMessage("ROOM_DELETE", this.handleRoomDelete.bind(this));
+    this.onMessage("ROOM_UPDATE", this.handleRoomUpdate.bind(this));
+    this.onMessage("ROOM_MEMBER_ADD", this.handleRoomMemberAdd.bind(this));
+    this.onMessage("ROOM_MEMBER_REMOVE", this.handleRoomMemberRemove.bind(this));
     this.onMessage("TYPING_INDICATOR", this.handleTypingIndicator.bind(this));    console.log("[WebSocket] Message handlers set up:", [...this.messageHandlers.entries()]);
   }
 
@@ -291,6 +297,8 @@ export class WebSocketClient {
           username: user.Username,
           discriminator: user.Discriminator,
           display_name: user.DisplayName,
+          about_me: user.AboutMe,
+          bio: user.Bio,
           avatar: user.Avatar,
           banner: user.Banner,
           presence: {
@@ -456,8 +464,14 @@ export class WebSocketClient {
         break;
 
       case "message_edit":
-        // Directly call the message edit handler
-        this.handleMessageEdit(payload);
+        // Route message_edit events to MESSAGE_EDIT handler registered by AuthProvider
+        const messageEditHandler = this.messageHandlers.get("MESSAGE_EDIT");
+        if (messageEditHandler) {
+          console.log("[WebSocket] Routing message_edit to MESSAGE_EDIT handler");
+          messageEditHandler(payload);
+        } else {
+          console.warn("[WebSocket] No MESSAGE_EDIT handler registered");
+        }
         break;
        
         case "typing_indicator":
@@ -476,6 +490,33 @@ export class WebSocketClient {
       
       case "roomCreate":
         this.handleRoomCreate(payload);
+        break;
+
+      case "roomDelete":
+        this.handleRoomDelete(payload);
+        break;
+
+      case "roomUpdate":
+        this.handleRoomUpdate(payload);
+        break;
+
+      case "roomMemberAdd":
+        this.handleRoomMemberAdd(payload);
+        break;
+
+      case "roomMemberRemove":
+        this.handleRoomMemberRemove(payload);
+        break;
+
+      case "roomOwnershipTransfer":
+        // Call the registered ROOM_OWNERSHIP_TRANSFER handler directly
+        const roomOwnershipHandler = this.messageHandlers.get("ROOM_OWNERSHIP_TRANSFER");
+        if (roomOwnershipHandler) {
+          console.log("[WebSocket] Routing roomOwnershipTransfer to ROOM_OWNERSHIP_TRANSFER handler");
+          roomOwnershipHandler(payload);
+        } else {
+          console.warn("[WebSocket] No ROOM_OWNERSHIP_TRANSFER handler registered");
+        }
         break;
 
       case "ready":
@@ -508,7 +549,7 @@ export class WebSocketClient {
         name: roomData.name || "",
         type: roomData.type || 0,
         recipients: roomData.recipients || [],
-        owner_id: roomData.owner_id || "",
+        owner_id: roomData.creator || roomData.owner_id || "",
         last_message_id: roomData.last_message_id || null,
         icon: roomData.icon || null,
         created_at: roomData.created_at || new Date().toISOString(),
@@ -523,11 +564,69 @@ export class WebSocketClient {
     }
   }
 
+  private handleRoomDelete(data: any): void {
+    console.log("[WebSocket] Handling room delete:", data);
+    const roomData = data.data || data;
+    if (roomData.room_id) {
+      console.log("[WebSocket] Dispatching room delete event:", roomData);
+      // Call the registered ROOM_DELETE handler directly
+      const roomDeleteHandler = this.messageHandlers.get("ROOM_DELETE");
+      if (roomDeleteHandler) {
+        roomDeleteHandler(roomData);
+      }
+    }
+  }
+
+  private handleRoomUpdate(data: any): void {
+    console.log("[WebSocket] Handling room update:", data);
+    const roomData = data.data || data;
+    if (roomData.room_id) {
+      console.log("[WebSocket] Dispatching room update event:", roomData);
+      // Call the registered ROOM_UPDATE handler directly
+      const roomUpdateHandler = this.messageHandlers.get("ROOM_UPDATE");
+      if (roomUpdateHandler) {
+        roomUpdateHandler(roomData);
+      }
+    }
+  }
+
+  private handleRoomMemberAdd(data: any): void {
+    console.log("[WebSocket] Handling room member add:", data);
+    const roomData = data.data || data;
+    if (roomData.room_id && roomData.user_id) {
+      console.log("[WebSocket] Dispatching room member add event:", roomData);
+      // Call the registered ROOM_MEMBER_ADD handler directly
+      const roomMemberAddHandler = this.messageHandlers.get("ROOM_MEMBER_ADD");
+      if (roomMemberAddHandler) {
+        roomMemberAddHandler(roomData);
+      }
+    }
+  }
+
+  private handleRoomMemberRemove(data: any): void {
+    console.log("[WebSocket] Handling room member remove:", data);
+    const roomData = data.data || data;
+    if (roomData.room_id && roomData.user_id) {
+      console.log("[WebSocket] Dispatching room member remove event:", roomData);
+      // Call the registered ROOM_MEMBER_REMOVE handler directly
+      const roomMemberRemoveHandler = this.messageHandlers.get("ROOM_MEMBER_REMOVE");
+      if (roomMemberRemoveHandler) {
+        roomMemberRemoveHandler(roomData);
+      }
+    }
+  }
+
   private handleMessageCreate(data: any): void {
     console.log("[WebSocket] Handling message create:", data);
     const messageData = data.data || data;
     if (messageData.room_id) {
       console.log("[WebSocket] Dispatching message create event:", messageData);
+      console.log("[WebSocket] Message type debug:", {
+        originalType: messageData.type,
+        typeOfType: typeof messageData.type,
+        systemType: messageData.system_type,
+        systemData: messageData.system_data
+      });
       this.dispatchEvent("messageCreate", {
         roomId: messageData.room_id,
         message: {
@@ -539,7 +638,10 @@ export class WebSocketClient {
           edited_at: messageData.edited_at || null,
           attachments: messageData.attachments || [],
           author: messageData.author || null,
-          message_refrences: messageData.message_refrences || []
+          message_refrences: messageData.message_refrences || [],
+          type: messageData.type,
+          system_type: messageData.system_type,
+          system_data: messageData.system_data
         }
       });
     }
@@ -568,34 +670,6 @@ export class WebSocketClient {
     }
   }
 
-  private handleMessageEdit(data: any): void {
-    console.log("[WebSocket] Handling message edit:", data);
-    const messageData = data.data || data;
-    if (messageData.room_id && messageData.message_id) {
-      console.log("[WebSocket] Dispatching message edit event:", messageData);
-      
-      // Dispatch event for UI updates
-      this.dispatchEvent("messageEdit", {
-        roomId: messageData.room_id,
-        messageId: messageData.message_id,
-        content: messageData.content,
-        editedAt: messageData.edited_at,
-        authorId: messageData.author_id
-      });
-      
-      // Update the message in cache if available
-      if (this.cache) {
-        const messageCache = window.messageCache;
-        if (messageCache) {
-          messageCache.updateMessage(messageData.room_id, messageData.message_id, {
-            content: messageData.content,
-            edited_at: messageData.edited_at
-          });
-        }
-      }
-    }
-  }
-
   private async requestUserData(userIds: string[]): Promise<void> {
     if (!userIds.length) return;
     
@@ -615,7 +689,10 @@ export class WebSocketClient {
       }
 
       const userData = await response.json();
+      console.log('[WebSocket] Raw bulk user response:', userData);
       if (userData && userData.users) {
+        console.log('[WebSocket] Users from bulk response:', userData.users);
+        console.log('[WebSocket] Sample user data:', Object.values(userData.users)[0]);
         this.cache.setUsers(userData.users);
       }
     } catch (error) {
@@ -633,6 +710,8 @@ export class WebSocketClient {
     // Cache users if available
     if (data.users && this.cache) {
       console.log("[WebSocket] Caching users:", Object.keys(data.users).length);
+      console.log("[WebSocket] READY users data:", data.users);
+      console.log("[WebSocket] Sample READY user:", Object.values(data.users)[0]);
       this.cache.setUsers(data.users);
     }
 
@@ -669,6 +748,9 @@ export class WebSocketClient {
           display_name: data.client_user.display_name || data.client_user.DisplayName || data.client_user.username || data.client_user.Username,
           avatar: data.client_user.avatar || data.client_user.Avatar,
           banner: data.client_user.banner || data.client_user.Banner,
+          bio: data.client_user.bio || data.client_user.Bio,
+          about_me: data.client_user.about_me || data.client_user.AboutMe,
+          flags: data.client_user.flags || data.client_user.Flags || 0,
           presence: {
             status: data.client_user.presence?.status || data.client_user.Presence?.Status || "online",
             custom_status: data.client_user.presence?.custom_status || data.client_user.Presence?.CustomStatus || ""

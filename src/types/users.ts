@@ -5,6 +5,8 @@ export interface UserType {
   display_name: string;
   avatar: string | null;
   banner: string | null;
+  bio?: string;
+  about_me?: string;
   bot: boolean;
   system: boolean;
   flags: number;

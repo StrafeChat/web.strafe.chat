@@ -41,6 +41,7 @@ type CacheContextType = {
   addMessage: (roomId: string, message: CachedMessage) => void;
   updateMessage: (roomId: string, messageId: string, updates: Partial<CachedMessage>) => void;
   deleteMessage: (roomId: string, messageId: string) => void;
+  hasMessages: (roomId: string) => boolean;
   getOldestMessageId: (roomId: string) => string | undefined;
   getNewestMessageId: (roomId: string) => string | undefined;
   hasReachedBeginning: (roomId: string) => boolean;
@@ -135,6 +136,8 @@ export const CacheProvider: ParentComponent = (props) => {
             username: userData.Username,
             discriminator: userData.Discriminator,
             display_name: userData.DisplayName || userData.Username,
+            about_me: userData.AboutMe,
+            bio: userData.Bio,
             avatar: userData.Avatar,
             banner: userData.Banner,
             badges: userData.Badges,
@@ -166,6 +169,7 @@ export const CacheProvider: ParentComponent = (props) => {
     addMessage: (roomId: string, message: CachedMessage) => messageCache.addMessage(roomId, message),
     updateMessage: (roomId: string, messageId: string, updates: Partial<CachedMessage>) => messageCache.updateMessage(roomId, messageId, updates),
     deleteMessage: (roomId: string, messageId: string) => messageCache.deleteMessage(roomId, messageId),
+    hasMessages: (roomId: string) => messageCache.hasMessages(roomId),
     getOldestMessageId: (roomId: string) => messageCache.getOldestMessageId(roomId),
     getNewestMessageId: (roomId: string) => messageCache.getNewestMessageId(roomId),
     hasReachedBeginning: (roomId: string) => messageCache.hasReachedBeginning(roomId),

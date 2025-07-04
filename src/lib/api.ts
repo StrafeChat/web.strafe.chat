@@ -94,6 +94,7 @@ export const api = {
       }),
   },
   rooms: {
+    list: () => apiRequest(API_ENDPOINTS.USER_ROOMS),
     create: (data: any) =>
       apiRequest(API_ENDPOINTS.CREATE_ROOM, {
         method: "POST",

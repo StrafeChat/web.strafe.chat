@@ -5,6 +5,8 @@ export interface CachedUser {
   DisplayName?: string;
   Avatar?: string;
   Banner?: string;
+  Bio?: string;
+  AboutMe?: string;
   Bot?: boolean;
   System?: boolean;
   Flags?: number;
@@ -27,7 +29,7 @@ export class UserCache {
 
   public setUsers(users: { [key: string]: any }) {
     for (const [id, user] of Object.entries(users)) {
-      this.users.set(id, user as CachedUser);
+      this.setUser({ ...user, ID: id, id: id });
     }
   }
 
@@ -43,6 +45,8 @@ export class UserCache {
         DisplayName: user.DisplayName || user.display_name || user.Username || user.username,
         Avatar: user.Avatar || user.avatar,
         Banner: user.Banner || user.banner,
+        Bio: user.Bio || user.bio,
+        AboutMe: user.AboutMe || user.about_me,
         Bot: user.Bot || user.bot,
         System: user.System || user.system,
         Flags: user.Flags || user.flags,

@@ -24,11 +24,13 @@ export const API_ENDPOINTS = {
   USER_ME: `${BASE_URL}/users/@me`,
   RELATIONSHIPS: `${BASE_URL}/users/@me/relationships`,
   CREATE_ROOM: `${BASE_URL}/users/@me/rooms`,
+  USER_ROOMS: `${BASE_URL}/users/@me/rooms`,
   ROOM_MESSAGES: (roomId: string) => `${BASE_URL}/rooms/${roomId}/messages`,
   UPDATE_STATUS: `${BASE_URL}/users/@me/status`,
   BULK_USERS: `${BASE_URL}/users/bulk`,
   TYPING_INDICATOR: (roomId: string) => `${BASE_URL}/rooms/${roomId}/typing`,
   SESSIONS: `${BASE_URL}/users/@me/sessions`,
+  ROOMS: `${BASE_URL}/rooms`,
 };
 
 const API_HEADERS = {
@@ -51,6 +53,8 @@ export type Clientuser = {
   date_of_birth?: string;
   avatar?: string;
   banner?: string;
+  bio?: string;
+  about_me?: string;
   presence?: {
     status: string;
     custom_status: string;
@@ -168,8 +172,14 @@ export const AuthProvider: ParentComponent = (props) => {
     client.onMessage("relationshipAccept", handleRelationshipAcceptEvent);
     client.onMessage("relationshipDelete", handleRelationshipEvent);
     client.onMessage("ROOM_CREATE", handleRoomCreateEvent);
+    client.onMessage("ROOM_DELETE", handleRoomDeleteEvent);
+    client.onMessage("ROOM_UPDATE", handleRoomUpdateEvent);
+    client.onMessage("ROOM_MEMBER_ADD", handleRoomMemberAddEvent);
+    client.onMessage("ROOM_MEMBER_REMOVE", handleRoomMemberRemoveEvent);
+    client.onMessage("ROOM_OWNERSHIP_TRANSFER", handleRoomOwnershipTransferEvent);
     client.onMessage("presence", handlePresenceEvent);
     client.onMessage("MESSAGE_CREATE", handleMessageCreateEvent);
+    client.onMessage("MESSAGE_EDIT", handleMessageEditEvent);
   };
 
   const handleReadyEvent = (data: any) => {
@@ -226,27 +236,29 @@ export const AuthProvider: ParentComponent = (props) => {
   };
 
   const normalizeUserData = (userData: any): Clientuser => ({
-    id: userData.ID,
-    username: userData.Username,
-    discriminator: userData.Discriminator,
-    display_name: userData.DisplayName || userData.Username,
-    email: userData.Email,
-    avatar: userData.Avatar,
-    banner: userData.Banner,
-    date_of_birth: userData.DateOfBirth,
-    friends: userData.Friends || [],
-    presence: userData.Presence ? {
-      status: userData.Presence.Status || "offline",
-      custom_status: userData.Presence.CustomStatus || "",
+    id: userData.id || userData.ID,
+    username: userData.username || userData.Username,
+    discriminator: userData.discriminator || userData.Discriminator,
+    display_name: userData.display_name || userData.DisplayName || userData.username || userData.Username,
+    email: userData.email || userData.Email,
+    avatar: userData.avatar || userData.Avatar,
+    banner: userData.banner || userData.Banner,
+    bio: userData.bio || userData.Bio,
+    about_me: userData.about_me || userData.AboutMe,
+    date_of_birth: userData.date_of_birth || userData.DateOfBirth,
+    friends: userData.friends || userData.Friends || [],
+    presence: (userData.presence || userData.Presence) ? {
+      status: (userData.presence?.status || userData.Presence?.Status) || "offline",
+      custom_status: (userData.presence?.custom_status || userData.Presence?.CustomStatus) || "",
     } : undefined,
   });
 
   const normalizeRelationshipRequests = (requests: any[]): Relationship[] =>
     requests.map((request) => ({
-      id: request.ID,
-      sender_id: request.SenderID,
-      recipient_id: request.RecipientID,
-      created_at: request.CreatedAt || new Date().toISOString(),
+      id: request.id || request.ID,
+      sender_id: request.sender_id || request.SenderID,
+      recipient_id: request.recipient_id || request.RecipientID,
+      created_at: request.created_at || request.CreatedAt || new Date().toISOString(),
     }));
 
   const normalizeRoomsData = (rooms: any, users: any): RoomWithRecipients[] =>
@@ -255,9 +267,10 @@ export const AuthProvider: ParentComponent = (props) => {
       name: room.Name || room.name || "",
       type: room.Type || room.type || 0,
       recipients: room.Recipients || room.recipients || [],
-      owner_id: room.OwnerID || room.owner_id || "",
+      owner_id: room.Creator || room.creator || room.OwnerID || room.owner_id || "",
       last_message_id: room.LastMessageID || room.LastMessageId || room.last_message_id || null,
       icon: room.Icon || room.icon || null,
+      topic: room.Topic || room.topic || "",
       created_at: room.CreatedAt || room.created_at || new Date().toISOString(),
       updated_at: room.UpdatedAt || room.updated_at || null,
       recipients_data: (room.Recipients || room.recipients || [])?.map((recipientId: string) =>
@@ -301,7 +314,7 @@ export const AuthProvider: ParentComponent = (props) => {
       name: roomData.name || "",
       type: roomData.type || 0,
       recipients: roomData.recipients || [],
-      owner_id: roomData.owner_id || "",
+      owner_id: roomData.creator || roomData.owner_id || "",
       last_message_id: roomData.last_message_id || null,
       icon: roomData.icon || null,
       created_at: roomData.created_at || new Date().toISOString(),
@@ -319,7 +332,167 @@ export const AuthProvider: ParentComponent = (props) => {
       }).filter(Boolean)
     };
     
-    setRooms(prev => [...prev, newRoom]);
+    setRooms(prev => [...prev, newRoom as RoomWithRecipients]);
+  };
+
+  const handleRoomDeleteEvent = (data: any) => {
+    const roomData = data.data || data;
+    const roomId = roomData.room_id;
+    
+    if (roomId) {
+      console.log("[AuthProvider] Room deleted:", roomId);
+      setRooms(prev => prev.filter(room => room.id !== roomId));
+      
+      // If user is currently viewing the deleted room, redirect to home
+      const currentLocation = window.location.pathname;
+      if (currentLocation.includes(`/rooms/${roomId}`)) {
+        window.location.href = '/home';
+      }
+    }
+  };
+
+  const handleRoomUpdateEvent = (data: any) => {
+    const roomData = data.data || data;
+    const roomId = roomData.room_id;
+    
+    if (roomId) {
+      console.log("[AuthProvider] Room updated:", roomData);
+      
+      setRooms(prev => prev.map(room => {
+        if (room.id === roomId) {
+          const updatedRoom = { ...room };
+          
+          // Update name if provided
+          if (roomData.name !== undefined) {
+            updatedRoom.name = roomData.name;
+          }
+          
+          // Update topic if provided
+          if (roomData.topic !== undefined) {
+            updatedRoom.topic = roomData.topic;
+          }
+          
+          // Update icon if provided
+          if (roomData.icon !== undefined) {
+            updatedRoom.icon = roomData.icon;
+          }
+          
+          // Update timestamp
+          updatedRoom.updated_at = new Date().toISOString();
+          
+          return updatedRoom;
+        }
+        return room;
+      }));
+    }
+  };
+
+  const handleRoomMemberAddEvent = (data: any) => {
+    const roomData = data.data || data;
+    const roomId = roomData.room_id;
+    const userId = roomData.user_id;
+    const recipients = roomData.recipients || [];
+    
+    if (roomId && userId) {
+      console.log("[AuthProvider] Member added to room:", { roomId, userId });
+      
+      setRooms(prev => prev.map(room => {
+        if (room.id === roomId) {
+          // Update recipients list
+          const updatedRecipients = [...recipients];
+          const updatedRecipientsData = updatedRecipients.map((recipientId: string) => {
+            const userData = cache.getUser(recipientId);
+            return userData ? {
+              id: recipientId,
+              username: userData.username,
+              discriminator: userData.discriminator,
+              display_name: userData.display_name || userData.username,
+              avatar: userData.avatar,
+              presence: userData.presence
+            } : null;
+          }).filter(Boolean);
+          
+          return {
+            ...room,
+            recipients: updatedRecipients,
+            recipients_data: updatedRecipientsData
+          };
+        }
+        return room;
+      }));
+    }
+  };
+
+  const handleRoomMemberRemoveEvent = (data: any) => {
+    const roomData = data.data || data;
+    const roomId = roomData.room_id;
+    const userId = roomData.user_id;
+    const recipients = roomData.recipients || [];
+    const newCreator = roomData.new_creator;
+    const currentUser = user();
+    
+    if (roomId && userId && currentUser) {
+      console.log("[AuthProvider] Member removed from room:", { roomId, userId });
+      
+      // If the current user was removed, remove the room from their list
+      if (userId === currentUser.id) {
+        setRooms(prev => prev.filter(room => room.id !== roomId));
+        
+        // If user is currently viewing the room they were removed from, redirect to home
+        const currentLocation = window.location.pathname;
+        if (currentLocation.includes(`/rooms/${roomId}`)) {
+          window.location.href = '/home';
+        }
+      } else {
+        // Update the room's recipients list
+        setRooms(prev => prev.map(room => {
+          if (room.id === roomId) {
+            const updatedRecipients = [...recipients];
+            const updatedRecipientsData = updatedRecipients.map((recipientId: string) => {
+              const userData = cache.getUser(recipientId);
+              return userData ? {
+                id: recipientId,
+                username: userData.username,
+                discriminator: userData.discriminator,
+                display_name: userData.display_name || userData.username,
+                avatar: userData.avatar,
+                presence: userData.presence
+              } : null;
+            }).filter(Boolean);
+            
+            return {
+              ...room,
+              recipients: updatedRecipients,
+              recipients_data: updatedRecipientsData,
+              owner_id: newCreator || room.owner_id // Update creator if ownership was transferred
+            };
+          }
+          return room;
+        }));
+      }
+    }
+  };
+
+  const handleRoomOwnershipTransferEvent = (data: any) => {
+    const roomData = data.data || data;
+    const roomId = roomData.room_id;
+    const oldOwner = roomData.old_owner;
+    const newOwner = roomData.new_owner;
+    
+    if (roomId && newOwner) {
+      console.log("[AuthProvider] Room ownership transferred:", { roomId, oldOwner, newOwner });
+      
+      // Update the room's owner_id
+      setRooms(prev => prev.map(room => {
+        if (room.id === roomId) {
+          return {
+            ...room,
+            owner_id: newOwner
+          };
+        }
+        return room;
+      }));
+    }
   };
 
   const sendTypingIndicator = async (roomId: string): Promise<void> => {
@@ -512,14 +685,16 @@ export const AuthProvider: ParentComponent = (props) => {
           Object.entries(userData.users).forEach(([userId, userData]: [string, any]) => {
             cache.setUser({
               id: userId,
-              username: userData.Username,
-              discriminator: userData.Discriminator,
-              display_name: userData.DisplayName,
-              avatar: userData.Avatar,
-              banner: userData.Banner,
-              presence: userData.Presence ? {
-                status: userData.Presence.Status,
-                custom_status: userData.Presence.CustomStatus
+              username: userData.username || userData.Username,
+              discriminator: userData.discriminator || userData.Discriminator,
+              display_name: userData.display_name || userData.DisplayName,
+              avatar: userData.avatar || userData.Avatar,
+              banner: userData.banner || userData.Banner,
+              bio: userData.bio || userData.Bio,
+              about_me: userData.about_me || userData.AboutMe,
+              presence: (userData.presence || userData.Presence) ? {
+                status: (userData.presence?.status || userData.Presence?.Status),
+                custom_status: (userData.presence?.custom_status || userData.Presence?.CustomStatus)
               } : undefined
             });
           });
@@ -675,6 +850,9 @@ export const AuthProvider: ParentComponent = (props) => {
     const currentLocation = window.location.pathname;
     const isViewingThisRoom = currentLocation.includes(`/rooms/${messageData.room_id}`);
     
+    // Check if room has no cached messages before adding this one
+    const hadNoMessages = !cache.hasMessages(messageData.room_id);
+    
     // Create a normalized message object
     const normalizedMessage = {
       id: messageData.id,
@@ -684,12 +862,24 @@ export const AuthProvider: ParentComponent = (props) => {
       created_at: messageData.created_at || new Date().toISOString(),
       edited_at: messageData.edited_at || null,
       attachments: messageData.attachments || [],
+      type: messageData.type,
+      system: messageData.system,
+      system_type: messageData.system_type,
+      system_data: messageData.system_data,
     };
     
     // Add message to cache
     if (window.messageCache) {
       console.log("[AuthProvider] Adding message to cache:", normalizedMessage);
       window.messageCache.addMessage(messageData.room_id, normalizedMessage);
+    }
+    
+    // If room had no messages before this one, fetch historical messages
+    if (hadNoMessages) {
+      console.log("[AuthProvider] Room had no cached messages, fetching historical messages for room:", messageData.room_id);
+      fetchRoomMessages(messageData.room_id).catch(error => {
+        console.error("[AuthProvider] Failed to fetch historical messages:", error);
+      });
     }
     
     // Dispatch messageCreate event for UI components to listen to
@@ -733,6 +923,56 @@ export const AuthProvider: ParentComponent = (props) => {
         return room;
       });
     });
+  };
+
+  const handleMessageEditEvent = (data: any) => {
+    console.log("[AuthProvider] Raw message edit data received:", data);
+    // Handle both direct payload and nested data structure
+    const messageData = data.payload || data.data || data;
+    console.log("[AuthProvider] Extracted messageData:", messageData);
+    console.log("[AuthProvider] messageData.room_id:", messageData.room_id);
+    console.log("[AuthProvider] messageData.message_id:", messageData.message_id);
+    
+    if (!messageData.room_id || !messageData.message_id) {
+      console.warn("[AuthProvider] Missing room_id or message_id, skipping message edit");
+      return;
+    }
+    
+    const currentUser = user();
+    if (!currentUser) {
+      console.warn("[AuthProvider] No current user, skipping message edit");
+      return;
+    }
+    
+    console.log("[AuthProvider] Processing message edit event:", messageData);
+    
+    // Update message in cache
+    if (window.messageCache) {
+      console.log("[AuthProvider] Updating message in cache:", {
+        roomId: messageData.room_id,
+        messageId: messageData.message_id,
+        content: messageData.content,
+        editedAt: messageData.edited_at
+      });
+      
+      window.messageCache.updateMessage(messageData.room_id, messageData.message_id, {
+        content: messageData.content,
+        edited_at: messageData.edited_at || new Date().toISOString()
+      });
+    }
+    
+    // Dispatch messageEdit event for UI components to listen to
+    // This is critical for real-time updates in the ChatArea component
+    console.log("[AuthProvider] Dispatching messageEdit event");
+    window.dispatchEvent(new CustomEvent("messageEdit", {
+      detail: {
+        roomId: messageData.room_id,
+        messageId: messageData.message_id,
+        content: messageData.content,
+        editedAt: messageData.edited_at,
+        authorId: messageData.author_id
+      }
+    }));
   };
 
   const fetchUnreadMessages = async (roomId: string): Promise<void> => {
@@ -788,6 +1028,39 @@ export const AuthProvider: ParentComponent = (props) => {
 
     } catch (error) {
       console.error('Failed to mark messages as read:', error);
+    }
+  };
+
+  const fetchRoomMessages = async (roomId: string): Promise<void> => {
+    try {
+      console.log(`[AuthProvider] Fetching messages for room: ${roomId}`);
+      const response = await fetch(`${BASE_URL}/rooms/${roomId}/messages`, {
+        headers: {
+          ...API_HEADERS.JSON,
+          ...API_HEADERS.SESSION(),
+        },
+      });
+      
+      if (!response.ok) {
+        throw new Error(`Failed to fetch messages: ${response.status}`);
+      }
+      
+      const data = await response.json();
+      
+      // Handle different response formats
+      const messages = Array.isArray(data) ? data : 
+                      data.messages ? data.messages : 
+                      data.success && data.messages ? data.messages : [];
+      
+      if (Array.isArray(messages) && messages.length > 0) {
+        console.log(`[AuthProvider] Fetched ${messages.length} historical messages for room: ${roomId}`);
+        // Add messages to cache using 'older' position to place them before the real-time message
+        cache.setMessages(roomId, messages, 'older');
+      } else {
+        console.log(`[AuthProvider] No historical messages found for room: ${roomId}`);
+      }
+    } catch (error) {
+      console.error(`[AuthProvider] Failed to fetch messages for room ${roomId}:`, error);
     }
   };
 

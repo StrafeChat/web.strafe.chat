@@ -1,17 +1,30 @@
-import { Component, createSignal, Show } from "solid-js";
+import { Component, createSignal, Show, createEffect } from "solid-js";
 import { useAuth } from "../../../lib/providers/auth/AuthProvider";
 import { useTransContext } from "@mbarzda/solid-i18next";
 import { Avatar } from "../../common/Avatar";
 import { useToast } from "../../common/Toast";
 import { BASE_URL, FS_URL } from "../../../constants";
+import { parseMarkdown } from "../../../lib/utils/markdownUtils";
 
 const ProfileSettings: Component = () => {
   const { user, isMobile, updateUser } = useAuth();
   const [t] = useTransContext();
   const [uploading, setUploading] = createSignal(false);
   const [uploadingBanner, setUploadingBanner] = createSignal(false);
+  const [bio, setBio] = createSignal(user()?.bio || "");
+  const [aboutMe, setAboutMe] = createSignal(user()?.about_me || "");
+  const [savingProfile, setSavingProfile] = createSignal(false);
 
   const { showToast } = useToast();
+
+  // Update local state when user data changes
+  createEffect(() => {
+    const currentUser = user();
+    if (currentUser) {
+      setBio(currentUser.bio || "");
+      setAboutMe(currentUser.about_me || "");
+    }
+  });
 
   const handleAvatarUpload = async (event: Event) => {
     const input = event.target as HTMLInputElement;
@@ -116,6 +129,38 @@ const ProfileSettings: Component = () => {
     }
   };
 
+  const handleProfileSave = async () => {
+    try {
+      setSavingProfile(true);
+      
+      const response = await fetch(`${BASE_URL}/users/@me/profile`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Session-Token": localStorage.getItem("sc_token") || "",
+        },
+        body: JSON.stringify({
+          bio: bio().trim() || null,
+          about_me: aboutMe().trim() || null,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to update profile");
+      
+      const updatedUser = await response.json();
+      console.log("[ProfileSettings] Backend response:", updatedUser);
+      console.log("[ProfileSettings] Bio in response:", updatedUser.bio);
+      console.log("[ProfileSettings] AboutMe in response:", updatedUser.about_me);
+      updateUser(updatedUser);
+      showToast("Profile updated successfully!", "success");
+    } catch (error) {
+      console.error("Profile update error:", error);
+      showToast("Failed to update profile", "error");
+    } finally {
+      setSavingProfile(false);
+    }
+  };
+
   return (
     <div class={`mb-8 ${isMobile() ? "" : "mr-5"}`}>
       <h2 class="text-xl font-semibold text-text-primary mb-1">
@@ -213,9 +258,67 @@ const ProfileSettings: Component = () => {
             </div>
           </div>
 
-          {/* Rest of the profile settings */}
+          {/* Bio and About Me Fields */}
           <div class="flex flex-col gap-4">
-            <div class="flex-1 text-center md:text-left"></div>
+            {/* About Me Field */}
+            <div class="flex flex-col gap-2">
+              <label class="text-sm font-medium text-text-primary">
+                About Me
+              </label>
+              <textarea
+                value={aboutMe()}
+                onInput={(e) => setAboutMe(e.target.value)}
+                placeholder="Tell others a bit about yourself..."
+                class="w-full p-3 bg-background2 border border-border rounded-lg text-text-primary placeholder-text-secondary resize-none focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                rows="2"
+                maxLength="150"
+              />
+              <div class="text-xs text-text-secondary">
+                {aboutMe().length}/150 characters
+              </div>
+            </div>
+
+            {/* Bio Field */}
+            <div class="flex flex-col gap-2">
+              <label class="text-sm font-medium text-text-primary">
+                Biography
+              </label>
+              <textarea
+                value={bio()}
+                onInput={(e) => setBio(e.target.value)}
+                placeholder="Write a longer bio about yourself. Supports Markdown formatting..."
+                class="w-full p-3 bg-background2 border border-border rounded-lg text-text-primary placeholder-text-secondary resize-none focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                rows="6"
+                maxLength="1000"
+              />
+              <div class="text-xs text-text-secondary">
+                {bio().length}/1000 characters • Supports Markdown
+              </div>
+            </div>
+
+            {/* Bio Preview */}
+            <Show when={bio().trim()}>
+              <div class="flex flex-col gap-2">
+                <label class="text-sm font-medium text-text-primary">
+                  Bio Preview
+                </label>
+                <div class="p-3 bg-background2 border border-border rounded-lg">
+                  <div 
+                    class="text-text-primary markdown-content"
+                    innerHTML={parseMarkdown(bio())}
+                  />
+                </div>
+              </div>
+            </Show>
+
+            {/* Save Button */}
+            <button
+              onClick={handleProfileSave}
+              disabled={savingProfile()}
+              class="self-start px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+            >
+              {savingProfile() ? "Saving..." : "Save Profile"}
+            </button>
           </div>
         </div>
       </div>

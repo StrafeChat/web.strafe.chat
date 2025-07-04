@@ -1,3 +1,5 @@
+import { MessageType, SystemMessageType } from '../../types/messageTypes';
+
 export interface CachedMessage {
   id?: string;
   nonce?: string;
@@ -19,13 +21,22 @@ export interface CachedMessage {
     size: number;
     url: string;
   }>;
+  type?: MessageType;
+  system_type?: SystemMessageType;
+  system_data?: {
+    user_id?: string;
+    actor_id?: string;
+    old_value?: string;
+    new_value?: string;
+    extra_data?: any;
+  };
 }
 
 export class MessageCache {
   private messages: Map<string, Map<string, CachedMessage>> = new Map();
   private messageUpdateCallbacks: ((roomId: string, message: CachedMessage) => void)[] = [];
   private deletedMessageIds: Map<string, Set<string>> = new Map(); // Track deleted message IDs by room
-  private readonly MAX_MESSAGES_PER_ROOM = 100; // Increased from 50 to 100
+  private readonly MAX_MESSAGES_PER_ROOM = 200; // Increased to 200 to reduce message loss
   private readonly DELETED_MESSAGES_STORAGE_KEY = 'sc_deleted_messages';
   // Track the oldest and newest message IDs for each room
   private oldestMessageIds: Map<string, string> = new Map();
@@ -33,6 +44,8 @@ export class MessageCache {
   // Track if we've reached the beginning or end of message history
   private reachedBeginning: Map<string, boolean> = new Map();
   private reachedEnd: Map<string, boolean> = new Map();
+  // Track when messages were last fetched for each room
+  private lastFetchTimes: Map<string, number> = new Map();
 
   constructor() {
     this.loadDeletedMessagesFromStorage();
@@ -106,8 +119,11 @@ export class MessageCache {
       }
     });
 
-    // Trim messages if they exceed the limit
-    if (roomMessages.size > this.MAX_MESSAGES_PER_ROOM) {
+    // Trim messages if they exceed the limit (more conservative approach)
+    const TRIM_THRESHOLD = this.MAX_MESSAGES_PER_ROOM + 50; // Allow some buffer before trimming
+    const TRIM_TARGET = this.MAX_MESSAGES_PER_ROOM - 25; // Trim to 25 messages below the limit
+    
+    if (roomMessages.size > TRIM_THRESHOLD) {
       // If we're adding older messages, remove newer ones
       if (position === 'older') {
         const messagesToDelete = Array.from(roomMessages.entries())
@@ -116,7 +132,7 @@ export class MessageCache {
             const dateB = b[1].created_at ? new Date(b[1].created_at).getTime() : 0;
             return dateB - dateA; // Sort newest first
           })
-          .slice(0, roomMessages.size - this.MAX_MESSAGES_PER_ROOM);
+          .slice(0, roomMessages.size - TRIM_TARGET);
         messagesToDelete.forEach(([key]) => roomMessages.delete(key));
       } else {
         // Otherwise remove older messages
@@ -126,14 +142,24 @@ export class MessageCache {
             const dateB = b[1].created_at ? new Date(b[1].created_at).getTime() : 0;
             return dateA - dateB; // Sort oldest first
           })
-          .slice(0, roomMessages.size - this.MAX_MESSAGES_PER_ROOM);
+          .slice(0, roomMessages.size - TRIM_TARGET);
         messagesToDelete.forEach(([key]) => roomMessages.delete(key));
       }
     }
+    
+    // Update the last fetch time for this room
+    this.setLastFetchTime(roomId);
+    
+    console.log(`[MessageCache] Set ${sortedMessages.length} messages for room ${roomId} (position: ${position})`);
   }
 
   public getMessages(roomId: string): CachedMessage[] {
     return Array.from(this.messages.get(roomId)?.values() || []);
+  }
+
+  public hasMessages(roomId: string): boolean {
+    const roomMessages = this.messages.get(roomId);
+    return roomMessages ? roomMessages.size > 0 : false;
   }
 
   public getMessage(roomId: string, messageId: string): CachedMessage | undefined {
@@ -162,12 +188,18 @@ export class MessageCache {
       callback(roomId, message);
     });
 
-    // Trim messages if they exceed the limit
-    if (roomMessages.size > this.MAX_MESSAGES_PER_ROOM) {
-      const oldestMessage = Array.from(roomMessages.entries())[0];
-      if (oldestMessage) {
-        roomMessages.delete(oldestMessage[0]);
-      }
+    // Trim messages if they exceed the limit (conservative approach)
+    const TRIM_THRESHOLD = this.MAX_MESSAGES_PER_ROOM + 50;
+    if (roomMessages.size > TRIM_THRESHOLD) {
+      // Remove older messages to make room
+      const messagesToDelete = Array.from(roomMessages.entries())
+        .sort((a, b) => {
+          const dateA = a[1].created_at ? new Date(a[1].created_at).getTime() : 0;
+          const dateB = b[1].created_at ? new Date(b[1].created_at).getTime() : 0;
+          return dateA - dateB; // Sort oldest first
+        })
+        .slice(0, 25); // Remove 25 oldest messages
+      messagesToDelete.forEach(([key]) => roomMessages.delete(key));
     }
   }
 
@@ -286,6 +318,26 @@ export class MessageCache {
   // Check if we've reached the end of message history
   public hasReachedEnd(roomId: string): boolean {
     return this.reachedEnd.get(roomId) || false;
+  }
+  
+  public getLastFetchTime(roomId: string): number | undefined {
+    return this.lastFetchTimes.get(roomId);
+  }
+  
+  public setLastFetchTime(roomId: string): void {
+    this.lastFetchTimes.set(roomId, Date.now());
+  }
+  
+  public clearMessages(roomId: string): void {
+    if (!this.messages.has(roomId)) return;
+    
+    console.log(`[MessageCache] Clearing all messages for room ${roomId}`);
+    this.messages.get(roomId)?.clear();
+    this.oldestMessageIds.delete(roomId);
+    this.newestMessageIds.delete(roomId);
+    this.reachedBeginning.delete(roomId);
+    this.reachedEnd.delete(roomId);
+    // Don't clear deleted message IDs as they should persist
   }
 
   // Reset the reached flags for a room
