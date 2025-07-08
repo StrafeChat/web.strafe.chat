@@ -1,5 +1,6 @@
-import { Component, Show } from "solid-js";
+import { Component, Show, createEffect } from "solid-js";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
+import { useNavigate } from "@solidjs/router";
 
 interface ProtectedRouteProps {
   children: any;
@@ -7,6 +8,14 @@ interface ProtectedRouteProps {
 
 const ProtectedRoute: Component<ProtectedRouteProps> = (props) => {
   const { isAuthenticated, loading } = useAuth();
+  const navigate = useNavigate();
+
+  createEffect(() => {
+    // Only redirect if not loading and not authenticated
+    if (!loading() && !isAuthenticated()) {
+      navigate("/login", { replace: true });
+    }
+  });
 
   return (
     <Show
@@ -15,14 +24,7 @@ const ProtectedRoute: Component<ProtectedRouteProps> = (props) => {
     >
       <Show
         when={isAuthenticated()}
-        fallback={
-          <div class="flex items-center justify-center min-h-screen">
-            <div class="text-center">
-              <h1 class="text-2xl font-bold mb-4">Access Denied</h1>
-              <p class="text-gray-600">Please log in to access this page.</p>
-            </div>
-          </div>
-        }
+        fallback={null}
       >
         {props.children}
       </Show>

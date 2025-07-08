@@ -9,7 +9,7 @@ import en from "./locales/list/en-us.json";
 import es from "./locales/list/es-es.json";
 import fr from "./locales/list/fr-fr.json";
 import ar from "./locales/list/ar-sa.json";
-import { ParentProps, createEffect, lazy } from "solid-js";
+import { ParentProps, createEffect, lazy, Show } from "solid-js";
 import { Interface } from "./components/shared/Interface";
 import { getDirection } from "./lib/utils/direction";
 import { applyCustomStyles } from "./lib/utils/customStyles";
@@ -20,16 +20,31 @@ import { ModalProvider } from "./lib/providers/modal/ModalProvider";
 import LinkConfirmationHandler from "./components/LinkConfirmationHandler";
 import UpdateNotificationModal from "./components/modals/UpdateNotificationModal";
 import { useUpdateNotification } from "./lib/hooks/useUpdateNotification";
+import { useAuth } from "./lib/providers/auth/AuthProvider";
 // Import test utilities for development
 import "./lib/utils/updateTestUtils";
 
-const MountApp = (props: ParentProps) => {
-  const savedLang = localStorage.getItem("sc_lang") || "en_us";
+const UpdateNotificationWrapper = () => {
+  const { isAuthenticated } = useAuth();
   const {
     updateInfo,
     isModalOpen,
     handleModalClose
   } = useUpdateNotification();
+
+  return (
+    <Show when={isAuthenticated()}>
+      <UpdateNotificationModal
+        isOpen={isModalOpen()}
+        onClose={handleModalClose}
+        updateInfo={updateInfo()}
+      />
+    </Show>
+  );
+};
+
+const MountApp = (props: ParentProps) => {
+  const savedLang = localStorage.getItem("sc_lang") || "en_us";
 
   createEffect(() => {
     // Set language and direction
@@ -63,11 +78,7 @@ const MountApp = (props: ParentProps) => {
                     <SettingsProvider>
                       <ModalProvider>
                         <LinkConfirmationHandler />
-                        <UpdateNotificationModal
-                          isOpen={isModalOpen()}
-                          onClose={handleModalClose}
-                          updateInfo={updateInfo()}
-                        />
+                        <UpdateNotificationWrapper />
                         <div class="h-[100dvh] w-full overflow-hidden">{props.children}</div>
                       </ModalProvider>
                     </SettingsProvider>

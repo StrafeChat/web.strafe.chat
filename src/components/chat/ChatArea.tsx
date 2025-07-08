@@ -12,7 +12,7 @@ import Message from "./Message";
 import { useTransContext } from "@mbarzda/solid-i18next";
 import { useCache } from "../../lib/providers/cache/CacheProvider";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
-import { BASE_URL, FS_URL } from "../../constants";
+import { BASE_URL } from "../../constants";
 import { CachedMessage } from "../../lib/cache/MessageCache";
 import { useUserSettings } from "../../lib/providers/userSettings/UserSettingsProvider";
 import { hasUnclosedCodeBlock, updateCodeBlockIndicator } from "../../lib/utils/codeBlockUtils";
@@ -1296,17 +1296,13 @@ const ChatArea: Component = () => {
                     const user = cache.getUser(typingUser.id);
                     return (
                       <div class="w-6 h-6 rounded-full bg-primary flex-shrink-0 overflow-hidden border border-background2">
-                        {user?.avatar ? (
-                          <img 
-                            src={`${FS_URL}/avatars/${user.id}/${user.avatar}`} 
-                            alt={user.display_name || user.username} 
-                            class="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div class="w-full h-full flex items-center justify-center bg-primary text-white text-xs font-medium">
-                            {(user?.display_name || user?.username || "?").charAt(0).toUpperCase()}
-                          </div>
-                        )}
+                        <Avatar
+                          userId={user?.id || ''}
+                          avatar={user?.avatar}
+                          alt={user?.display_name || user?.username}
+                          class=""
+                          size="sm"
+                        />
                       </div>
                     );
                   }}
@@ -1614,17 +1610,13 @@ const ChatArea: Component = () => {
                     const user = cache.getUser(typingUser.id);
                     return (
                       <div class="w-6 h-6 rounded-full bg-primary flex-shrink-0 overflow-hidden border border-background2">
-                        {user?.avatar ? (
-                          <img 
-                            src={`${FS_URL}/avatars/${user.id}/${user.avatar}`} 
-                            alt={user.display_name || user.username} 
-                            class="w-full h-full object-cover"
-                          />
-                        ) : (
-                          <div class="w-full h-full flex items-center justify-center bg-primary text-white text-xs font-medium">
-                            {(user?.display_name || user?.username || "?").charAt(0).toUpperCase()}
-                          </div>
-                        )}
+                        <Avatar
+                          userId={user?.id || ""}
+                          avatar={user?.avatar}
+                          alt={user?.display_name || user?.username}
+                          class=""
+                          size="sm"
+                        />
                       </div>
                     );
                   }}

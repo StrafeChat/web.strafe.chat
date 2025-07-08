@@ -9,6 +9,7 @@ import {
 } from "solid-js";
 import { FS_URL } from "../../constants";
 import { UserStatus, StatusIndicator } from "./StatusIndicator";
+import { Avatar } from "./Avatar";
 import { Portal } from "solid-js/web";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
 import { useSettings } from "../../lib/providers/settings/SettingsProvider";
@@ -187,11 +188,12 @@ const ClientUserPopup: Component<Props> = (props) => {
               </Show>
               <div class="absolute -bottom-6 left-2">
                 <div class="relative w-[80px] h-[80px]">
-                  <img
-                    src={`${FS_URL}/avatars/${user()?.id}/${user()?.avatar || "default.webp"}`}
+                  <Avatar
+                    userId={user()?.id!}
+                    avatar={user()?.avatar}
                     alt="User avatar"
-                    class="w-full h-full rounded-full object-cover border-4 border-background2"
-                    style={{ "aspect-ratio": "1/1" }}
+                    class="object-cover border-4 border-background2"
+                    size="xl"
                   />
                   <div class="absolute bottom-0.5 right-0.5">
                     <StatusIndicator

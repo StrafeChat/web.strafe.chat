@@ -295,7 +295,7 @@ export const PendingTab: Component = () => {
                   isIncoming ? request.sender_id : request.recipient_id,
                 );
                 return (
-                  <div class="flex flex-col bg-background-secondary p-2 pb-3.5 border-t-2 border-t-border hover:bg-border hover:rounded-lg hover:cursor-pointer">
+                  <div class="flex flex-col p-2 pb-3.5 border-t-2 border-t-border hover:bg-border hover:rounded-lg hover:cursor-pointer">
                     <div class="flex items-center gap-3">
                       <Avatar
                         userId={person.id ?? ""}

@@ -1,5 +1,4 @@
 import { Component, createMemo, Show, createSignal, onCleanup, createEffect, For } from "solid-js";
-import { FS_URL } from "../../constants";
 import { useCache } from "../../lib/providers/cache/CacheProvider";
 import { useTransContext } from "@mbarzda/solid-i18next";
 import { Tooltip } from "../common/Tooltip";
@@ -11,6 +10,7 @@ import { parseMarkdown } from "../../lib/utils/markdownUtils";
 import { useUserSettings } from "../../lib/providers/userSettings/UserSettingsProvider";
 import UserPopupMenu from "../common/UserPopupMenu";
 import { MessageType, SystemMessageType } from "../../types/messageTypes";
+import { Avatar } from "../common/Avatar";
 
 interface MessageProps {
   id: string | undefined;
@@ -625,10 +625,12 @@ const Message: Component<MessageProps> = (props) => {
                       class="flex items-center gap-1.5 ml-[42px] px-3 rounded hover:bg-surface hover:bg-opacity-20 cursor-pointer transition-colors max-w-[calc(100%-3rem)] overflow-hidden"
                      onClick={() => scrollToMessage(refMessage.id)}
                    >
-                     <img
-                       src={`${FS_URL}/avatars/${refMessage.author_id}/${refMessage.avatar || "default.webp"}`}
+                     <Avatar
+                       userId={refMessage.author_id}
+                       avatar={refMessage.avatar}
                        alt="Avatar"
-                       class="w-4 h-4 rounded-full flex-shrink-0"
+                       class="flex-shrink-0"
+                       size="sm"
                      />
                      <span class="text-xs font-medium text-text-primary flex-shrink-0 max-w-[120px] truncate">
                        {refMessage.author}
@@ -691,10 +693,12 @@ const Message: Component<MessageProps> = (props) => {
         <div class={`flex gap-3 w-full overflow-visible min-w-0 ${props.pending && !props.id ? 'opacity-70' : ''}`} id={`message-${props.id}`} data-message-id={props.id}>
           <Show when={!shouldShowCompact}>
             <div class="flex-shrink-0 mt-1">
-              <img
-                src={`${FS_URL}/avatars/${props.author_id}/${author()?.avatar || "default.webp"}`}
+              <Avatar
+                userId={props.author_id}
+                avatar={author()?.avatar}
                 alt="Avatar"
-                class={`w-10 h-10 rounded-full cursor-pointer hover:ring-2 hover:ring-primary transition-transform duration-300 ${avatarBouncing() ? 'animate-bounce' : ''}`}
+                class={`cursor-pointer hover:ring-2 hover:ring-primary transition-transform duration-300 ${avatarBouncing() ? 'animate-bounce' : ''}`}
+                size="md"
                 onClick={handleAuthorClick}
               />
             </div>

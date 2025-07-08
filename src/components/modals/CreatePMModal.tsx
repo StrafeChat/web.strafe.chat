@@ -7,7 +7,7 @@ import {
   StatusIndicator,
   UserStatus,
 } from "../../components/common/StatusIndicator";
-import { FS_URL } from "../../constants";
+import { Avatar } from "../common/Avatar";
 import { FriendSearch } from "../home/friends/FriendSearch";
 import { AnimatedCheckbox } from "../../components/common/AnimatedCheckbox";
 
@@ -152,10 +152,12 @@ export const CreatePMModal: Component<CreatePMModalProps> = (props) => {
                   >
                     <div class="flex items-center gap-3">
                       <div class="relative flex-shrink-0">
-                        <img
-                          src={`${FS_URL}/avatars/${friend.id}/${friend.avatar || "default.webp"}`}
+                        <Avatar
+                          userId={friend.id}
+                          avatar={friend.avatar}
                           alt={`${friend.display_name}'s avatar`}
-                          class="w-8 h-8 rounded-full object-cover"
+                          class="object-cover"
+                          size="sm"
                         />
                         <StatusIndicator
                           status={

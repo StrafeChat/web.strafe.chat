@@ -2,7 +2,7 @@ import { Component, For, Show, createSignal } from "solid-js";
 import { useAuth } from "../../../lib/providers/auth/AuthProvider";
 import { useCache } from "../../../lib/providers/cache/CacheProvider";
 import UserPopupMenu from "../../common/UserPopupMenu";
-import { FS_URL } from "../../../constants";
+import { Avatar } from "../../common/Avatar";
 
 const MembersList: Component = () => {
   const { rooms } = useAuth();
@@ -37,10 +37,12 @@ const MembersList: Component = () => {
             }`}
             onClick={e => handleUserClick(e, member.id)}
           >
-            <img
-              src={`${FS_URL}/avatars/${member.id}/${member.avatar || "default.webp"}`}
+            <Avatar
+              userId={member.id}
+              avatar={member.avatar}
               alt="User avatar"
-              class="w-8 h-8 rounded-full"
+              class=""
+              size="sm"
             />
             <span class="font-medium truncate">{member.display_name || member.username}</span>
           </div>
