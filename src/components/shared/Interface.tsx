@@ -1,7 +1,7 @@
 import { JSX, createSignal, onMount, createEffect } from "solid-js";
 import SpacesList from "../spaces/SpacesList";
 import RoomsList from "../spaces/rooms/RoomsList";
-import { ProtectedRoute } from "../auth/ProtectedRoute";
+import ProtectedRoute from "../auth/ProtectedRoute";
 import { useLocation, useNavigate } from "@solidjs/router";
 import { PMList } from "../home/pms/PMList";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";

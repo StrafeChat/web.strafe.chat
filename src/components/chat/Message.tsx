@@ -41,23 +41,11 @@ const Message: Component<MessageProps> = (props) => {
   
   // Check if this is a system message
   const isSystemMessage = () => {
-    console.log("Message type check:", {
-      propsType: props.type,
-      MessageTypeSYSTEM: MessageType.SYSTEM,
-      isEqual: props.type === MessageType.SYSTEM,
-      typeOfPropsType: typeof props.type
-    });
     return props.type === MessageType.SYSTEM;
   };
   
   // Function to render system message content
   const renderSystemMessage = () => {
-    console.log("System message debug:", {
-      system_type: props.system_type,
-      system_data: props.system_data,
-      type: props.type,
-      content: props.content
-    });
     if (!props.system_type || !props.system_data) return { text: "System message", timestamp: formatTimeOnly(props.created_at) };
     
     let systemData: { user_id?: string; actor_id?: string; new_value?: string; old_value?: string } = {};
@@ -624,7 +612,7 @@ const Message: Component<MessageProps> = (props) => {
 
   return (
     <>
-      <div class={`flex flex-col ${shouldShowCompact ? 'mt-1' : 'mt-5'} group hover:bg-surface hover:bg-opacity-10 transition-colors px-4 w-full relative overflow-visible`}>
+      <div class={`flex flex-col ${shouldShowCompact ? 'mt-1' : 'mt-5'} group hover:bg-surface hover:bg-opacity-10 transition-colors px-4 w-full relative overflow-visible min-w-0`}>
         {/* Referenced messages (replies) - Discord style - Above the message content */}
          <Show when={referencedMessages().length > 0}>
            <div class="relative mb-1">
@@ -634,18 +622,18 @@ const Message: Component<MessageProps> = (props) => {
                    {/* Connecting line - goes down from reply to main message */}
                     <div class="absolute left-[20px] bottom-[-9px] w-7 h-3 border-l-2 border-t-2 border-text-secondary opacity-40 rounded-tl-md"></div>
                     <div 
-                      class="flex items-center gap-1.5 ml-[42px] px-3 rounded hover:bg-surface hover:bg-opacity-20 cursor-pointer transition-colors"
+                      class="flex items-center gap-1.5 ml-[42px] px-3 rounded hover:bg-surface hover:bg-opacity-20 cursor-pointer transition-colors max-w-[calc(100%-3rem)] overflow-hidden"
                      onClick={() => scrollToMessage(refMessage.id)}
                    >
                      <img
-                       src={`${FS_URL}/avatars/${refMessage.author_id}/${refMessage.avatar || "favicon.ico"}`}
+                       src={`${FS_URL}/avatars/${refMessage.author_id}/${refMessage.avatar || "default.webp"}`}
                        alt="Avatar"
                        class="w-4 h-4 rounded-full flex-shrink-0"
                      />
-                     <span class="text-xs font-medium text-text-primary flex-shrink-0">
+                     <span class="text-xs font-medium text-text-primary flex-shrink-0 max-w-[120px] truncate">
                        {refMessage.author}
                      </span>
-                     <span class="text-xs text-text-secondary truncate opacity-80">
+                     <span class="text-xs text-text-secondary opacity-80 truncate min-w-0 flex-1">
                        {refMessage.content || "Click to see attachment"}
                      </span>
                    </div>
@@ -700,18 +688,18 @@ const Message: Component<MessageProps> = (props) => {
           triggerRef={userPopupTrigger()}
           userId={props.author_id}
         />
-        <div class={`flex gap-3 w-full overflow-visible ${props.pending && !props.id ? 'opacity-70' : ''}`} id={`message-${props.id}`}>
+        <div class={`flex gap-3 w-full overflow-visible min-w-0 ${props.pending && !props.id ? 'opacity-70' : ''}`} id={`message-${props.id}`} data-message-id={props.id}>
           <Show when={!shouldShowCompact}>
             <div class="flex-shrink-0 mt-1">
               <img
-                src={`${FS_URL}/avatars/${props.author_id}/${author()?.avatar || "favicon.ico"}`}
+                src={`${FS_URL}/avatars/${props.author_id}/${author()?.avatar || "default.webp"}`}
                 alt="Avatar"
                 class={`w-10 h-10 rounded-full cursor-pointer hover:ring-2 hover:ring-primary transition-transform duration-300 ${avatarBouncing() ? 'animate-bounce' : ''}`}
                 onClick={handleAuthorClick}
               />
             </div>
           </Show>
-          <div class={`flex-1 min-w-0 flex flex-col justify-center ${shouldShowCompact ? 'ml-[52px]' : ''} relative`}>
+          <div class={`flex-1 min-w-0 flex flex-col justify-center ${shouldShowCompact ? 'ml-[52px]' : ''} relative overflow-hidden`}>
             <Show when={shouldShowCompact}>  
               <div class="text-xs text-text-secondary whitespace-nowrap flex-shrink-0 absolute left-[-56px] top-0 leading-[1.5] w-12 text-center opacity-0 group-hover:opacity-100 transition-opacity z-10" style="margin-top: 0.25rem;">
                 <Tooltip position="top" content={formatFullDate(props.created_at)}>
@@ -746,9 +734,9 @@ const Message: Component<MessageProps> = (props) => {
 
             <Show when={!isEditing()}>
               <div 
-                class="text-text-primary max-w-full message-content whitespace-pre-wrap overflow-hidden overflow-wrap-anywhere"
+                class="text-text-primary max-w-full message-content whitespace-pre-wrap overflow-hidden overflow-wrap-anywhere min-w-0"
                 data-edited={props.edited_at ? "true" : undefined}
-                style="word-break: break-word; overflow-wrap: break-word;"
+                style="word-break: break-word; overflow-wrap: break-word; max-width: 100%;"
               >
                 <span class="markdown-content" innerHTML={parseMarkdown(props.content)} />
               </div>

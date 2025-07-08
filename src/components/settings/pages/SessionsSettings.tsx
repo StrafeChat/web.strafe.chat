@@ -4,6 +4,7 @@ import { useTransContext } from "@mbarzda/solid-i18next";
 import { api } from "../../../lib/api";
 import { formatDistanceToNow } from "date-fns";
 import { useToast } from "../../common/Toast";
+import Monitor from "../../shared/icons/Monitor";
 
 type Session = {
   token: string;
@@ -210,8 +211,12 @@ const SessionsSettings: Component = () => {
 
   return (
     <div class={`mb-8 ${isMobile() ? "px-4" : "mr-5"}`}>
-      <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0 mb-5">
-        <div>
+      {/* Header with Icon */}
+      <div class="flex items-center gap-3 mb-6">
+        <div class="p-3 bg-primary/10 rounded-lg">
+          <Monitor />
+        </div>
+        <div class="flex-1">
           <h2 class="text-xl font-semibold text-text-primary mb-1">
             {t("settings.sessions.title")}
           </h2>
@@ -222,7 +227,7 @@ const SessionsSettings: Component = () => {
         {sessions().length > 1 && (
           <button
             onClick={handleLogoutAllSessions}
-            class="px-4 py-2 text-sm bg-red-500 hover:bg-red-600 text-white rounded-md transition-colors flex items-center space-x-2"
+            class="px-4 py-2 text-sm bg-red-500 hover:bg-red-600 text-white rounded-md transition-colors flex items-center space-x-2 ml-auto"
           >
             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
               <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />

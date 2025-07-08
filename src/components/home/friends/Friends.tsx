@@ -121,7 +121,7 @@ const Friends: Component = () => {
             </div>
 
             {/*_ Desktop Tabs _*/}
-            <div class="hidden md:inline-flex gap-2 relative bg-background-secondary rounded">
+            <div class="hidden md:inline-flex gap-2 relative rounded">
               <div
                 class="absolute h-[26px] bg-accent rounded"
                 style={{
@@ -182,7 +182,7 @@ const Friends: Component = () => {
         </div>
 
         {/* Mobile Tabs */}
-        <div class="md:hidden flex justify-center w-full mt-4">
+        <div class="flex md:!hidden justify-center w-full mt-4">
           <div class="flex gap-2 relative">
             {tabOrder.map((tab) => (
               <button

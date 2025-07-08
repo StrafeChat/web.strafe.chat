@@ -9,5 +9,6 @@ declare global {
     setRooms: (updater: (rooms: RoomWithRecipients[]) => RoomWithRecipients[]) => void;
     getCurrentUser: () => Clientuser | null;
     getCurrentRooms: () => RoomWithRecipients[];
+    removeInitialLoadingScreen?: () => void;
   }
 }

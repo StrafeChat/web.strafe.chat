@@ -1,38 +1,33 @@
+import { Component, Show } from "solid-js";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
-import { Navigate } from "@solidjs/router";
-import type { JSX } from "solid-js";
-import { Show, createMemo } from "solid-js";
-import { LoadingScreen } from "../shared/LoadingScreen";
-import { useAssetLoading } from "../../lib/hooks/useAssetLoading";
 
-export const ProtectedRoute = (props: { children: JSX.Element }) => {
-  const {
-    user,
-    relationships,
-    relationshipRequests,
-    isAuthenticated,
-    loading,
-  } = useAuth();
-  const assetsLoaded = useAssetLoading();
+interface ProtectedRouteProps {
+  children: any;
+}
 
-  const authLoadingDone = createMemo(() => !loading() && assetsLoaded());
-  const allDataLoaded = createMemo(
-    () =>
-      isAuthenticated() && user() && relationships() && relationshipRequests(),
-  );
-
-  const shouldRedirect = createMemo(
-    () => authLoadingDone() && !isAuthenticated(),
-  );
+const ProtectedRoute: Component<ProtectedRouteProps> = (props) => {
+  const { isAuthenticated, loading } = useAuth();
 
   return (
-    <Show when={authLoadingDone()} fallback={<LoadingScreen />}>
+    <Show
+      when={!loading()}
+      fallback={null}
+    >
       <Show
-        when={!shouldRedirect() && allDataLoaded()}
-        fallback={<Navigate href="/login" />}
+        when={isAuthenticated()}
+        fallback={
+          <div class="flex items-center justify-center min-h-screen">
+            <div class="text-center">
+              <h1 class="text-2xl font-bold mb-4">Access Denied</h1>
+              <p class="text-gray-600">Please log in to access this page.</p>
+            </div>
+          </div>
+        }
       >
         {props.children}
       </Show>
     </Show>
   );
 };
+
+export default ProtectedRoute;

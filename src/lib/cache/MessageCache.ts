@@ -162,6 +162,11 @@ export class MessageCache {
     return roomMessages ? roomMessages.size > 0 : false;
   }
 
+  public getMessageCount(roomId: string): number {
+    const roomMessages = this.messages.get(roomId);
+    return roomMessages ? roomMessages.size : 0;
+  }
+
   public getMessage(roomId: string, messageId: string): CachedMessage | undefined {
     return this.messages.get(roomId)?.get(messageId);
   }
@@ -344,5 +349,15 @@ export class MessageCache {
   public resetReachedFlags(roomId: string): void {
     this.reachedBeginning.set(roomId, false);
     this.reachedEnd.set(roomId, false);
+  }
+  
+  // Set if we've reached the beginning of message history
+  public setHasReachedBeginning(roomId: string, reached: boolean): void {
+    this.reachedBeginning.set(roomId, reached);
+  }
+  
+  // Set if we've reached the end of message history
+  public setHasReachedEnd(roomId: string, reached: boolean): void {
+    this.reachedEnd.set(roomId, reached);
   }
 }

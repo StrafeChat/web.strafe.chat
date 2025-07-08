@@ -2,6 +2,41 @@
 module.exports = {
   darkMode: ["class"],
   content: ["./src/**/*.{js,jsx,ts,tsx}"],
+  safelist: [
+    'hidden',
+    'inline-flex', 
+    'block',
+    'flex',
+    'md:hidden',
+    'md:inline-flex',
+    'md:block',
+    'md:flex',
+    'sm:hidden',
+    'sm:block',
+    'lg:hidden',
+    'lg:block',
+    'xl:hidden',
+    'xl:block',
+    // Force generation of all responsive classes
+    {
+      pattern: /^(sm|md|lg|xl|2xl):/,
+    },
+    // Ensure responsive variants are generated
+    {
+      pattern: /^(hidden|inline-flex|block|flex)$/,
+      variants: ['sm', 'md', 'lg', 'xl', '2xl']
+    },
+    // Ensure object-cover and rounded classes are preserved
+    'object-cover',
+    'rounded-full',
+    'aspect-ratio',
+    // Ensure important classes are preserved
+    '!hidden',
+    'md:!hidden',
+    '!w-[72px]',
+    '!h-[72px]',
+    '!rounded-full'
+  ],
   theme: {
     container: {
       center: true,
@@ -10,26 +45,33 @@ module.exports = {
         "2xl": "1400px",
       },
     },
+    screens: {
+      'sm': '640px',
+      'md': '768px',
+      'lg': '1024px',
+      'xl': '1280px',
+      '2xl': '1536px',
+    },
     extend: {
       colors: {
-        border: "var(--border)",
-        input: "var(--input)",
-        ring: "var(--ring)",
-        accent: "var(--accent)",
+        primary: "var(--primary)",
         background: "var(--background)",
-        background0: "var(--background0)",
-        background1: "var(--background1)",
-        background2: "var(--background2)",
+        "background-secondary": "var(--background1)",
         foreground: "var(--foreground)",
-        primary: {
-          DEFAULT: "var(--primary)",
-          foreground: "var(--primary-foreground)",
-        },
+        accent: "var(--accent)",
         surface: "var(--surface)",
         "text-primary": "var(--text-primary)",
         "text-secondary": "var(--text-secondary)",
         "text-accent": "var(--text-accent)",
         "text-inverse": "var(--text-inverse)",
+        border: "var(--border)",
+        error: "var(--error)",
+        success: "var(--success)",
+        warning: "var(--warning)",
+        ring: "var(--ring)",
+      },
+      borderRadius: {
+        DEFAULT: "var(--radius)",
       },
       keyframes: {
         "accordion-down": {
@@ -108,6 +150,15 @@ module.exports = {
         "swim-3": "swim-3 22s infinite ease-in-out",
       },
     },
+  },
+  corePlugins: {
+    // Ensure all responsive variants are enabled
+  },
+  variants: {
+    extend: {
+      display: ['responsive'],
+      visibility: ['responsive']
+    }
   },
   plugins: [
     require("tailwindcss-animate"),

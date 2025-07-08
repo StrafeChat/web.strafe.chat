@@ -1,6 +1,7 @@
 import { Component } from "solid-js";
 import { useTransContext } from "@mbarzda/solid-i18next";
 import { useUserSettings } from "../../../lib/providers/userSettings/UserSettingsProvider";
+import Shield from "../../shared/icons/Shield";
 
 const PrivacySettings: Component = () => {
   const [t] = useTransContext();
@@ -8,17 +9,30 @@ const PrivacySettings: Component = () => {
 
   return (
     <div class="mb-8">
-      <h2 class="text-xl font-semibold text-text-primary mb-1">
-        {t("settings.privacy.title")}
-      </h2>
-      <p class="text-text-secondary mb-5 text-xs">
-        {t("settings.privacy.description")}
-      </p>
+      {/* Header with Icon */}
+      <div class="flex items-center gap-3 mb-6">
+        <div class="p-3 bg-primary/10 rounded-lg">
+          <Shield />
+        </div>
+        <div>
+          <h2 class="text-xl font-semibold text-text-primary mb-1">
+            {t("settings.privacy.title")}
+          </h2>
+          <p class="text-text-secondary text-xs">
+            {t("settings.privacy.description")}
+          </p>
+        </div>
+      </div>
       
       {/* Privacy Options Section */}
-      <div class="mt-8">
-        <h3 class="text-lg font-semibold text-text-primary mb-3">Privacy Options</h3>
-        <div class="bg-surface rounded-lg p-4">
+      <div class="bg-background1 rounded-lg p-6">
+        <div class="flex items-center gap-4 mb-4">
+          <div class="p-2 bg-green-500/10 rounded-lg">
+            <Shield />
+          </div>
+          <h3 class="text-lg font-semibold text-text-primary">Privacy Options</h3>
+        </div>
+        <div class="bg-background2 rounded-lg p-4">
           <div class="flex items-center justify-between">
             <div class="flex-1">
               <h4 class="text-base font-medium text-text-primary mb-1">

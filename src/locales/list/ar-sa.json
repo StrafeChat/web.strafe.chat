@@ -144,7 +144,128 @@
     "comingSoon": "الرسائل الخاصة والدردشات الجماعية قريباً..."
   },
   "settings": {
-    "report_issue": "الإبلاغ عن مشكلة"
+    "sections": {
+      "user": "إعدادات المستخدم",
+      "app": "إعدادات التطبيق",
+      "account": "الحساب",
+      "profile": "الملف الشخصي",
+      "privacy": "الخصوصية والأمان",
+      "appearance": "المظهر",
+      "accessibility": "إمكانية الوصول",
+      "voice": "الصوت والفيديو",
+      "text": "النص والصور",
+      "notifications": "الإشعارات",
+      "keybinds": "اختصارات لوحة المفاتيح",
+      "language": "اللغة",
+      "logout": "تسجيل الخروج"
+    },
+    "report_issue": "الإبلاغ عن مشكلة",
+    "account": {
+      "title": "الحساب",
+      "description": "تحديث حسابك",
+      "status": {
+        "online": "متصل",
+        "offline": "غير متصل",
+        "idle": "غير نشط",
+        "dnd": "عدم الإزعاج"
+      },
+      "editProfile": "تعديل الملف الشخصي"
+    },
+    "profile": {
+      "title": "الملف الشخصي",
+      "description": "خصص كيف يراك الآخرون",
+      "avatar": {
+        "alt": "صورة المستخدم",
+        "change": "تغيير الصورة",
+        "uploading": "جاري الرفع...",
+        "success": "تم تحديث الصورة بنجاح.",
+        "error": {
+          "invalidType": "نوع ملف غير صالح. يرجى رفع صورة.",
+          "generic": "فشل تحديث الصورة. يرجى المحاولة مرة أخرى.",
+          "uploadFailed": "فشل رفع الصورة"
+        }
+      },
+      "banner": {
+        "alt": "صورة الغلاف",
+        "change": "تغيير الغلاف",
+        "uploading": "جاري الرفع...",
+        "success": "تم تحديث الغلاف بنجاح.",
+        "error": {
+          "invalidType": "نوع ملف غير صالح. يرجى رفع صورة.",
+          "uploadFailed": "فشل رفع الغلاف"
+        }
+      },
+      "bio": {
+        "title": "نبذة عني",
+        "success": "تم تحديث النبذة بنجاح!",
+        "error": "فشل تحديث النبذة."
+      }
+    },
+    "appearance": {
+      "title": "المظهر",
+      "description": "اجعل Strafe خاصاً بك"
+    },
+    "language": {
+      "title": "اللغة",
+      "description": "اختر لغتك"
+    },
+    "sessions": {
+      "title": "الجلسات",
+      "description": "إدارة جلسات تسجيل الدخول النشطة",
+      "current": "الحالية",
+      "lastActive": "آخر نشاط {{time}}",
+      "ipAddress": "عنوان IP",
+      "logout": "تسجيل الخروج",
+      "logoutOthers": "تسجيل الخروج من جميع الجلسات الأخرى",
+      "noSessions": "لم يتم العثور على جلسات نشطة",
+      "device": {
+        "android": "أندرويد",
+        "ios": "iOS",
+        "windows": "ويندوز",
+        "mac": "ماك",
+        "linux": "لينكس",
+        "unknown": "جهاز غير معروف"
+      },
+      "browser": {
+        "unknown": "متصفح غير معروف"
+      },
+      "success": {
+        "loggedOut": "تم تسجيل الخروج من الجلسة بنجاح",
+        "loggedOutAll": "تم تسجيل الخروج من جميع الجلسات الأخرى بنجاح"
+      },
+      "error": {
+        "fetchFailed": "فشل في جلب الجلسات",
+        "logoutFailed": "فشل في تسجيل الخروج من الجلسة",
+        "logoutAllFailed": "فشل في تسجيل الخروج من جميع الجلسات الأخرى"
+      }
+    },
+    "privacy": {
+      "title": "الخصوصية والأمان",
+      "description": "تحكم في إعدادات الخصوصية والأمان"
+    },
+    "developers": {
+      "bots": {
+        "title": "البوتات",
+        "description": "إنشاء وإدارة البوتات الخاصة بك",
+        "createNew": "إنشاء بوت",
+        "createButton": "إنشاء بوت",
+        "existing": "بوتاتي",
+        "noBots": "لم تقم بإنشاء أي بوتات بعد."
+      },
+      "oauth2": {
+        "title": "تطبيقات OAuth2",
+        "description": "إنشاء وإدارة تطبيقات OAuth2 للتكامل مع الطرف الثالث",
+        "createNew": "إنشاء تطبيق",
+        "createButton": "إنشاء تطبيق",
+        "existing": "تطبيقاتي",
+        "noApps": "لم تقم بإنشاء أي تطبيقات بعد.",
+        "authorized": "التطبيقات المصرح بها",
+        "noAuthorized": "لم تقم بتفويض أي تطبيقات طرف ثالث."
+      }
+    },
+    "default": {
+      "underDevelopment": "هذا القسم قيد التطوير."
+    }
   },
   "profile": {
     "title": "الملف الشخصي",
@@ -185,5 +306,40 @@
     "today": "اليوم في {{time}}",
     "yesterday": "أمس في {{time}}",
     "date": "{{weekday}} في {{time}}"
+  },
+  "common": {
+    "cancel": "إلغاء",
+    "loading": "جاري التحميل...",
+    "unknownError": "حدث خطأ غير معروف"
+  },
+  "components": {
+    "datePicker": {
+      "months": {
+        "january": "يناير",
+        "february": "فبراير",
+        "march": "مارس",
+        "april": "أبريل",
+        "may": "مايو",
+        "june": "يونيو",
+        "july": "يوليو",
+        "august": "أغسطس",
+        "september": "سبتمبر",
+        "october": "أكتوبر",
+        "november": "نوفمبر",
+        "december": "ديسمبر"
+      },
+      "weekDays": {
+        "sunday": "أح",
+        "monday": "إث",
+        "tuesday": "ثل",
+        "wednesday": "أر",
+        "thursday": "خم",
+        "friday": "جم",
+        "saturday": "سب"
+      },
+      "selectMonth": "اختر الشهر",
+      "selectYear": "اختر السنة",
+      "dateFormat": "{{day}} {{month}} {{year}}"
+    }
   }
 }

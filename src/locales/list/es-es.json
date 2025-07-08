@@ -202,6 +202,60 @@
       "title": "Idioma",
       "description": "Selecciona tu idioma"
     },
+    "sessions": {
+      "title": "Sesiones",
+      "description": "Gestiona tus sesiones de inicio de sesión activas",
+      "current": "Actual",
+      "lastActive": "Última actividad {{time}}",
+      "ipAddress": "IP",
+      "logout": "Cerrar sesión",
+      "logoutOthers": "Cerrar sesión en todas las demás sesiones",
+      "noSessions": "No se encontraron sesiones activas",
+      "device": {
+        "android": "Android",
+        "ios": "iOS",
+        "windows": "Windows",
+        "mac": "Mac",
+        "linux": "Linux",
+        "unknown": "Dispositivo desconocido"
+      },
+      "browser": {
+        "unknown": "Navegador desconocido"
+      },
+      "success": {
+        "loggedOut": "Sesión cerrada exitosamente",
+        "loggedOutAll": "Todas las demás sesiones cerradas exitosamente"
+      },
+      "error": {
+        "fetchFailed": "Error al obtener las sesiones",
+        "logoutFailed": "Error al cerrar la sesión",
+        "logoutAllFailed": "Error al cerrar todas las demás sesiones"
+      }
+    },
+    "privacy": {
+      "title": "Privacidad y Seguridad",
+      "description": "Controla tu configuración de privacidad y seguridad"
+    },
+    "developers": {
+      "bots": {
+        "title": "Bots",
+        "description": "Crear y gestionar tus bots",
+        "createNew": "Crear un Bot",
+        "createButton": "Crear Bot",
+        "existing": "Mis Bots",
+        "noBots": "Aún no has creado ningún bot."
+      },
+      "oauth2": {
+        "title": "Aplicaciones OAuth2",
+        "description": "Crear y gestionar aplicaciones OAuth2 para integraciones de terceros",
+        "createNew": "Crear Aplicación",
+        "createButton": "Crear Aplicación",
+        "existing": "Mis Aplicaciones",
+        "noApps": "Aún no has creado ninguna aplicación.",
+        "authorized": "Aplicaciones Autorizadas",
+        "noAuthorized": "No has autorizado ninguna aplicación de terceros."
+      }
+    },
     "default": {
       "underDevelopment": "Esta sección está en desarrollo."
     }

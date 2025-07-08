@@ -185,6 +185,60 @@
       "title": "Langue",
       "description": "Sélectionnez votre langue"
     },
+    "sessions": {
+      "title": "Sessions",
+      "description": "Gérez vos sessions de connexion actives",
+      "current": "Actuelle",
+      "lastActive": "Dernière activité {{time}}",
+      "ipAddress": "IP",
+      "logout": "Se déconnecter",
+      "logoutOthers": "Se déconnecter de toutes les autres sessions",
+      "noSessions": "Aucune session active trouvée",
+      "device": {
+        "android": "Android",
+        "ios": "iOS",
+        "windows": "Windows",
+        "mac": "Mac",
+        "linux": "Linux",
+        "unknown": "Appareil inconnu"
+      },
+      "browser": {
+        "unknown": "Navigateur inconnu"
+      },
+      "success": {
+        "loggedOut": "Session déconnectée avec succès",
+        "loggedOutAll": "Toutes les autres sessions déconnectées avec succès"
+      },
+      "error": {
+        "fetchFailed": "Échec de la récupération des sessions",
+        "logoutFailed": "Échec de la déconnexion de la session",
+        "logoutAllFailed": "Échec de la déconnexion de toutes les autres sessions"
+      }
+    },
+    "privacy": {
+      "title": "Confidentialité et Sécurité",
+      "description": "Contrôlez vos paramètres de confidentialité et de sécurité"
+    },
+    "developers": {
+      "bots": {
+        "title": "Bots",
+        "description": "Créer et gérer vos bots",
+        "createNew": "Créer un Bot",
+        "createButton": "Créer un Bot",
+        "existing": "Mes Bots",
+        "noBots": "Vous n'avez encore créé aucun bot."
+      },
+      "oauth2": {
+        "title": "Applications OAuth2",
+        "description": "Créer et gérer des applications OAuth2 pour les intégrations tierces",
+        "createNew": "Créer une Application",
+        "createButton": "Créer une Application",
+        "existing": "Mes Applications",
+        "noApps": "Vous n'avez encore créé aucune application.",
+        "authorized": "Applications Autorisées",
+        "noAuthorized": "Vous n'avez autorisé aucune application tierce."
+      }
+    },
     "default": {
       "underDevelopment": "Cette section est en cours de développement."
     }

@@ -18,9 +18,18 @@ import { SettingsProvider } from "./lib/providers/settings/SettingsProvider";
 import { UserSettingsProvider } from "./lib/providers/userSettings/UserSettingsProvider";
 import { ModalProvider } from "./lib/providers/modal/ModalProvider";
 import LinkConfirmationHandler from "./components/LinkConfirmationHandler";
+import UpdateNotificationModal from "./components/modals/UpdateNotificationModal";
+import { useUpdateNotification } from "./lib/hooks/useUpdateNotification";
+// Import test utilities for development
+import "./lib/utils/updateTestUtils";
 
 const MountApp = (props: ParentProps) => {
   const savedLang = localStorage.getItem("sc_lang") || "en_us";
+  const {
+    updateInfo,
+    isModalOpen,
+    handleModalClose
+  } = useUpdateNotification();
 
   createEffect(() => {
     // Set language and direction
@@ -54,6 +63,11 @@ const MountApp = (props: ParentProps) => {
                     <SettingsProvider>
                       <ModalProvider>
                         <LinkConfirmationHandler />
+                        <UpdateNotificationModal
+                          isOpen={isModalOpen()}
+                          onClose={handleModalClose}
+                          updateInfo={updateInfo()}
+                        />
                         <div class="h-[100dvh] w-full overflow-hidden">{props.children}</div>
                       </ModalProvider>
                     </SettingsProvider>
@@ -75,6 +89,7 @@ const App = () => {
       <Router>
         <Route path="/login" component={lazy(() => import('./components/auth/Login'))} />
         <Route path="/register" component={lazy(() => import('./components/auth/Register'))} />
+        <Route path="/verify-email" component={lazy(() => import('./components/auth/EmailVerify'))} />
         <Route path="/password-reset" component={lazy(() => import('./components/auth/PasswordReset'))} />
         <Route path="/password-reset/verify" component={lazy(() => import('./components/auth/PasswordResetVerify'))} />
         <Route path="/password-reset/complete" component={lazy(() => import('./components/auth/PasswordResetComplete'))} />

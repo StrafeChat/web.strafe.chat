@@ -76,6 +76,13 @@
         "requiredFields": "Please fill in all required fields",
         "registrationFailed": "Registration failed. Please try again."
       }
+    },
+    "emailVerify": {
+      "title": "Email Verification",
+      "subtitle": "Please check your email for verification instructions.",
+      "verifying": "Verifying your email address...",
+      "redirecting": "Redirecting to login page...",
+      "goToLogin": "Go to Login"
     }
   },
   "common": {
@@ -120,6 +127,9 @@
       "notifications": "Notifications",
       "keybinds": "Keybinds",
       "language": "Language",
+      "developers": "Developers",
+      "bots": "Bots",
+      "oauth2": "OAuth2",
       "logout": "Log Out"
     },
     "version": "Version",
@@ -209,6 +219,26 @@
     },
     "default": {
       "underDevelopment": "This section is under development."
+    },
+    "developers": {
+      "bots": {
+        "title": "Bots",
+        "description": "Create and manage your bots",
+        "createNew": "Create a Bot",
+        "createButton": "Create Bot",
+        "existing": "My Bots",
+        "noBots": "You haven't created any bots yet."
+      },
+      "oauth2": {
+        "title": "OAuth2 Applications",
+        "description": "Create and manage OAuth2 applications for third-party integrations",
+        "createNew": "Create Application",
+        "createButton": "Create Application",
+        "existing": "My Applications",
+        "noApps": "You haven't created any applications yet.",
+        "authorized": "Authorized Applications",
+        "noAuthorized": "You haven't authorized any third-party applications."
+      }
     }
   },
   "profile": {

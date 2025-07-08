@@ -17,7 +17,7 @@ const DateDivider: Component<DateDividerProps> = (props) => {
   };
 
   return (
-    <div class="flex items-center justify-center my-1.5 px-4">
+    <div class="flex items-center justify-center my-1.5 pt-3 px-4">
       <div class="flex-grow h-[1px] bg-text-secondary opacity-20"></div>
       <div class="mx-4 text-sm text-text-secondary font-medium">
         {formatDate(props.date)}

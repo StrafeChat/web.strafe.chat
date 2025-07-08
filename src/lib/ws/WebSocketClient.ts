@@ -164,7 +164,7 @@ export class WebSocketClient {
     this.onMessage("relationshipAccept", this.handleRelationship.bind(this));
     this.onMessage("relationshipDelete", this.handleRelationship.bind(this));
     this.onMessage("PRESENCE_UPDATE", this.handlePresenceUpdate.bind(this));
-    this.onMessage("MESSAGE_CREATE", this.handleMessageCreate.bind(this));
+    // MESSAGE_CREATE is handled by AuthProvider to avoid conflicts
     this.onMessage("MESSAGE_DELETE", this.handleMessageDelete.bind(this));
     // MESSAGE_EDIT is handled by AuthProvider to avoid conflicts
     this.onMessage("ROOM_CREATE", this.handleRoomCreate.bind(this));
@@ -449,12 +449,24 @@ export class WebSocketClient {
     switch (type) {
       case "message":
       case "dispatch":
-      case "message_create":
         const handler = this.messageHandlers.get(payload.type);
         if (handler) {
           handler(payload);
         } else {
           console.warn("[WebSocket] No handler for message type:", payload.type);
+        }
+        break;
+
+      case "message_create":
+        // Route message_create events to MESSAGE_CREATE handler registered by AuthProvider
+        console.log("[WebSocket] Received message_create event with payload:", payload);
+        const messageCreateHandler = this.messageHandlers.get("MESSAGE_CREATE");
+        console.log("[WebSocket] Available handlers:", [...this.messageHandlers.keys()]);
+        if (messageCreateHandler) {
+          console.log("[WebSocket] Routing message_create to MESSAGE_CREATE handler");
+          messageCreateHandler(payload);
+        } else {
+          console.warn("[WebSocket] No MESSAGE_CREATE handler registered");
         }
         break;
 
@@ -616,36 +628,36 @@ export class WebSocketClient {
     }
   }
 
-  private handleMessageCreate(data: any): void {
-    console.log("[WebSocket] Handling message create:", data);
-    const messageData = data.data || data;
-    if (messageData.room_id) {
-      console.log("[WebSocket] Dispatching message create event:", messageData);
-      console.log("[WebSocket] Message type debug:", {
-        originalType: messageData.type,
-        typeOfType: typeof messageData.type,
-        systemType: messageData.system_type,
-        systemData: messageData.system_data
-      });
-      this.dispatchEvent("messageCreate", {
-        roomId: messageData.room_id,
-        message: {
-          id: messageData.id || "",
-          content: messageData.content || "",
-          author_id: messageData.author_id || messageData.sender_id || "",
-          room_id: messageData.room_id,
-          created_at: messageData.created_at || new Date().toISOString(),
-          edited_at: messageData.edited_at || null,
-          attachments: messageData.attachments || [],
-          author: messageData.author || null,
-          message_refrences: messageData.message_refrences || [],
-          type: messageData.type,
-          system_type: messageData.system_type,
-          system_data: messageData.system_data
-        }
-      });
-    }
-  }
+  // private handleMessageCreate(data: any): void {
+  //   console.log("[WebSocket] Handling message create:", data);
+  //   const messageData = data.data || data;
+  //   if (messageData.room_id) {
+  //     console.log("[WebSocket] Dispatching message create event:", messageData);
+  //     console.log("[WebSocket] Message type debug:", {
+  //       originalType: messageData.type,
+  //       typeOfType: typeof messageData.type,
+  //       systemType: messageData.system_type,
+  //       systemData: messageData.system_data
+  //     });
+  //     this.dispatchEvent("messageCreate", {
+  //       roomId: messageData.room_id,
+  //       message: {
+  //         id: messageData.id || "",
+  //         content: messageData.content || "",
+  //         author_id: messageData.author_id || messageData.sender_id || "",
+  //         room_id: messageData.room_id,
+  //         created_at: messageData.created_at || new Date().toISOString(),
+  //         edited_at: messageData.edited_at || null,
+  //         attachments: messageData.attachments || [],
+  //         author: messageData.author || null,
+  //         message_refrences: messageData.message_refrences || [],
+  //         type: messageData.type,
+  //         system_type: messageData.system_type,
+  //         system_data: messageData.system_data
+  //       }
+  //     });
+  //   }
+  // }
 
   private handleMessageDelete(data: any): void {
     console.log("[WebSocket] Handling message delete:", data);

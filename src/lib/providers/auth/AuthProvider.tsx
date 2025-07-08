@@ -115,6 +115,7 @@ type Relationship = {
 type AuthResponse = {
   success: boolean;
   error?: string;
+  message?: string;
 };
 
 type MessageResponse = {
@@ -158,11 +159,13 @@ export const AuthProvider: ParentComponent = (props) => {
       if (!connected && !localStorage.getItem("sc_token")) setLoading(true);
     });
 
+    // Setup handlers BEFORE connecting
+    setupWebSocketHandlers(client);
+
     client.connect(token).catch((error) => {
       console.error("[WebSocket] Failed to connect:", error);
     });
 
-    setupWebSocketHandlers(client);
     return true;
   };
 
@@ -178,7 +181,9 @@ export const AuthProvider: ParentComponent = (props) => {
     client.onMessage("ROOM_MEMBER_REMOVE", handleRoomMemberRemoveEvent);
     client.onMessage("ROOM_OWNERSHIP_TRANSFER", handleRoomOwnershipTransferEvent);
     client.onMessage("presence", handlePresenceEvent);
+    console.log("[AuthProvider] Registering MESSAGE_CREATE handler");
     client.onMessage("MESSAGE_CREATE", handleMessageCreateEvent);
+    console.log("[AuthProvider] Registering MESSAGE_EDIT handler");
     client.onMessage("MESSAGE_EDIT", handleMessageEditEvent);
   };
 
@@ -210,7 +215,6 @@ export const AuthProvider: ParentComponent = (props) => {
 
     // Handle unread messages from READY event
     if (data.unread_messages) {
-      console.log("[AuthProvider] Received unread messages in READY event:", data.unread_messages);
       setUnreadMessages(data.unread_messages);
       
       // Update room unread counts based on unread messages
@@ -233,6 +237,11 @@ export const AuthProvider: ParentComponent = (props) => {
     }
 
     setLoading(false);
+    
+    // Remove initial HTML loading screen
+    if (window.removeInitialLoadingScreen) {
+      window.removeInitialLoadingScreen();
+    }
   };
 
   const normalizeUserData = (userData: any): Clientuser => ({
@@ -346,7 +355,7 @@ export const AuthProvider: ParentComponent = (props) => {
       // If user is currently viewing the deleted room, redirect to home
       const currentLocation = window.location.pathname;
       if (currentLocation.includes(`/rooms/${roomId}`)) {
-        window.location.href = '/home';
+        window.location.href = '/';
       }
     }
   };
@@ -441,7 +450,7 @@ export const AuthProvider: ParentComponent = (props) => {
         // If user is currently viewing the room they were removed from, redirect to home
         const currentLocation = window.location.pathname;
         if (currentLocation.includes(`/rooms/${roomId}`)) {
-          window.location.href = '/home';
+          window.location.href = '/';
         }
       } else {
         // Update the room's recipients list
@@ -546,6 +555,16 @@ export const AuthProvider: ParentComponent = (props) => {
       const data = await api.users.me();
       if (!data?.client_user) {
         setLoading(false);
+      
+      // Remove initial HTML loading screen
+      if (window.removeInitialLoadingScreen) {
+        window.removeInitialLoadingScreen();
+      }
+        
+        // Remove initial HTML loading screen
+        if (window.removeInitialLoadingScreen) {
+          window.removeInitialLoadingScreen();
+        }
         return { success: false, error: "Invalid response format" };
       }
 
@@ -585,6 +604,11 @@ export const AuthProvider: ParentComponent = (props) => {
       };
     } finally {
       setLoading(false);
+      
+      // Remove initial HTML loading screen
+      if (window.removeInitialLoadingScreen) {
+        window.removeInitialLoadingScreen();
+      }
     }
   };
 
@@ -592,7 +616,19 @@ export const AuthProvider: ParentComponent = (props) => {
     try {
       setLoading(true);
       const response = await api.auth.register(data);
-      if (!response?.token) return { success: false, error: "No token in response" };
+      
+      // Handle email verification case (no token returned)
+      if ((response as any).message && !(response as any).token) {
+        return { 
+          success: true, 
+          message: (response as any).message
+        };
+      }
+      
+      // Handle immediate login case (token returned)
+      if (!response?.token) {
+        return { success: false, error: "No token in response" };
+      }
 
       localStorage.setItem("sc_token", response.token);
       const result = await fetchUserData(response.token);
@@ -614,6 +650,12 @@ export const AuthProvider: ParentComponent = (props) => {
     setUser(null);
     setIsAuthenticated(false);
     setLoading(false);
+    
+    // Remove initial HTML loading screen
+    if (window.removeInitialLoadingScreen) {
+      window.removeInitialLoadingScreen();
+    }
+    
     wsClient()?.disconnect();
     setWsClient(null);
   };
@@ -757,9 +799,19 @@ export const AuthProvider: ParentComponent = (props) => {
         fetchUserData(token).catch(() => {
           localStorage.removeItem("sc_token");
           setLoading(false);
+          
+          // Remove initial HTML loading screen
+          if (window.removeInitialLoadingScreen) {
+            window.removeInitialLoadingScreen();
+          }
         });
       } else {
         setLoading(false);
+        
+        // Remove initial HTML loading screen
+        if (window.removeInitialLoadingScreen) {
+          window.removeInitialLoadingScreen();
+        }
       }
     };
     
@@ -840,8 +892,13 @@ export const AuthProvider: ParentComponent = (props) => {
 
   // Handle new message events to update unread messages
   const handleMessageCreateEvent = (data: any) => {
+    console.log("[AuthProvider] handleMessageCreateEvent called with data:", data);
     const messageData = data.data || data;
-    if (!messageData.room_id || !messageData.id) return;
+    console.log("[AuthProvider] Extracted messageData:", messageData);
+    if (!messageData.room_id || !messageData.id) {
+      console.warn("[AuthProvider] Missing room_id or id, skipping message create:", { room_id: messageData.room_id, id: messageData.id });
+      return;
+    }
     
     const currentUser = user();
     if (!currentUser) return;

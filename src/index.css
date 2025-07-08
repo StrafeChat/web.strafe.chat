@@ -103,7 +103,17 @@
   html,
   body,
   #root {
-    @apply h-full w-full overflow-hidden;
+    @apply h-full w-full;
+  }
+  
+  html,
+  body {
+    overflow: hidden;
+  }
+  
+  #root {
+    overflow: hidden;
+    min-width: 0;
   }
   * {
     @apply border-border;
@@ -135,6 +145,28 @@
 
   *::-webkit-scrollbar-corner {
     background: transparent;
+  }
+
+  *::-webkit-scrollbar-button {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  *::-webkit-scrollbar-button:start:decrement,
+  *::-webkit-scrollbar-button:end:increment {
+    display: none;
+    width: 0;
+    height: 0;
+  }
+
+  *::-webkit-scrollbar-button:vertical:start:decrement,
+  *::-webkit-scrollbar-button:vertical:end:increment,
+  *::-webkit-scrollbar-button:horizontal:start:decrement,
+  *::-webkit-scrollbar-button:horizontal:end:increment {
+    display: none;
+    width: 0;
+    height: 0;
   }
 }
 

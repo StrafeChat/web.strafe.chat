@@ -134,36 +134,6 @@ const RoomView: Component = () => {
     return "Unknown Chat";
   };
 
-  // Helper function to get room avatar
-  const getRoomAvatar = () => {
-    const room = currentRoom();
-    if (!room) return `${FS_URL}/avatars/default/default.webp`;
-
-    // If room has an icon, use it (for group PMs)
-    if (room.icon) return `${FS_URL}/icons/${room.id}/${room.icon}`;
-    
-    // For group PMs without an icon, use our custom SVG icon component
-    if (room.type === RoomType.GROUP_PM) {
-      return null; // Return null to indicate we'll use the DefaultGroupPM component
-    }
-    
-    // For PMs, use the other user's avatar
-    if (room.type === RoomType.PM && room.recipients_data && room.recipients_data.length > 0) {
-      const currentUserId = user()?.id;
-      // Find the recipient that isn't the current user
-      const recipient = room.recipients_data.find((r) => r.id !== currentUserId);
-      if (recipient) {
-        return `${FS_URL}/avatars/${recipient.id}/${recipient.avatar || "default.webp"}`;
-      }
-      // Fallback to first recipient if we can't find a non-current user
-      const firstRecipient = room.recipients_data[0];
-      return `${FS_URL}/avatars/${firstRecipient.id}/${firstRecipient.avatar || "default.webp"}`;
-    }
-    
-    const currentUserId = user()?.id || "default";
-    return `${FS_URL}/avatars/${currentUserId}/default.webp`;
-  };
-
   // Helper function to get room status (for PMs)
   const getRoomStatus = () => {
     const room = currentRoom();
@@ -410,13 +380,21 @@ const RoomView: Component = () => {
         <div class="flex items-center gap-2">
           <div class="relative flex-shrink-0 flex items-center">
             <div class="w-8 h-8 rounded-full overflow-hidden">
-              {roomType() === RoomType.GROUP_PM && !currentRoom()?.icon ? (
-                <div class="w-full h-full bg-surface bg-opacity-20 text-text-primary flex items-center justify-center">
-                  <DefaultGroupPM />
-                </div>
-              ) : (
+              {roomType() === RoomType.GROUP_PM ? (
+                currentRoom()?.icon ? (
+                  <img
+                    src={`${FS_URL}/icons/${currentRoom()?.id}/${currentRoom()?.icon}`}
+                    alt="Group icon"
+                    class="w-full h-full object-cover"
+                  />
+                ) : (
+                  <div class="w-full h-full bg-surface bg-opacity-20 text-text-primary flex items-center justify-center">
+                    <DefaultGroupPM />
+                  </div>
+                )
+              ) : roomType() === RoomType.PM ? (
                 <Show
-                  when={getRoomAvatar()}
+                  when={Boolean(currentRoom()?.recipients_data?.length)}
                   fallback={
                     <Avatar
                       userId="default"
@@ -425,18 +403,25 @@ const RoomView: Component = () => {
                     />
                   }
                 >
-                  <img
-                    src={getRoomAvatar()!}
-                    alt="Room avatar"
-                    class="w-full h-full object-cover"
-                    draggable="false"
-                    onError={(e) => {
-                      // Use the actual user ID instead of "default"
-                      const userId = user()?.id || "default";
-                      e.currentTarget.src = `${FS_URL}/avatars/${userId}/default.webp`;
-                    }}
-                  />
+                  {(() => {
+                    const room = currentRoom();
+                    const currentUserId = user()?.id;
+                    const recipient = room?.recipients_data?.find((r) => r.id !== currentUserId);
+                    return (
+                      <Avatar
+                        userId={recipient?.id || "default"}
+                        avatar={recipient?.avatar || "default.webp"}
+                        alt="Room avatar"
+                      />
+                    );
+                  })()}
                 </Show>
+              ) : (
+                <Avatar
+                  userId="default"
+                  avatar="default.webp"
+                  alt="Room avatar"
+                />
               )}
             </div>
             {roomType() === RoomType.PM && (

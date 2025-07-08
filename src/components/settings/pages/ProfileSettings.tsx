@@ -5,6 +5,7 @@ import { Avatar } from "../../common/Avatar";
 import { useToast } from "../../common/Toast";
 import { BASE_URL, FS_URL } from "../../../constants";
 import { parseMarkdown } from "../../../lib/utils/markdownUtils";
+import User from "../../shared/icons/User";
 
 const ProfileSettings: Component = () => {
   const { user, isMobile, updateUser } = useAuth();
@@ -163,12 +164,20 @@ const ProfileSettings: Component = () => {
 
   return (
     <div class={`mb-8 ${isMobile() ? "" : "mr-5"}`}>
-      <h2 class="text-xl font-semibold text-text-primary mb-1">
-        {t("settings.profile.title")}
-      </h2>
-      <p class="text-text-secondary mb-5 text-xs">
-        {t("settings.profile.description")}
-      </p>
+      {/* Header with Icon */}
+      <div class="flex items-center gap-3 mb-6">
+        <div class="p-3 bg-primary/10 rounded-lg">
+          <User />
+        </div>
+        <div>
+          <h2 class="text-xl font-semibold text-text-primary mb-1">
+            {t("settings.profile.title")}
+          </h2>
+          <p class="text-text-secondary text-xs">
+            {t("settings.profile.description")}
+          </p>
+        </div>
+      </div>
       <div class="bg-background1 rounded-lg p-4">
         <div class="flex flex-col gap-6">
           {/* Banner Upload */}

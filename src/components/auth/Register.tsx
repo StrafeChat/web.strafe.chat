@@ -56,7 +56,13 @@ const Register = () => {
     });
 
     if (result.success) {
-      navigate("/", { replace: true });
+      if (result.message) {
+        // Email verification required - redirect to verify email page
+        navigate("/verify-email", { replace: true });
+      } else {
+        // Immediate login - redirect to home
+        navigate("/", { replace: true });
+      }
     } else {
       setError(result.error || t("auth.register.error.registrationFailed"));
     }

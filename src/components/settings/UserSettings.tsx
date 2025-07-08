@@ -12,7 +12,21 @@ import DefaultSettings from "./pages/DefaultSettings";
 import LanguageSettings from "./pages/LanguageSettings";
 import SessionsSettings from "./pages/SessionsSettings";
 import PrivacySettings from "./pages/PrivacySettings";
+import BotsSettings from "./pages/BotsSettings";
+import OAuth2Settings from "./pages/OAuth2Settings";
 import { ToastProvider } from "../common/Toast";
+
+// Import icons
+import User from "../shared/icons/User";
+import Friends from "../shared/icons/Friends";
+import Monitor from "../shared/icons/Monitor";
+import Shield from "../shared/icons/Shield";
+import Palette from "../shared/icons/Palette";
+import Globe from "../shared/icons/Globe";
+import Keyboard from "../shared/icons/Keyboard";
+import Bell from "../shared/icons/Bell";
+import Robot from "../shared/icons/Robot";
+import Key from "../shared/icons/Key";
 
 interface UserSettingsProps {
   isOpen: boolean;
@@ -64,6 +78,10 @@ const UserSettings: Component<UserSettingsProps> = (props) => {
         return <AppearanceSettings />;
       case "language":
         return <LanguageSettings />;
+      case "bots":
+        return <BotsSettings />;
+      case "oauth2":
+        return <OAuth2Settings />;
       default:
         return <DefaultSettings title={state.activeSection} />;
     }
@@ -138,8 +156,9 @@ const UserSettings: Component<UserSettingsProps> = (props) => {
                             state.activeSection === "account"
                               ? "bg-surface"
                               : ""
-                          } text-text-primary`}
+                          } text-text-primary flex items-center gap-3`}
                         >
+                          <User />
                           {t("settings.sections.account")}
                         </button>
                         <button
@@ -151,8 +170,9 @@ const UserSettings: Component<UserSettingsProps> = (props) => {
                             state.activeSection === "profile"
                               ? "bg-surface"
                               : ""
-                          } text-text-primary`}
+                          } text-text-primary flex items-center gap-3`}
                         >
+                          <Friends />
                           {t("settings.sections.profile")}
                         </button>
                         <button
@@ -164,8 +184,9 @@ const UserSettings: Component<UserSettingsProps> = (props) => {
                             state.activeSection === "sessions"
                               ? "bg-surface"
                               : ""
-                          } text-text-primary`}
+                          } text-text-primary flex items-center gap-3`}
                         >
+                          <Monitor />
                           {t("settings.sections.sessions")}
                         </button>
                         <button
@@ -177,8 +198,9 @@ const UserSettings: Component<UserSettingsProps> = (props) => {
                             state.activeSection === "privacy"
                               ? "bg-surface"
                               : ""
-                          } text-text-primary`}
+                          } text-text-primary flex items-center gap-3`}
                         >
+                          <Shield />
                           {t("settings.sections.privacy")}
                         </button>
                       </div>
@@ -202,8 +224,9 @@ const UserSettings: Component<UserSettingsProps> = (props) => {
                             state.activeSection === "appearance"
                               ? "bg-surface"
                               : ""
-                          } text-text-primary`}
+                          } text-text-primary flex items-center gap-3`}
                         >
+                          <Palette />
                           {t("settings.sections.appearance")}
                         </button>
                         <button
@@ -215,8 +238,9 @@ const UserSettings: Component<UserSettingsProps> = (props) => {
                             state.activeSection === "language"
                               ? "bg-surface"
                               : ""
-                          } text-text-primary`}
+                          } text-text-primary flex items-center gap-3`}
                         >
+                          <Globe />
                           {t("settings.sections.language")}
                         </button>
                         <button
@@ -228,8 +252,9 @@ const UserSettings: Component<UserSettingsProps> = (props) => {
                             state.activeSection === "keybinds"
                               ? "bg-surface"
                               : ""
-                          } text-text-primary`}
+                          } text-text-primary flex items-center gap-3`}
                         >
+                          <Keyboard />
                           {t("settings.sections.keybinds")}
                         </button>
                         <button
@@ -241,9 +266,47 @@ const UserSettings: Component<UserSettingsProps> = (props) => {
                             state.activeSection === "notifications"
                               ? "bg-surface"
                               : ""
-                          } text-text-primary`}
+                          } text-text-primary flex items-center gap-3`}
                         >
+                          <Bell />
                           {t("settings.sections.notifications")}
+                        </button>
+                      </div>
+
+                      <div class="mx-2 mb-4 border-t border-border"></div>
+
+                      {/* Developers Section */}
+                      <div class="space-y-[2px] mb-2">
+                        <h3 class="px-[10px] mb-1 text-xs font-semibold text-text-secondary uppercase">
+                          {t("settings.sections.developers")}
+                        </h3>
+                        <button
+                          onClick={() => {
+                            setActiveSection("bots");
+                            isMobile() && setIsSidebarOpen(false);
+                          }}
+                          class={`w-full px-[10px] py-[6px] rounded-[4px] text-left text-base hover:bg-surface ${
+                            state.activeSection === "bots"
+                              ? "bg-surface"
+                              : ""
+                          } text-text-primary flex items-center gap-3`}
+                        >
+                          <Robot />
+                          {t("settings.sections.bots")}
+                        </button>
+                        <button
+                          onClick={() => {
+                            setActiveSection("oauth2");
+                            isMobile() && setIsSidebarOpen(false);
+                          }}
+                          class={`w-full px-[10px] py-[6px] rounded-[4px] text-left text-base hover:bg-surface ${
+                            state.activeSection === "oauth2"
+                              ? "bg-surface"
+                              : ""
+                          } text-text-primary flex items-center gap-3`}
+                        >
+                          <Key />
+                          {t("settings.sections.oauth2")}
                         </button>
                       </div>
 

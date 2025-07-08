@@ -8,6 +8,7 @@ import {
 } from "solid-js";
 import { FS_URL } from "../../constants";
 import { StatusIndicator } from "./StatusIndicator";
+import { Avatar } from "./Avatar";
 import { Portal } from "solid-js/web";
 import { useCache } from "../../lib/providers/cache/CacheProvider";
 
@@ -120,17 +121,27 @@ const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
                   src={`${FS_URL}/banners/${user()?.id}/${user()?.banner}`}
                   alt="User banner"
                   class="w-full h-full object-cover"
-                  onError={e => (e.currentTarget.style.display = 'none')}
+                  onError={e => {
+                    // Hide the banner image if it fails to load
+                    e.currentTarget.style.display = 'none';
+                    // Show the fallback background
+                    const parent = e.currentTarget.parentElement;
+                    if (parent) {
+                      parent.style.background = 'var(--primary)';
+                    }
+                  }}
                 />
               </Show>
               <div class="absolute -bottom-6 left-2">
                 <div class="relative w-[80px] h-[80px]">
-                  <img
-                    src={`${FS_URL}/avatars/${user()?.id}/${user()?.avatar || "default.webp"}`}
-                    alt="User avatar"
-                    class="w-full h-full rounded-full object-cover border-4 border-background2"
-                    style={{ "aspect-ratio": "1/1" }}
-                  />
+                  <div class="w-full h-full rounded-full overflow-hidden border-4 border-background2" style={{ "aspect-ratio": "1/1" }}>
+                    <Avatar
+                      userId={user()?.id || ''}
+                      avatar={user()?.avatar}
+                      alt="User avatar"
+                      class="!w-[72px] !h-[72px] !rounded-full object-cover"
+                    />
+                  </div>
                   <div class="absolute bottom-0.5 right-0.5">
                     <StatusIndicator
                       status={user()?.presence?.status || "offline"}

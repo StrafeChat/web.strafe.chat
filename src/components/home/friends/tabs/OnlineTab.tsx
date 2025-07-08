@@ -4,8 +4,8 @@ import { useCache } from "../../../../lib/providers/cache/CacheProvider";
 import { useTransContext } from "@mbarzda/solid-i18next";
 import { Tooltip } from "../../../common/Tooltip";
 import { FriendSearch } from "../FriendSearch";
-import { FS_URL } from "../../../../constants";
 import { StatusIndicator, UserStatus } from "../../../common/StatusIndicator";
+import { Avatar } from "../../../common/Avatar";
 import { FriendMenu } from "../FriendMenu";
 import { useNavigate } from "@solidjs/router";
 import { RoomWithRecipients } from "../../../../types/rooms";
@@ -192,34 +192,17 @@ export const OnlineTab: Component = () => {
               )}
             >
               {(friend) => (
-                <div class="flex flex-col bg-background-secondary p-2 pb-3.5 border-t-2 border-t-border hover:bg-border hover:rounded-lg hover:cursor-pointer">
+                <div class="flex flex-col p-2 pb-3.5 border-t-2 border-t-border hover:bg-border hover:rounded-lg hover:cursor-pointer">
                   <div class="flex items-center gap-3">
-                    {friend.avatar ? (
-                      <div class="relative">
-                        <div class="relative w-10 h-10">
-                          <img
-                            src={`${FS_URL}/avatars/${friend.id}/${friend.avatar}`}
-                            alt="avatar"
-                            class="w-full h-full rounded-full object-cover"
-                            style={{ "aspect-ratio": "1/1" }}
-                            onError={(e) => {
-                              const target = e.target as HTMLImageElement;
-                              target.src = "/path/to/fallback/image.jpg";
-                            }}
-                          />
-                        </div>
-                        <StatusIndicator status={friend.status as UserStatus} />
-                      </div>
-                    ) : (
-                      <div class="relative">
-                        <div class="w-10 h-10 rounded-full bg-background-tertiary flex items-center justify-center">
-                          <span class="text-text-secondary text-sm">
-                            {friend.username[0].toUpperCase()}
-                          </span>
-                        </div>
-                        <StatusIndicator status={friend.status as UserStatus} />
-                      </div>
-                    )}
+                    <div class="relative">
+                      <Avatar
+                        userId={friend.id}
+                        avatar={friend.avatar}
+                        alt={`${friend.display_name}'s avatar`}
+                        size="md"
+                      />
+                      <StatusIndicator status={friend.status as UserStatus} />
+                    </div>
                     <div class="flex flex-col flex-grow">
                       <span>{friend.display_name}</span>
                       <span class="text-text-secondary text-sm">

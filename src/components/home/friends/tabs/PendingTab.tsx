@@ -10,8 +10,9 @@ import { useAuth } from "../../../../lib/providers/auth/AuthProvider";
 import { useCache } from "../../../../lib/providers/cache/CacheProvider";
 import { useTransContext } from "@mbarzda/solid-i18next";
 import { Tooltip } from "../../../common/Tooltip";
+import { Avatar } from "../../../common/Avatar";
 import { FriendSearch } from "../FriendSearch";
-import { BASE_URL, FS_URL } from "../../../../constants";
+import { BASE_URL } from "../../../../constants";
 
 export const PendingTab: Component = () => {
   const { relationshipRequests, user, setRelationshipRequests } = useAuth();
@@ -296,20 +297,12 @@ export const PendingTab: Component = () => {
                 return (
                   <div class="flex flex-col bg-background-secondary p-2 pb-3.5 border-t-2 border-t-border hover:bg-border hover:rounded-lg hover:cursor-pointer">
                     <div class="flex items-center gap-3">
-                      {person.avatar ? (
-                        <div class="relative w-10 h-10">
-                          <img
-                            src={`${FS_URL}/avatars/${person.id}/${person.avatar}`}
-                            alt="avatar"
-                            class="w-full h-full rounded-full object-cover"
-                            style={{ "aspect-ratio": "1/1" }}
-                          />
-                        </div>
-                      ) : (
-                        <div class="w-10 h-10 rounded-full bg-background-tertiary flex items-center justify-center">
-                          {person.name.charAt(0)}
-                        </div>
-                      )}
+                      <Avatar
+                        userId={person.id ?? ""}
+                        avatar={person.avatar}
+                        alt={`${person.name}'s avatar`}
+                        size="md"
+                      />
                       <div class="flex flex-col flex-grow">
                         <span>{person.name}</span>
                         <span class="text-text-secondary text-sm">

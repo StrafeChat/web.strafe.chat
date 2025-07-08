@@ -22,39 +22,110 @@
       if (savedTheme) {
         const theme = JSON.parse(savedTheme);
 
-        root.style.setProperty(
-          "--primary-border",
-          theme.colors.primary || "var(--primary)",
-        );
-        root.style.setProperty(
-          "--background",
-          theme.colors.background || "var(--background)",
-        );
+        // Apply all theme colors to ensure consistent styling
+        root.style.setProperty("--primary", theme.colors.primary || "#21c35e");
+        root.style.setProperty("--background", theme.colors.background || "#000000");
+        root.style.setProperty("--background0", theme.colors.background0 || "#111111");
+        root.style.setProperty("--background1", theme.colors.background1 || "#222222");
+        root.style.setProperty("--background2", theme.colors.background2 || "#333333");
+        root.style.setProperty("--foreground", theme.colors.foreground || "#ffffff");
+        root.style.setProperty("--accent", theme.colors.accent || "#1a9d4b");
+        root.style.setProperty("--surface", theme.colors.surface || "#333333");
+        root.style.setProperty("--text-primary", theme.colors.text?.primary || "#ffffff");
+        root.style.setProperty("--text-secondary", theme.colors.text?.secondary || "#aaaaaa");
+        root.style.setProperty("--text-accent", theme.colors.text?.accent || "#21c35e");
+        root.style.setProperty("--text-inverse", theme.colors.text?.inverse || "#000000");
+        root.style.setProperty("--border", theme.colors.border || "#444444");
+        root.style.setProperty("--error", theme.colors.error || "#ff3b30");
+        root.style.setProperty("--success", theme.colors.success || "#34c759");
+        root.style.setProperty("--warning", theme.colors.warning || "#ffcc00");
+      } else {
+        // Apply dark theme as default
+        root.style.setProperty("--primary", "#21c35e");
+        root.style.setProperty("--background", "#000000");
+        root.style.setProperty("--background0", "#111111");
+        root.style.setProperty("--background1", "#222222");
+        root.style.setProperty("--background2", "#333333");
+        root.style.setProperty("--foreground", "#ffffff");
+        root.style.setProperty("--accent", "#1a9d4b");
+        root.style.setProperty("--surface", "#333333");
+        root.style.setProperty("--text-primary", "#ffffff");
+        root.style.setProperty("--text-secondary", "#aaaaaa");
+        root.style.setProperty("--text-accent", "#21c35e");
+        root.style.setProperty("--text-inverse", "#000000");
+        root.style.setProperty("--border", "#444444");
+        root.style.setProperty("--error", "#ff3b30");
+        root.style.setProperty("--success", "#34c759");
+        root.style.setProperty("--warning", "#ffcc00");
       }
 
       const loadingScreen = document.createElement("div");
       loadingScreen.innerHTML = `
-        <div class="fixed inset-0 flex justify-center items-center transition-opacity duration-500" style="background-color: var(--background);">
-          <div class="w-16 h-16 border-4 rounded-full animate-spin" style="border-color: var(--primary); border-top-color: transparent;"></div>
+        <div class="fixed inset-0 flex flex-col justify-center items-center transition-opacity duration-500" style="background-color: var(--background); background-opacity: 0.95; z-index: 50;">
+          <div class="flex flex-col items-center space-y-6">
+            <div class="w-16 h-16 border-4 rounded-full animate-spin" style="border-color: var(--primary); border-top-color: transparent;"></div>
+            <div class="text-center">
+              <p class="text-lg font-medium mb-2" style="color: var(--text-primary);">Loading Strafe...</p>
+              <p class="text-sm" style="color: var(--text-secondary);">Please wait while we prepare everything for you</p>
+            </div>
+            <div class="flex space-x-2">
+              <div class="w-2 h-2 rounded-full animate-pulse" style="background-color: var(--primary);"></div>
+              <div class="w-2 h-2 rounded-full animate-pulse" style="background-color: var(--primary); animation-delay: 0.2s;"></div>
+              <div class="w-2 h-2 rounded-full animate-pulse" style="background-color: var(--primary); animation-delay: 0.4s;"></div>
+            </div>
+          </div>
         </div>
       `;
       loadingScreen.style.position = "fixed";
       loadingScreen.style.inset = "0";
-      loadingScreen.style.zIndex = "9999";
+      loadingScreen.style.zIndex = "50";
 
       document.body.appendChild(loadingScreen);
 
       const style = document.createElement("style");
       style.textContent = `
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         .animate-spin { animation: spin 1s linear infinite; }
+        .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        .space-y-6 > * + * { margin-top: 1.5rem; }
+        .space-x-2 > * + * { margin-left: 0.5rem; }
+        .flex { display: flex; }
+        .flex-col { flex-direction: column; }
+        .items-center { align-items: center; }
+        .justify-center { justify-content: center; }
+        .text-center { text-align: center; }
+        .text-lg { font-size: 1.125rem; }
+        .text-sm { font-size: 0.875rem; }
+        .font-medium { font-weight: 500; }
+        .mb-2 { margin-bottom: 0.5rem; }
+        .w-16 { width: 4rem; }
+        .h-16 { height: 4rem; }
+        .w-2 { width: 0.5rem; }
+        .h-2 { height: 0.5rem; }
+        .border-4 { border-width: 4px; }
+        .rounded-full { border-radius: 9999px; }
       `;
       document.head.appendChild(style);
 
-      window.addEventListener("load", function () {
-        loadingScreen.firstElementChild.style.opacity = "0";
-        setTimeout(() => document.body.removeChild(loadingScreen), 1000);
-      });
+      // Expose function to remove loading screen from SolidJS app
+      window.removeInitialLoadingScreen = function() {
+        if (document.body.contains(loadingScreen)) {
+          loadingScreen.firstElementChild.style.opacity = "0";
+          setTimeout(() => {
+            if (document.body.contains(loadingScreen)) {
+              document.body.removeChild(loadingScreen);
+            }
+          }, 300);
+        }
+      };
+      
+      // Fallback: remove after 10 seconds regardless
+      setTimeout(() => {
+        if (window.removeInitialLoadingScreen) {
+          window.removeInitialLoadingScreen();
+        }
+      }, 10000);
     })();
   </script>
 </html>

@@ -1,6 +1,7 @@
 import { Component, createSignal } from "solid-js";
 import { useTransContext } from "@mbarzda/solid-i18next";
 import { USFlag, ESFlag, FRFlag } from "../../shared/Flags";
+import Globe from "../../shared/icons/Globe";
 
 interface Language {
   code: string;
@@ -29,14 +30,31 @@ const LanguageSettings: Component = () => {
 
   return (
     <div class="mb-8">
-      <h2 class="text-xl font-semibold text-text-primary mb-1">
-        {t("settings.language.title")}
-      </h2>
-      <p class="text-text-secondary mb-5 text-xs">
-        {t("settings.language.description")}
-      </p>
-      <div class="bg-background1 rounded-lg">
-        <div class="divide-y divide-surface">
+      {/* Header with Icon */}
+      <div class="flex items-center gap-3 mb-6">
+        <div class="p-3 bg-primary/10 rounded-lg">
+          <Globe />
+        </div>
+        <div>
+          <h2 class="text-xl font-semibold text-text-primary mb-1">
+            {t("settings.language.title")}
+          </h2>
+          <p class="text-text-secondary text-xs">
+            {t("settings.language.description")}
+          </p>
+        </div>
+      </div>
+
+      {/* Language Selection */}
+      <div class="bg-background1 rounded-lg p-6">
+        <div class="flex items-center gap-4 mb-4">
+          <div class="p-2 bg-primary/10 rounded-lg">
+            <Globe />
+          </div>
+          <h3 class="text-lg font-semibold text-text-primary">Select Language</h3>
+        </div>
+        <div class="bg-background2 rounded-lg">
+          <div class="divide-y divide-border">
           {languages.map((language, index) => (
             <button
               class={`w-full px-4 py-3 flex items-center gap-4 hover:bg-opacity-80 transition-colors ${
@@ -73,6 +91,7 @@ const LanguageSettings: Component = () => {
               )}
             </button>
           ))}
+          </div>
         </div>
       </div>
     </div>
