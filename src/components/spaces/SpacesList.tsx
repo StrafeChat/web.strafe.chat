@@ -123,6 +123,14 @@ const SpacesList: Component = () => {
                       alt="Room avatar"
                       class="w-full h-full object-cover"
                       draggable="false"
+                      onError={(e) => {
+                        // Replace failed room icon with default group icon for group PMs
+                        const target = e.target as HTMLImageElement;
+                        const container = target.parentElement;
+                        if (container && room.type === RoomType.GROUP_PM) {
+                          container.innerHTML = '<div class="w-full h-full bg-surface bg-opacity-20 text-text-primary flex items-center justify-center"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-full h-full"><path fill-rule="evenodd" d="M18.685 19.097A9.723 9.723 0 0021.75 12c0-5.385-4.365-9.75-9.75-9.75S2.25 6.615 2.25 12a9.723 9.723 0 003.065 7.097A9.716 9.716 0 0012 21.75a9.716 9.716 0 006.685-2.653zm-12.54-1.285A7.486 7.486 0 0112 15a7.486 7.486 0 015.855 2.812A8.224 8.224 0 0112 20.25a8.224 8.224 0 01-5.855-2.438zM15.75 9a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0z" clip-rule="evenodd" /><path d="M8.25 9.75a3 3 0 10-6 0 3 3 0 006 0zm9.5 0a3 3 0 10-6 0 3 3 0 006 0z" fill-opacity="0.5" /></svg></div>';
+                        }
+                      }}
                     />
                   )}
                   <div class="absolute bottom-0 right-0 bg-red-500 w-[12px] h-[12px] rounded-full border-2 border-[var(--background)]"></div>

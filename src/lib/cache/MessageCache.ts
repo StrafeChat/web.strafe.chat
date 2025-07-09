@@ -16,10 +16,13 @@ export interface CachedMessage {
   message_references?: string[];
   attachments?: Array<{
     id: string;
-    filename: string;
-    content_type: string;
+    name: string;
+    type: string;
     size: number;
     url: string;
+    height?: number;
+    width?: number;
+    user_id: string;
   }>;
   type?: MessageType;
   system_type?: SystemMessageType;

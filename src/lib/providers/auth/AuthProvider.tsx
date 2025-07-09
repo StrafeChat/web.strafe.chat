@@ -80,7 +80,7 @@ type AuthContextType = {
   wsClient: () => WebSocketClient | null;
   updateStatus: (status?: string, customStatus?: string) => Promise<boolean>;
   fetchBulkUsers: (userIds: string[]) => Promise<void>;
-  sendMessage: (roomId: string, messageData: { content: string; nonce?: string; message_references?: string[] }) => Promise<MessageResponse>;
+  sendMessage: (roomId: string, messageData: { content: string; nonce?: string; message_references?: string[]; attachments?: string[] }) => Promise<MessageResponse>;
   sendTypingIndicator: (roomId: string) => Promise<void>;
   deleteMessage: (roomId: string, messageId: string) => Promise<{ success: boolean; error?: string; }>;
   editMessage: (roomId: string, messageId: string, content: string) => Promise<{ success: boolean; message?: any; error?: string; }>;
@@ -747,10 +747,10 @@ export const AuthProvider: ParentComponent = (props) => {
     }
   };
 
-  const sendMessage = async (roomId: string, messageData: { content: string; nonce?: string; message_references?: string[] }): Promise<MessageResponse> => {
+  const sendMessage = async (roomId: string, messageData: { content: string; nonce?: string; message_references?: string[]; attachments?: string[] }): Promise<MessageResponse> => {
     try {
-      if (!roomId || !messageData.content.trim()) {
-        return { success: false, error: "Room ID and message content are required" };
+      if (!roomId || (!messageData.content.trim() && (!messageData.attachments || messageData.attachments.length === 0))) {
+        return { success: false, error: "Room ID and message content or attachments are required" };
       }
 
       const response = await fetch(API_ENDPOINTS.ROOM_MESSAGES(roomId), {
@@ -919,6 +919,7 @@ export const AuthProvider: ParentComponent = (props) => {
       created_at: messageData.created_at || new Date().toISOString(),
       edited_at: messageData.edited_at || null,
       attachments: messageData.attachments || [],
+      message_references: messageData.message_references || [],
       type: messageData.type,
       system: messageData.system,
       system_type: messageData.system_type,
@@ -1108,6 +1109,34 @@ export const AuthProvider: ParentComponent = (props) => {
       const messages = Array.isArray(data) ? data : 
                       data.messages ? data.messages : 
                       data.success && data.messages ? data.messages : [];
+      
+      // Extract author data from messages and add to user cache (optimized batch processing)
+      if (Array.isArray(messages)) {
+        const newUsers = new Map();
+        
+        // First pass: collect unique authors that aren't already cached
+        messages.forEach((message: any) => {
+          if (message.author && message.author.id && !cache.getUser(message.author.id) && !newUsers.has(message.author.id)) {
+            newUsers.set(message.author.id, {
+              id: message.author.id,
+              username: message.author.username,
+              discriminator: message.author.discriminator,
+              display_name: message.author.display_name,
+              avatar: message.author.avatar,
+              banner: message.author.banner,
+              presence: message.author.presence,
+              flags: message.author.flags,
+              about_me: message.author.about_me,
+              bio: message.author.bio
+            });
+          }
+        });
+        
+        // Batch add new users to cache
+        newUsers.forEach((user) => {
+          cache.setUser(user);
+        });
+      }
       
       if (Array.isArray(messages) && messages.length > 0) {
         console.log(`[AuthProvider] Fetched ${messages.length} historical messages for room: ${roomId}`);

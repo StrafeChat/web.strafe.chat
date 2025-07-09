@@ -23,6 +23,14 @@ const SessionsSettings: Component = () => {
   const { showToast } = useToast();
   const [sessions, setSessions] = createSignal<Session[]>([]);
   const [loading, setLoading] = createSignal(true);
+  const [hiddenIPs, setHiddenIPs] = createSignal<{ [key: string]: boolean }>({});
+
+  const toggleIPVisibility = (sessionToken: string) => {
+    setHiddenIPs(prev => ({
+      ...prev,
+      [sessionToken]: !prev[sessionToken]
+    }));
+  };
 
   const fetchSessions = async () => {
     try {
@@ -205,246 +213,196 @@ const SessionsSettings: Component = () => {
     }
   };
 
+
+
   onMount(() => {
     fetchSessions();
   });
 
   return (
-    <div class={`mb-8 ${isMobile() ? "px-4" : "mr-5"}`}>
+    <div class={`mb-8 overflow-hidden ${isMobile() ? "" : "mr-5"}`}>
       {/* Header with Icon */}
-      <div class="flex items-center gap-3 mb-6">
-        <div class="p-3 bg-primary/10 rounded-lg">
+      <div class="flex items-center gap-3 mb-6 overflow-hidden">
+        <div class="p-2 bg-primary/10 rounded-lg flex-shrink-0">
           <Monitor />
         </div>
-        <div class="flex-1">
-          <h2 class="text-xl font-semibold text-text-primary mb-1">
+        <div class="min-w-0 flex-1">
+          <h2 class="text-xl font-semibold text-text-primary mb-1 truncate">
             {t("settings.sessions.title")}
           </h2>
-          <p class="text-text-secondary text-xs">
+          <p class="text-text-secondary text-sm truncate">
             {t("settings.sessions.description")}
           </p>
         </div>
-        {sessions().length > 1 && (
-          <button
-            onClick={handleLogoutAllSessions}
-            class="px-4 py-2 text-sm bg-red-500 hover:bg-red-600 text-white rounded-md transition-colors flex items-center space-x-2 ml-auto"
-          >
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-              <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-              <polyline points="16 17 21 12 16 7" />
-              <line x1="21" y1="12" x2="9" y2="12" />
-            </svg>
-            <span>{t("settings.sessions.logoutOthers")}</span>
-          </button>
-        )}
       </div>
 
       {loading() ? (
-        <div class="flex justify-center items-center py-8">
-          <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
+        <div class="flex items-center justify-center py-8">
+          <div class="animate-spin rounded-full h-8 w-8 border-2 border-primary border-t-transparent"></div>
         </div>
       ) : (
-        <div class="space-y-4">
+        <div class="space-y-6 overflow-hidden">
           {/* Current Session */}
-          <For each={sessions().filter(session => session.current)}>
-            {(session) => (
-              <div class="bg-background1 rounded-lg p-4 transition-colors duration-200 border-2 border-primary overflow-hidden">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 sm:gap-0">
-                  <div class="flex items-start space-x-4">
-                    <div class="p-2 bg-background2 rounded-lg">{getBrowserIcon(session.user_agent)}</div>
-                    <div>
-                      <div class="flex items-center space-x-2 mb-1">
-                        <h3 class="text-md font-medium text-text-primary">
-                          {getBrowserName(session.user_agent)}
-                        </h3>
-                        {session.current && (
-                          <span class="px-2 py-0.5 text-xs bg-primary text-white rounded-full flex items-center">
-                            <div class="w-2 h-2 bg-green-400 rounded-full mr-1"></div>
-                            {t("settings.sessions.current")}
-                          </span>
-                        )}
-                        {session.trusted && (
-                          <span class="px-2 py-0.5 text-xs bg-yellow-500 text-white rounded-full">
-                            {t("settings.sessions.trusted")}
-                          </span>
-                        )}
+          <div class="bg-background1 rounded-lg p-4 sm:p-6 overflow-hidden">
+            <div class="flex items-center gap-2 mb-4 overflow-hidden">
+              <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse flex-shrink-0"></div>
+              <h3 class="text-lg font-semibold text-text-primary truncate">Current Session</h3>
+            </div>
+            <For each={sessions().filter(session => session.current)}>
+              {(session) => (
+                <div class="p-3 sm:p-4 rounded-lg border bg-green-500/10 border-green-500/30 dark:bg-green-400/10 dark:border-green-400/30 overflow-hidden">
+                  <div class="flex flex-col sm:flex-row sm:items-start gap-3 overflow-hidden">
+                    <div class="flex items-start gap-3 min-w-0 flex-1 overflow-hidden">
+                      <div class="p-2 bg-background2 rounded-lg flex-shrink-0">
+                        {getBrowserIcon(session.user_agent)}
                       </div>
-                      <p class="text-text-secondary text-sm flex items-center">
-                        <svg class="w-4 h-4 mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                          <line x1="8" y1="21" x2="16" y2="21"></line>
-                          <line x1="12" y1="17" x2="12" y2="21"></line>
-                        </svg>
-                        {getDeviceType(session.user_agent)}
-                      </p>
-                      <p class="text-text-secondary text-xs mt-2 flex items-center">
-                        <svg class="w-4 h-4 mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <circle cx="12" cy="12" r="10"></circle>
-                          <polyline points="12 6 12 12 16 14"></polyline>
-                        </svg>
-                        {t("settings.sessions.lastActive", {
-                          time: formatDistanceToNow(new Date(session.created_at), {
-                            addSuffix: true,
-                          }),
-                        })}
-                      </p>
-                      <div class="text-text-secondary text-xs flex items-center mt-1">
-                        <svg class="w-4 h-4 mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
-                          <line x1="7" y1="2" x2="7" y2="22"></line>
-                          <line x1="17" y1="2" x2="17" y2="22"></line>
-                          <line x1="2" y1="12" x2="22" y2="12"></line>
-                          <line x1="2" y1="7" x2="7" y2="7"></line>
-                          <line x1="2" y1="17" x2="7" y2="17"></line>
-                          <line x1="17" y1="17" x2="22" y2="17"></line>
-                          <line x1="17" y1="7" x2="22" y2="7"></line>
-                        </svg>
-                        {t("settings.sessions.ipAddress")}:{" "}
-                        <span class="font-mono">
-                          {hiddenIPs()[session.token] ? session.ip : session.ip.replace(/[^.]/g, '*')}
-                        </span>
-                        <button
-                          onClick={() => toggleIPVisibility(session.token)}
-                          class="ml-2 text-primary hover:text-primary-dark transition-colors"
-                          title={hiddenIPs()[session.token] ? t("settings.sessions.hideIP") : t("settings.sessions.showIP")}
-                        >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            class="h-4 w-4"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                          >
-                            {hiddenIPs()[session.token] ? (
-                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                            ) : (
-                              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                            )}
-                          </svg>
-                        </button>
+                      <div class="min-w-0 flex-1">
+                        <div class="flex flex-wrap items-center gap-2 mb-1 overflow-hidden">
+                          <h4 class="text-text-primary font-medium truncate break-all">
+                            {getBrowserName(session.user_agent)}
+                          </h4>
+                          {session.trusted && (
+                            <span class="px-2 py-1 text-xs bg-yellow-500 text-white rounded-full flex-shrink-0">
+                              Trusted
+                            </span>
+                          )}
+                        </div>
+                        <p class="text-text-secondary text-sm mb-2 truncate break-all">
+                          {getDeviceType(session.user_agent)}
+                        </p>
+                        <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs text-text-secondary overflow-hidden">
+                          <span class="truncate break-all">
+                            {t("settings.sessions.lastActive", {
+                              time: formatDistanceToNow(new Date(session.created_at), {
+                                addSuffix: true,
+                              }),
+                            })}
+                          </span>
+                          <div class="flex items-center gap-1 min-w-0 overflow-hidden">
+                            <span class="flex-shrink-0 text-xs">{t("settings.sessions.ipAddress")}:</span>
+                            <span class="font-mono text-xs truncate break-all max-w-20">
+                              {hiddenIPs()[session.token] ? session.ip : session.ip.replace(/[^.]/g, '*')}
+                            </span>
+                            <button
+                              onClick={() => toggleIPVisibility(session.token)}
+                              class="text-primary hover:text-primary-dark flex-shrink-0 p-1"
+                              title={hiddenIPs()[session.token] ? "Hide IP" : "Show IP"}
+                            >
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                class="h-3 w-3"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                stroke-width="2"
+                              >
+                                {hiddenIPs()[session.token] ? (
+                                  <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                ) : (
+                                  <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                                )}
+                              </svg>
+                            </button>
+                          </div>
+                        </div>
                       </div>
                     </div>
-                    {!session.current && (
-                      <button
-                        onClick={() => handleLogoutSession(session.token)}
-                        class="px-4 py-2 text-sm bg-red-500 hover:bg-red-600 text-white rounded-md transition-colors flex items-center space-x-1"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                          <polyline points="16 17 21 12 16 7" />
-                          <line x1="21" y1="12" x2="9" y2="12" />
-                        </svg>
-                        <span>{t("settings.sessions.logout")}</span>
-                      </button>
-                    )}
                   </div>
                 </div>
-              </div>
-            )}
-          </For>
-
-          {/* Separator */}
-          <div class="border-t border-border my-4"></div>
+              )}
+            </For>
+          </div>
 
           {/* Other Sessions */}
-          <For each={sessions().filter(session => !session.current)}>
-            {(session) => (
-              <div class="bg-background1 rounded-lg p-4 transition-colors duration-200">
-                <div class="flex justify-between items-center w-full">
-                  <div class="flex items-start space-x-4 flex-grow">
-                    <div class="p-2 bg-background2 rounded-lg">{getBrowserIcon(session.user_agent)}</div>
-                    <div class="flex-grow">
-                      <div class="flex items-center space-x-2 mb-1">
-                        <h3 class="text-md font-medium text-text-primary">
-                          {getBrowserName(session.user_agent)}
-                        </h3>
-                        {session.current && (
-                          <span class="px-2 py-0.5 text-xs bg-primary text-white rounded-full flex items-center">
-                            <div class="w-2 h-2 bg-green-400 rounded-full mr-1"></div>
-                            {t("settings.sessions.current")}
-                          </span>
-                        )}
-                        {session.trusted && (
-                          <span class="px-2 py-0.5 text-xs bg-yellow-500 text-white rounded-full">
-                            {t("settings.sessions.trusted")}
-                          </span>
-                        )}
-                      </div>
-                      <p class="text-text-secondary text-sm flex items-center">
-                        <svg class="w-4 h-4 mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
-                          <line x1="8" y1="21" x2="16" y2="21"></line>
-                          <line x1="12" y1="17" x2="12" y2="21"></line>
-                        </svg>
-                        {getDeviceType(session.user_agent)}
-                      </p>
-                      <p class="text-text-secondary text-xs mt-2 flex items-center">
-                        <svg class="w-4 h-4 mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <circle cx="12" cy="12" r="10"></circle>
-                          <polyline points="12 6 12 12 16 14"></polyline>
-                        </svg>
-                        {t("settings.sessions.lastActive", {
-                          time: formatDistanceToNow(new Date(session.created_at), {
-                            addSuffix: true,
-                          }),
-                        })}
-                      </p>
-                      <div class="text-text-secondary text-xs flex items-center mt-1">
-                        <svg class="w-4 h-4 mr-1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <rect x="2" y="2" width="20" height="20" rx="2.18" ry="2.18"></rect>
-                          <line x1="7" y1="2" x2="7" y2="22"></line>
-                          <line x1="17" y1="2" x2="17" y2="22"></line>
-                          <line x1="2" y1="12" x2="22" y2="12"></line>
-                          <line x1="2" y1="7" x2="7" y2="7"></line>
-                          <line x1="2" y1="17" x2="7" y2="17"></line>
-                          <line x1="17" y1="17" x2="22" y2="17"></line>
-                          <line x1="17" y1="7" x2="22" y2="7"></line>
-                        </svg>
-                        {t("settings.sessions.ipAddress")}:{" "}
-                        <span class="font-mono">
-                          {hiddenIPs()[session.token] ? session.ip : session.ip.replace(/[^.]/g, '*')}
-                        </span>
+          {sessions().filter(session => !session.current).length > 0 && (
+            <div class="bg-background1 rounded-lg p-4 sm:p-6 overflow-hidden">
+              <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 overflow-hidden">
+                <div class="flex items-center gap-2 min-w-0 overflow-hidden">
+                  <div class="w-2 h-2 bg-gray-400 rounded-full flex-shrink-0"></div>
+                  <h3 class="text-lg font-semibold text-text-primary truncate break-all">
+                    Other Sessions ({sessions().filter(session => !session.current).length})
+                  </h3>
+                </div>
+                <button
+                  onClick={handleLogoutAllSessions}
+                  class="px-3 py-1.5 text-sm bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors flex-shrink-0 w-full sm:w-auto"
+                >
+                  {t("settings.sessions.logoutOthers")}
+                </button>
+              </div>
+              <div class="space-y-4 overflow-hidden">
+                <For each={sessions().filter(session => !session.current)}>
+                  {(session) => (
+                    <div class="p-3 sm:p-4 rounded-lg border bg-background2 border-border overflow-hidden">
+                      <div class="flex flex-col gap-3 overflow-hidden">
+                        <div class="flex items-start gap-3 min-w-0 overflow-hidden">
+                          <div class="p-2 bg-background2 rounded-lg flex-shrink-0">
+                            {getBrowserIcon(session.user_agent)}
+                          </div>
+                          <div class="min-w-0 flex-1 overflow-hidden">
+                            <div class="flex flex-wrap items-center gap-2 mb-1 overflow-hidden">
+                              <h4 class="text-text-primary font-medium truncate break-all">
+                                {getBrowserName(session.user_agent)}
+                              </h4>
+                              {session.trusted && (
+                                <span class="px-2 py-1 text-xs bg-yellow-500 text-white rounded-full flex-shrink-0">
+                                  Trusted
+                                </span>
+                              )}
+                            </div>
+                            <p class="text-text-secondary text-sm mb-2 truncate break-all">
+                              {getDeviceType(session.user_agent)}
+                            </p>
+                            <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs text-text-secondary overflow-hidden">
+                              <span class="truncate break-all">
+                                {t("settings.sessions.lastActive", {
+                                  time: formatDistanceToNow(new Date(session.created_at), {
+                                    addSuffix: true,
+                                  }),
+                                })}
+                              </span>
+                              <div class="flex items-center gap-1 min-w-0 overflow-hidden">
+                                <span class="flex-shrink-0 text-xs">{t("settings.sessions.ipAddress")}:</span>
+                                <span class="font-mono text-xs truncate break-all max-w-20">
+                                  {hiddenIPs()[session.token] ? session.ip : session.ip.replace(/[^.]/g, '*')}
+                                </span>
+                                <button
+                                  onClick={() => toggleIPVisibility(session.token)}
+                                  class="text-primary hover:text-primary-dark flex-shrink-0 p-1"
+                                  title={hiddenIPs()[session.token] ? "Hide IP" : "Show IP"}
+                                >
+                                  <svg
+                                    xmlns="http://www.w3.org/2000/svg"
+                                    class="h-3 w-3"
+                                    viewBox="0 0 24 24"
+                                    fill="none"
+                                    stroke="currentColor"
+                                    stroke-width="2"
+                                  >
+                                    {hiddenIPs()[session.token] ? (
+                                      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+                                    ) : (
+                                      <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
+                                    )}
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
                         <button
-                          onClick={() => toggleIPVisibility(session.token)}
-                          class="ml-2 text-primary hover:text-primary-dark transition-colors"
-                          title={hiddenIPs()[session.token] ? t("settings.sessions.hideIP") : t("settings.sessions.showIP")}
+                          onClick={() => handleLogoutSession(session.token)}
+                          class="px-3 py-1.5 text-sm bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors w-full sm:w-auto sm:self-end"
                         >
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            class="h-4 w-4"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            stroke-width="2"
-                          >
-                            {hiddenIPs()[session.token] ? (
-                              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
-                            ) : (
-                              <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" />
-                            )}
-                          </svg>
+                          {t("settings.sessions.logout")}
                         </button>
                       </div>
                     </div>
-                    {!session.current && (
-                      <button
-                        onClick={() => handleLogoutSession(session.token)}
-                        class="ml-auto px-4 py-2 text-sm bg-red-500 hover:bg-red-600 text-white rounded-md transition-colors flex items-center space-x-1"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                          <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
-                          <polyline points="16 17 21 12 16 7" />
-                          <line x1="21" y1="12" x2="9" y2="12" />
-                        </svg>
-                        <span>{t("settings.sessions.logout")}</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
+                  )}
+                </For>
               </div>
-            )}
-          </For>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -452,9 +410,3 @@ const SessionsSettings: Component = () => {
 };
 
 export default SessionsSettings;
-
-const [hiddenIPs, setHiddenIPs] = createSignal<{ [key: string]: boolean }>({});
-
-const toggleIPVisibility = (token: string) => {
-  setHiddenIPs(prev => ({ ...prev, [token]: !prev[token] }));
-};
