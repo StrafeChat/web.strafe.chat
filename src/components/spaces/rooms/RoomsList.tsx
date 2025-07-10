@@ -9,7 +9,7 @@ const RoomsList: Component = () => {
   return (
     <div class="flex flex-col h-full bg-[var(--background1)] rounded-tl-2xl overflow-hidden">
       {/* Main content area - will flex-grow to fill space */}
-      <div class="flex-1 overflow-y-auto pb-[80px] md:pb-0">
+      <div class="flex-1 overflow-y-auto pb-14 md:pb-0">
         {/* Add your rooms list content here */}
       </div>
 

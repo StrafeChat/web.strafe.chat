@@ -343,45 +343,252 @@ export class WebSocketClient {
       data = this.normalizePayload(data);
 
       // Ensure the data follows the standard event payload structure
-      if (!(data.op !== undefined && data.d !== undefined) && 
-          !(data.type !== undefined)) {
+      if (!(data.op !== undefined && data.d !== undefined)) {
         console.warn("[WebSocket] Received non-standard payload:", data);
-        if (data.op !== undefined) {
-          data = {
-            type: this.mapEventTypeToOpCode(data.op),
-            ...data
-          };
-        } else {
-          data = {
-            op: 0,
-            type: data.type || 'UNKNOWN',
-            d: data,
-          };
-        }
-      }
-
-      // Extract actual payload data - different formats might exist
-      const actualData = data.d || data;
-      const eventType = data.type || (data.t || this.mapEventTypeToOpCode(data.op));
-
-      // Handle READY event specially
-      if (eventType === "READY") {
-        const readyData = {
-          type: "READY",
-          ...actualData,
+        data = {
+          op: 0,
+          d: data,
         };
-        console.log("[WebSocket] Processing READY event:", readyData);
-        this.handleReady(readyData);
-        return;
       }
 
-      // Process other event types
-      const handler = this.messageHandlers.get(eventType);
-      if (handler) {
-        console.log(`[WebSocket] Processing ${eventType} event:`, actualData);
-        handler(actualData);
-      } else {
-        console.warn("[WebSocket] No handler for message type:", eventType);
+      console.log("[WebSocket] Message details:", {
+        opCode: data.op,
+        data: data.d,
+      });
+
+      const OpCodes = {
+        READY: "READY",
+        HEARTBEAT_ACK: "HEARTBEAT_ACK",
+        RELATIONSHIP_CREATE: "RELATIONSHIP_CREATE",
+        RELATIONSHIP_UPDATE: "RELATIONSHIP_UPDATE",
+        RELATIONSHIP_ACCEPT: "RELATIONSHIP_ACCEPT",
+        RELATIONSHIP_DELETE: "RELATIONSHIP_DELETE",
+        MESSAGE: "MESSAGE",
+        DISPATCH: "DISPATCH",
+        PRESENCE_UPDATE: "PRESENCE_UPDATE",
+        MESSAGE_DELETE: "MESSAGE_DELETE",
+        MESSAGE_EDIT: "MESSAGE_EDIT",
+      };
+
+      switch (data.op) {
+        case OpCodes.READY:
+          console.log("[WebSocket] Received READY event:", data.d);
+          this.handleReady(data.d);
+          break;
+
+        case OpCodes.HEARTBEAT_ACK:
+          console.log("[WebSocket] Received HEARTBEAT_ACK");
+          break;
+
+        case OpCodes.RELATIONSHIP_CREATE:
+          console.log("[WebSocket] Received RELATIONSHIP_CREATE raw data:", data);
+          if (!data.d || !data.d.id) {
+            console.error("[WebSocket] Invalid relationship data received:", data);
+            break;
+          }
+          const relationship = {
+            id: data.d.id,
+            sender_id: data.d.sender_id,
+            recipient_id: data.d.recipient_id,
+            created_at: data.d.created_at || new Date().toISOString(),
+            type: "relationshipCreate",
+            sender: data.d.sender || null,
+            recipient: data.d.recipient || null,
+          };
+          console.log("[WebSocket] Processing relationshipCreate:", relationship);
+          const relationshipCreateHandler = this.messageHandlers.get("relationshipCreate");
+          if (relationshipCreateHandler) {
+            relationshipCreateHandler(relationship);
+          }
+          break;
+
+        case OpCodes.RELATIONSHIP_UPDATE:
+          console.log("[WebSocket] Received RELATIONSHIP_UPDATE raw data:", data);
+          if (!data.d || !data.d.id) {
+            console.error("[WebSocket] Invalid relationship update data received:", data);
+            break;
+          }
+          const updatedRelationship = {
+            id: data.d.id,
+            sender_id: data.d.sender_id,
+            recipient_id: data.d.recipient_id,
+            created_at: data.d.created_at || new Date().toISOString(),
+            type: "relationshipUpdate",
+            sender: data.d.sender || null,
+            recipient: data.d.recipient || null,
+          };
+          console.log("[WebSocket] Processing relationshipUpdate:", updatedRelationship);
+          const relationshipUpdateHandler = this.messageHandlers.get("relationshipUpdate");
+          if (relationshipUpdateHandler) {
+            relationshipUpdateHandler(updatedRelationship);
+          }
+          break;
+
+        case OpCodes.RELATIONSHIP_ACCEPT:
+          console.log("[WebSocket] Received RELATIONSHIP_ACCEPT raw data:", data);
+          if (!data.d || !data.d.id) {
+            console.error("[WebSocket] Invalid relationship accept data received:", data);
+            break;
+          }
+          const acceptedRelationship = {
+            id: data.d.id,
+            sender_id: data.d.sender_id,
+            recipient_id: data.d.recipient_id,
+            created_at: data.d.created_at || new Date().toISOString(),
+            type: "relationshipAccept",
+            sender: data.d.sender || null,
+            recipient: data.d.recipient || null,
+          };
+          console.log("[WebSocket] Processing relationshipAccept:", acceptedRelationship);
+          const relationshipAcceptHandler = this.messageHandlers.get("relationshipAccept");
+          if (relationshipAcceptHandler) {
+            relationshipAcceptHandler(acceptedRelationship);
+          }
+          break;
+
+        case OpCodes.RELATIONSHIP_DELETE:
+          console.log("[WebSocket] Received RELATIONSHIP_DELETE raw data:", data);
+          if (!data.d || !data.d.id) {
+            console.error("[WebSocket] Invalid relationship delete data received:", data);
+            break;
+          }
+          const deletedRelationship = {
+            id: data.d.id,
+            sender_id: data.d.sender_id,
+            recipient_id: data.d.recipient_id,
+            created_at: data.d.created_at || new Date().toISOString(),
+            type: "relationshipDelete",
+            sender: data.d.sender || null,
+            recipient: data.d.recipient || null,
+          };
+          console.log("[WebSocket] Processing relationshipDelete:", deletedRelationship);
+          const relationshipDeleteHandler = this.messageHandlers.get("relationshipDelete");
+          if (relationshipDeleteHandler) {
+            relationshipDeleteHandler(deletedRelationship);
+          }
+          break;
+
+        case OpCodes.MESSAGE:
+          console.log("[WebSocket] Received MESSAGE:", data.d);
+          // Check if this is a message with the new nested data structure
+          if (data.d && (data.d.type === "MESSAGE_CREATE" || data.d.event_type === "MESSAGE_CREATE") && data.d.data) {
+            console.log("[WebSocket] Routing message_create to MESSAGE_CREATE handler");
+            const messageCreateHandler = this.messageHandlers.get("MESSAGE_CREATE");
+            if (messageCreateHandler) {
+              messageCreateHandler({
+                type: "MESSAGE_CREATE",
+                data: data.d.data
+              });
+            }
+          } else if (data.d && (data.d.type === "MESSAGE_DELETE" || data.d.event_type === "MESSAGE_DELETE") && data.d.data) {
+            console.log("[WebSocket] Handling message delete:", data.d);
+            this.handleMessageDelete({
+              room_id: data.d.data.room_id,
+              message_id: data.d.data.id
+            });
+          } else if (data.d && (data.d.type === "MESSAGE_EDIT" || data.d.event_type === "MESSAGE_EDIT") && data.d.data) {
+            console.log("[WebSocket] Handling message edit:", data.d);
+            const messageEditHandler = this.messageHandlers.get("MESSAGE_EDIT");
+            if (messageEditHandler) {
+              messageEditHandler({
+                room_id: data.d.data.room_id,
+                message_id: data.d.data.id,
+                content: data.d.data.content,
+                edited_at: data.d.data.edited_at,
+                author_id: data.d.data.author_id
+              });
+            }
+          } else {
+            // Handle legacy message format
+            const handler = this.messageHandlers.get("MESSAGE");
+            if (handler) {
+              handler(data.d);
+            }
+          }
+          break;
+
+        case OpCodes.DISPATCH:
+          console.log("[WebSocket] Received DISPATCH:", data.d);
+          // Handle legacy dispatch events
+          if (data.d && data.d.op) {
+            const messageEvent = new MessageEvent("message", {
+              data: data.d,
+              lastEventId: "",
+              origin: "yourOrigin",
+              ports: [],
+            });
+            this.handleDirectMessage(messageEvent);
+          } 
+          // Handle room creation events with nested data structure
+          else if (data.d && (data.d.type === "ROOM_CREATE" || data.d.event_type === "ROOM_CREATE") && data.d.data) {
+            this.handleRoomCreate(data.d);
+          }
+          // Handle room update events
+          else if (data.d && (data.d.type === "ROOM_UPDATE" || data.d.event_type === "ROOM_UPDATE") && data.d.data) {
+            this.handleRoomUpdate(data.d);
+          }
+          // Handle room delete events
+          else if (data.d && (data.d.type === "ROOM_DELETE" || data.d.event_type === "ROOM_DELETE") && data.d.data) {
+            this.handleRoomDelete(data.d);
+          }
+          // Handle room member add events
+          else if (data.d && (data.d.type === "ROOM_MEMBER_ADD" || data.d.event_type === "ROOM_MEMBER_ADD") && data.d.data) {
+            this.handleRoomMemberAdd(data.d);
+          }
+          // Handle room member remove events
+          else if (data.d && (data.d.type === "ROOM_MEMBER_REMOVE" || data.d.event_type === "ROOM_MEMBER_REMOVE") && data.d.data) {
+            this.handleRoomMemberRemove(data.d);
+          }
+          // Handle room ownership transfer events
+          else if (data.d && (data.d.type === "ROOM_OWNERSHIP_TRANSFER" || data.d.event_type === "ROOM_OWNERSHIP_TRANSFER") && data.d.data) {
+            const roomOwnershipHandler = this.messageHandlers.get("ROOM_OWNERSHIP_TRANSFER");
+            if (roomOwnershipHandler) {
+              console.log("[WebSocket] Routing roomOwnershipTransfer to ROOM_OWNERSHIP_TRANSFER handler");
+              roomOwnershipHandler(data.d);
+            }
+          }
+          // Handle room icon change events
+          else if (data.d && (data.d.type === "ROOM_ICON_CHANGED" || data.d.event_type === "ROOM_ICON_CHANGED") && data.d.data) {
+            this.handleRoomUpdate(data.d);
+          }
+          // Handle typing indicator events
+          else if (data.d && (data.d.type === "TYPING_INDICATOR" || data.d.event_type === "TYPING_INDICATOR") && data.d.data) {
+            this.handleTypingIndicator(data.d.data);
+          }
+          else {
+            const handler = this.messageHandlers.get("DISPATCH");
+            if (handler) {
+              handler(data.d);
+            }
+          }
+          break;
+
+        case OpCodes.PRESENCE_UPDATE:
+          console.log("[WebSocket] Received PRESENCE_UPDATE raw data:", data);
+          if (!data.d || !data.d.user_id) {
+            console.error("[WebSocket] Invalid presence update data received:", data);
+            break;
+          }
+          const presenceUpdate = {
+            type: "PRESENCE_UPDATE",
+            user_id: data.d.user_id,
+            status: data.d.status || "Offline",
+            custom_status: data.d.custom_status || "",
+          };
+          console.log("[WebSocket] Processing presence update:", presenceUpdate);
+          await this.handlePresenceUpdate({
+            type: "PRESENCE_UPDATE",
+            user_id: presenceUpdate.user_id,
+            status: presenceUpdate.status,
+            custom_status: presenceUpdate.custom_status
+          } as PresenceUpdatePayload).catch((error: any) => {
+            console.error("[WebSocket] Error handling presence update:", error);
+          });
+          break;
+
+        default:
+          console.warn("[WebSocket] Unhandled event type:", data.op);
+          break;
       }
     } catch (error) {
       console.error("[WebSocket] Error handling message:", error);
@@ -445,15 +652,30 @@ export class WebSocketClient {
 
   private handleWorkerMessage(event: MessageEvent): void {
     const { type, payload } = event.data;
+    console.log("[WebSocket] Received worker message with type:", type, "and payload:", payload);
 
     switch (type) {
       case "message":
       case "dispatch":
-        const handler = this.messageHandlers.get(payload.type);
-        if (handler) {
-          handler(payload);
+        console.log("[WebSocket] Processing dispatch/message with payload.type:", payload?.type);
+        // Handle presence updates specifically
+        if (payload.type === "presenceUpdate") {
+          console.log("[WebSocket] Handling presence update from worker:", payload);
+          this.handlePresenceUpdate({
+            type: "PRESENCE_UPDATE",
+            user_id: payload.user_id,
+            status: payload.status,
+            custom_status: payload.custom_status
+          }).catch((error: any) => {
+            console.error("[WebSocket] Error handling presence update from worker:", error);
+          });
         } else {
-          console.warn("[WebSocket] No handler for message type:", payload.type);
+          const handler = this.messageHandlers.get(payload.type);
+          if (handler) {
+            handler(payload);
+          } else {
+            console.warn("[WebSocket] No handler for message type:", payload.type);
+          }
         }
         break;
 
@@ -827,13 +1049,13 @@ export class WebSocketClient {
     }
   }
 
-  private handlePresenceUpdate(payload: PresenceUpdatePayload): void {
+  private async handlePresenceUpdate(payload: PresenceUpdatePayload): Promise<void> {
     console.log("[WebSocketClient] Handling presence update:", payload);
     if (!this.cache) {
       console.warn("[WebSocketClient] No cache available for presence update");
       return;
     }
-    handlePresenceUpdate(payload, this.cache);
+    await handlePresenceUpdate(payload, this.cache);
   }
 
   private normalizePayload(data: any): any {

@@ -1,92 +1,5 @@
 // Utility functions for emoji handling
-
-// Map of emoji shortcodes to their Unicode representations
-const emojiMap: Record<string, string> = {
-  // Smileys & Emotion
-  smile: "😄",
-  joy: "😂",
-  rofl: "🤣",
-  heart_eyes: "😍",
-  kissing_heart: "😘",
-  wink: "😉",
-  thinking: "🤔",
-  unamused: "😒",
-  sweat: "😓",
-  weary: "😩",
-  sob: "😭",
-  angry: "😠",
-  rage: "😡",
-  sunglasses: "😎",
-  innocent: "😇",
-  
-  // People & Body
-  wave: "👋",
-  thumbsup: "👍",
-  thumbsdown: "👎",
-  clap: "👏",
-  pray: "🙏",
-  muscle: "💪",
-  point_up: "☝️",
-  point_down: "👇",
-  ok_hand: "👌",
-  v: "✌️",
-  raised_hands: "🙌",
-  eyes: "👀",
-  heart: "❤️",
-  fire: "🔥",
-  "100": "💯",
-  
-  // Animals & Nature
-  dog: "🐶",
-  cat: "🐱",
-  fox: "🦊",
-  panda: "🐼",
-  bear: "🐻",
-  tiger: "🐯",
-  monkey: "🐵",
-  unicorn: "🦄",
-  chicken: "🐔",
-  penguin: "🐧",
-  frog: "🐸",
-  snake: "🐍",
-  whale: "🐳",
-  octopus: "🐙",
-  butterfly: "🦋",
-  
-  // Food & Drink
-  pizza: "🍕",
-  burger: "🍔",
-  fries: "🍟",
-  hotdog: "🌭",
-  taco: "🌮",
-  sushi: "🍣",
-  ice_cream: "🍦",
-  cake: "🍰",
-  cookie: "🍪",
-  coffee: "☕",
-  beer: "🍺",
-  wine: "🍷",
-  cocktail: "🍸",
-  apple: "🍎",
-  banana: "🍌",
-  
-  // Objects
-  gift: "🎁",
-  trophy: "🏆",
-  camera: "📷",
-  computer: "💻",
-  phone: "📱",
-  tv: "📺",
-  bulb: "💡",
-  book: "📚",
-  money: "💰",
-  gem: "💎",
-  lock: "🔒",
-  key: "🔑",
-  hammer: "🔨",
-  bomb: "💣",
-  pill: "💊",
-};
+import { emojiMap, getEmojiByShortcode } from '../data/twemojiData';
 
 /**
  * Parses a message string and replaces emoji shortcodes with their Unicode representations
@@ -95,8 +8,8 @@ const emojiMap: Record<string, string> = {
  */
 export const parseEmojis = (message: string): string => {
   // Replace all :emoji_name: patterns with their Unicode equivalents
-  return message.replace(/:([\w_]+):/g, (match, emojiName) => {
-    return emojiMap[emojiName] || match; // Return the emoji or the original text if not found
+  return message.replace(/:([\w_]+):/g, (match: string, emojiName: string): string => {
+    return (emojiMap[emojiName]?.code || match) as string; // Return the emoji code or the original text if not found
   });
 };
 
@@ -120,27 +33,57 @@ export const isSingleEmoji = (message: string): boolean => {
  * @param message The message to render
  * @returns An array of message parts with class names for styling
  */
-export const renderMessageWithEmojis = (message: string): { text: string; isEmoji: boolean; isLarge: boolean }[] => {
-  const parsedMessage = parseEmojis(message);
+export const renderMessageWithEmojis = (message: string): { text?: string; isEmoji: boolean; isLarge: boolean; emojiCode?: string; shortcode?: string }[] => {
+  // First, replace shortcodes with placeholders to track them
+  const shortcodeMatches: { shortcode: string; emoji: any; index: number }[] = [];
+  let processedMessage = message.replace(/:(\w+):/g, (match, shortcode) => {
+    const emoji = getEmojiByShortcode(shortcode);
+    if (emoji) {
+      const placeholder = `__EMOJI_${shortcodeMatches.length}__`;
+      shortcodeMatches.push({ shortcode, emoji, index: shortcodeMatches.length });
+      return placeholder;
+    }
+    return match;
+  });
   
-  // Check if the message contains only emojis
-  const emojiRegex = /^(?:\p{Emoji}\p{Emoji_Modifier}*|\p{Emoji_Presentation}|\p{Emoji}\u{FE0F})+$/u;
-  const isEmojiOnly = emojiRegex.test(parsedMessage.trim());
+  // Check if the message contains only emoji placeholders (emoji-only message)
+  const emojiOnlyRegex = /^(__EMOJI_\d+__\s*)+$/;
+  const isEmojiOnly = emojiOnlyRegex.test(processedMessage.trim());
   
   if (isEmojiOnly) {
-    // Split the message into individual emojis
-    const emojis = Array.from(parsedMessage.matchAll(/(?:\p{Emoji}\p{Emoji_Modifier}*|\p{Emoji_Presentation}|\p{Emoji}\u{FE0F})/gu));
-    return emojis.map(emoji => ({ text: emoji[0], isEmoji: true, isLarge: true }));
+    // Return large emojis for emoji-only messages
+    return shortcodeMatches.map(({ emoji, shortcode }) => ({
+      isEmoji: true,
+      isLarge: true,
+      emojiCode: emoji.code,
+      shortcode
+    }));
   }
   
-  // For messages with text and emojis, parse and return all parts
-  const parts = parsedMessage.split(/((?:\p{Emoji}\p{Emoji_Modifier}*|\p{Emoji_Presentation}|\p{Emoji}\u{FE0F}))/u)
-    .filter(part => part.length > 0)
-    .map(part => ({
-      text: part,
-      isEmoji: /^(?:\p{Emoji}\p{Emoji_Modifier}*|\p{Emoji_Presentation}|\p{Emoji}\u{FE0F})$/u.test(part),
-      isLarge: false
-    }));
+  // For mixed content, split and process each part
+  const parts: { text?: string; isEmoji: boolean; isLarge: boolean; emojiCode?: string; shortcode?: string }[] = [];
+  const segments = processedMessage.split(/(__EMOJI_\d+__)/g);
+  
+  segments.forEach(segment => {
+    if (segment.match(/^__EMOJI_(\d+)__$/)) {
+      const index = parseInt(segment.match(/^__EMOJI_(\d+)__$/)![1]);
+      const match = shortcodeMatches[index];
+      if (match) {
+        parts.push({
+          isEmoji: true,
+          isLarge: false,
+          emojiCode: match.emoji.code,
+          shortcode: match.shortcode
+        });
+      }
+    } else if (segment.length > 0) {
+      parts.push({
+        text: segment,
+        isEmoji: false,
+        isLarge: false
+      });
+    }
+  });
   
   return parts;
 };

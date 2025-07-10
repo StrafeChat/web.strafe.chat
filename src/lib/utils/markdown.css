@@ -139,3 +139,10 @@
 .markdown-underline {
   text-decoration: underline;
 }
+
+/* Emoji styles */
+.inline-emoji {
+  display: inline-block;
+  vertical-align: -0.1em;
+  object-fit: contain;
+}

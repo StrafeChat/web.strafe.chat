@@ -106,14 +106,25 @@
     @apply h-full w-full;
   }
   
-  html,
+  html {
+    overflow: hidden;
+  }
+  
   body {
     overflow: hidden;
+    /* Fix mobile viewport issues */
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
   }
   
   #root {
     overflow: hidden;
     min-width: 0;
+    height: 100vh;
+    height: 100dvh; /* Use dynamic viewport height for mobile */
   }
   * {
     @apply border-border;

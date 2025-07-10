@@ -199,6 +199,59 @@ const Message: Component<MessageProps> = (props) => {
   const [editError, setEditError] = createSignal("");
   let editInputRef: HTMLDivElement | undefined;
   
+  // Emoji details popup state
+  const [showEmojiDetails, setShowEmojiDetails] = createSignal(false);
+  const [selectedEmoji, setSelectedEmoji] = createSignal<{shortcode: string, emoji: {name: string, code: string}} | null>(null);
+  const [popupPosition, setPopupPosition] = createSignal<{x: number, y: number}>({x: 0, y: 0});
+  
+  // Event listener for emoji clicks using event delegation
+   const handleMessageClick = (event: MouseEvent) => {
+     const target = event.target as HTMLElement;
+     if (target.tagName === 'IMG' && target.classList.contains('inline-emoji')) {
+       const shortcode = target.getAttribute('data-emoji-shortcode');
+       const emojiName = target.getAttribute('data-emoji-name');
+       const emojiCode = target.getAttribute('data-emoji-code');
+       
+       if (shortcode && emojiName && emojiCode) {
+          // Get the position of the clicked emoji
+          const rect = target.getBoundingClientRect();
+          const viewportWidth = window.innerWidth;
+          const viewportHeight = window.innerHeight;
+          const popupWidth = 200; // Approximate popup width
+          const popupHeight = 80; // Approximate popup height
+          
+          let x = rect.right + 10; // Position to the right of emoji
+          let y = rect.top + rect.height / 2; // Center vertically with emoji
+          
+          // Adjust if popup would go off the right edge
+          if (x + popupWidth > viewportWidth - 20) {
+            x = rect.left - popupWidth - 10; // Position to the left instead
+          }
+          
+          // Adjust if popup would go off the top or bottom
+          if (y - popupHeight / 2 < 20) {
+            y = 20 + popupHeight / 2; // Keep some margin from top
+          } else if (y + popupHeight / 2 > viewportHeight - 20) {
+            y = viewportHeight - 20 - popupHeight / 2; // Keep some margin from bottom
+          }
+          
+          setPopupPosition({ x, y });
+         
+         setSelectedEmoji({ 
+           shortcode, 
+           emoji: { name: emojiName, code: emojiCode } 
+         });
+         setShowEmojiDetails(true);
+       }
+     }
+   };
+  
+  // Close emoji details
+  const closeEmojiDetails = () => {
+    setShowEmojiDetails(false);
+    setSelectedEmoji(null);
+  };
+  
   const author = createMemo(() => {
     const userData = cache.getUser(props.author_id);
     return userData;
@@ -721,7 +774,7 @@ const Message: Component<MessageProps> = (props) => {
           triggerRef={userPopupTrigger()}
           userId={props.author_id}
         />
-        <div class={`flex gap-3 w-full overflow-visible min-w-0 ${props.pending && !props.id ? 'opacity-70' : ''}`} id={`message-${props.id}`} data-message-id={props.id}>
+        <div class={`flex gap-3 w-full overflow-visible min-w-0 transition-all duration-300 ease-in-out ${props.pending && !props.id ? 'opacity-60' : 'opacity-100'}`} id={`message-${props.id}`} data-message-id={props.id}>
           <Show when={!shouldShowCompact}>
             <div class="flex-shrink-0 mt-1">
               <Avatar
@@ -768,12 +821,21 @@ const Message: Component<MessageProps> = (props) => {
             </Show>
 
             <Show when={!isEditing()}>
-              <div 
-                class="text-text-primary max-w-full message-content whitespace-pre-wrap overflow-hidden overflow-wrap-anywhere min-w-0"
-                data-edited={props.edited_at ? "true" : undefined}
-                style="word-break: break-word; overflow-wrap: break-word; max-width: 100%;"
-              >
-                <span class="markdown-content" innerHTML={parseMarkdown(props.content)} />
+              <div class="flex items-center gap-2 overflow-hidden">
+                <div 
+                  class="text-text-primary max-w-full message-content whitespace-pre-wrap overflow-hidden overflow-wrap-anywhere min-w-0 flex-1"
+                  data-edited={props.edited_at ? "true" : undefined}
+                  style="word-break: break-word; overflow-wrap: break-word; max-width: 100%;"
+                  onClick={handleMessageClick}
+                >
+                  <span class="markdown-content" innerHTML={parseMarkdown(props.content)} />
+                </div>
+                <Show when={shouldShowCompact && props.pending && !props.id}>
+                  <span class="text-xs text-text-secondary italic flex-shrink-0">(sending...)</span>
+                </Show>
+                <Show when={shouldShowCompact && props.error}>
+                  <span class="text-xs text-red-500 flex-shrink-0">{props.error}</span>
+                </Show>
               </div>
               
               {/* Attachments */}
@@ -926,6 +988,35 @@ const Message: Component<MessageProps> = (props) => {
           isDanger={true}
         />
       </Portal>
+      
+      {/* Emoji Details Popup */}
+      <Show when={showEmojiDetails() && selectedEmoji()}>
+        <Portal>
+          <div class="fixed inset-0 z-40" onClick={closeEmojiDetails}>
+            <div 
+              class="absolute bg-background border border-border rounded-lg p-3 shadow-lg z-50 w-[250px]"
+              style={{
+                left: `${popupPosition().x}px`,
+                top: `${popupPosition().y}px`,
+                transform: 'translate(0, -50%)'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div class="flex items-center gap-3">
+                <img 
+                  src={`${FS_URL}/twemoji/${selectedEmoji()?.emoji.code}.svg`} 
+                  alt={selectedEmoji()?.emoji.name} 
+                  class="w-10 h-10 flex-shrink-0"
+                />
+                <div class="min-w-0">
+                  <div class="text-sm font-medium text-text-primary truncate">:{selectedEmoji()?.shortcode}:</div>
+                  <div class="text-xs text-text-secondary">This is a default emoji, it can be used everywhere.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      </Show>
     </>
   );
 };

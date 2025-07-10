@@ -19,6 +19,7 @@ import { useUserSettings } from "../../lib/providers/userSettings/UserSettingsPr
 import { hasUnclosedCodeBlock, updateCodeBlockIndicator } from "../../lib/utils/codeBlockUtils";
 import { RoomType } from "../../types/roomTypes";
 import { EmojiPicker } from "../shared/EmojiPicker";
+import { EmojiAutocomplete } from "../shared/EmojiAutocomplete";
 import DateDivider from "./DateDivider";
 import UnreadDivider from "./UnreadDivider";
 import MessageSkeleton from "./MessageSkeleton";
@@ -36,6 +37,7 @@ const ChatArea: Component = () => {
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal("");
   const [messages, setMessages] = createSignal<CachedMessage[]>([]);
+  const [pendingMessages, setPendingMessages] = createSignal<CachedMessage[]>([]);
   const [replyingTo, setReplyingTo] = createSignal<string[]>([]);
   const [editingMessageId, setEditingMessageId] = createSignal<string | null>(null);
   const [editingRoomId, setEditingRoomId] = createSignal<string | null>(null);
@@ -45,6 +47,10 @@ const ChatArea: Component = () => {
   const [hasScrolledUp, setHasScrolledUp] = createSignal(false);
   const [showEmojiPicker, setShowEmojiPicker] = createSignal(false);
   const [emojiPickerPosition, setEmojiPickerPosition] = createSignal({ top: 0, left: 0 });
+  const [showEmojiAutocomplete, setShowEmojiAutocomplete] = createSignal(false);
+  const [emojiAutocompleteQuery, setEmojiAutocompleteQuery] = createSignal("");
+  const [emojiAutocompletePosition, setEmojiAutocompletePosition] = createSignal({ top: 0, left: 0, width: 0 });
+  const [emojiAutocompleteRange, setEmojiAutocompleteRange] = createSignal<Range | null>(null);
   const [fileInputRef, setFileInputRef] = createSignal<HTMLInputElement>();
   const [attachments, setAttachments] = createSignal<Array<MessageAttachment & {
     uploading?: boolean;
@@ -304,20 +310,32 @@ const ChatArea: Component = () => {
       }
     }
     
-    // Create optimized map for deduplication
+    // Create optimized map for deduplication with smooth transitions
     const messageMap = new Map<string, CachedMessage>();
     const seenNonces = new Set<string>();
     
-    // Single pass processing with better performance
+    // Single pass processing with better performance and smooth transitions
     for (const msg of msgs) {
       if (msg.deleted) continue; // Skip deleted messages early
       
-      if (msg.id) {
-        // Server messages take priority
+      // Use a unique key that prioritizes confirmed messages but maintains position
+      const key = msg.id || msg.nonce || '';
+      if (!key) continue;
+      
+      // If message has both ID and nonce, it's a confirmed message that replaced a temp one
+      if (msg.id && msg.nonce) {
+        // Remove any existing temporary message with this nonce
+        if (messageMap.has(msg.nonce)) {
+          messageMap.delete(msg.nonce);
+        }
+        // Add the confirmed message with its ID as key
         messageMap.set(msg.id, msg);
-        if (msg.nonce) seenNonces.add(msg.nonce);
-      } else if (msg.nonce && !seenNonces.has(msg.nonce)) {
-        // Pending messages only if no server version exists
+        seenNonces.add(msg.nonce);
+      } else if (msg.id && !msg.nonce) {
+        // Regular server message
+        messageMap.set(msg.id, msg);
+      } else if (msg.nonce && !seenNonces.has(msg.nonce) && !msg.id) {
+        // Pending message only if no confirmed version exists
         messageMap.set(msg.nonce, msg);
         seenNonces.add(msg.nonce);
       }
@@ -356,6 +374,56 @@ const ChatArea: Component = () => {
     if (!allRooms) return null;
     
     return allRooms.find(room => room.id === params.roomId);
+  });
+
+  // Combined messages for display (cached + pending)
+  const displayMessages = createMemo(() => {
+    const cached = messages();
+    const pending = pendingMessages();
+    
+    // Create a set of nonces from cached messages for deduplication
+    const cachedNonces = new Set(cached.filter(msg => msg.nonce).map(msg => msg.nonce));
+    // Also create a set of cached message IDs for additional deduplication
+    const cachedIds = new Set(cached.filter(msg => msg.id).map(msg => msg.id));
+    
+    // Debug logging
+    if (pending.length > 0 || cachedNonces.size > 0) {
+      console.log("[ChatArea] Deduplication debug:", {
+        cachedCount: cached.length,
+        pendingCount: pending.length,
+        cachedNonces: Array.from(cachedNonces),
+        pendingNonces: pending.map(msg => msg.nonce),
+        cachedMessagesWithNonces: cached.filter(msg => msg.nonce).map(msg => ({ id: msg.id, nonce: msg.nonce })),
+        cachedIds: Array.from(cachedIds),
+        pendingIds: pending.map(msg => msg.id).filter(Boolean)
+      });
+    }
+    
+    // Filter out pending messages that have been confirmed
+    // Check both nonce and ID to handle race conditions
+    const filteredPending = pending.filter(msg => {
+      // If message has a nonce and it exists in cache, filter it out
+      if (msg.nonce && cachedNonces.has(msg.nonce)) {
+        return false;
+      }
+      // If message has an ID and it exists in cache, filter it out
+      if (msg.id && cachedIds.has(msg.id)) {
+        return false;
+      }
+      return true;
+    });
+    
+    if (filteredPending.length !== pending.length) {
+      console.log("[ChatArea] Filtered out", pending.length - filteredPending.length, "pending messages due to deduplication");
+    }
+    
+    // Combine and sort by timestamp
+    const combined = [...cached, ...filteredPending];
+    return combined.sort((a, b) => {
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : Date.now();
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : Date.now();
+      return timeA - timeB;
+    });
   });
 
   // Helper function to get room name for display
@@ -453,7 +521,7 @@ const ChatArea: Component = () => {
 
   // Handle new messages with optimized scrolling
   createEffect(() => {
-    const msgs = messages();
+    const msgs = displayMessages();
     
     // If we have messages and should scroll to bottom, do it
     // Don't auto-scroll when editing a message to prevent position issues
@@ -581,6 +649,7 @@ const ChatArea: Component = () => {
       
       // Reset state for the new room
       setMessages([]);
+      setPendingMessages([]); // Clear pending messages when switching rooms
       setError("");
       setHasScrolledUp(false);
       setShouldScrollToBottom(true);
@@ -635,8 +704,9 @@ const ChatArea: Component = () => {
 
   // Effect to scroll to bottom when messages change
   createEffect(() => {
-    // This will trigger whenever messages() changes
+    // This will trigger whenever displayMessages() changes
     // Only auto-scroll if we're near the bottom and not editing a message
+    const msgs = displayMessages(); // Track displayMessages changes
     if (shouldScrollToBottom() && chatContainerRef && !editingMessageId()) {
       requestAnimationFrame(() => {
         if (chatContainerRef) {
@@ -1055,7 +1125,7 @@ const ChatArea: Component = () => {
       
       // Load newer messages with similar optimization
       if (isAtBottom && !hasReachedEnd() && !isLoadingNewer() && 
-          hasScrolledUp() && messages().length > 0) {
+          hasScrolledUp() && displayMessages().length > 0) {
         if ('requestIdleCallback' in window) {
           requestIdleCallback(() => fetchNewerMessages(), { timeout: 100 });
         } else {
@@ -1179,6 +1249,84 @@ const ChatArea: Component = () => {
     });
   });
 
+  // Handle pending message confirmation events
+  createEffect(() => {
+    const handlePendingMessageConfirmed = (event: CustomEvent) => {
+      const { roomId, nonce, messageId } = event.detail;
+      const currentRoomId = params.roomId;
+      
+      console.log("[ChatArea] pendingMessageConfirmed event received:", { roomId, nonce, messageId, currentRoomId });
+      
+      // Only process confirmations for the current room
+      if (roomId !== currentRoomId) {
+        console.log("[ChatArea] Ignoring pendingMessageConfirmed for different room");
+        return;
+      }
+      
+      const beforeCount = pendingMessages().length;
+      // Remove the pending message with matching nonce
+      setPendingMessages(prev => {
+        const filtered = prev.filter(msg => msg.nonce !== nonce);
+        console.log("[ChatArea] Removing pending message with nonce:", nonce, "before:", prev.length, "after:", filtered.length);
+        return filtered;
+      });
+      const afterCount = pendingMessages().length;
+      console.log("[ChatArea] Pending messages count changed from", beforeCount, "to", afterCount);
+    };
+
+    // Listen for fallback current user message events (when nonce is not available)
+    const handleCurrentUserMessageReceived = (event: CustomEvent) => {
+      const { roomId, messageId, content, createdAt } = event.detail;
+      const currentRoomId = params.roomId;
+      
+      console.log("[ChatArea] currentUserMessageReceived event received:", { roomId, messageId, content, currentRoomId });
+      
+      if (roomId !== currentRoomId) {
+        console.log("[ChatArea] Ignoring currentUserMessageReceived for different room");
+        return;
+      }
+      
+      // Add a 2-second delay to give the nonce-based system priority
+      setTimeout(() => {
+        console.log("[ChatArea] Fallback: Removing pending message by content match after delay:", { content, messageId });
+        // Remove pending messages that match by content and are recent (within 15 seconds)
+        const messageTime = new Date(createdAt).getTime();
+        const beforeCount = pendingMessages().length;
+        
+        setPendingMessages(prev => prev.filter(msg => {
+          if (msg.content !== content) return true;
+          
+          // Check if the pending message is recent (within 15 seconds of the received message)
+          const pendingTime = msg.created_at ? new Date(msg.created_at).getTime() : Date.now();
+          const timeDiff = Math.abs(messageTime - pendingTime);
+          const isRecent = timeDiff <= 15000; // 15 seconds
+          
+          if (!isRecent) return true; // Keep if not recent
+          
+          console.log("[ChatArea] Removing pending message by content and time match:", {
+            pendingContent: msg.content,
+            receivedContent: content,
+            timeDiff,
+            pendingId: msg.id,
+            receivedId: messageId
+          });
+          return false; // Remove this pending message
+        }));
+        
+        const afterCount = pendingMessages().length;
+        console.log("[ChatArea] Pending messages count changed from", beforeCount, "to", afterCount, "via fallback");
+      }, 2000); // 2-second delay
+    };
+
+    window.addEventListener('pendingMessageConfirmed', handlePendingMessageConfirmed as EventListener);
+    window.addEventListener('currentUserMessageReceived', handleCurrentUserMessageReceived as EventListener);
+
+    onCleanup(() => {
+      window.removeEventListener('pendingMessageConfirmed', handlePendingMessageConfirmed as EventListener);
+      window.removeEventListener('currentUserMessageReceived', handleCurrentUserMessageReceived as EventListener);
+    });
+  });
+
   // Set up MutationObserver to monitor chat input content changes
   createEffect(() => {
     if (!chatInputRef) return;
@@ -1241,9 +1389,10 @@ const ChatArea: Component = () => {
       return;
     }
     
+    const nonce = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+    
     try {
       setSending(true);
-      const nonce = Math.random().toString(36).substring(2, 15);
       
       // Remove current user from typing users when sending a message
       if (currentUser?.id) {
@@ -1294,7 +1443,7 @@ const ChatArea: Component = () => {
       // Clear unread messages for this room when user sends a message
       // This is the user interaction that should clear the unread state
       
-      // Add temporary message to cache with optimistic update
+      // Create temporary message for optimistic UI update (don't add to cache yet)
       const tempMessage = {
         id: undefined,
         content,
@@ -1315,9 +1464,8 @@ const ChatArea: Component = () => {
         }))
       };
     
-      // Optimistically add message to cache and update local state
-      cache.addMessage(room.id, tempMessage);
-      setMessages(prev => processMessages([...prev, tempMessage]));
+      // Add to pending messages for immediate UI feedback
+      // setPendingMessages(prev => [...prev, tempMessage]);
       
       // Clear input field immediately for better UX
       inputElement.textContent = "";
@@ -1338,20 +1486,8 @@ const ChatArea: Component = () => {
       const result = await sendMessage(room.id, messageData);
       
       if (result.success && result.message) {
-        // Remove the temporary message and add the confirmed one
-        const updatedMessages = messages().filter(m => m.nonce !== nonce);
-        const confirmedMessage = {
-          ...result.message,
-          id: result.message.id, // Ensure ID is explicitly set
-          created_at: result.message.created_at || new Date().toISOString(),
-          pending: false,
-          error: undefined
-        };
-        // First update the cache to ensure persistence
-        cache.deleteMessage(room.id, nonce); // Delete the temporary message
-        cache.addMessage(room.id, confirmedMessage); // Add the confirmed message
-        // Then update the local state
-        setMessages(processMessages([...updatedMessages, confirmedMessage]));
+        // Don't manually remove from pending or add to cache here
+        // Let the WebSocket message from AuthProvider handle the update via updateMessageByNonce
         
         // Clear reply references and attachments after successful send
         setReplyingTo([]);
@@ -1362,28 +1498,17 @@ const ChatArea: Component = () => {
           }
         });
         setAttachments([]);
-        
-        // Dispatch messageCreate event to update the PM list
-        // This ensures the room list is updated when sending messages
-        window.dispatchEvent(new CustomEvent("messageCreate", {
-          detail: {
-            roomId: room.id,
-            message: confirmedMessage
-          }
-        }));
       } else {
-        // Mark message as failed and show error
+        // Mark pending message as failed
         const errorMessage = result.error || t("chat.errors.sendFailed");
-        cache.updateMessage(room.id, nonce, { 
-          ...tempMessage, 
-          created_at: new Date().toISOString(),
-          pending: false, 
-          error: errorMessage
-        });
+        setPendingMessages(prev => prev.map(msg => 
+          msg.nonce === nonce 
+            ? { ...msg, pending: false, error: errorMessage }
+            : msg
+        ));
         setError(errorMessage);
     
-        // Refresh messages from cache to show error state
-        setMessages(cache.getMessages(room.id));
+        // displayMessages memo will automatically show the updated pending message
     
         // Clear reply references on failure
         setReplyingTo([]);
@@ -1395,15 +1520,14 @@ const ChatArea: Component = () => {
         });
         setAttachments([]);
     
-        // Restore message text on failure if user hasn't typed something new
-        if (!messageText()) {
-          inputElement.textContent = content;
-          setMessageText(content);
-        }
+       
       }
     } catch (err) {
       console.error("Error sending message:", err);
       setError(t("chat.errors.sendFailed"));
+      
+      // Remove failed message from pending
+      setPendingMessages(prev => prev.filter(msg => msg.nonce !== nonce));
       
       // Clear reply references and attachments on exception
       setReplyingTo([]);
@@ -1532,8 +1656,8 @@ const ChatArea: Component = () => {
                 </div>
               </div>
               </Show>
-              <Show when={messages().length > 0}>
-                <For each={groupMessagesByDate(messages())}>
+              <Show when={displayMessages().length > 0}>
+                <For each={groupMessagesByDate(displayMessages())}>
                   {(group) => (
                     <>
                       <DateDivider date={group.date} />
@@ -1612,7 +1736,7 @@ const ChatArea: Component = () => {
                   {(() => {
                     const uniqueAuthors = new Map();
                     replyingTo().forEach(replyId => {
-                      const replyMessage = messages().find(m => m.id === replyId);
+                      const replyMessage = displayMessages().find(m => m.id === replyId);
                       if (replyMessage) {
                         const authorId = replyMessage.author_id;
                         if (!uniqueAuthors.has(authorId)) {
@@ -1833,6 +1957,54 @@ const ChatArea: Component = () => {
                 const hasUnclosed = hasUnclosedCodeBlock(text);
                 updateCodeBlockIndicator(e.currentTarget, hasUnclosed);
                 
+                // Emoji autocomplete detection
+                const selection = window.getSelection();
+                if (selection && selection.rangeCount > 0) {
+                  const range = selection.getRangeAt(0);
+                  const textNode = range.startContainer;
+                  
+                  if (textNode.nodeType === Node.TEXT_NODE) {
+                    const textContent = textNode.textContent || "";
+                    const cursorPosition = range.startOffset;
+                    
+                    // Look for emoji shortcode pattern (:word) before cursor
+                    const beforeCursor = textContent.substring(0, cursorPosition);
+                    const emojiMatch = beforeCursor.match(/:([a-zA-Z_]*)$/);
+                    
+                    if (emojiMatch) {
+                      const query = emojiMatch[1];
+                      setEmojiAutocompleteQuery(query);
+                      
+                      // Calculate position for autocomplete menu - position like reply popup
+                      const inputContainer = e.currentTarget.parentElement as HTMLElement;
+                      if (inputContainer) {
+                        const rect = inputContainer.getBoundingClientRect();
+                        // Position above the input container so bottom edge is above input
+                          const autocompleteHeight = 250; // Approximate height including padding and content
+                          setEmojiAutocompletePosition({
+                            top: rect.top + window.scrollY - autocompleteHeight - 15, // Position so bottom is above input with 8px gap
+                            left: rect.left + window.scrollX,
+                            width: rect.width // Match the width of the input container
+                          });
+                      }
+                      
+                      // Store the range for later replacement
+                      const emojiRange = document.createRange();
+                      emojiRange.setStart(textNode, emojiMatch.index || 0);
+                      emojiRange.setEnd(textNode, cursorPosition);
+                      setEmojiAutocompleteRange(emojiRange);
+                      
+                      setShowEmojiAutocomplete(true);
+                    } else {
+                      setShowEmojiAutocomplete(false);
+                      setEmojiAutocompleteRange(null);
+                    }
+                  } else {
+                    setShowEmojiAutocomplete(false);
+                    setEmojiAutocompleteRange(null);
+                  }
+                }
+                
                 // Send typing indicator to backend after second character is typed
                 if (text.length >= 2 && !editingMessageId() && userSettings().privacy.sendTypingIndicators) {
                   const currentTime = Date.now();
@@ -1856,6 +2028,14 @@ const ChatArea: Component = () => {
                 }
               }}
               onKeyDown={(e) => {
+                // Handle emoji autocomplete navigation first
+                if (showEmojiAutocomplete()) {
+                  if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === 'Escape') {
+                    // Let the EmojiAutocomplete component handle these keys
+                    return;
+                  }
+                }
+                
                 // Check if we're inside an unclosed code block
                 const text = e.currentTarget.textContent || "";
                 const isInUnclosedCodeBlock = hasUnclosedCodeBlock(text);
@@ -2028,6 +2208,47 @@ const ChatArea: Component = () => {
                 setShowEmojiPicker(false);
               }}
               onClose={() => setShowEmojiPicker(false)}
+            />
+          </Show>
+          
+          {/* Emoji Autocomplete */}
+          <Show when={showEmojiAutocomplete()}>
+            <EmojiAutocomplete
+              query={emojiAutocompleteQuery()}
+              position={emojiAutocompletePosition()}
+              onSelect={(shortcode) => {
+                const range = emojiAutocompleteRange();
+                if (range) {
+                  // Replace the :query with the selected emoji shortcode
+                  range.deleteContents();
+                  range.insertNode(document.createTextNode(`:${shortcode}:`));
+                  range.collapse(false);
+                  
+                  const selection = window.getSelection();
+                  if (selection) {
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                  }
+                  
+                  // Update the message text state
+                  const chatInput = document.querySelector('[data-placeholder]') as HTMLDivElement;
+                  if (chatInput) {
+                    setMessageText(chatInput.textContent || "");
+                    chatInput.focus();
+                    
+                    // Trigger input event to update state
+                    const inputEvent = new Event('input', { bubbles: true });
+                    chatInput.dispatchEvent(inputEvent);
+                  }
+                }
+                
+                setShowEmojiAutocomplete(false);
+                setEmojiAutocompleteRange(null);
+              }}
+              onClose={() => {
+                setShowEmojiAutocomplete(false);
+                setEmojiAutocompleteRange(null);
+              }}
             />
           </Show>
           

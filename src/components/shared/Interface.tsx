@@ -83,17 +83,17 @@ export const Interface = (props: { children: JSX.Element }) => {
 
   return (
     <ProtectedRoute>
-      <div class="flex h-screen bg-background text-text-primary overflow-hidden" 
+      <div class="flex h-full bg-background text-text-primary overflow-hidden" 
            onTouchStart={handleTouchStart} 
            onTouchMove={handleTouchMove} 
            onTouchEnd={handleTouchEnd}>
-        <div class={`flex md:flex-1 w-screen overflow-x-auto snap-x snap-mandatory scroll-smooth hide-scrollbar ${showBottomNav() ? 'pb-14' : ''} md:pb-0`}>
+        <div class={`flex md:flex-1 w-screen overflow-x-auto snap-x snap-mandatory scroll-smooth hide-scrollbar ${showBottomNav() ? 'pb-14' : ''} md:pb-0 h-full`}>
           {/* First snap point - Lists */}
           <div class="flex w-[calc(92px+15rem)] md:w-auto flex-none snap-start">
-            <div class="w-[72px] h-screen flex-none">
+            <div class="w-[72px] h-full flex-none">
               <SpacesList />
             </div>
-            <div class="w-[260px] h-screen flex-none">
+            <div class="w-[260px] h-full flex-none">
               {showRoomsList() ? <RoomsList /> : <PMList />}
             </div>
           </div>
@@ -104,7 +104,7 @@ export const Interface = (props: { children: JSX.Element }) => {
               <div class="flex-1 h-full w-full">{props.children}</div>
               {/* Members List (desktop only) */}
               {location.pathname.startsWith("/spaces") && (
-                <div class="w-64 h-screen flex-none hidden md:block">
+                <div class="w-64 h-full flex-none hidden md:block">
                   {/* Add your MembersList component here */}
                 </div>
               )}

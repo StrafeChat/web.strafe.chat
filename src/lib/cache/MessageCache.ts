@@ -180,16 +180,38 @@ export class MessageCache {
     }
 
     const roomMessages = this.messages.get(roomId)!;
-    const messageId = message.id || message.nonce || '';
+    
+    // For temporary messages, always use nonce as the key
+    // For confirmed messages, use ID as the key
+    const messageKey = message.id || message.nonce || '';
     
     // Check if this message has been deleted before
     const deletedIds = this.getDeletedMessageIds(roomId);
-    if (messageId && deletedIds.has(messageId)) {
-      console.log(`[MessageCache] Skipping deleted message: ${messageId}`);
+    if (messageKey && deletedIds.has(messageKey)) {
+      console.log(`[MessageCache] Skipping deleted message: ${messageKey}`);
       return;
     }
     
-    roomMessages.set(messageId, message);
+    // Check if we're trying to add a message that already exists with same nonce
+    if (message.nonce) {
+      const existingByNonce = Array.from(roomMessages.values()).find(m => m.nonce === message.nonce);
+      if (existingByNonce) {
+        console.log(`[MessageCache] Message with nonce ${message.nonce} already exists, updating instead`);
+        const existingKey = existingByNonce.id || existingByNonce.nonce || '';
+        this.updateMessage(roomId, existingKey, message);
+        return;
+      }
+    }
+    
+    // Check for existing message with same ID to prevent duplicates
+    if (message.id && roomMessages.has(message.id)) {
+      console.log(`[MessageCache] Message with ID ${message.id} already exists, updating instead`);
+      this.updateMessage(roomId, message.id, message);
+      return;
+    }
+    
+    roomMessages.set(messageKey, message);
+    console.log(`[MessageCache] Added message with key: ${messageKey}, nonce: ${message.nonce}, id: ${message.id}`);
 
     // Notify callbacks of message update
     this.messageUpdateCallbacks.forEach(callback => {
@@ -211,15 +233,42 @@ export class MessageCache {
     }
   }
 
-  public updateMessage(roomId: string, messageId: string, updates: Partial<CachedMessage>) {
+  public updateMessage(roomId: string, messageKey: string, updates: Partial<CachedMessage>) {
     const roomMessages = this.messages.get(roomId);
     if (!roomMessages) return;
 
-    const existingMessage = roomMessages.get(messageId);
-    if (!existingMessage) return;
+    let existingMessage = roomMessages.get(messageKey);
+    let actualKey = messageKey;
+    
+    // If not found by key, try to find by nonce
+    if (!existingMessage && updates.nonce) {
+      const foundEntry = Array.from(roomMessages.entries()).find(([_, msg]) => msg.nonce === updates.nonce);
+      if (foundEntry) {
+        actualKey = foundEntry[0];
+        existingMessage = foundEntry[1];
+      }
+    }
+    
+    if (!existingMessage) {
+      console.log(`[MessageCache] Message not found for update: ${messageKey}`);
+      return;
+    }
 
     const updatedMessage = { ...existingMessage, ...updates };
-    roomMessages.set(messageId, updatedMessage);
+    
+    // Handle transition from temporary (nonce-keyed) to confirmed (ID-keyed) message
+    if (updates.id && !existingMessage.id && existingMessage.nonce) {
+      // This is a temporary message being confirmed with a real ID
+      // Remove the old entry with nonce key
+      roomMessages.delete(actualKey);
+      // Add the updated message with the new ID key
+      roomMessages.set(updates.id, updatedMessage);
+      console.log(`[MessageCache] Transitioned message from nonce ${existingMessage.nonce} to ID ${updates.id}`);
+    } else {
+      // Regular in-place update
+      roomMessages.set(actualKey, updatedMessage);
+      console.log(`[MessageCache] Updated message in-place: ${actualKey}`);
+    }
 
     // Notify callbacks of message update
     this.messageUpdateCallbacks.forEach(callback => {
@@ -300,6 +349,53 @@ export class MessageCache {
     if (index !== -1) {
       this.messageUpdateCallbacks.splice(index, 1);
     }
+  }
+
+  // Update message by nonce - convenience method for temporary messages
+  public updateMessageByNonce(roomId: string, nonce: string, updates: Partial<CachedMessage>) {
+    const roomMessages = this.messages.get(roomId);
+    if (!roomMessages) {
+      console.log(`[MessageCache] Room ${roomId} not found for nonce update`);
+      return;
+    }
+
+    // Find message by nonce
+    let foundKey: string | null = null;
+    let foundMessage: CachedMessage | null = null;
+    
+    for (const [key, message] of roomMessages.entries()) {
+      if (message.nonce === nonce) {
+        foundKey = key;
+        foundMessage = message;
+        break;
+      }
+    }
+    
+    if (!foundKey || !foundMessage) {
+      console.log(`[MessageCache] Message with nonce ${nonce} not found for update`);
+      return;
+    }
+    
+    const updatedMessage = { ...foundMessage, ...updates };
+    
+    // Handle transition from temporary (nonce-keyed) to confirmed (ID-keyed) message
+    if (updates.id && !foundMessage.id) {
+      // This is a temporary message being confirmed with a real ID
+      // Remove the old entry with nonce key
+      roomMessages.delete(foundKey);
+      // Add the updated message with the new ID key
+      roomMessages.set(updates.id, updatedMessage);
+      console.log(`[MessageCache] updateMessageByNonce: Transitioned message from nonce ${nonce} (key: ${foundKey}) to ID ${updates.id}`);
+    } else {
+      // Regular in-place update
+      roomMessages.set(foundKey, updatedMessage);
+      console.log(`[MessageCache] updateMessageByNonce: Updated message in-place with key: ${foundKey}`);
+    }
+
+    // Notify callbacks of message update
+    this.messageUpdateCallbacks.forEach(callback => {
+      callback(roomId, updatedMessage);
+    });
   }
 
   public clear() {

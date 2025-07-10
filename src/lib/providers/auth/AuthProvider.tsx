@@ -926,10 +926,75 @@ export const AuthProvider: ParentComponent = (props) => {
       system_data: messageData.system_data,
     };
     
-    // Add message to cache
-    if (window.messageCache) {
-      console.log("[AuthProvider] Adding message to cache:", normalizedMessage);
-      window.messageCache.addMessage(messageData.room_id, normalizedMessage);
+    // Check if this message is from the current user and has a nonce (indicating it's a confirmation of a sent message)
+    const isFromCurrentUser = normalizedMessage.author_id === currentUser.id;
+    const messageNonce = messageData.nonce;
+    
+    console.log("[AuthProvider] Message analysis:", {
+      isFromCurrentUser,
+      messageNonce,
+      hasNonce: !!messageNonce,
+      messageId: messageData.id,
+      authorId: normalizedMessage.author_id,
+      currentUserId: currentUser.id
+    });
+    
+    if (isFromCurrentUser && messageNonce && window.messageCache) {
+      // This is a confirmation of a message we sent - update the pending message with real data
+      console.log("[AuthProvider] Updating pending message with real data:", { nonce: messageNonce, id: messageData.id });
+      window.messageCache.updateMessageByNonce(messageData.room_id, messageNonce, {
+        id: messageData.id,
+        created_at: messageData.created_at,
+        sending: false,
+        nonce: messageNonce // Preserve the nonce for deduplication
+      });
+      
+      // Dispatch event to remove from pending messages in ChatArea
+      // Use setTimeout to ensure the cache update has been processed
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("pendingMessageConfirmed", {
+          detail: {
+            roomId: messageData.room_id,
+            nonce: messageNonce,
+            messageId: messageData.id
+          }
+        }));
+      }, 0);
+      
+      // Don't dispatch messageCreate for nonce-based confirmations to avoid duplicates
+      // The pending message will be converted to a real message via cache update
+    } else {
+      // This is a message from another user - add it to cache normally
+      if (window.messageCache) {
+        console.log("[AuthProvider] Adding message to cache:", normalizedMessage);
+        window.messageCache.addMessage(messageData.room_id, normalizedMessage);
+      }
+      
+      // If this is from current user but no nonce, dispatch a fallback event
+      // This handles cases where the server doesn't return the nonce
+      if (isFromCurrentUser) {
+        console.log("[AuthProvider] Message from current user but no nonce, dispatching fallback event");
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent("currentUserMessageReceived", {
+            detail: {
+              roomId: messageData.room_id,
+              messageId: messageData.id,
+              content: normalizedMessage.content,
+              createdAt: normalizedMessage.created_at
+            }
+          }));
+        }, 0);
+      }
+      
+      // Dispatch messageCreate event for UI components to listen to
+      // This is critical for real-time updates in the ChatArea component
+      console.log("[AuthProvider] Dispatching messageCreate event");
+      window.dispatchEvent(new CustomEvent("messageCreate", {
+        detail: {
+          roomId: messageData.room_id,
+          message: normalizedMessage
+        }
+      }));
     }
     
     // If room had no messages before this one, fetch historical messages
@@ -939,16 +1004,6 @@ export const AuthProvider: ParentComponent = (props) => {
         console.error("[AuthProvider] Failed to fetch historical messages:", error);
       });
     }
-    
-    // Dispatch messageCreate event for UI components to listen to
-    // This is critical for real-time updates in the ChatArea component
-    console.log("[AuthProvider] Dispatching messageCreate event");
-    window.dispatchEvent(new CustomEvent("messageCreate", {
-      detail: {
-        roomId: messageData.room_id,
-        message: normalizedMessage
-      }
-    }));
     
     // Don't mark as unread if user is viewing this room or in DND mode
     if (isViewingThisRoom || currentUser.presence?.status === "dnd") return;
