@@ -88,6 +88,7 @@ type AuthContextType = {
   setUnreadMessages: (unreads: { [roomId: string]: string[] } | ((prev: { [roomId: string]: string[] }) => { [roomId: string]: string[] })) => void;
   fetchUnreadMessages: (roomId: string) => Promise<void>;
   markMessagesAsRead: (roomId: string) => Promise<void>;
+	getJoinToken: (roomId: string) => Promise<string>;
 };
 
 type LoginCredentials = {
@@ -1088,6 +1089,29 @@ export const AuthProvider: ParentComponent = (props) => {
     }
   };
 
+	const getJoinToken = async (roomId: string): Promise<string> => {
+		try {
+			const response = await fetch(`${BASE_URL}/rooms/join/${roomId}`, {
+				headers: {
+					...API_HEADERS.JSON,
+					...API_HEADERS.SESSION(),
+				},
+				method: "POST"
+			})
+
+			if (!response.ok) {
+				throw new Error(`Failed to get join token for room ${roomId}: ${response.status}`);
+			}
+
+			const data = await response.json();
+
+			return data.token;
+		} catch(error) {
+			console.error(`[AuthProvider] Failed to get join token: `, error);
+			return "";
+		}
+	}
+
   const fetchRoomMessages = async (roomId: string): Promise<void> => {
     try {
       console.log(`[AuthProvider] Fetching messages for room: ${roomId}`);
@@ -1150,6 +1174,7 @@ export const AuthProvider: ParentComponent = (props) => {
         fetchUnreadMessages,
         markMessagesAsRead,
         sendTypingIndicator,
+				getJoinToken,
       }}
       data-auth-provider
     >
