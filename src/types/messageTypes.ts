@@ -13,6 +13,28 @@ export interface MessageUnread {
 }
 
 /**
+ * Interface for message attachment data
+ */
+export interface MessageAttachment {
+  /** Unique identifier for the attachment */
+  id: string;
+  /** The name of the attachment file */
+  name: string;
+  /** The URL to access the attachment */
+  url: string;
+  /** The MIME type of the attachment */
+  type: string;
+  /** Height of the attachment (for images/videos) */
+  height: number;
+  /** Width of the attachment (for images/videos) */
+  width: number;
+  /** Size of the attachment in bytes */
+  size: number;
+  /** ID of the user who uploaded the attachment */
+  user_id: string;
+}
+
+/**
  * Interface for message data
  */
 export interface Message {
@@ -32,6 +54,8 @@ export interface Message {
   message_references?: string[];
   /** Whether the message is unread */
   unread?: boolean;
+  /** Array of attachments for the message */
+  attachments?: MessageAttachment[];
 }
 
 /**

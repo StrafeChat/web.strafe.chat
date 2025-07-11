@@ -1,15 +1,11 @@
 import { Component, createSignal, For, Show, onCleanup, onMount } from "solid-js";
 import { Portal } from "solid-js/web";
+import { twemojiCategories, getTwemojiUrl, type TwemojiEmoji } from "../../lib/data/twemojiData";
 
 interface EmojiPickerProps {
   onSelect: (emoji: string) => void;
   onClose: () => void;
   position: { top: number; left: number };
-}
-
-interface Emoji {
-  name: string;
-  emoji: string;
 }
 
 // Maximum number of recent emojis to store
@@ -18,113 +14,9 @@ const MAX_RECENT_EMOJIS = 16;
 // Local storage key for recent emojis
 const RECENT_EMOJIS_KEY = "strafe-recent-emojis";
 
-// Define emoji categories and their emojis
-const emojiCategories = [
-  {
-    name: "Smileys & Emotion",
-    emojis: [
-      { name: "smile", emoji: "😄" },
-      { name: "joy", emoji: "😂" },
-      { name: "rofl", emoji: "🤣" },
-      { name: "heart_eyes", emoji: "😍" },
-      { name: "kissing_heart", emoji: "😘" },
-      { name: "wink", emoji: "😉" },
-      { name: "thinking", emoji: "🤔" },
-      { name: "unamused", emoji: "😒" },
-      { name: "sweat", emoji: "😓" },
-      { name: "weary", emoji: "😩" },
-      { name: "sob", emoji: "😭" },
-      { name: "angry", emoji: "😠" },
-      { name: "rage", emoji: "😡" },
-      { name: "sunglasses", emoji: "😎" },
-      { name: "innocent", emoji: "😇" },
-    ],
-  },
-  {
-    name: "People & Body",
-    emojis: [
-      { name: "wave", emoji: "👋" },
-      { name: "thumbsup", emoji: "👍" },
-      { name: "thumbsdown", emoji: "👎" },
-      { name: "clap", emoji: "👏" },
-      { name: "pray", emoji: "🙏" },
-      { name: "muscle", emoji: "💪" },
-      { name: "point_up", emoji: "☝️" },
-      { name: "point_down", emoji: "👇" },
-      { name: "ok_hand", emoji: "👌" },
-      { name: "v", emoji: "✌️" },
-      { name: "raised_hands", emoji: "🙌" },
-      { name: "eyes", emoji: "👀" },
-      { name: "heart", emoji: "❤️" },
-      { name: "fire", emoji: "🔥" },
-      { name: "100", emoji: "💯" },
-    ],
-  },
-  {
-    name: "Animals & Nature",
-    emojis: [
-      { name: "dog", emoji: "🐶" },
-      { name: "cat", emoji: "🐱" },
-      { name: "fox", emoji: "🦊" },
-      { name: "panda", emoji: "🐼" },
-      { name: "bear", emoji: "🐻" },
-      { name: "tiger", emoji: "🐯" },
-      { name: "monkey", emoji: "🐵" },
-      { name: "unicorn", emoji: "🦄" },
-      { name: "chicken", emoji: "🐔" },
-      { name: "penguin", emoji: "🐧" },
-      { name: "frog", emoji: "🐸" },
-      { name: "snake", emoji: "🐍" },
-      { name: "whale", emoji: "🐳" },
-      { name: "octopus", emoji: "🐙" },
-      { name: "butterfly", emoji: "🦋" },
-    ],
-  },
-  {
-    name: "Food & Drink",
-    emojis: [
-      { name: "pizza", emoji: "🍕" },
-      { name: "burger", emoji: "🍔" },
-      { name: "fries", emoji: "🍟" },
-      { name: "hotdog", emoji: "🌭" },
-      { name: "taco", emoji: "🌮" },
-      { name: "sushi", emoji: "🍣" },
-      { name: "ice_cream", emoji: "🍦" },
-      { name: "cake", emoji: "🍰" },
-      { name: "cookie", emoji: "🍪" },
-      { name: "coffee", emoji: "☕" },
-      { name: "beer", emoji: "🍺" },
-      { name: "wine", emoji: "🍷" },
-      { name: "cocktail", emoji: "🍸" },
-      { name: "apple", emoji: "🍎" },
-      { name: "banana", emoji: "🍌" },
-    ],
-  },
-  {
-    name: "Objects",
-    emojis: [
-      { name: "gift", emoji: "🎁" },
-      { name: "trophy", emoji: "🏆" },
-      { name: "camera", emoji: "📷" },
-      { name: "computer", emoji: "💻" },
-      { name: "phone", emoji: "📱" },
-      { name: "tv", emoji: "📺" },
-      { name: "bulb", emoji: "💡" },
-      { name: "book", emoji: "📚" },
-      { name: "money", emoji: "💰" },
-      { name: "gem", emoji: "💎" },
-      { name: "lock", emoji: "🔒" },
-      { name: "key", emoji: "🔑" },
-      { name: "hammer", emoji: "🔨" },
-      { name: "bomb", emoji: "💣" },
-      { name: "pill", emoji: "💊" },
-    ],
-  },
-];
-
 export const EmojiPicker: Component<EmojiPickerProps> = (props) => {
   const [activeCategory, setActiveCategory] = createSignal(0);
-  const [recentEmojis, setRecentEmojis] = createSignal<Emoji[]>([]);
+  const [recentEmojis, setRecentEmojis] = createSignal<TwemojiEmoji[]>([]);
   let pickerRef: HTMLDivElement | undefined;
 
   // Load recent emojis from localStorage on mount
@@ -151,10 +43,10 @@ export const EmojiPicker: Component<EmojiPickerProps> = (props) => {
     }
   };
 
-  const addToRecentEmojis = (emoji: Emoji) => {
+  const addToRecentEmojis = (emoji: TwemojiEmoji) => {
     const current = recentEmojis();
     // Remove the emoji if it already exists
-    const filtered = current.filter(e => e.name !== emoji.name);
+    const filtered = current.filter(e => e.shortcode !== emoji.shortcode);
     // Add the emoji to the beginning of the array
     const updated = [emoji, ...filtered].slice(0, MAX_RECENT_EMOJIS);
     setRecentEmojis(updated);
@@ -167,10 +59,10 @@ export const EmojiPicker: Component<EmojiPickerProps> = (props) => {
     }
   };
 
-  const handleEmojiSelect = (emoji: Emoji) => {
+  const handleEmojiSelect = (emoji: TwemojiEmoji) => {
     addToRecentEmojis(emoji);
-    // Return the emoji shortcode instead of the actual emoji character
-    props.onSelect(`:${emoji.name}:`);
+    // Return the emoji shortcode
+    props.onSelect(`:${emoji.shortcode}:`);
   };
 
   return (
@@ -214,7 +106,7 @@ export const EmojiPicker: Component<EmojiPickerProps> = (props) => {
             </button>
             
             {/* Category buttons */}
-            <For each={emojiCategories}>
+            <For each={twemojiCategories}>
               {(category, index) => (
                 <button
                   class="w-full p-3 text-text-secondary hover:bg-surface transition-colors flex flex-col items-center"
@@ -223,7 +115,12 @@ export const EmojiPicker: Component<EmojiPickerProps> = (props) => {
                   }}
                   onClick={() => setActiveCategory(index())}
                 >
-                  <span class="text-lg mb-1">{category.emojis[0].emoji}</span>
+                  <img 
+                    src={getTwemojiUrl(category.icon)} 
+                    alt={category.name} 
+                    class="w-5 h-5 mb-1"
+                    loading="lazy"
+                  />
                   <span class="text-xs">{category.name.split(" ")[0]}</span>
                 </button>
               )}
@@ -247,9 +144,14 @@ export const EmojiPicker: Component<EmojiPickerProps> = (props) => {
                         <button
                           class="w-9 h-9 flex items-center justify-center hover:bg-surface rounded-md transition-colors"
                           onClick={() => handleEmojiSelect(emoji)}
-                          title={`:${emoji.name}:`}
+                          title={`:${emoji.shortcode}:`}
                         >
-                          <span class="text-xl">{emoji.emoji}</span>
+                          <img 
+                            src={getTwemojiUrl(emoji.code)} 
+                            alt={emoji.name} 
+                            class="w-6 h-6"
+                            loading="lazy"
+                          />
                         </button>
                       )}
                     </For>
@@ -259,7 +161,7 @@ export const EmojiPicker: Component<EmojiPickerProps> = (props) => {
             </Show>
 
             {/* Category emojis */}
-            <Show when={activeCategory() >= 0 && emojiCategories[activeCategory()]}>
+            <Show when={activeCategory() >= 0 && twemojiCategories[activeCategory()]}>
               {(category) => (
                 <div>
                   <h3 class="text-sm font-medium text-text-primary mb-2">{category().name}</h3>
@@ -268,10 +170,15 @@ export const EmojiPicker: Component<EmojiPickerProps> = (props) => {
                       {(emoji) => (
                         <button
                           class="w-9 h-9 flex items-center justify-center hover:bg-surface rounded-md transition-colors"
-                          onClick={() => handleEmojiSelect(emoji)}
-                          title={`:${emoji.name}:`}
+                          onClick={() => handleEmojiSelect({ ...emoji, category: category().name })}
+                          title={`:${emoji.shortcode}:`}
                         >
-                          <span class="text-xl">{emoji.emoji}</span>
+                          <img 
+                            src={getTwemojiUrl(emoji.code)} 
+                            alt={emoji.name} 
+                            class="w-6 h-6"
+                            loading="lazy"
+                          />
                         </button>
                       )}
                     </For>

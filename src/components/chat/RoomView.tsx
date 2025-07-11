@@ -403,6 +403,7 @@ const RoomView: Component = () => {
                       userId="default"
                       avatar="default.webp"
                       alt="Room avatar"
+                      size="sm"
                     />
                   }
                 >
@@ -415,6 +416,7 @@ const RoomView: Component = () => {
                         userId={recipient?.id || "default"}
                         avatar={recipient?.avatar || "default.webp"}
                         alt="Room avatar"
+                        size="sm"
                       />
                     );
                   })()}
@@ -424,6 +426,7 @@ const RoomView: Component = () => {
                   userId="default"
                   avatar="default.webp"
                   alt="Room avatar"
+                  size="sm"
                 />
               )}
             </div>

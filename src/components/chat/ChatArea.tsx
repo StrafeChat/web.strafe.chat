@@ -6,22 +6,25 @@ import {
   For,
   onCleanup,
   Show,
+  batch,
 } from "solid-js";
 import { useParams } from "@solidjs/router";
 import Message from "./Message";
 import { useTransContext } from "@mbarzda/solid-i18next";
 import { useCache } from "../../lib/providers/cache/CacheProvider";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
-import { BASE_URL } from "../../constants";
+import { BASE_URL, FS_URL } from "../../constants";
 import { CachedMessage } from "../../lib/cache/MessageCache";
 import { useUserSettings } from "../../lib/providers/userSettings/UserSettingsProvider";
 import { hasUnclosedCodeBlock, updateCodeBlockIndicator } from "../../lib/utils/codeBlockUtils";
 import { RoomType } from "../../types/roomTypes";
 import { EmojiPicker } from "../shared/EmojiPicker";
+import { EmojiAutocomplete } from "../shared/EmojiAutocomplete";
 import DateDivider from "./DateDivider";
 import UnreadDivider from "./UnreadDivider";
 import MessageSkeleton from "./MessageSkeleton";
 import { Avatar } from "../common/Avatar";
+import { MessageAttachment } from "../../types/messageTypes";
 
 const ChatArea: Component = () => {
   const params = useParams();
@@ -34,6 +37,7 @@ const ChatArea: Component = () => {
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal("");
   const [messages, setMessages] = createSignal<CachedMessage[]>([]);
+  const [pendingMessages, setPendingMessages] = createSignal<CachedMessage[]>([]);
   const [replyingTo, setReplyingTo] = createSignal<string[]>([]);
   const [editingMessageId, setEditingMessageId] = createSignal<string | null>(null);
   const [editingRoomId, setEditingRoomId] = createSignal<string | null>(null);
@@ -43,7 +47,17 @@ const ChatArea: Component = () => {
   const [hasScrolledUp, setHasScrolledUp] = createSignal(false);
   const [showEmojiPicker, setShowEmojiPicker] = createSignal(false);
   const [emojiPickerPosition, setEmojiPickerPosition] = createSignal({ top: 0, left: 0 });
+  const [showEmojiAutocomplete, setShowEmojiAutocomplete] = createSignal(false);
+  const [emojiAutocompleteQuery, setEmojiAutocompleteQuery] = createSignal("");
+  const [emojiAutocompletePosition, setEmojiAutocompletePosition] = createSignal({ top: 0, left: 0, width: 0 });
+  const [emojiAutocompleteRange, setEmojiAutocompleteRange] = createSignal<Range | null>(null);
   const [fileInputRef, setFileInputRef] = createSignal<HTMLInputElement>();
+  const [attachments, setAttachments] = createSignal<Array<MessageAttachment & {
+    uploading?: boolean;
+    error?: string;
+    file?: File; // Store the actual file for upload later
+  }>>([]);
+  const [, setUploadingFiles] = createSignal(false);
   const [hasReachedBeginning, setHasReachedBeginning] = createSignal(false);
   const [hasReachedEnd, setHasReachedEnd] = createSignal(false);
   const [loadingOlderPhase, setLoadingOlderPhase] = createSignal<'idle' | 'loading' | 'positioning'>('idle');
@@ -54,6 +68,116 @@ const ChatArea: Component = () => {
   const initiallyFetchedRooms = { current: new Set<string>() };
 
   const messageCache = { current: new Map<string, CachedMessage[]>() };
+
+  // File attachment constants
+  const MAX_ATTACHMENTS = 10;
+  const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
+  const ALLOWED_FILE_TYPES = [
+    'image/', 'video/', 'audio/', 'text/', 'application/pdf',
+    'application/msword', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    'application/vnd.ms-powerpoint', 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+    'application/zip', 'application/x-rar-compressed', 'application/x-7z-compressed'
+  ];
+
+  // File upload helper functions
+  const isFileTypeAllowed = (fileType: string): boolean => {
+    return ALLOWED_FILE_TYPES.some(allowedType => fileType.startsWith(allowedType));
+  };
+
+  const formatFileSize = (bytes: number): string => {
+    if (bytes === 0) return '0 Bytes';
+    const k = 1024;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+  };
+
+  const uploadFileToNebula = async (file: File): Promise<MessageAttachment> => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    const response = await fetch(`${FS_URL}/api/v1/files`, {
+      method: 'POST',
+      body: formData,
+      headers: {
+        'X-Session-Token': localStorage.getItem('sc_token') || '',
+      },
+    });
+
+    if (!response.ok) {
+      throw new Error(`Upload failed: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    // Construct the URL from user_id and file id
+    const url = `/attachments/${data.user_id}/${data.id}`;
+    return {
+      id: data.id,
+      name: data.name,
+        type: data.type,
+      size: data.size,
+      url: url,
+      height: data.height || 0,
+      width: data.width || 0,
+      user_id: data.user_id
+    };
+  };
+
+  const handleFileUpload = async (files: FileList) => {
+    const currentAttachments = attachments();
+    
+    // Check attachment limit
+    if (currentAttachments.length + files.length > MAX_ATTACHMENTS) {
+      setError(`Maximum ${MAX_ATTACHMENTS} attachments allowed`);
+      return;
+    }
+
+    const newAttachments = [...currentAttachments];
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      
+      // Validate file size
+      if (file.size > MAX_FILE_SIZE) {
+        setError(`File "${file.name}" is too large. Maximum size is ${formatFileSize(MAX_FILE_SIZE)}`);
+        continue;
+      }
+
+      // Validate file type
+      if (!isFileTypeAllowed(file.type)) {
+        setError(`File type "${file.type}" is not allowed`);
+        continue;
+      }
+
+      // Store file locally without uploading
+      const localAttachment = {
+        id: `local-${Date.now()}-${i}`,
+        name: file.name,
+        type: file.type,
+        size: file.size,
+        url: URL.createObjectURL(file), // Create local URL for preview
+        height: 0, // Will be set later for images/videos
+        width: 0, // Will be set later for images/videos
+        user_id: user()?.id || '', // Current user ID
+        file: file // Store the actual file for upload later
+      };
+      newAttachments.push(localAttachment);
+    }
+
+    setAttachments(newAttachments);
+  };
+
+  const removeAttachment = (attachmentId: string) => {
+    setAttachments(prev => {
+      const attachmentToRemove = prev.find(a => a.id === attachmentId);
+      if (attachmentToRemove && attachmentToRemove.url.startsWith('blob:')) {
+        // Clean up object URL to prevent memory leaks
+        URL.revokeObjectURL(attachmentToRemove.url);
+      }
+      return prev.filter(a => a.id !== attachmentId);
+    });
+  };
 
 
   // Get unread messages for the current room
@@ -111,6 +235,7 @@ const ChatArea: Component = () => {
     setEditingMessageId(null);
     setEditingRoomId(null);
     setReplyingTo([]);
+    setAttachments([]);
     
     // Let the room change effect handle loading state management
     // Removed conflicting setLoading(true) call that was causing inconsistent skeleton behavior
@@ -185,20 +310,32 @@ const ChatArea: Component = () => {
       }
     }
     
-    // Create optimized map for deduplication
+    // Create optimized map for deduplication with smooth transitions
     const messageMap = new Map<string, CachedMessage>();
     const seenNonces = new Set<string>();
     
-    // Single pass processing with better performance
+    // Single pass processing with better performance and smooth transitions
     for (const msg of msgs) {
       if (msg.deleted) continue; // Skip deleted messages early
       
-      if (msg.id) {
-        // Server messages take priority
+      // Use a unique key that prioritizes confirmed messages but maintains position
+      const key = msg.id || msg.nonce || '';
+      if (!key) continue;
+      
+      // If message has both ID and nonce, it's a confirmed message that replaced a temp one
+      if (msg.id && msg.nonce) {
+        // Remove any existing temporary message with this nonce
+        if (messageMap.has(msg.nonce)) {
+          messageMap.delete(msg.nonce);
+        }
+        // Add the confirmed message with its ID as key
         messageMap.set(msg.id, msg);
-        if (msg.nonce) seenNonces.add(msg.nonce);
-      } else if (msg.nonce && !seenNonces.has(msg.nonce)) {
-        // Pending messages only if no server version exists
+        seenNonces.add(msg.nonce);
+      } else if (msg.id && !msg.nonce) {
+        // Regular server message
+        messageMap.set(msg.id, msg);
+      } else if (msg.nonce && !seenNonces.has(msg.nonce) && !msg.id) {
+        // Pending message only if no confirmed version exists
         messageMap.set(msg.nonce, msg);
         seenNonces.add(msg.nonce);
       }
@@ -237,6 +374,56 @@ const ChatArea: Component = () => {
     if (!allRooms) return null;
     
     return allRooms.find(room => room.id === params.roomId);
+  });
+
+  // Combined messages for display (cached + pending)
+  const displayMessages = createMemo(() => {
+    const cached = messages();
+    const pending = pendingMessages();
+    
+    // Create a set of nonces from cached messages for deduplication
+    const cachedNonces = new Set(cached.filter(msg => msg.nonce).map(msg => msg.nonce));
+    // Also create a set of cached message IDs for additional deduplication
+    const cachedIds = new Set(cached.filter(msg => msg.id).map(msg => msg.id));
+    
+    // Debug logging
+    if (pending.length > 0 || cachedNonces.size > 0) {
+      console.log("[ChatArea] Deduplication debug:", {
+        cachedCount: cached.length,
+        pendingCount: pending.length,
+        cachedNonces: Array.from(cachedNonces),
+        pendingNonces: pending.map(msg => msg.nonce),
+        cachedMessagesWithNonces: cached.filter(msg => msg.nonce).map(msg => ({ id: msg.id, nonce: msg.nonce })),
+        cachedIds: Array.from(cachedIds),
+        pendingIds: pending.map(msg => msg.id).filter(Boolean)
+      });
+    }
+    
+    // Filter out pending messages that have been confirmed
+    // Check both nonce and ID to handle race conditions
+    const filteredPending = pending.filter(msg => {
+      // If message has a nonce and it exists in cache, filter it out
+      if (msg.nonce && cachedNonces.has(msg.nonce)) {
+        return false;
+      }
+      // If message has an ID and it exists in cache, filter it out
+      if (msg.id && cachedIds.has(msg.id)) {
+        return false;
+      }
+      return true;
+    });
+    
+    if (filteredPending.length !== pending.length) {
+      console.log("[ChatArea] Filtered out", pending.length - filteredPending.length, "pending messages due to deduplication");
+    }
+    
+    // Combine and sort by timestamp
+    const combined = [...cached, ...filteredPending];
+    return combined.sort((a, b) => {
+      const timeA = a.created_at ? new Date(a.created_at).getTime() : Date.now();
+      const timeB = b.created_at ? new Date(b.created_at).getTime() : Date.now();
+      return timeA - timeB;
+    });
   });
 
   // Helper function to get room name for display
@@ -334,7 +521,7 @@ const ChatArea: Component = () => {
 
   // Handle new messages with optimized scrolling
   createEffect(() => {
-    const msgs = messages();
+    const msgs = displayMessages();
     
     // If we have messages and should scroll to bottom, do it
     // Don't auto-scroll when editing a message to prevent position issues
@@ -462,6 +649,7 @@ const ChatArea: Component = () => {
       
       // Reset state for the new room
       setMessages([]);
+      setPendingMessages([]); // Clear pending messages when switching rooms
       setError("");
       setHasScrolledUp(false);
       setShouldScrollToBottom(true);
@@ -516,8 +704,9 @@ const ChatArea: Component = () => {
 
   // Effect to scroll to bottom when messages change
   createEffect(() => {
-    // This will trigger whenever messages() changes
+    // This will trigger whenever displayMessages() changes
     // Only auto-scroll if we're near the bottom and not editing a message
+    const msgs = displayMessages(); // Track displayMessages changes
     if (shouldScrollToBottom() && chatContainerRef && !editingMessageId()) {
       requestAnimationFrame(() => {
         if (chatContainerRef) {
@@ -538,10 +727,27 @@ const ChatArea: Component = () => {
     try {
       setLoadingOlderPhase('loading');
       
-      // Capture scroll state for perfect restoration
+      // Enhanced scroll state capture with anchor message tracking
       const scrollState = chatContainerRef ? {
         scrollTop: chatContainerRef.scrollTop,
-        scrollHeight: chatContainerRef.scrollHeight
+        scrollHeight: chatContainerRef.scrollHeight,
+        clientHeight: chatContainerRef.clientHeight,
+        // Find anchor message for precise restoration
+        anchorMessage: (() => {
+          const messageElements = chatContainerRef.querySelectorAll('.message-container');
+          for (const element of messageElements) {
+            const rect = element.getBoundingClientRect();
+            const containerRect = chatContainerRef.getBoundingClientRect();
+            if (rect.top >= containerRect.top) {
+              return {
+                id: element.getAttribute('data-message-id'),
+                offsetTop: (element as HTMLElement).offsetTop,
+                distanceFromTop: rect.top - containerRect.top
+              };
+            }
+          }
+          return null;
+        })()
       } : null;
       
       // Get the oldest message ID for the API request
@@ -569,6 +775,34 @@ const ChatArea: Component = () => {
                     data.messages ? data.messages : 
                     data.success && data.messages ? data.messages : [];
       
+      // Extract author data from messages and add to user cache (optimized batch processing)
+      if (Array.isArray(messages)) {
+        const newUsers = new Map();
+        
+        // First pass: collect unique authors that aren't already cached
+        messages.forEach((message: any) => {
+          if (message.author && message.author.id && !cache.getUser(message.author.id) && !newUsers.has(message.author.id)) {
+            newUsers.set(message.author.id, {
+              id: message.author.id,
+              username: message.author.username,
+              discriminator: message.author.discriminator,
+              display_name: message.author.display_name,
+              avatar: message.author.avatar,
+              banner: message.author.banner,
+              presence: message.author.presence,
+              flags: message.author.flags,
+              about_me: message.author.about_me,
+              bio: message.author.bio
+            });
+          }
+        });
+        
+        // Batch add new users to cache
+        newUsers.forEach((user) => {
+          cache.setUser(user);
+        });
+      }
+      
       if (fetchedMessages.length === 0) {
         cache.setHasReachedBeginning(params.roomId, true);
         setHasReachedBeginning(true);
@@ -576,20 +810,35 @@ const ChatArea: Component = () => {
         // Add messages to cache
         cache.setMessages(params.roomId, fetchedMessages, 'older');
         
-        // Update displayed messages
+        // Update displayed messages with batched DOM updates
         const updatedMessages = processMessages(cache.getMessages(params.roomId));
-        setMessages(updatedMessages);
         
-        // Perfect scroll restoration with zero movement
+        // Use flushSync to ensure DOM updates are applied immediately
+        batch(() => {
+          setMessages(updatedMessages);
+        });
+        
+        // Enhanced scroll restoration with multiple fallback strategies
         if (scrollState && chatContainerRef) {
-          const newScrollHeight = chatContainerRef.scrollHeight;
-          const heightIncrease = newScrollHeight - scrollState.scrollHeight;
-          
-          // Calculate exact new scroll position
-          const targetScrollTop = scrollState.scrollTop + heightIncrease;
-          
-          // Apply immediately with pixel-perfect precision
-          chatContainerRef.scrollTop = Math.max(0, targetScrollTop);
+          // Strategy 1: Use anchor message for pixel-perfect restoration
+          if (scrollState.anchorMessage?.id) {
+            const anchorElement = chatContainerRef.querySelector(`[data-message-id="${scrollState.anchorMessage.id}"]`) as HTMLElement;
+            if (anchorElement) {
+              const newOffsetTop = anchorElement.offsetTop;
+              const targetScrollTop = newOffsetTop - scrollState.anchorMessage.distanceFromTop;
+              chatContainerRef.scrollTop = Math.max(0, targetScrollTop);
+            } else {
+              // Fallback to height-based calculation
+              const newScrollHeight = chatContainerRef.scrollHeight;
+              const heightIncrease = newScrollHeight - scrollState.scrollHeight;
+              chatContainerRef.scrollTop = Math.max(0, scrollState.scrollTop + heightIncrease);
+            }
+          } else {
+            // Strategy 2: Height-based restoration
+            const newScrollHeight = chatContainerRef.scrollHeight;
+            const heightIncrease = newScrollHeight - scrollState.scrollHeight;
+            chatContainerRef.scrollTop = Math.max(0, scrollState.scrollTop + heightIncrease);
+          }
         }
         
         // Check if we got fewer messages than requested (reached beginning)
@@ -640,6 +889,34 @@ const ChatArea: Component = () => {
       const fetchedMessages = Array.isArray(data) ? data : 
                       data.messages ? data.messages : 
                       data.success && data.messages ? data.messages : [];
+      
+      // Extract author data from messages and add to user cache (optimized batch processing)
+        if (Array.isArray(fetchedMessages)) {
+          const newUsers = new Map();
+          
+          // First pass: collect unique authors that aren't already cached
+          fetchedMessages.forEach((message: any) => {
+            if (message.author && message.author.id && !cache.getUser(message.author.id) && !newUsers.has(message.author.id)) {
+              newUsers.set(message.author.id, {
+                id: message.author.id,
+                username: message.author.username,
+                discriminator: message.author.discriminator,
+                display_name: message.author.display_name,
+                avatar: message.author.avatar,
+                banner: message.author.banner,
+                presence: message.author.presence,
+                flags: message.author.flags,
+                about_me: message.author.about_me,
+                bio: message.author.bio
+              });
+            }
+          });
+          
+          // Batch add new users to cache
+          newUsers.forEach((user) => {
+            cache.setUser(user);
+          });
+        }
       
       if (fetchedMessages.length === 0) {
         // No more newer messages
@@ -703,6 +980,34 @@ const ChatArea: Component = () => {
                       data.messages ? data.messages : 
                       data.success && data.messages ? data.messages : [];
       
+      // Extract author data from messages and add to user cache (optimized batch processing)
+      if (Array.isArray(messages)) {
+        const newUsers = new Map();
+        
+        // First pass: collect unique authors that aren't already cached
+        messages.forEach((message: any) => {
+          if (message.author && message.author.id && !cache.getUser(message.author.id) && !newUsers.has(message.author.id)) {
+            newUsers.set(message.author.id, {
+              id: message.author.id,
+              username: message.author.username,
+              discriminator: message.author.discriminator,
+              display_name: message.author.display_name,
+              avatar: message.author.avatar,
+              banner: message.author.banner,
+              presence: message.author.presence,
+              flags: message.author.flags,
+              about_me: message.author.about_me,
+              bio: message.author.bio
+            });
+          }
+        });
+        
+        // Batch add new users to cache
+        newUsers.forEach((user) => {
+          cache.setUser(user);
+        });
+      }
+      
       // Let the room change effect manage loading state
       // Don't set loading to false here to prevent race conditions
       
@@ -750,17 +1055,24 @@ const ChatArea: Component = () => {
   const scrollToBottom = () => {
     if (!chatContainerRef) return;
     
-    // Use smooth scrolling with better performance
+    // Enhanced smooth scrolling with momentum preservation
     const scrollToBottomImmediate = () => {
       const { scrollHeight, clientHeight } = chatContainerRef;
       const targetScrollTop = scrollHeight - clientHeight;
+      const currentScrollTop = chatContainerRef.scrollTop;
       
       // Only scroll if we're not already at the bottom
-      if (Math.abs(chatContainerRef.scrollTop - targetScrollTop) > 5) {
-        chatContainerRef.scrollTo({
-          top: targetScrollTop,
-          behavior: 'instant'
-        });
+      if (Math.abs(currentScrollTop - targetScrollTop) > 5) {
+        // Use transform for smoother animation on supported browsers
+        if ('scrollBehavior' in document.documentElement.style) {
+          chatContainerRef.scrollTo({
+            top: targetScrollTop,
+            behavior: 'instant'
+          });
+        } else {
+          // Fallback for older browsers
+          chatContainerRef.scrollTop = targetScrollTop;
+        }
       }
     };
     
@@ -774,41 +1086,66 @@ const ChatArea: Component = () => {
   };
 
   // Ultra-smooth scroll handling with minimal triggers
+  // Throttled scroll handler for better performance
+  let scrollTimeout: number | null = null;
+  let lastScrollTime = 0;
+  
   const handleScroll = (e: Event) => {
     if (!chatContainerRef) return;
     
     const target = e.target as HTMLDivElement;
     const { scrollTop, scrollHeight, clientHeight } = target;
+    const now = Date.now();
     
-    // Update scroll position state
-    setScrollPosition({ top: scrollTop, height: scrollHeight });
-    
-    // Proper infinite scroll thresholds - load before reaching the end
+    // Immediate position updates for smooth UI
     const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
-    const isNearTop = scrollTop < 300; // Load when getting close to top, not at top
+    const isNearTop = scrollTop < 500; // Increased threshold for smoother loading
     const isAtTop = scrollTop < 50;
     
-    // Update position states
+    // Update position states immediately
     setIsNearBottom(isAtBottom);
     setIsNearTop(isAtTop);
     setShouldScrollToBottom(isAtBottom);
     setHasScrolledUp(!isAtBottom);
     
-    // Trigger infinite scroll loading when approaching the top
-    if (isNearTop && !hasReachedBeginning() && loadingOlderPhase() === 'idle') {
-      // Load older messages before user reaches the very top
-      fetchOlderMessages();
+    // Throttle expensive operations
+    if (now - lastScrollTime > 16) { // ~60fps throttling
+      lastScrollTime = now;
+      setScrollPosition({ top: scrollTop, height: scrollHeight });
+      
+      // Predictive loading - start loading before user reaches threshold
+      if (isNearTop && !hasReachedBeginning() && loadingOlderPhase() === 'idle') {
+        // Use requestIdleCallback for non-blocking loading
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(() => fetchOlderMessages(), { timeout: 100 });
+        } else {
+          setTimeout(() => fetchOlderMessages(), 0);
+        }
+      }
+      
+      // Load newer messages with similar optimization
+      if (isAtBottom && !hasReachedEnd() && !isLoadingNewer() && 
+          hasScrolledUp() && displayMessages().length > 0) {
+        if ('requestIdleCallback' in window) {
+          requestIdleCallback(() => fetchNewerMessages(), { timeout: 100 });
+        } else {
+          setTimeout(() => fetchNewerMessages(), 0);
+        }
+      }
     }
     
-    // Only trigger fetchNewerMessages if user manually scrolled to bottom AND we have messages
-    // Don't trigger on initial load or automatic scroll-to-bottom
-    if (isAtBottom && !hasReachedEnd() && !isLoadingNewer() && 
-        hasScrolledUp() && messages().length > 0) {
-      fetchNewerMessages();
+    // Clear any pending scroll timeout
+    if (scrollTimeout) {
+      clearTimeout(scrollTimeout);
     }
     
-    // Update previous scroll state
-    previouslyScrolledUp.current = hasScrolledUp();
+    // Debounced scroll end detection
+    scrollTimeout = setTimeout(() => {
+      // Final scroll position update
+      setScrollPosition({ top: scrollTop, height: scrollHeight });
+      previouslyScrolledUp.current = hasScrolledUp();
+      scrollTimeout = null;
+    }, 150) as unknown as number;
   };
 
   // Check if we're on mobile
@@ -912,6 +1249,84 @@ const ChatArea: Component = () => {
     });
   });
 
+  // Handle pending message confirmation events
+  createEffect(() => {
+    const handlePendingMessageConfirmed = (event: CustomEvent) => {
+      const { roomId, nonce, messageId } = event.detail;
+      const currentRoomId = params.roomId;
+      
+      console.log("[ChatArea] pendingMessageConfirmed event received:", { roomId, nonce, messageId, currentRoomId });
+      
+      // Only process confirmations for the current room
+      if (roomId !== currentRoomId) {
+        console.log("[ChatArea] Ignoring pendingMessageConfirmed for different room");
+        return;
+      }
+      
+      const beforeCount = pendingMessages().length;
+      // Remove the pending message with matching nonce
+      setPendingMessages(prev => {
+        const filtered = prev.filter(msg => msg.nonce !== nonce);
+        console.log("[ChatArea] Removing pending message with nonce:", nonce, "before:", prev.length, "after:", filtered.length);
+        return filtered;
+      });
+      const afterCount = pendingMessages().length;
+      console.log("[ChatArea] Pending messages count changed from", beforeCount, "to", afterCount);
+    };
+
+    // Listen for fallback current user message events (when nonce is not available)
+    const handleCurrentUserMessageReceived = (event: CustomEvent) => {
+      const { roomId, messageId, content, createdAt } = event.detail;
+      const currentRoomId = params.roomId;
+      
+      console.log("[ChatArea] currentUserMessageReceived event received:", { roomId, messageId, content, currentRoomId });
+      
+      if (roomId !== currentRoomId) {
+        console.log("[ChatArea] Ignoring currentUserMessageReceived for different room");
+        return;
+      }
+      
+      // Add a 2-second delay to give the nonce-based system priority
+      setTimeout(() => {
+        console.log("[ChatArea] Fallback: Removing pending message by content match after delay:", { content, messageId });
+        // Remove pending messages that match by content and are recent (within 15 seconds)
+        const messageTime = new Date(createdAt).getTime();
+        const beforeCount = pendingMessages().length;
+        
+        setPendingMessages(prev => prev.filter(msg => {
+          if (msg.content !== content) return true;
+          
+          // Check if the pending message is recent (within 15 seconds of the received message)
+          const pendingTime = msg.created_at ? new Date(msg.created_at).getTime() : Date.now();
+          const timeDiff = Math.abs(messageTime - pendingTime);
+          const isRecent = timeDiff <= 15000; // 15 seconds
+          
+          if (!isRecent) return true; // Keep if not recent
+          
+          console.log("[ChatArea] Removing pending message by content and time match:", {
+            pendingContent: msg.content,
+            receivedContent: content,
+            timeDiff,
+            pendingId: msg.id,
+            receivedId: messageId
+          });
+          return false; // Remove this pending message
+        }));
+        
+        const afterCount = pendingMessages().length;
+        console.log("[ChatArea] Pending messages count changed from", beforeCount, "to", afterCount, "via fallback");
+      }, 2000); // 2-second delay
+    };
+
+    window.addEventListener('pendingMessageConfirmed', handlePendingMessageConfirmed as EventListener);
+    window.addEventListener('currentUserMessageReceived', handleCurrentUserMessageReceived as EventListener);
+
+    onCleanup(() => {
+      window.removeEventListener('pendingMessageConfirmed', handlePendingMessageConfirmed as EventListener);
+      window.removeEventListener('currentUserMessageReceived', handleCurrentUserMessageReceived as EventListener);
+    });
+  });
+
   // Set up MutationObserver to monitor chat input content changes
   createEffect(() => {
     if (!chatInputRef) return;
@@ -959,8 +1374,9 @@ const ChatArea: Component = () => {
     // Clear any previous errors
     setError("");
     
-    // Validate message content
-    if (!content) return;
+    // Validate message content or attachments
+    const currentAttachments = attachments().filter(a => !a.uploading && !a.error);
+    if (!content && currentAttachments.length === 0) return;
     
     // Validate room and user
     if (!room) {
@@ -973,19 +1389,61 @@ const ChatArea: Component = () => {
       return;
     }
     
+    const nonce = `${Date.now()}-${Math.random().toString(36).substring(2, 15)}`;
+    
     try {
       setSending(true);
-      const nonce = Math.random().toString(36).substring(2, 15);
       
       // Remove current user from typing users when sending a message
       if (currentUser?.id) {
         setTypingUsers(prev => prev.filter(u => u.id !== currentUser.id));
       }
       
+      // Upload files first if there are any
+      let uploadedAttachments: string[] = [];
+      if (currentAttachments.length > 0) {
+        setUploadingFiles(true);
+        
+        for (const attachment of currentAttachments) {
+          if (attachment.file) {
+            try {
+              // Mark this attachment as uploading
+              setAttachments(prev => prev.map(a => 
+                a.id === attachment.id ? { ...a, uploading: true } : a
+              ));
+              
+              const uploadedFile = await uploadFileToNebula(attachment.file);
+              uploadedAttachments.push(uploadedFile.id);
+              
+              // Update attachment with uploaded data
+              setAttachments(prev => prev.map(a => 
+                a.id === attachment.id ? { 
+                  ...a, 
+                  id: uploadedFile.id,
+                  url: uploadedFile.url,
+                  uploading: false 
+                } : a
+              ));
+            } catch (error) {
+              console.error('File upload error:', error);
+              setAttachments(prev => prev.map(a => 
+                a.id === attachment.id ? { ...a, uploading: false, error: 'Upload failed' } : a
+              ));
+              throw new Error(`Failed to upload ${attachment.name}`);
+            }
+          } else if (attachment.id && !attachment.id.startsWith('local-')) {
+            // File already uploaded
+            uploadedAttachments.push(attachment.id);
+          }
+        }
+        
+        setUploadingFiles(false);
+      }
+      
       // Clear unread messages for this room when user sends a message
       // This is the user interaction that should clear the unread state
       
-      // Add temporary message to cache with optimistic update
+      // Create temporary message for optimistic UI update (don't add to cache yet)
       const tempMessage = {
         id: undefined,
         content,
@@ -993,12 +1451,21 @@ const ChatArea: Component = () => {
         created_at: new Date().toISOString(),
         nonce,
         pending: true,
-        room_id: room.id
+        room_id: room.id,
+        attachments: currentAttachments.map(a => ({
+          id: a.id,
+          name: a.name,
+          type: a.type,
+          size: a.size,
+          url: a.url,
+          height: a.height,
+          width: a.width,
+          user_id: a.user_id
+        }))
       };
     
-      // Optimistically add message to cache and update local state
-      cache.addMessage(room.id, tempMessage);
-      setMessages(prev => processMessages([...prev, tempMessage]));
+      // Add to pending messages for immediate UI feedback
+      // setPendingMessages(prev => [...prev, tempMessage]);
       
       // Clear input field immediately for better UX
       inputElement.textContent = "";
@@ -1013,60 +1480,64 @@ const ChatArea: Component = () => {
       const messageData = {
         content,
         nonce,
-        message_references: replyingTo().length > 0 ? replyingTo() : undefined
+        message_references: replyingTo().length > 0 ? replyingTo() : undefined,
+        attachments: uploadedAttachments.length > 0 ? uploadedAttachments : undefined
       };
       const result = await sendMessage(room.id, messageData);
       
-      // Clear reply references after sending
-      setReplyingTo([]);
-      
       if (result.success && result.message) {
-        // Remove the temporary message and add the confirmed one
-        const updatedMessages = messages().filter(m => m.nonce !== nonce);
-        const confirmedMessage = {
-          ...result.message,
-          id: result.message.id, // Ensure ID is explicitly set
-          created_at: result.message.created_at || new Date().toISOString(),
-          pending: false,
-          error: undefined
-        };
-        // First update the cache to ensure persistence
-        cache.deleteMessage(room.id, nonce); // Delete the temporary message
-        cache.addMessage(room.id, confirmedMessage); // Add the confirmed message
-        // Then update the local state
-        setMessages(processMessages([...updatedMessages, confirmedMessage]));
+        // Don't manually remove from pending or add to cache here
+        // Let the WebSocket message from AuthProvider handle the update via updateMessageByNonce
         
-        // Dispatch messageCreate event to update the PM list
-        // This ensures the room list is updated when sending messages
-        window.dispatchEvent(new CustomEvent("messageCreate", {
-          detail: {
-            roomId: room.id,
-            message: confirmedMessage
+        // Clear reply references and attachments after successful send
+        setReplyingTo([]);
+        // Clean up object URLs before clearing attachments
+        attachments().forEach(attachment => {
+          if (attachment.url.startsWith('blob:')) {
+            URL.revokeObjectURL(attachment.url);
           }
-        }));
-      } else {
-        // Mark message as failed and show error
-        const errorMessage = result.error || t("chat.errors.sendFailed");
-        cache.updateMessage(room.id, nonce, { 
-          ...tempMessage, 
-          created_at: new Date().toISOString(),
-          pending: false, 
-          error: errorMessage
         });
+        setAttachments([]);
+      } else {
+        // Mark pending message as failed
+        const errorMessage = result.error || t("chat.errors.sendFailed");
+        setPendingMessages(prev => prev.map(msg => 
+          msg.nonce === nonce 
+            ? { ...msg, pending: false, error: errorMessage }
+            : msg
+        ));
         setError(errorMessage);
     
-        // Refresh messages from cache to show error state
-        setMessages(cache.getMessages(room.id));
+        // displayMessages memo will automatically show the updated pending message
     
-        // Restore message text on failure if user hasn't typed something new
-        if (!messageText()) {
-          inputElement.textContent = content;
-          setMessageText(content);
-        }
+        // Clear reply references on failure
+        setReplyingTo([]);
+        // Clean up object URLs and clear attachments on failure
+        attachments().forEach(attachment => {
+          if (attachment.url.startsWith('blob:')) {
+            URL.revokeObjectURL(attachment.url);
+          }
+        });
+        setAttachments([]);
+    
+       
       }
     } catch (err) {
       console.error("Error sending message:", err);
       setError(t("chat.errors.sendFailed"));
+      
+      // Remove failed message from pending
+      setPendingMessages(prev => prev.filter(msg => msg.nonce !== nonce));
+      
+      // Clear reply references and attachments on exception
+      setReplyingTo([]);
+      // Clean up object URLs before clearing attachments
+      attachments().forEach(attachment => {
+        if (attachment.url.startsWith('blob:')) {
+          URL.revokeObjectURL(attachment.url);
+        }
+      });
+      setAttachments([]);
     } finally {
       setSending(false);
     }
@@ -1118,9 +1589,14 @@ const ChatArea: Component = () => {
       <div class="flex-1 flex flex-col h-full min-w-0">
         {/* Messages container */}
         <div 
-          class={`flex-1 overflow-y-auto flex flex-col py-4 scroll-smooth overflow-x-hidden w-full max-w-full relative min-w-0 ${isMobile() ? 'mb-4' : ''}`}
+          class={`flex-1 overflow-y-auto flex flex-col py-4 overflow-x-hidden w-full max-w-full relative min-w-0 ${isMobile() ? 'mb-4' : ''}`}
           ref={chatContainerRef}
-          style={{ "scroll-behavior": "auto" }}
+          style={{ 
+            "scroll-behavior": "auto",
+            "will-change": "scroll-position",
+            "contain": "layout style paint",
+            "transform": "translateZ(0)" // Force hardware acceleration
+          }}
           onScroll={handleScroll}
         >
           {/* Messages */}
@@ -1180,8 +1656,8 @@ const ChatArea: Component = () => {
                 </div>
               </div>
               </Show>
-              <Show when={messages().length > 0}>
-                <For each={groupMessagesByDate(messages())}>
+              <Show when={displayMessages().length > 0}>
+                <For each={groupMessagesByDate(displayMessages())}>
                   {(group) => (
                     <>
                       <DateDivider date={group.date} />
@@ -1217,6 +1693,11 @@ const ChatArea: Component = () => {
                                   type={message.type}
                                   system_type={message.system_type}
                                   system_data={message.system_data}
+                                  attachments={message.attachments?.map(att => ({
+                                    ...att,
+                                    height: att.height || 0,
+                                    width: att.width || 0
+                                  }))}
                                 />
                               </div>
                             </>
@@ -1255,7 +1736,7 @@ const ChatArea: Component = () => {
                   {(() => {
                     const uniqueAuthors = new Map();
                     replyingTo().forEach(replyId => {
-                      const replyMessage = messages().find(m => m.id === replyId);
+                      const replyMessage = displayMessages().find(m => m.id === replyId);
                       if (replyMessage) {
                         const authorId = replyMessage.author_id;
                         if (!uniqueAuthors.has(authorId)) {
@@ -1333,6 +1814,70 @@ const ChatArea: Component = () => {
               </div>
             </div>
           </Show>
+          {/* File attachments preview */}
+          <Show when={attachments().length > 0}>
+            <div class="mb-2 p-3 bg-surface bg-opacity-10 rounded-lg border border-border">
+              <div class="flex items-center justify-between mb-2">
+                <span class="text-sm font-medium text-text-primary">
+                  Attachments ({attachments().length}/{MAX_ATTACHMENTS})
+                </span>
+                <button
+                  onClick={() => setAttachments([])}
+                  class="text-text-secondary hover:text-text-primary text-sm"
+                  title="Clear all attachments"
+                >
+                  Clear all
+                </button>
+              </div>
+              <div class="grid grid-cols-1 gap-2 max-h-32 overflow-y-auto">
+                <For each={attachments()}>
+                  {(attachment) => (
+                    <div class="flex items-center gap-3 p-2 bg-background1 rounded border border-border">
+                      <div class="flex-shrink-0">
+                        <Show when={attachment.type.startsWith('image/')} fallback={
+                          <div class="w-8 h-8 bg-surface rounded flex items-center justify-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-text-secondary" viewBox="0 0 20 20" fill="currentColor">
+                              <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h8a2 2 0 012 2v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 0v12h8V4H6z" clip-rule="evenodd" />
+                            </svg>
+                          </div>
+                        }>
+                          <img
+                            src={attachment.url}
+                            alt={attachment.name}
+                            class="w-8 h-8 object-cover rounded"
+                          />
+                        </Show>
+                      </div>
+                      <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium text-text-primary truncate">
+                          {attachment.name}
+                        </div>
+                        <div class="text-xs text-text-secondary">
+                          {formatFileSize(attachment.size)}
+                          <Show when={attachment.uploading}>
+                            <span class="ml-2 text-primary">Uploading...</span>
+                          </Show>
+                          <Show when={attachment.error}>
+                            <span class="ml-2 text-red-500">{attachment.error}</span>
+                          </Show>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => removeAttachment(attachment.id)}
+                        class="flex-shrink-0 p-1 text-text-secondary hover:text-red-500 transition-colors"
+                        title="Remove attachment"
+                        disabled={attachment.uploading}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                          <path fill-rule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                </For>
+              </div>
+            </div>
+          </Show>
           <div class={`bg-[var(--background1)] p-2 flex items-center relative min-w-0 ${isMobile() ? 'rounded-none mx-0 px-4' : 'rounded-lg'}`}>
             {/* File attachment button */}
             <button
@@ -1355,8 +1900,10 @@ const ChatArea: Component = () => {
               class="hidden"
               multiple
               onChange={(e) => {
-                // File attachment logic will be implemented in the future
-                console.log("Files selected:", e.currentTarget.files);
+                const files = e.currentTarget.files;
+                if (files && files.length > 0) {
+                  handleFileUpload(files);
+                }
                 // Reset the input to allow selecting the same file again
                 e.currentTarget.value = "";
               }}
@@ -1368,6 +1915,13 @@ const ChatArea: Component = () => {
               class="bg-transparent w-full focus:outline-none text-text-primary min-h-[20px] max-h-[120px] overflow-y-auto whitespace-pre-wrap word-break break-all break-words break-anywhere relative empty:before:content-[attr(data-placeholder)] empty:before:text-text-secondary empty:before:absolute empty:before:left-0 empty:before:top-0 empty:before:pointer-events-none empty:before:transition-opacity empty:before:duration-100 empty:before:ease-in-out flex items-center empty min-w-0 max-w-full"
               onPaste={(e) => {
                 e.preventDefault();
+                
+                // Check for files first
+                const files = e.clipboardData?.files;
+                if (files && files.length > 0) {
+                  handleFileUpload(files);
+                  return;
+                }
             
                 const text = e.clipboardData?.getData('text/plain') || '';
 
@@ -1403,6 +1957,54 @@ const ChatArea: Component = () => {
                 const hasUnclosed = hasUnclosedCodeBlock(text);
                 updateCodeBlockIndicator(e.currentTarget, hasUnclosed);
                 
+                // Emoji autocomplete detection
+                const selection = window.getSelection();
+                if (selection && selection.rangeCount > 0) {
+                  const range = selection.getRangeAt(0);
+                  const textNode = range.startContainer;
+                  
+                  if (textNode.nodeType === Node.TEXT_NODE) {
+                    const textContent = textNode.textContent || "";
+                    const cursorPosition = range.startOffset;
+                    
+                    // Look for emoji shortcode pattern (:word) before cursor
+                    const beforeCursor = textContent.substring(0, cursorPosition);
+                    const emojiMatch = beforeCursor.match(/:([a-zA-Z_]*)$/);
+                    
+                    if (emojiMatch) {
+                      const query = emojiMatch[1];
+                      setEmojiAutocompleteQuery(query);
+                      
+                      // Calculate position for autocomplete menu - position like reply popup
+                      const inputContainer = e.currentTarget.parentElement as HTMLElement;
+                      if (inputContainer) {
+                        const rect = inputContainer.getBoundingClientRect();
+                        // Position above the input container so bottom edge is above input
+                          const autocompleteHeight = 250; // Approximate height including padding and content
+                          setEmojiAutocompletePosition({
+                            top: rect.top + window.scrollY - autocompleteHeight - 15, // Position so bottom is above input with 8px gap
+                            left: rect.left + window.scrollX,
+                            width: rect.width // Match the width of the input container
+                          });
+                      }
+                      
+                      // Store the range for later replacement
+                      const emojiRange = document.createRange();
+                      emojiRange.setStart(textNode, emojiMatch.index || 0);
+                      emojiRange.setEnd(textNode, cursorPosition);
+                      setEmojiAutocompleteRange(emojiRange);
+                      
+                      setShowEmojiAutocomplete(true);
+                    } else {
+                      setShowEmojiAutocomplete(false);
+                      setEmojiAutocompleteRange(null);
+                    }
+                  } else {
+                    setShowEmojiAutocomplete(false);
+                    setEmojiAutocompleteRange(null);
+                  }
+                }
+                
                 // Send typing indicator to backend after second character is typed
                 if (text.length >= 2 && !editingMessageId() && userSettings().privacy.sendTypingIndicators) {
                   const currentTime = Date.now();
@@ -1426,6 +2028,14 @@ const ChatArea: Component = () => {
                 }
               }}
               onKeyDown={(e) => {
+                // Handle emoji autocomplete navigation first
+                if (showEmojiAutocomplete()) {
+                  if (e.key === 'ArrowDown' || e.key === 'ArrowUp' || e.key === 'Enter' || e.key === 'Escape') {
+                    // Let the EmojiAutocomplete component handle these keys
+                    return;
+                  }
+                }
+                
                 // Check if we're inside an unclosed code block
                 const text = e.currentTarget.textContent || "";
                 const isInUnclosedCodeBlock = hasUnclosedCodeBlock(text);
@@ -1519,7 +2129,7 @@ const ChatArea: Component = () => {
                   </svg>
                 </button>
               </Show>
-              <Show when={messageText().trim() !== "" || userSettings().appearance.alwaysShowSendButton || isMobile() || editingMessageId()}>
+              <Show when={messageText().trim() !== "" || attachments().length > 0 || userSettings().appearance.alwaysShowSendButton || isMobile() || editingMessageId()}>
                 <button 
                   onClick={() => {
                     // Add haptic feedback on mobile
@@ -1598,6 +2208,47 @@ const ChatArea: Component = () => {
                 setShowEmojiPicker(false);
               }}
               onClose={() => setShowEmojiPicker(false)}
+            />
+          </Show>
+          
+          {/* Emoji Autocomplete */}
+          <Show when={showEmojiAutocomplete()}>
+            <EmojiAutocomplete
+              query={emojiAutocompleteQuery()}
+              position={emojiAutocompletePosition()}
+              onSelect={(shortcode) => {
+                const range = emojiAutocompleteRange();
+                if (range) {
+                  // Replace the :query with the selected emoji shortcode
+                  range.deleteContents();
+                  range.insertNode(document.createTextNode(`:${shortcode}:`));
+                  range.collapse(false);
+                  
+                  const selection = window.getSelection();
+                  if (selection) {
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                  }
+                  
+                  // Update the message text state
+                  const chatInput = document.querySelector('[data-placeholder]') as HTMLDivElement;
+                  if (chatInput) {
+                    setMessageText(chatInput.textContent || "");
+                    chatInput.focus();
+                    
+                    // Trigger input event to update state
+                    const inputEvent = new Event('input', { bubbles: true });
+                    chatInput.dispatchEvent(inputEvent);
+                  }
+                }
+                
+                setShowEmojiAutocomplete(false);
+                setEmojiAutocompleteRange(null);
+              }}
+              onClose={() => {
+                setShowEmojiAutocomplete(false);
+                setEmojiAutocompleteRange(null);
+              }}
             />
           </Show>
           

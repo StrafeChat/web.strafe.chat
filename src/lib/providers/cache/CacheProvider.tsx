@@ -41,6 +41,7 @@ type CacheContextType = {
   setMessages: (roomId: string, messages: CachedMessage[], position?: 'newer' | 'older' | 'replace') => void;
   addMessage: (roomId: string, message: CachedMessage) => void;
   updateMessage: (roomId: string, messageId: string, updates: Partial<CachedMessage>) => void;
+  updateMessageByNonce: (roomId: string, nonce: string, updates: Partial<CachedMessage>) => void;
   deleteMessage: (roomId: string, messageId: string) => void;
   hasMessages: (roomId: string) => boolean;
   getOldestMessageId: (roomId: string) => string | undefined;
@@ -173,6 +174,7 @@ export const CacheProvider: ParentComponent = (props) => {
     setMessages: (roomId: string, messages: CachedMessage[], position?: 'newer' | 'older' | 'replace') => messageCache.setMessages(roomId, messages, position),
     addMessage: (roomId: string, message: CachedMessage) => messageCache.addMessage(roomId, message),
     updateMessage: (roomId: string, messageId: string, updates: Partial<CachedMessage>) => messageCache.updateMessage(roomId, messageId, updates),
+    updateMessageByNonce: (roomId: string, nonce: string, updates: Partial<CachedMessage>) => messageCache.updateMessageByNonce(roomId, nonce, updates),
     deleteMessage: (roomId: string, messageId: string) => messageCache.deleteMessage(roomId, messageId),
     hasMessages: (roomId: string) => messageCache.hasMessages(roomId),
     getOldestMessageId: (roomId: string) => messageCache.getOldestMessageId(roomId),

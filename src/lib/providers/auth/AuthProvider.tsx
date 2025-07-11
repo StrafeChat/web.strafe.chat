@@ -80,7 +80,7 @@ type AuthContextType = {
   wsClient: () => WebSocketClient | null;
   updateStatus: (status?: string, customStatus?: string) => Promise<boolean>;
   fetchBulkUsers: (userIds: string[]) => Promise<void>;
-  sendMessage: (roomId: string, messageData: { content: string; nonce?: string; message_references?: string[] }) => Promise<MessageResponse>;
+  sendMessage: (roomId: string, messageData: { content: string; nonce?: string; message_references?: string[]; attachments?: string[] }) => Promise<MessageResponse>;
   sendTypingIndicator: (roomId: string) => Promise<void>;
   deleteMessage: (roomId: string, messageId: string) => Promise<{ success: boolean; error?: string; }>;
   editMessage: (roomId: string, messageId: string, content: string) => Promise<{ success: boolean; message?: any; error?: string; }>;
@@ -748,10 +748,10 @@ export const AuthProvider: ParentComponent = (props) => {
     }
   };
 
-  const sendMessage = async (roomId: string, messageData: { content: string; nonce?: string; message_references?: string[] }): Promise<MessageResponse> => {
+  const sendMessage = async (roomId: string, messageData: { content: string; nonce?: string; message_references?: string[]; attachments?: string[] }): Promise<MessageResponse> => {
     try {
-      if (!roomId || !messageData.content.trim()) {
-        return { success: false, error: "Room ID and message content are required" };
+      if (!roomId || (!messageData.content.trim() && (!messageData.attachments || messageData.attachments.length === 0))) {
+        return { success: false, error: "Room ID and message content or attachments are required" };
       }
 
       const response = await fetch(API_ENDPOINTS.ROOM_MESSAGES(roomId), {
@@ -920,16 +920,82 @@ export const AuthProvider: ParentComponent = (props) => {
       created_at: messageData.created_at || new Date().toISOString(),
       edited_at: messageData.edited_at || null,
       attachments: messageData.attachments || [],
+      message_references: messageData.message_references || [],
       type: messageData.type,
       system: messageData.system,
       system_type: messageData.system_type,
       system_data: messageData.system_data,
     };
     
-    // Add message to cache
-    if (window.messageCache) {
-      console.log("[AuthProvider] Adding message to cache:", normalizedMessage);
-      window.messageCache.addMessage(messageData.room_id, normalizedMessage);
+    // Check if this message is from the current user and has a nonce (indicating it's a confirmation of a sent message)
+    const isFromCurrentUser = normalizedMessage.author_id === currentUser.id;
+    const messageNonce = messageData.nonce;
+    
+    console.log("[AuthProvider] Message analysis:", {
+      isFromCurrentUser,
+      messageNonce,
+      hasNonce: !!messageNonce,
+      messageId: messageData.id,
+      authorId: normalizedMessage.author_id,
+      currentUserId: currentUser.id
+    });
+    
+    if (isFromCurrentUser && messageNonce && window.messageCache) {
+      // This is a confirmation of a message we sent - update the pending message with real data
+      console.log("[AuthProvider] Updating pending message with real data:", { nonce: messageNonce, id: messageData.id });
+      window.messageCache.updateMessageByNonce(messageData.room_id, messageNonce, {
+        id: messageData.id,
+        created_at: messageData.created_at,
+        sending: false,
+        nonce: messageNonce // Preserve the nonce for deduplication
+      });
+      
+      // Dispatch event to remove from pending messages in ChatArea
+      // Use setTimeout to ensure the cache update has been processed
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent("pendingMessageConfirmed", {
+          detail: {
+            roomId: messageData.room_id,
+            nonce: messageNonce,
+            messageId: messageData.id
+          }
+        }));
+      }, 0);
+      
+      // Don't dispatch messageCreate for nonce-based confirmations to avoid duplicates
+      // The pending message will be converted to a real message via cache update
+    } else {
+      // This is a message from another user - add it to cache normally
+      if (window.messageCache) {
+        console.log("[AuthProvider] Adding message to cache:", normalizedMessage);
+        window.messageCache.addMessage(messageData.room_id, normalizedMessage);
+      }
+      
+      // If this is from current user but no nonce, dispatch a fallback event
+      // This handles cases where the server doesn't return the nonce
+      if (isFromCurrentUser) {
+        console.log("[AuthProvider] Message from current user but no nonce, dispatching fallback event");
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent("currentUserMessageReceived", {
+            detail: {
+              roomId: messageData.room_id,
+              messageId: messageData.id,
+              content: normalizedMessage.content,
+              createdAt: normalizedMessage.created_at
+            }
+          }));
+        }, 0);
+      }
+      
+      // Dispatch messageCreate event for UI components to listen to
+      // This is critical for real-time updates in the ChatArea component
+      console.log("[AuthProvider] Dispatching messageCreate event");
+      window.dispatchEvent(new CustomEvent("messageCreate", {
+        detail: {
+          roomId: messageData.room_id,
+          message: normalizedMessage
+        }
+      }));
     }
     
     // If room had no messages before this one, fetch historical messages
@@ -939,16 +1005,6 @@ export const AuthProvider: ParentComponent = (props) => {
         console.error("[AuthProvider] Failed to fetch historical messages:", error);
       });
     }
-    
-    // Dispatch messageCreate event for UI components to listen to
-    // This is critical for real-time updates in the ChatArea component
-    console.log("[AuthProvider] Dispatching messageCreate event");
-    window.dispatchEvent(new CustomEvent("messageCreate", {
-      detail: {
-        roomId: messageData.room_id,
-        message: normalizedMessage
-      }
-    }));
     
     // Don't mark as unread if user is viewing this room or in DND mode
     if (isViewingThisRoom || currentUser.presence?.status === "dnd") return;
@@ -1132,6 +1188,34 @@ export const AuthProvider: ParentComponent = (props) => {
       const messages = Array.isArray(data) ? data : 
                       data.messages ? data.messages : 
                       data.success && data.messages ? data.messages : [];
+      
+      // Extract author data from messages and add to user cache (optimized batch processing)
+      if (Array.isArray(messages)) {
+        const newUsers = new Map();
+        
+        // First pass: collect unique authors that aren't already cached
+        messages.forEach((message: any) => {
+          if (message.author && message.author.id && !cache.getUser(message.author.id) && !newUsers.has(message.author.id)) {
+            newUsers.set(message.author.id, {
+              id: message.author.id,
+              username: message.author.username,
+              discriminator: message.author.discriminator,
+              display_name: message.author.display_name,
+              avatar: message.author.avatar,
+              banner: message.author.banner,
+              presence: message.author.presence,
+              flags: message.author.flags,
+              about_me: message.author.about_me,
+              bio: message.author.bio
+            });
+          }
+        });
+        
+        // Batch add new users to cache
+        newUsers.forEach((user) => {
+          cache.setUser(user);
+        });
+      }
       
       if (Array.isArray(messages) && messages.length > 0) {
         console.log(`[AuthProvider] Fetched ${messages.length} historical messages for room: ${roomId}`);

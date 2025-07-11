@@ -9,8 +9,10 @@ import { Portal } from "solid-js/web";
 import { parseMarkdown } from "../../lib/utils/markdownUtils";
 import { useUserSettings } from "../../lib/providers/userSettings/UserSettingsProvider";
 import UserPopupMenu from "../common/UserPopupMenu";
-import { MessageType, SystemMessageType } from "../../types/messageTypes";
+import { MessageType, SystemMessageType, MessageAttachment } from "../../types/messageTypes";
 import { Avatar } from "../common/Avatar";
+import { FS_URL } from '../../constants';
+import AudioPlayer from '../ui/AudioPlayer';
 
 interface MessageProps {
   id: string | undefined;
@@ -31,6 +33,7 @@ interface MessageProps {
   type?: MessageType;
   system_type?: string;
   system_data?: object;
+  attachments?: MessageAttachment[];
 }
 
 const Message: Component<MessageProps> = (props) => {
@@ -38,6 +41,34 @@ const Message: Component<MessageProps> = (props) => {
   const cache = useCache();
   const { user, rooms, deleteMessage, editMessage, isMobile } = useAuth();
   const [t] = useTransContext();
+  
+  // Helper function to construct complete attachment URLs
+  const getAttachmentUrl = (url: string) => {
+    if (url.startsWith('/attachments')) {
+      return FS_URL + url; // Remove leading slash since FS_URL ends with slash
+    }
+    return url;
+  };
+
+  // Download function for attachments
+  const handleDownload = async (attachment: MessageAttachment) => {
+    try {
+      const response = await fetch(getAttachmentUrl(attachment.url));
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = attachment.name;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(url);
+    } catch (error) {
+      console.error('Download failed:', error);
+      // Fallback to direct link
+      window.open(getAttachmentUrl(attachment.url), '_blank');
+    }
+  };
   
   // Check if this is a system message
   const isSystemMessage = () => {
@@ -167,6 +198,59 @@ const Message: Component<MessageProps> = (props) => {
   const [isEditLoading, setIsEditLoading] = createSignal(false);
   const [editError, setEditError] = createSignal("");
   let editInputRef: HTMLDivElement | undefined;
+  
+  // Emoji details popup state
+  const [showEmojiDetails, setShowEmojiDetails] = createSignal(false);
+  const [selectedEmoji, setSelectedEmoji] = createSignal<{shortcode: string, emoji: {name: string, code: string}} | null>(null);
+  const [popupPosition, setPopupPosition] = createSignal<{x: number, y: number}>({x: 0, y: 0});
+  
+  // Event listener for emoji clicks using event delegation
+   const handleMessageClick = (event: MouseEvent) => {
+     const target = event.target as HTMLElement;
+     if (target.tagName === 'IMG' && target.classList.contains('inline-emoji')) {
+       const shortcode = target.getAttribute('data-emoji-shortcode');
+       const emojiName = target.getAttribute('data-emoji-name');
+       const emojiCode = target.getAttribute('data-emoji-code');
+       
+       if (shortcode && emojiName && emojiCode) {
+          // Get the position of the clicked emoji
+          const rect = target.getBoundingClientRect();
+          const viewportWidth = window.innerWidth;
+          const viewportHeight = window.innerHeight;
+          const popupWidth = 200; // Approximate popup width
+          const popupHeight = 80; // Approximate popup height
+          
+          let x = rect.right + 10; // Position to the right of emoji
+          let y = rect.top + rect.height / 2; // Center vertically with emoji
+          
+          // Adjust if popup would go off the right edge
+          if (x + popupWidth > viewportWidth - 20) {
+            x = rect.left - popupWidth - 10; // Position to the left instead
+          }
+          
+          // Adjust if popup would go off the top or bottom
+          if (y - popupHeight / 2 < 20) {
+            y = 20 + popupHeight / 2; // Keep some margin from top
+          } else if (y + popupHeight / 2 > viewportHeight - 20) {
+            y = viewportHeight - 20 - popupHeight / 2; // Keep some margin from bottom
+          }
+          
+          setPopupPosition({ x, y });
+         
+         setSelectedEmoji({ 
+           shortcode, 
+           emoji: { name: emojiName, code: emojiCode } 
+         });
+         setShowEmojiDetails(true);
+       }
+     }
+   };
+  
+  // Close emoji details
+  const closeEmojiDetails = () => {
+    setShowEmojiDetails(false);
+    setSelectedEmoji(null);
+  };
   
   const author = createMemo(() => {
     const userData = cache.getUser(props.author_id);
@@ -615,12 +699,12 @@ const Message: Component<MessageProps> = (props) => {
       <div class={`flex flex-col ${shouldShowCompact ? 'mt-1' : 'mt-5'} group hover:bg-surface hover:bg-opacity-10 transition-colors px-4 w-full relative overflow-visible min-w-0`}>
         {/* Referenced messages (replies) - Discord style - Above the message content */}
          <Show when={referencedMessages().length > 0}>
-           <div class="relative mb-1">
+           <div>
              <For each={referencedMessages()}>
                {(refMessage) => (
-                 <div class="relative mb-1">
+                 <div class="relative">
                    {/* Connecting line - goes down from reply to main message */}
-                    <div class="absolute left-[20px] bottom-[-9px] w-7 h-3 border-l-2 border-t-2 border-text-secondary opacity-40 rounded-tl-md"></div>
+                    <div class="absolute left-[20px] bottom-[-2px] w-7 h-2.5 border-l-2 border-t-2 border-text-secondary opacity-40 rounded-tl-md"></div>
                     <div 
                       class="flex items-center gap-1.5 ml-[42px] px-3 rounded hover:bg-surface hover:bg-opacity-20 cursor-pointer transition-colors max-w-[calc(100%-3rem)] overflow-hidden"
                      onClick={() => scrollToMessage(refMessage.id)}
@@ -630,7 +714,7 @@ const Message: Component<MessageProps> = (props) => {
                        avatar={refMessage.avatar}
                        alt="Avatar"
                        class="flex-shrink-0"
-                       size="sm"
+                       size="xs"
                      />
                      <span class="text-xs font-medium text-text-primary flex-shrink-0 max-w-[120px] truncate">
                        {refMessage.author}
@@ -690,7 +774,7 @@ const Message: Component<MessageProps> = (props) => {
           triggerRef={userPopupTrigger()}
           userId={props.author_id}
         />
-        <div class={`flex gap-3 w-full overflow-visible min-w-0 ${props.pending && !props.id ? 'opacity-70' : ''}`} id={`message-${props.id}`} data-message-id={props.id}>
+        <div class={`flex gap-3 w-full overflow-visible min-w-0 transition-all duration-300 ease-in-out ${props.pending && !props.id ? 'opacity-60' : 'opacity-100'}`} id={`message-${props.id}`} data-message-id={props.id}>
           <Show when={!shouldShowCompact}>
             <div class="flex-shrink-0 mt-1">
               <Avatar
@@ -737,13 +821,119 @@ const Message: Component<MessageProps> = (props) => {
             </Show>
 
             <Show when={!isEditing()}>
-              <div 
-                class="text-text-primary max-w-full message-content whitespace-pre-wrap overflow-hidden overflow-wrap-anywhere min-w-0"
-                data-edited={props.edited_at ? "true" : undefined}
-                style="word-break: break-word; overflow-wrap: break-word; max-width: 100%;"
-              >
-                <span class="markdown-content" innerHTML={parseMarkdown(props.content)} />
+              <div class="flex items-center gap-2 overflow-hidden">
+                <div 
+                  class="text-text-primary max-w-full message-content whitespace-pre-wrap overflow-hidden overflow-wrap-anywhere min-w-0 flex-1"
+                  data-edited={props.edited_at ? "true" : undefined}
+                  style="word-break: break-word; overflow-wrap: break-word; max-width: 100%;"
+                  onClick={handleMessageClick}
+                >
+                  <span class="markdown-content" innerHTML={parseMarkdown(props.content)} />
+                </div>
+                <Show when={shouldShowCompact && props.pending && !props.id}>
+                  <span class="text-xs text-text-secondary italic flex-shrink-0">(sending...)</span>
+                </Show>
+                <Show when={shouldShowCompact && props.error}>
+                  <span class="text-xs text-red-500 flex-shrink-0">{props.error}</span>
+                </Show>
               </div>
+              
+              {/* Attachments */}
+              <Show when={props.attachments && props.attachments.length > 0}>
+                <div class="mt-2 space-y-2">
+                  <For each={props.attachments}>
+                    {(attachment) => {
+                      const isImage = attachment?.type?.startsWith('image/') || false;
+                      const isVideo = attachment?.type?.startsWith('video/') || false;
+                      const isAudio = attachment?.type?.startsWith('audio/') || false;
+                      
+                      return (
+                        <div 
+                          class="border border-border rounded-lg overflow-hidden" 
+                          style={{
+                            ...((isImage || isVideo) && attachment.width && attachment.height && {
+                              'max-width': `min(${Math.min(attachment.width, 448)}px, 100%)`
+                            }),
+                            ...((isImage || isVideo) && (!attachment.width || !attachment.height) && {
+                              'max-width': '28rem'
+                            }),
+                            ...(!isImage && !isVideo && {
+                              'max-width': '28rem'
+                            })
+                          }}>
+                          <Show when={isImage}>
+                            <img 
+                              src={getAttachmentUrl(attachment.url)} 
+                              alt={attachment.name}
+                              class="w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
+                              onClick={() => window.open(getAttachmentUrl(attachment.url), '_blank')}
+                              loading="lazy"
+                              style={{
+                                ...(attachment.width && attachment.height && {
+                                  'aspect-ratio': `${attachment.width} / ${attachment.height}`
+                                })
+                              }}
+                            />
+                          </Show>
+                          <Show when={isVideo}>
+                            <video 
+                              src={getAttachmentUrl(attachment.url)} 
+                              controls
+                              class="w-full h-auto"
+                              preload="metadata"
+                              style={{
+                                ...(attachment.width && attachment.height && {
+                                  'aspect-ratio': `${attachment.width} / ${attachment.height}`
+                                })
+                              }}
+                            >
+                              Your browser does not support the video tag.
+                            </video>
+                          </Show>
+                          <Show when={isAudio}>
+                             <AudioPlayer 
+                               src={getAttachmentUrl(attachment.url)}
+                               name={attachment.name}
+                               size={attachment.size}
+                             />
+                           </Show>
+                          <Show when={!isAudio}>
+                            <div class="p-3 bg-surface bg-opacity-20">
+                              <div class="flex items-center justify-between">
+                                <div class="flex items-center gap-2 min-w-0">
+                                  <Show when={!isImage && !isVideo && !isAudio}>
+                                    <svg class="w-5 h-5 text-text-secondary flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
+                                      <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z" clip-rule="evenodd" />
+                                    </svg>
+                                  </Show>
+                                  <div class="min-w-0">
+                                    <div class="text-sm font-medium text-text-primary truncate">{attachment.name}</div>
+                                    <div class="text-xs text-text-secondary">
+                                      {(attachment.size / 1024 / 1024).toFixed(2)} MB
+                                      <Show when={attachment.width && attachment.height}>
+                                        <span class="ml-1">• {attachment.width}×{attachment.height}</span>
+                                      </Show>
+                                    </div>
+                                  </div>
+                                </div>
+                                <button 
+                                  onClick={() => handleDownload(attachment)}
+                                  class="flex-shrink-0 p-1 hover:bg-surface hover:bg-opacity-30 rounded transition-colors focus:outline-none"
+                                  title="Download"
+                                >
+                                  <svg class="w-4 h-4 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                                  </svg>
+                                </button>
+                              </div>
+                            </div>
+                          </Show>
+                        </div>
+                      );
+                    }}
+                  </For>
+                </div>
+              </Show>
             </Show>
             <Show when={isEditing()}>
               <div class="bg-background border border-border rounded-md p-3 mt-1">
@@ -798,6 +988,35 @@ const Message: Component<MessageProps> = (props) => {
           isDanger={true}
         />
       </Portal>
+      
+      {/* Emoji Details Popup */}
+      <Show when={showEmojiDetails() && selectedEmoji()}>
+        <Portal>
+          <div class="fixed inset-0 z-40" onClick={closeEmojiDetails}>
+            <div 
+              class="absolute bg-background border border-border rounded-lg p-3 shadow-lg z-50 w-[250px]"
+              style={{
+                left: `${popupPosition().x}px`,
+                top: `${popupPosition().y}px`,
+                transform: 'translate(0, -50%)'
+              }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div class="flex items-center gap-3">
+                <img 
+                  src={`${FS_URL}/twemoji/${selectedEmoji()?.emoji.code}.svg`} 
+                  alt={selectedEmoji()?.emoji.name} 
+                  class="w-10 h-10 flex-shrink-0"
+                />
+                <div class="min-w-0">
+                  <div class="text-sm font-medium text-text-primary truncate">:{selectedEmoji()?.shortcode}:</div>
+                  <div class="text-xs text-text-secondary">This is a default emoji, it can be used everywhere.</div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </Portal>
+      </Show>
     </>
   );
 };

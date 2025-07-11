@@ -1,5 +1,6 @@
 import { marked, Tokens } from 'marked';
 import { parseEmojis } from './emojiUtils';
+import { getEmojiByShortcode, getTwemojiUrl } from '../data/twemojiData';
 import DOMPurify from 'isomorphic-dompurify';
 import hljs from 'highlight.js';
 import { initializeCodeBlockCopyButtons, initializeCodeBlockHoverEffects } from './codeBlockUtils';
@@ -109,7 +110,7 @@ marked.use({ renderer });
 const processUnderlines = (text: string): string => {
   // Replace __text__ with <span class="markdown-underline">text</span>
   // But be careful not to match already escaped underscores like \__text\__
-  // Using a safer regex approach that works in all browsers
+  // Since we now use {{EMOJI:shortcode}} format, no need to worry about emoji conflicts
   return text.replace(/(?<![\\])__([^_]+?)(?<![\\])__/g, '<span class="markdown-underline">$1</span>');
 };
 
@@ -128,29 +129,41 @@ const escapeHtml = (text: string): string => {
 };
 
 /**
- * Process emojis in text and wrap them in appropriate spans for styling
+ * Process emojis in text and replace shortcodes with Twemoji images
  * @param text The text to process
- * @returns Text with emojis wrapped in spans
+ * @returns Text with emoji shortcodes replaced with Twemoji images
  */
 const processEmojisForMarkdown = (text: string): string => {
-  // First convert emoji shortcodes to Unicode
-  const textWithEmojis = parseEmojis(text);
+  // Track emoji shortcodes for emoji-only detection
+  const shortcodeMatches: string[] = [];
   
-  // Regular expression to match emoji characters
-  // Using a more compatible regex pattern
-  const emojiRegex = /(\u00a9|\u00ae|[\u2000-\u3300]|\ud83c[\ud000-\udfff]|\ud83d[\ud000-\udfff]|\ud83e[\ud000-\udfff])/g;
-  
-  // Check if the text contains only emojis (for large emoji display)
-  const trimmedText = textWithEmojis.trim();
-  const matches = trimmedText.match(emojiRegex) || [];
-  const isEmojiOnly = matches.length > 0 && 
-    matches.join('').length === trimmedText.length;
-  
-  // Replace emojis with spans that have appropriate classes
-  return textWithEmojis.replace(emojiRegex, (match) => {
-    const sizeClass = isEmojiOnly && matches.length <= 3 ? 'text-3xl' : '';
-    return `<span class="inline-block ${sizeClass}">${match}</span>`;
+  // Use a unique placeholder that won't conflict with markdown syntax
+  // Using {{EMOJI:shortcode}} format to avoid any underscore conflicts
+  let processedText = text.replace(/:(\w+):/g, (match, shortcode) => {
+    const emoji = getEmojiByShortcode(shortcode);
+    if (emoji) {
+      shortcodeMatches.push(shortcode);
+      return `{{EMOJI:${shortcode}}}`;
+    }
+    return match;
   });
+  
+  // Check if the text contains only emoji shortcodes (for large emoji display)
+  const trimmedText = processedText.trim();
+  const emojiOnlyRegex = /^(\{\{EMOJI:\w+\}\}\s*)+$/;
+  const isEmojiOnly = emojiOnlyRegex.test(trimmedText) && shortcodeMatches.length > 0;
+  
+  // Replace emoji placeholders with actual Twemoji images
+  processedText = processedText.replace(/\{\{EMOJI:(\w+)\}\}/g, (match, shortcode) => {
+    const emoji = getEmojiByShortcode(shortcode);
+    if (emoji) {
+      const sizeClass = isEmojiOnly && shortcodeMatches.length <= 3 ? 'w-12 h-12' : 'w-5 h-5';
+      return `<img src="${getTwemojiUrl(emoji.code)}" alt="${emoji.name}" class="inline-emoji ${sizeClass} cursor-pointer" style="vertical-align: -0.1em; display: inline-block;" loading="lazy" data-emoji-shortcode="${shortcode}" data-emoji-name="${emoji.name}" data-emoji-code="${emoji.code}" />`;
+    }
+    return match;
+  });
+  
+  return processedText;
 };
 
 /**
@@ -164,11 +177,11 @@ export const parseMarkdown = (text: string): string => {
   // Escape HTML tags first to display them as plain text
   let processedText = escapeHtml(text);
   
-  // Process Discord-style underlines
-  processedText = processUnderlines(processedText);
-  
-  // Process emojis next
+  // Process emojis first to avoid interference with underline processing
   processedText = processEmojisForMarkdown(processedText);
+  
+  // Process Discord-style underlines after emojis
+  processedText = processUnderlines(processedText);
   
   // Preserve original line breaks and spacing
   // First, handle headings specially - don't add line break markers to heading lines
@@ -200,7 +213,7 @@ export const parseMarkdown = (text: string): string => {
     ],
     ALLOWED_ATTR: [
       'href', 'target', 'rel', 'class', 'title', 'src', 'alt',
-      'aria-label', 'data-language'
+      'aria-label', 'data-language', 'style', 'loading', 'data-emoji-shortcode', 'data-emoji-name', 'data-emoji-code'
     ],
     ALLOW_DATA_ATTR: true
   });

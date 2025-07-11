@@ -619,6 +619,10 @@ class WebSocketWorkerHandler {
             "[WebSocketWorker] Normalized presence update:",
             presenceUpdate
           );
+          console.log(
+            "[WebSocketWorker] Broadcasting presence update with type dispatch and payload:",
+            presenceUpdate
+          );
 
           this.broadcast({
             type: "dispatch",

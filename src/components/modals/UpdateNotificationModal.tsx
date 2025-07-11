@@ -49,7 +49,7 @@ const UpdateNotificationModal: Component<UpdateNotificationModalProps> = (props)
           </div>
           <div>
             <h2 class="text-xl font-semibold text-text-primary">
-              New Update Available!
+              New Update!
             </h2>
             <p class="text-sm text-text-secondary">
               Commit {props.updateInfo?.version}
