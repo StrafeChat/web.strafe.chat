@@ -1,8 +1,10 @@
-import { Component, createSignal, createEffect, Show, Switch, Match } from "solid-js";
+import { Component, createEffect, Switch, Match } from "solid-js";
 import { RoomWithRecipients } from "../../types/rooms";
+import { useVoice, VoiceState } from "../../lib/providers/voice/VoiceProvider";
+import { VoiceControls } from "./VoiceControls";
+import { CallArea } from "./CallArea";
+import { useCache } from "../../lib/providers/cache/CacheProvider";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
-import { Room } from 'livekit-client';
-import { LIVEKIT_URL } from "../../constants";
 
 type PMCallProps = {
 	room: RoomWithRecipients
@@ -13,43 +15,35 @@ export const PMCall: Component<PMCallProps> = (props: PMCallProps) => {
 
 	const r = props.room;
 
-	const [connected, setConnected] = createSignal(0);
+	const { state } = useVoice();
+	const { getUser } = useCache();
+	const { user } = useAuth();
 
 	createEffect(() => {
-		const { getJoinToken } = useAuth();
-		setConnected(1);
-		getJoinToken(r.id).then(token => startCall(token));
+		const { connect } = useVoice();
+		connect(r.id);
+		
 	});
 
-	const startCall = async function(token: string): Promise<void> {
-		try {
-			const room = new Room();
-			await room.connect(LIVEKIT_URL, token);
-
-			console.log('connected to room', room.name);
-
-			setConnected(2);
-		} catch(e) {
-			console.error(e);
-			setConnected(0);
-		}
-	}
-
 	return (
-		<div>
-			<h1>{props.room.id}</h1>
+		<div style="padding: 0.5rem;">
+			<h1>{getUser(r.recipients[(r.recipients[0] != user()!.id) ? 0 : 1])?.username}</h1>
 
 			<Switch>
-				<Match when={connected() === 1}>
+				<Match when={state() === VoiceState.CONNECTING}>
 					<p>Connecting...</p>
 				</Match>
-				<Match when={connected() === 2}>
+				<Match when={state() === VoiceState.CONNECTED}>
 					<p>Connection established</p>
 				</Match>
-				<Match when={connected() === 0}>
+				<Match when={state() === VoiceState.ERROR}>
 					<p>Error.</p>
 				</Match>
 			</Switch>
+
+			<CallArea></CallArea>
+
+			<VoiceControls></VoiceControls>
 		</div>
 	)
 }

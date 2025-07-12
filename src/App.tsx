@@ -23,6 +23,7 @@ import { useUpdateNotification } from "./lib/hooks/useUpdateNotification";
 import { useAuth } from "./lib/providers/auth/AuthProvider";
 // Import test utilities for development
 import "./lib/utils/updateTestUtils";
+import { VoiceProvider } from "./lib/providers/voice/VoiceProvider";
 
 const UpdateNotificationWrapper = () => {
   const { isAuthenticated } = useAuth();
@@ -74,15 +75,17 @@ const MountApp = (props: ParentProps) => {
             <CacheProvider>
               <UserSettingsProvider>
                 <AuthProvider>
-                  <MobileNavProvider>
-                    <SettingsProvider>
-                      <ModalProvider>
-                        <LinkConfirmationHandler />
-                        <UpdateNotificationWrapper />
-                        <div class="h-[100dvh] w-full overflow-hidden">{props.children}</div>
-                      </ModalProvider>
-                    </SettingsProvider>
-                  </MobileNavProvider>
+									<VoiceProvider>
+										<MobileNavProvider>
+											<SettingsProvider>
+												<ModalProvider>
+													<LinkConfirmationHandler />
+													<UpdateNotificationWrapper />
+													<div class="h-[100dvh] w-full overflow-hidden">{props.children}</div>
+												</ModalProvider>
+											</SettingsProvider>
+										</MobileNavProvider>
+									</VoiceProvider>
                 </AuthProvider>
               </UserSettingsProvider>
             </CacheProvider>
