@@ -97,7 +97,7 @@ const Friends: Component = () => {
     <div class="h-full w-full bg-background2 select-none">
       <div class="flex flex-col h-full">
         {/*_ Header_ */}
-        <div class="p-2 flex flex-col [box-shadow:0_2px_4px_-2px_rgba(0,0,0,0.2)]">
+        <div class="p-2 flex flex-col border-b border-surface border-opacity-20">
           <div class="flex items-center gap-4">
             <h2 class="text-xl px-3 py-2 font-semibold text-text-primary select-none flex items-center gap-2">
               <svg

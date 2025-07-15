@@ -376,7 +376,7 @@ const RoomView: Component = () => {
   return (
     <div class="h-full w-full flex flex-col bg-background2">
       {/* Header with consistent styling */}
-      <div class="px-4 flex items-center justify-between h-[60px] bg-background2 relative z-10 [box-shadow:0_2px_4px_-2px_rgba(0,0,0,0.2)]">
+      <div class="px-4 flex items-center justify-between h-[61px] bg-background2 relative z-10 border-b border-surface border-opacity-20">
         <div class="flex items-center gap-2">
           <div class="relative flex-shrink-0 flex items-center">
             <div class="w-8 h-8 rounded-full overflow-hidden">

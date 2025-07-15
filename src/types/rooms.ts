@@ -11,6 +11,9 @@ export interface Room {
   icon?: string;
   created_at: string;
   updated_at?: string;
+  space_id?: string;
+  parent_id?: string;
+  position?: number;
 }
 
 export type RoomWithRecipients = {
@@ -26,6 +29,9 @@ export type RoomWithRecipients = {
   updated_at: string | null;
   recipients_data: any[];
   unread_count?: number;
+  space_id?: string;
+  parent_id?: string;
+  position?: number;
 };
 
 export { RoomType };

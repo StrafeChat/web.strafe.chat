@@ -17,7 +17,21 @@ export const Interface = (props: { children: JSX.Element }) => {
   const [showSettings, setShowSettings] = createSignal(false)
   const [, setIsSidebarVisible] = createSignal(true);
 
-  const showRoomsList = () => location.pathname.startsWith("/spaces");
+  const showRoomsList = () => {
+    // Only show RoomsList on general spaces list page, not individual space pages
+    return location.pathname === "/spaces";
+  };
+
+  const showPMList = () => {
+    // Show PMList on home, friends, and other non-space pages
+    return !location.pathname.startsWith("/spaces");
+  };
+
+  const showSidebar = () => {
+    // Show sidebar content except on individual space pages where SpaceView handles it
+    // Also hide for space room routes where SpaceRoomView handles it
+    return !location.pathname.match(/\/spaces\/[^/]+(\/.*)?$/);
+  };
 
   const handleScroll = () => {
     const container = document.querySelector(".snap-x");
@@ -89,26 +103,20 @@ export const Interface = (props: { children: JSX.Element }) => {
            onTouchEnd={handleTouchEnd}>
         <div class={`flex md:flex-1 w-screen overflow-x-auto snap-x snap-mandatory scroll-smooth hide-scrollbar ${showBottomNav() ? 'pb-14' : ''} md:pb-0 h-full`}>
           {/* First snap point - Lists */}
-          <div class="flex w-[calc(92px+15rem)] md:w-auto flex-none snap-start">
+          <div class={`flex ${showSidebar() ? 'w-[calc(92px+15rem)]' : 'w-[72px]'} md:w-auto flex-none snap-start`}>
             <div class="w-[72px] h-full flex-none">
               <SpacesList />
             </div>
-            <div class="w-[260px] h-full flex-none">
-              {showRoomsList() ? <RoomsList /> : <PMList />}
-            </div>
+            {showSidebar() && (
+              <div class="w-[260px] h-full flex-none">
+                {showRoomsList() ? <RoomsList /> : showPMList() ? <PMList /> : null}
+              </div>
+            )}
           </div>
 
           {/* Second snap point - Content */}
           <div class="w-screen md:flex-1 flex-none snap-start">
-            <div class="w-full h-full flex">
-              <div class="flex-1 h-full w-full">{props.children}</div>
-              {/* Members List (desktop only) */}
-              {location.pathname.startsWith("/spaces") && (
-                <div class="w-64 h-full flex-none hidden md:block">
-                  {/* Add your MembersList component here */}
-                </div>
-              )}
-            </div>
+            <div class="w-full h-full">{props.children}</div>
           </div>
         </div>
 

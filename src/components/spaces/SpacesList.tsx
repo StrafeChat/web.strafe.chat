@@ -1,17 +1,28 @@
-import { Component, createMemo, Show, For } from "solid-js";
+import { Component, createMemo, Show, For, createSignal } from "solid-js";
 import { useNavigate } from "@solidjs/router";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
+// import { useCache } from "../../lib/providers/cache/CacheProvider";
 import { useMobileNav } from "../../lib/providers/mobile/MobileNavProvider";
 import { Tooltip } from "../common/Tooltip";
 import { FS_URL } from "../../constants";
 import { RoomType } from "../../types/roomTypes";
 import Plus from "../shared/icons/Plus";
 import DefaultGroupPM from "../shared/icons/DefaultGroupPM";
+import { CreateSpaceModal } from "../modals/CreateSpaceModal";
 
 const SpacesList: Component = () => {
   const navigate = useNavigate();
-  const { relationshipRequests, user, rooms, isMobile } = useAuth();
+  const { relationshipRequests, user, rooms, isMobile, spaces } = useAuth();
   const { setCurrentView } = useMobileNav();
+  // const cache = useCache();
+  const [showCreateModal, setShowCreateModal] = createSignal(false);
+
+  // Get user's spaces from auth provider signal
+  const userSpaces = createMemo(() => {
+    const spaceData = spaces();
+    console.log('[SpacesList] Spaces from auth signal:', spaceData);
+    return spaceData;
+  });
 
   const unreadCount = createMemo(() => {
     const currentUser = user();
@@ -152,8 +163,48 @@ const SpacesList: Component = () => {
       {/* Separator */}
       <div class="w-8 h-0.5 rounded-full bg-border" />
 
-      {/* Flex spacer to push buttons to bottom */}
-      <div class="flex-1" />
+      {/* Spaces List */}
+      <div class="flex flex-col gap-2 flex-1 overflow-y-auto">
+        <For each={userSpaces()}>
+          {(space) => (
+            <Tooltip content={space.name} position="right">
+              <button
+                class="w-12 h-12 rounded-full bg-surface hover:bg-accent transition-all relative overflow-hidden group"
+                onClick={() => {
+                  navigate(`/spaces/${space.id}`);
+                  if (isMobile()) {
+                    setCurrentView("content");
+                  }
+                }}
+              >
+                <Show
+                  when={space.icon}
+                  fallback={
+                    <div class="w-full h-full bg-surface bg-opacity-20 text-text-primary flex items-center justify-center text-lg font-semibold">
+                      {space.name_acronym}
+                    </div>
+                  }
+                >
+                  <img
+                    src={`${FS_URL}/icons/${space.id}/${space.icon}`}
+                    alt={space.name}
+                    class="w-full h-full object-cover"
+                    draggable="false"
+                    onError={(e) => {
+                      // Replace failed space icon with acronym
+                      const target = e.target as HTMLImageElement;
+                      const container = target.parentElement;
+                      if (container) {
+                        container.innerHTML = `<div class="w-full h-full bg-surface bg-opacity-20 text-text-primary flex items-center justify-center text-lg font-semibold">${space.name_acronym}</div>`;
+                      }
+                    }}
+                  />
+                </Show>
+              </button>
+            </Tooltip>
+          )}
+        </For>
+      </div>
 
       {/* Separator */}
       <div class="w-8 h-0.5 rounded-full bg-border" />
@@ -161,7 +212,10 @@ const SpacesList: Component = () => {
       {/* Bottom buttons container */}
       <div class="flex flex-col gap-2">
         <Tooltip content={"Add a Space"} position="right">
-          <button class="w-12 h-12 rounded-full bg-surface hover:bg-accent transition-all">
+          <button 
+            class="w-12 h-12 rounded-full bg-surface hover:bg-accent transition-all"
+            onClick={() => setShowCreateModal(true)}
+          >
             <Plus />
           </button>
         </Tooltip>
@@ -182,6 +236,12 @@ const SpacesList: Component = () => {
           </button>
         </Tooltip>
       </div>
+
+      {/* Create Space Modal */}
+      <CreateSpaceModal
+        isOpen={showCreateModal()}
+        onClose={() => setShowCreateModal(false)}
+      />
     </div>
   );
 };

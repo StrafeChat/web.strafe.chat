@@ -9,7 +9,7 @@ import en from "./locales/list/en-us.json";
 import es from "./locales/list/es-es.json";
 import fr from "./locales/list/fr-fr.json";
 import ar from "./locales/list/ar-sa.json";
-import { ParentProps, createEffect, lazy, Show } from "solid-js";
+import { ParentProps, createEffect, Show } from "solid-js";
 import { Interface } from "./components/shared/Interface";
 import { getDirection } from "./lib/utils/direction";
 import { applyCustomStyles } from "./lib/utils/customStyles";
@@ -23,6 +23,19 @@ import { useUpdateNotification } from "./lib/hooks/useUpdateNotification";
 import { useAuth } from "./lib/providers/auth/AuthProvider";
 // Import test utilities for development
 import "./lib/utils/updateTestUtils";
+import EmailVerify from "./components/auth/EmailVerify";
+import Login from "./components/auth/Login";
+import PasswordReset from "./components/auth/PasswordReset";
+import PasswordResetComplete from "./components/auth/PasswordResetComplete";
+import PasswordResetVerify from "./components/auth/PasswordResetVerify";
+import Register from "./components/auth/Register";
+import RoomView from "./components/chat/RoomView";
+import Home from "./components/home/Home";
+import Friends from "./components/home/friends/Friends";
+import Notes from "./components/home/notes/Notes";
+import { SpaceRoomView } from "./components/spaces/SpaceRoomView";
+import SpaceView from "./components/spaces/SpaceView";
+import InviteHandler from "./components/invite/InviteHandler";
 
 const UpdateNotificationWrapper = () => {
   const { isAuthenticated } = useAuth();
@@ -98,17 +111,20 @@ const App = () => {
   return (
     <MountApp>
       <Router>
-        <Route path="/login" component={lazy(() => import('./components/auth/Login'))} />
-        <Route path="/register" component={lazy(() => import('./components/auth/Register'))} />
-        <Route path="/verify-email" component={lazy(() => import('./components/auth/EmailVerify'))} />
-        <Route path="/password-reset" component={lazy(() => import('./components/auth/PasswordReset'))} />
-        <Route path="/password-reset/verify" component={lazy(() => import('./components/auth/PasswordResetVerify'))} />
-        <Route path="/password-reset/complete" component={lazy(() => import('./components/auth/PasswordResetComplete'))} />
+        <Route path="/login" component={Login} />
+        <Route path="/register" component={Register} />
+        <Route path="/verify-email" component={EmailVerify} />
+        <Route path="/password-reset" component={PasswordReset} />
+        <Route path="/password-reset/verify" component={PasswordResetVerify} />
+        <Route path="/password-reset/complete" component={PasswordResetComplete} />
+        <Route path="/invite/:code" component={InviteHandler} />
         <Route path="/" component={Interface as never}>
-          <Route path="/" component={lazy(() => import('./components/home/Home'))} />
-          <Route path="/friends" component={lazy(() => import('./components/home/friends/Friends'))} />
-          <Route path="/notes" component={lazy(() => import('./components/home/notes/Notes'))} />
-          <Route path="/rooms/:roomId" component={lazy(() => import('./components/chat/RoomView'))} />
+          <Route path="/" component={Home} />
+          <Route path="/friends" component={Friends} />
+          <Route path="/notes" component={Notes} />
+          <Route path="/rooms/:roomId" component={RoomView} />
+          <Route path="/spaces/:spaceId" component={SpaceView} />
+          <Route path="/spaces/:spaceId/rooms/:roomId" component={SpaceRoomView} />
         </Route>
       </Router>
     </MountApp>

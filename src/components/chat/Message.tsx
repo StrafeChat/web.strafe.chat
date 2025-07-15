@@ -1,4 +1,4 @@
-import { Component, createMemo, Show, createSignal, onCleanup, createEffect, For } from "solid-js";
+import { Component, createMemo, Show, createSignal, onCleanup, createEffect, For, createResource } from "solid-js";
 import { useCache } from "../../lib/providers/cache/CacheProvider";
 import { useTransContext } from "@mbarzda/solid-i18next";
 import { Tooltip } from "../common/Tooltip";
@@ -13,9 +13,27 @@ import { MessageType, SystemMessageType, MessageAttachment } from "../../types/m
 import { Avatar } from "../common/Avatar";
 import { FS_URL } from '../../constants';
 import AudioPlayer from '../ui/AudioPlayer';
+import { api } from "../../lib/api";
+
+interface InviteInfo {
+  space_id: number;
+  space_name: string;
+  space_icon?: string;
+  space_banner?: string;
+  space_name_acronym?: string;
+  inviter_id: string;
+  inviter_username: string;
+  inviter_display_name?: string;
+  inviter_avatar?: string;
+  member_count: number;
+  expires_at?: string;
+  max_uses?: number;
+  uses: number;
+  code: string;
+}
 
 interface MessageProps {
-  id: string | undefined;
+  id?: string;
   content: string;
   author_id: string;
   created_at: string | undefined;
@@ -36,11 +54,44 @@ interface MessageProps {
   attachments?: MessageAttachment[];
 }
 
-const Message: Component<MessageProps> = (props) => {
+export const Message: Component<MessageProps> = (props) => {
   const shouldShowCompact = props.isCompact && !props.message_references?.length;
   const cache = useCache();
   const { user, rooms, deleteMessage, editMessage, isMobile } = useAuth();
   const [t] = useTransContext();
+  
+  // Invite embed detection and fetching
+  const [inviteCodes] = createResource(() => {
+    // Make sure we're reactive to content changes
+    const content = props.content;
+    const matches = content.match(/\/invite\/(\w+)/g);
+    return matches ? matches.map(m => m.split('/').pop()).filter(Boolean) : [];
+  });
+  
+  const [inviteInfos] = createResource(inviteCodes, async (codes): Promise<InviteInfo[]> => {
+    if (!codes || codes.length === 0) return [];
+    const infos: InviteInfo[] = [];
+    for (const code of codes) {
+      try {
+        if (!code) continue;
+        const info = await api.spaces.invites.getInfo(code) as InviteInfo;
+        infos.push(info);
+      } catch (e) {
+        console.warn('Failed to fetch invite info for code:', code);
+      }
+    }
+    return infos;
+  }, { initialValue: [] });
+  
+  // Users icon component for invite embeds
+  const Users = (props: any) => (
+    <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M16 21v-2a4 4 0 00-4-4H6a4 4 0 00-4 4v2"/>
+      <circle cx="9" cy="7" r="4"/>
+      <path d="M22 21v-2a4 4 0 00-3-3.87"/>
+      <path d="M16 3.13a4 4 0 010 7.75"/>
+    </svg>
+  );
   
   // Helper function to construct complete attachment URLs
   const getAttachmentUrl = (url: string) => {
@@ -934,6 +985,47 @@ const Message: Component<MessageProps> = (props) => {
                   </For>
                 </div>
               </Show>
+              
+              {/* Invite embeds */}
+              <Show when={Array.isArray(inviteInfos()) && inviteInfos()!.length > 0}>
+                <div class="mt-2 space-y-2">
+                  <For each={inviteInfos()}>
+                    {(info: InviteInfo) => (
+                      <div class="border border-border rounded-lg p-4 bg-surface bg-opacity-20 max-w-md">
+                        <div class="flex items-center justify-center gap-3">
+                          <Show when={info?.space_icon} fallback={
+                            <div class="w-12 h-12 rounded-lg bg-primary flex items-center justify-center text-text-primary font-bold text-lg">
+                              {info?.space_name_acronym || info?.space_name?.charAt(0).toUpperCase()}
+                            </div>
+                          }>
+                            <img 
+                              src={`${FS_URL}${info?.space_icon}`} 
+                              alt={info?.space_name} 
+                              class="w-12 h-12 rounded-lg object-cover" 
+                            />
+                          </Show>
+                          <div class="flex-1 min-w-0">
+                            <h4 class="font-semibold text-text-primary truncate">{info?.space_name}</h4>
+                            <p class="text-sm text-text-secondary truncate">
+                              Invited by {info?.inviter_display_name || info?.inviter_username}
+                            </p>
+                            <p class="text-sm text-text-secondary flex items-center gap-1">
+                              <Users class="w-4 h-4" /> 
+                              {info?.member_count} member{info?.member_count !== 1 ? 's' : ''}
+                            </p>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => window.location.href = `/invite/${info?.code}`}
+                          class="mt-3 w-full bg-primary text-white py-2 px-4 rounded-md hover:bg-primary-dark transition-colors font-medium"
+                        >
+                          Join Space
+                        </button>
+                      </div>
+                    )}
+                  </For>
+                </div>
+              </Show>
             </Show>
             <Show when={isEditing()}>
               <div class="bg-background border border-border rounded-md p-3 mt-1">
@@ -1017,6 +1109,7 @@ const Message: Component<MessageProps> = (props) => {
           </div>
         </Portal>
       </Show>
+    
     </>
   );
 };

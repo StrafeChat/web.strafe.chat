@@ -675,8 +675,11 @@ const ChatArea: Component = () => {
         const cacheHasReachedEnd = cache.hasReachedEnd(roomId);
         setHasReachedEnd(cacheHasReachedEnd);
         
+        // Ensure scroll to bottom happens after DOM updates and invite embeds load
         requestAnimationFrame(() => {
-          scrollToBottom();
+          requestAnimationFrame(() => {
+            scrollToBottom();
+          });
         });
       } else {
         // Check if we've already fetched this room before (even if it was empty)
@@ -706,7 +709,7 @@ const ChatArea: Component = () => {
   createEffect(() => {
     // This will trigger whenever displayMessages() changes
     // Only auto-scroll if we're near the bottom and not editing a message
-    const msgs = displayMessages(); // Track displayMessages changes
+    // const msgs = displayMessages(); // Track displayMessages changes
     if (shouldScrollToBottom() && chatContainerRef && !editingMessageId()) {
       requestAnimationFrame(() => {
         if (chatContainerRef) {
@@ -1083,6 +1086,11 @@ const ChatArea: Component = () => {
     requestAnimationFrame(() => {
       requestAnimationFrame(scrollToBottomImmediate);
     });
+    
+    // Additional scroll after a short delay to account for invite embeds loading
+    setTimeout(() => {
+      scrollToBottomImmediate();
+    }, 100);
   };
 
   // Ultra-smooth scroll handling with minimal triggers
@@ -1443,26 +1451,26 @@ const ChatArea: Component = () => {
       // Clear unread messages for this room when user sends a message
       // This is the user interaction that should clear the unread state
       
-      // Create temporary message for optimistic UI update (don't add to cache yet)
-      const tempMessage = {
-        id: undefined,
-        content,
-        author_id: currentUser.id,
-        created_at: new Date().toISOString(),
-        nonce,
-        pending: true,
-        room_id: room.id,
-        attachments: currentAttachments.map(a => ({
-          id: a.id,
-          name: a.name,
-          type: a.type,
-          size: a.size,
-          url: a.url,
-          height: a.height,
-          width: a.width,
-          user_id: a.user_id
-        }))
-      };
+      // // Create temporary message for optimistic UI update (don't add to cache yet)
+      // const tempMessage = {
+      //   id: undefined,
+      //   content,
+      //   author_id: currentUser.id,
+      //   created_at: new Date().toISOString(),
+      //   nonce,
+      //   pending: true,
+      //   room_id: room.id,
+      //   attachments: currentAttachments.map(a => ({
+      //     id: a.id,
+      //     name: a.name,
+      //     type: a.type,
+      //     size: a.size,
+      //     url: a.url,
+      //     height: a.height,
+      //     width: a.width,
+      //     user_id: a.user_id
+      //   }))
+      // };
     
       // Add to pending messages for immediate UI feedback
       // setPendingMessages(prev => [...prev, tempMessage]);

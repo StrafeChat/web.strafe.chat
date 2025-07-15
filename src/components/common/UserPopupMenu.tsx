@@ -11,6 +11,9 @@ import { StatusIndicator } from "./StatusIndicator";
 import { Avatar } from "./Avatar";
 import { Portal } from "solid-js/web";
 import { useCache } from "../../lib/providers/cache/CacheProvider";
+import { useAuth } from "../../lib/providers/auth/AuthProvider";
+import RoleManagementModal from "../modals/RoleManagementModal";
+import { SpaceMember } from "../../lib/cache/SpaceCache";
 
 
 
@@ -20,17 +23,55 @@ interface UserPopupMenuProps {
   triggerRef?: HTMLElement;
   userId: string;
   placement?: "left" | "right";
+  spaceId?: string; // Optional space context for role management
+  spaceMember?: SpaceMember; // Space member data if in space context
 }
 
 const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
   const cache = useCache();
+  const { user: currentUser } = useAuth();
   const [user, setUser] = createSignal<any>(null);
+  const [showRoleModal, setShowRoleModal] = createSignal(false);
   let popupRef: HTMLDivElement | undefined;
 
   // Fetch user info from cache whenever props.userId changes
   createEffect(() => {
     setUser(cache.getUser(props.userId));
   });
+
+  // Check if current user can manage roles in this space
+  const canManageRoles = () => {
+    if (!props.spaceId || !props.spaceMember || !currentUser()) return false;
+    
+    const currentSpace = cache.getSpace(props.spaceId);
+    if (!currentSpace) return false;
+    
+    // Space owner can always manage roles
+    if (currentSpace.owner_id === currentUser()?.id) return true;
+    
+    // Don't allow managing own roles
+    if (props.userId === currentUser()?.id) return false;
+    
+    // TODO: Check for MANAGE_ROLES permission
+    // For now, only allow space owners
+    return false;
+  };
+
+  const [modalSpaceMember, setModalSpaceMember] = createSignal<any | null>(null);
+
+  const handleManageRoles = (e: MouseEvent) => {
+    e.stopPropagation();
+    console.log('[UserPopupMenu] handleManageRoles called');
+    console.log('[UserPopupMenu] props.spaceMember:', props.spaceMember);
+    console.log('[UserPopupMenu] canManageRoles():', canManageRoles());
+    
+    if (canManageRoles() && props.spaceMember) {
+      // Store the spaceMember data before opening the modal
+      setModalSpaceMember(props.spaceMember);
+      setShowRoleModal(true);
+      console.log('[UserPopupMenu] Modal opened with member:', props.spaceMember);
+    }
+  };
 
   // Handle clicking outside to close
   const handleClickOutside = (e: MouseEvent) => {
@@ -180,10 +221,33 @@ const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
                   </div>
                 </div>
               </Show>
+
+              {/* Actions Section */}
+              <Show when={props.spaceId && canManageRoles()}>
+                <div class="w-full pt-4 border-t border-surface border-opacity-20">
+                  <button
+                    onClick={handleManageRoles}
+                    class="w-full px-3 py-2 bg-primary hover:bg-primary-hover text-white rounded-md transition-colors text-sm font-medium"
+                  >
+                    Manage Roles
+                  </button>
+                </div>
+              </Show>
             </div>
           </div>
         </Portal>
       </Show>
+      
+      {/* Role Management Modal */}
+      <RoleManagementModal
+        isOpen={showRoleModal()}
+        onClose={() => {
+          setShowRoleModal(false);
+          setModalSpaceMember(null);
+        }}
+        member={modalSpaceMember()}
+        spaceId={props.spaceId || ""}
+      />
     </div>
   );
 };

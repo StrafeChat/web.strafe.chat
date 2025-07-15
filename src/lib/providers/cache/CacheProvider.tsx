@@ -6,6 +6,7 @@ import {
   createEffect,
 } from "solid-js";
 import { MessageCache, CachedMessage } from "../../cache/MessageCache";
+import { SpaceCache, Space, SpaceMember, SpaceRole } from "../../cache/SpaceCache";
 
 export type Presence = {
   status: string;
@@ -52,25 +53,49 @@ type CacheContextType = {
   setHasReachedEnd: (roomId: string, reached: boolean) => void;
   resetReachedFlags: (roomId: string) => void;
   getLastFetchTime: (roomId: string) => number | undefined;
+  // Space management
+  spaces: () => Space[];
+  getSpace: (spaceId: string) => Space | undefined;
+  setSpace: (space: Space) => void;
+  getUserSpaces: (userId: string) => Space[];
+  getSpaceMembers: (spaceId: string) => SpaceMember[];
+  getSpaceMember: (spaceId: string, userId: string) => SpaceMember | undefined;
+  setSpaceMember: (spaceMember: SpaceMember) => void;
+  removeSpaceMember: (spaceId: string, userId: string) => void;
+  deleteSpace: (spaceId: string) => void;
+  // Space members cache
+  getCachedSpaceMembers: (spaceId: string) => SpaceMember[] | null;
+  setCachedSpaceMembers: (spaceId: string, members: SpaceMember[]) => void;
+  updateCachedSpaceMember: (spaceId: string, member: SpaceMember) => void;
+  // Space roles
+  getSpaceRoles: (spaceId: string) => SpaceRole[];
+  getSpaceRole: (spaceId: string, roleId: string) => SpaceRole | undefined;
+  setSpaceRole: (spaceId: string, role: SpaceRole) => void;
+  getCachedSpaceRoles: (spaceId: string) => SpaceRole[] | null;
+  setCachedSpaceRoles: (spaceId: string, roles: SpaceRole[]) => void;
 };
 
 const CacheContext = createContext<CacheContextType>();
 const messageCache = new MessageCache();
+const spaceCache = new SpaceCache();
 
-// Make messageCache globally accessible for WebSocketClient
+// Make caches globally accessible for WebSocketClient
 declare global {
   interface Window {
     messageCache: MessageCache;
+    spaceCache: SpaceCache;
   }
 }
 
-// Expose messageCache globally
+// Expose caches globally
 window.messageCache = messageCache;
+window.spaceCache = spaceCache;
 
 export const CacheProvider: ParentComponent = (props) => {
   const [users, setUsers] = createSignal<Record<string, User>>({});
+  const [spaces, setSpaces] = createSignal<Space[]>([]);
 
-  // Listen for user updates and message events
+  // Listen for user updates, message events, and space events
   createEffect(() => {
     const handleUserUpdate = (event: CustomEvent) => {
       const userData = event.detail;
@@ -95,14 +120,96 @@ export const CacheProvider: ParentComponent = (props) => {
       }
     };
 
+    const handleSpaceCreate = (event: CustomEvent) => {
+      const space = event.detail;
+      if (space && space.id) {
+        console.log("[CacheProvider] Adding space to cache:", space);
+        spaceCache.setSpace(space);
+        setSpaces(spaceCache.getAllSpaces());
+      }
+    };
+
+    const handleSpaceUpdate = (event: CustomEvent) => {
+      const space = event.detail;
+      if (space && space.id) {
+        console.log("[CacheProvider] Updating space in cache:", space);
+        spaceCache.setSpace(space);
+        setSpaces(spaceCache.getAllSpaces());
+      }
+    };
+
+    const handleSpaceDelete = (event: CustomEvent) => {
+      const { spaceId } = event.detail;
+      if (spaceId) {
+        console.log("[CacheProvider] Deleting space from cache:", spaceId);
+        spaceCache.deleteSpace(spaceId);
+        setSpaces(spaceCache.getAllSpaces());
+      }
+    };
+
+    const handleSpaceMemberCreate = (event: CustomEvent) => {
+      const spaceMember = event.detail;
+      if (spaceMember && spaceMember.space_id && spaceMember.user_id) {
+        console.log("[CacheProvider] Adding space member to cache:", spaceMember);
+        spaceCache.setSpaceMember(spaceMember);
+        setSpaces(spaceCache.getAllSpaces());
+      }
+    };
+
+    const handleSpaceMembersCache = (event: CustomEvent) => {
+      const { spaceId, members } = event.detail;
+      if (spaceId && members && Array.isArray(members)) {
+        console.log(`[CacheProvider] Caching ${members.length} members for space ${spaceId}`);
+        spaceCache.setCachedSpaceMembers(spaceId, members);
+      }
+    };
+
+    const handleSpaceRolesCache = (event: CustomEvent) => {
+      const { spaceId, roles } = event.detail;
+      if (spaceId && roles && Array.isArray(roles)) {
+        console.log(`[CacheProvider] Caching ${roles.length} roles for space ${spaceId}`);
+        spaceCache.setCachedSpaceRoles(spaceId, roles);
+      }
+    };
+
+    const handleSpaceMemberRoleUpdate = (event: CustomEvent) => {
+      console.log(`[CacheProvider] Received spaceMemberRoleUpdate event:`, event.detail);
+      const { spaceId, member } = event.detail;
+      if (spaceId && member) {
+        console.log(`[CacheProvider] Member role updated for space ${spaceId}:`, member);
+        spaceCache.updateCachedSpaceMember(spaceId, member);
+        // Dispatch a general spaceMemberUpdate event to trigger UI reactivity
+        console.log(`[CacheProvider] Dispatching spaceMemberUpdate event for space ${spaceId}`);
+        window.dispatchEvent(new CustomEvent('spaceMemberUpdate', { 
+          detail: { spaceId, member }
+        }));
+      } else {
+        console.warn(`[CacheProvider] Invalid spaceMemberRoleUpdate event data:`, event.detail);
+      }
+    };
+
     window.addEventListener("userUpdate", handleUserUpdate as EventListener);
     window.addEventListener("messageCreate", handleMessageCreate as EventListener);
     window.addEventListener("messageDelete", handleMessageDelete as EventListener);
+    window.addEventListener("spaceCreate", handleSpaceCreate as EventListener);
+    window.addEventListener("spaceUpdate", handleSpaceUpdate as EventListener);
+    window.addEventListener("spaceDelete", handleSpaceDelete as EventListener);
+    window.addEventListener("spaceMemberCreate", handleSpaceMemberCreate as EventListener);
+    window.addEventListener("spaceMembersCache", handleSpaceMembersCache as EventListener);
+    window.addEventListener("spaceRolesCache", handleSpaceRolesCache as EventListener);
+    window.addEventListener("spaceMemberRoleUpdate", handleSpaceMemberRoleUpdate as EventListener);
 
     return () => {
       window.removeEventListener("userUpdate", handleUserUpdate as EventListener);
       window.removeEventListener("messageCreate", handleMessageCreate as EventListener);
       window.removeEventListener("messageDelete", handleMessageDelete as EventListener);
+      window.removeEventListener("spaceCreate", handleSpaceCreate as EventListener);
+      window.removeEventListener("spaceUpdate", handleSpaceUpdate as EventListener);
+      window.removeEventListener("spaceDelete", handleSpaceDelete as EventListener);
+      window.removeEventListener("spaceMemberCreate", handleSpaceMemberCreate as EventListener);
+      window.removeEventListener("spaceMembersCache", handleSpaceMembersCache as EventListener);
+      window.removeEventListener("spaceRolesCache", handleSpaceRolesCache as EventListener);
+      window.removeEventListener("spaceMemberRoleUpdate", handleSpaceMemberRoleUpdate as EventListener);
     };
   });
 
@@ -185,6 +292,38 @@ export const CacheProvider: ParentComponent = (props) => {
     setHasReachedEnd: (roomId: string, reached: boolean) => messageCache.setHasReachedEnd(roomId, reached),
     resetReachedFlags: (roomId: string) => messageCache.resetReachedFlags(roomId),
     getLastFetchTime: (roomId: string) => messageCache.getLastFetchTime(roomId),
+    // Space management
+    spaces,
+    getSpace: (spaceId: string) => spaceCache.getSpace(spaceId),
+    setSpace: (space: Space) => {
+      spaceCache.setSpace(space);
+      setSpaces(spaceCache.getAllSpaces());
+    },
+    getUserSpaces: (userId: string) => spaceCache.getUserSpaces(userId),
+    getSpaceMembers: (spaceId: string) => spaceCache.getSpaceMembers(spaceId),
+    getSpaceMember: (spaceId: string, userId: string) => spaceCache.getSpaceMember(spaceId, userId),
+    setSpaceMember: (spaceMember: SpaceMember) => {
+      spaceCache.setSpaceMember(spaceMember);
+      setSpaces(spaceCache.getAllSpaces());
+    },
+    removeSpaceMember: (spaceId: string, userId: string) => {
+      spaceCache.removeSpaceMember(spaceId, userId);
+      setSpaces(spaceCache.getAllSpaces());
+    },
+    deleteSpace: (spaceId: string) => {
+      spaceCache.deleteSpace(spaceId);
+      setSpaces(spaceCache.getAllSpaces());
+    },
+    // Space members cache
+    getCachedSpaceMembers: (spaceId: string) => spaceCache.getCachedSpaceMembers(spaceId),
+    setCachedSpaceMembers: (spaceId: string, members: SpaceMember[]) => spaceCache.setCachedSpaceMembers(spaceId, members),
+    updateCachedSpaceMember: (spaceId: string, member: SpaceMember) => spaceCache.updateCachedSpaceMember(spaceId, member),
+    // Space roles
+    getSpaceRoles: (spaceId: string) => spaceCache.getSpaceRoles(spaceId),
+    getSpaceRole: (spaceId: string, roleId: string) => spaceCache.getSpaceRole(spaceId, roleId),
+    setSpaceRole: (spaceId: string, role: SpaceRole) => spaceCache.setSpaceRole(spaceId, role),
+    getCachedSpaceRoles: (spaceId: string) => spaceCache.getCachedSpaceRoles(spaceId),
+    setCachedSpaceRoles: (spaceId: string, roles: SpaceRole[]) => spaceCache.setCachedSpaceRoles(spaceId, roles),
   };
 
   return (
@@ -201,3 +340,6 @@ export const useCache = () => {
   }
   return context;
 };
+
+export type { Space };
+

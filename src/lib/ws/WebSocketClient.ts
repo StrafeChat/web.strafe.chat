@@ -10,6 +10,7 @@ export type PayloadType =
   | "relationshipDelete"
   | "ROOM_CREATE"
   | "ROOM_UPDATE"
+  | "SPACE_CREATE"
   | "MESSAGE_CREATE"
   | "MESSAGE_DELETE"
   | "MESSAGE_EDIT"
@@ -33,7 +34,7 @@ export interface HeartbeatPayload extends BasePayload {
 
 export interface MessagePayload extends BasePayload {
   type: "MESSAGE";
-  channel_id: string;
+  room_id: string;
   content: string;
 }
 
@@ -46,6 +47,7 @@ export interface ReadyPayload extends BasePayload {
   presence?: any;
   users?: { [key: string]: any };
   rooms?: any[];
+  spaces?: any[];
   client_user?: any;
   relationship_requests?: any[];
   relationships?: string[];
@@ -122,6 +124,7 @@ const EVENT_TYPE_TO_OP_CODE: Record<string, string> = {
   PRESENCE_UPDATE: "PRESENCE_UPDATE",
   ROOM_CREATE: "ROOM_CREATE",
   ROOM_UPDATE: "ROOM_UPDATE",
+  SPACE_CREATE: "SPACE_CREATE",
   MESSAGE_CREATE: "MESSAGE_CREATE",
   MESSAGE_DELETE: "MESSAGE_DELETE",
   MESSAGE_EDIT: "MESSAGE_EDIT",
@@ -172,6 +175,7 @@ export class WebSocketClient {
     this.onMessage("ROOM_UPDATE", this.handleRoomUpdate.bind(this));
     this.onMessage("ROOM_MEMBER_ADD", this.handleRoomMemberAdd.bind(this));
     this.onMessage("ROOM_MEMBER_REMOVE", this.handleRoomMemberRemove.bind(this));
+    this.onMessage("SPACE_CREATE", this.handleSpaceCreate.bind(this));
     this.onMessage("TYPING_INDICATOR", this.handleTypingIndicator.bind(this));    console.log("[WebSocket] Message handlers set up:", [...this.messageHandlers.entries()]);
   }
 
@@ -539,6 +543,10 @@ export class WebSocketClient {
           else if (data.d && (data.d.type === "ROOM_MEMBER_REMOVE" || data.d.event_type === "ROOM_MEMBER_REMOVE") && data.d.data) {
             this.handleRoomMemberRemove(data.d);
           }
+          // Handle space creation events
+          else if (data.d && (data.d.type === "SPACE_CREATE" || data.d.event_type === "SPACE_CREATE") && data.d.data) {
+            this.handleSpaceCreate(data.d);
+          }
           // Handle room ownership transfer events
           else if (data.d && (data.d.type === "ROOM_OWNERSHIP_TRANSFER" || data.d.event_type === "ROOM_OWNERSHIP_TRANSFER") && data.d.data) {
             const roomOwnershipHandler = this.messageHandlers.get("ROOM_OWNERSHIP_TRANSFER");
@@ -554,6 +562,13 @@ export class WebSocketClient {
           // Handle typing indicator events
           else if (data.d && (data.d.type === "TYPING_INDICATOR" || data.d.event_type === "TYPING_INDICATOR") && data.d.data) {
             this.handleTypingIndicator(data.d.data);
+          }
+          // Handle space member role update events
+          else if (data.d && (data.d.type === "SPACE_MEMBER_ROLE_UPDATE" || data.d.event_type === "SPACE_MEMBER_ROLE_UPDATE") && data.d.data) {
+            const handler = this.messageHandlers.get("SPACE_MEMBER_ROLE_UPDATE");
+            if (handler) {
+              handler(data.d);
+            }
           }
           else {
             const handler = this.messageHandlers.get("DISPATCH");
@@ -753,6 +768,17 @@ export class WebSocketClient {
         }
         break;
 
+      case "spaceCreate":
+        // Call the registered SPACE_CREATE handler directly
+        const spaceCreateHandler = this.messageHandlers.get("SPACE_CREATE");
+        if (spaceCreateHandler) {
+          console.log("[WebSocket] Routing spaceCreate to SPACE_CREATE handler");
+          spaceCreateHandler(payload);
+        } else {
+          console.warn("[WebSocket] No SPACE_CREATE handler registered");
+        }
+        break;
+
       case "ready":
         this.handleReady(payload);
         break;
@@ -846,6 +872,49 @@ export class WebSocketClient {
       const roomMemberRemoveHandler = this.messageHandlers.get("ROOM_MEMBER_REMOVE");
       if (roomMemberRemoveHandler) {
         roomMemberRemoveHandler(roomData);
+      }
+    }
+  }
+
+  private handleSpaceCreate(data: any): void {
+    console.log("[WebSocket] Handling space create:", data);
+    const spaceData = data.data || data;
+    if (spaceData.id) {
+      console.log("[WebSocket] Dispatching space create event:", spaceData);
+      
+      // Dispatch spaceCreate event for the cache provider
+      this.dispatchEvent("spaceCreate", {
+        id: spaceData.id,
+        name: spaceData.name || "",
+        name_acronym: spaceData.name_acronym || "",
+        description: spaceData.description || "",
+        icon: spaceData.icon || null,
+        banner: spaceData.banner || null,
+        owner_id: spaceData.owner_id || "",
+        verification_level: spaceData.verification_level || 0,
+        default_message_notifications: spaceData.default_message_notifications || 0,
+        explicit_content_filter: spaceData.explicit_content_filter || 0,
+        features: spaceData.features || [],
+        afk_room_id: spaceData.afk_room_id || null,
+        afk_timeout: spaceData.afk_timeout || 0,
+        system_room_id: spaceData.system_room_id || null,
+        system_room_flags: spaceData.system_room_flags || 0,
+        rules_room_id: spaceData.rules_room_id || null,
+        max_presences: spaceData.max_presences || null,
+        max_members: spaceData.max_members || null,
+        vanity_url_code: spaceData.vanity_url_code || null,
+        preferred_locale: spaceData.preferred_locale || "en-US",
+        public_updates_room_id: spaceData.public_updates_room_id || null,
+        max_video_room_users: spaceData.max_video_room_users || null,
+        nsfw_level: spaceData.nsfw_level || 0,
+        created_at: spaceData.created_at || new Date().toISOString(),
+        updated_at: spaceData.updated_at || new Date().toISOString()
+      });
+      
+      // Also call the message handler directly to ensure it's processed
+      const spaceCreateHandler = this.messageHandlers.get("SPACE_CREATE");
+      if (spaceCreateHandler) {
+        spaceCreateHandler(spaceData);
       }
     }
   }
@@ -947,6 +1016,133 @@ export class WebSocketClient {
       console.log("[WebSocket] READY users data:", data.users);
       console.log("[WebSocket] Sample READY user:", Object.values(data.users)[0]);
       this.cache.setUsers(data.users);
+    }
+
+    // Cache spaces if available
+    if (data.spaces && this.cache) {
+      console.log("[WebSocket] Caching spaces:", data.spaces.length);
+      console.log("[WebSocket] READY spaces data:", data.spaces);
+      data.spaces.forEach((space: any) => {
+        const spaceData = {
+          id: space.id || space.ID,
+          name: space.name || space.Name,
+          name_acronym: space.name_acronym || space.NameAcronym || "",
+          description: space.description || space.Description,
+          owner_id: space.owner_id || space.OwnerID,
+          created_at: space.created_at || space.CreatedAt,
+          updated_at: space.updated_at || space.UpdatedAt,
+          verification_level: space.verification_level || space.VerificationLevel || 0,
+          default_message_notifications: space.default_message_notifications || space.DefaultMessageNotifications || 0,
+          explicit_content_filter: space.explicit_content_filter || space.ExplicitContentFilter || 0,
+          features: space.features || space.Features || [],
+          afk_timeout: space.afk_timeout || space.AfkTimeout || 300,
+          icon: space.icon || space.Icon || null,
+          banner: space.banner || space.Banner || null,
+          afk_room_id: space.afk_room_id || space.AfkRoomID || null,
+          system_room_id: space.system_room_id || space.SystemRoomID || null
+        };
+        
+        // Cache space members if they exist in the space object from Stargate
+        if (space.members && Array.isArray(space.members)) {
+          console.log(`[WebSocket] Caching ${space.members.length} members for space ${spaceData.id}`);
+          
+          // Extract and cache user data from space members
+          const usersToCache: { [key: string]: any } = {};
+          
+          const normalizedMembers = space.members.map((member: any) => {
+            const userId = member.user_id || member.UserID;
+            const userData = member.user || member.User;
+            
+            // If we have user data, add it to the users cache
+            if (userData && userId) {
+              usersToCache[userId] = {
+                id: userData.id || userData.ID || userId,
+                username: userData.username || userData.Username,
+                display_name: userData.display_name || userData.DisplayName || userData.username || userData.Username,
+                discriminator: userData.discriminator || userData.Discriminator || 0,
+                avatar: userData.avatar || userData.Avatar || '',
+                banner: userData.banner || userData.Banner || '',
+                bot: userData.bot || userData.Bot || false,
+                system: userData.system || userData.System || false,
+                bio: userData.bio || userData.Bio || '',
+                about_me: userData.about_me || userData.AboutMe || '',
+                flags: userData.flags || userData.Flags || 0,
+                presence: userData.presence || userData.Presence || {
+                  status: 'offline',
+                  custom_status: ''
+                }
+              };
+            }
+            
+            return {
+              space_id: member.space_id || member.SpaceID || String(spaceData.id),
+              user_id: userId,
+              nick: member.nick || member.Nick,
+              avatar: member.avatar || member.Avatar,
+              roles: member.roles || member.Roles || [],
+              joined_at: member.joined_at || member.JoinedAt,
+              deaf: member.deaf || member.Deaf || false,
+              mute: member.mute || member.Mute || false,
+              flags: member.flags || member.Flags || 0,
+              pending: member.pending || member.Pending || false,
+              user: userData || {
+                id: userId,
+                username: `user_${userId}`,
+                display_name: `User ${userId}`,
+                discriminator: 0,
+                avatar: '',
+                banner: '',
+                bot: false,
+                system: false,
+                bio: '',
+                about_me: '',
+                flags: 0,
+                presence: {
+                  status: 'offline',
+                  custom_status: ''
+                }
+              }
+            };
+          });
+          
+          // Cache the extracted user data
+          if (Object.keys(usersToCache).length > 0) {
+            console.log(`[WebSocket] Caching ${Object.keys(usersToCache).length} users from space members`);
+            this.cache.setUsers(usersToCache);
+          }
+          
+          // Dispatch event for CacheProvider to handle
+          this.dispatchEvent("spaceMembersCache", {
+            spaceId: String(spaceData.id),
+            members: normalizedMembers
+          });
+        }
+        
+        // Cache space roles if they exist in the space object from Stargate
+        if (space.roles && Array.isArray(space.roles)) {
+          console.log(`[WebSocket] Caching ${space.roles.length} roles for space ${spaceData.id}`);
+          const normalizedRoles = space.roles.map((role: any) => ({
+            space_id: role.space_id || role.SpaceID || String(spaceData.id),
+            role_id: role.role_id || role.RoleID,
+            name: role.name || role.Name,
+            color: role.color || role.Color,
+            permissions: role.permissions || role.Permissions || [],
+            position: role.position || role.Position || 0,
+            mentionable: role.mentionable || role.Mentionable || false,
+            hoist: role.hoist || role.Hoist || false,
+            created_at: role.created_at || role.CreatedAt,
+            updated_at: role.updated_at || role.UpdatedAt
+          }));
+          // Dispatch event for CacheProvider to handle
+          this.dispatchEvent("spaceRolesCache", {
+            spaceId: String(spaceData.id),
+            roles: normalizedRoles
+          });
+        }
+        
+        // Dispatch space create event for the cache provider to handle
+        this.dispatchEvent("spaceCreate", spaceData);
+      });
     }
 
     // Cache users from group PMs

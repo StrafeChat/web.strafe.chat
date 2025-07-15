@@ -67,3 +67,25 @@ export type SessionsResponse = {
     current: boolean;
   }>;
 };
+
+// API Response types for invite operations
+export interface ApiResponse<T = any> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
+export interface SpaceInvite {
+  id: string;
+  code: string;
+  creator_id: string;
+  space_id: string;
+  max_uses?: number;
+  uses: number;
+  expires_at?: string;
+  created_at: string;
+}
+
+export type SpaceInvitesListResponse = ApiResponse<SpaceInvite[]>;
+export type SpaceInviteCreateResponse = ApiResponse<SpaceInvite>;
+export type SpaceInviteDeleteResponse = ApiResponse<{}>;
