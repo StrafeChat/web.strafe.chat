@@ -36,6 +36,7 @@ import Notes from "./components/home/notes/Notes";
 import { SpaceRoomView } from "./components/spaces/SpaceRoomView";
 import SpaceView from "./components/spaces/SpaceView";
 import InviteHandler from "./components/invite/InviteHandler";
+import { VoiceProvider } from "./lib/providers/voice/VoiceProvider";
 
 const UpdateNotificationWrapper = () => {
   const { isAuthenticated } = useAuth();
@@ -87,15 +88,17 @@ const MountApp = (props: ParentProps) => {
             <CacheProvider>
               <UserSettingsProvider>
                 <AuthProvider>
-                  <MobileNavProvider>
-                    <SettingsProvider>
-                      <ModalProvider>
-                        <LinkConfirmationHandler />
-                        <UpdateNotificationWrapper />
-                        <div class="h-[100dvh] w-full overflow-hidden">{props.children}</div>
-                      </ModalProvider>
-                    </SettingsProvider>
-                  </MobileNavProvider>
+									<VoiceProvider>
+										<MobileNavProvider>
+											<SettingsProvider>
+												<ModalProvider>
+													<LinkConfirmationHandler />
+													<UpdateNotificationWrapper />
+													<div class="h-[100dvh] w-full overflow-hidden">{props.children}</div>
+												</ModalProvider>
+											</SettingsProvider>
+										</MobileNavProvider>
+									</VoiceProvider>
                 </AuthProvider>
               </UserSettingsProvider>
             </CacheProvider>
