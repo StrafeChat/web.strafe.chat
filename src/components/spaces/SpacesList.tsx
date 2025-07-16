@@ -1,5 +1,5 @@
 import { Component, createMemo, Show, For, createSignal } from "solid-js";
-import { useNavigate } from "@solidjs/router";
+import { useNavigate, useLocation } from "@solidjs/router";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
 // import { useCache } from "../../lib/providers/cache/CacheProvider";
 import { useMobileNav } from "../../lib/providers/mobile/MobileNavProvider";
@@ -10,18 +10,58 @@ import Plus from "../shared/icons/Plus";
 import DefaultGroupPM from "../shared/icons/DefaultGroupPM";
 import { CreateSpaceModal } from "../modals/CreateSpaceModal";
 
+// Constants for indicator positioning
+const INDICATOR_POSITIONS = {
+  HOME_TOP: 18,
+  SPACES_BASE: 86,
+  SPACE_SPACING: 56,
+} as const;
+
+const INDICATOR_STYLES = {
+  ACTIVE: "w-1 h-8",
+  HOVER: "w-1 h-5",
+} as const;
+
 const SpacesList: Component = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const { relationshipRequests, user, rooms, isMobile, spaces } = useAuth();
   const { setCurrentView } = useMobileNav();
   // const cache = useCache();
   const [showCreateModal, setShowCreateModal] = createSignal(false);
+  const [hoveredSpace, setHoveredSpace] = createSignal<string | null>(null);
+  const [hoveredHome, setHoveredHome] = createSignal(false);
+
+  // Memoized function to check if a space is currently active
+  const isSpaceActive = createMemo(() => {
+    const pathname = location.pathname;
+    const spaceMatch = pathname.match(/\/spaces\/(\d+)/);
+    return spaceMatch ? String(spaceMatch[1]) : null;
+  });
+
+  // Memoized function to check if we're on the home page
+  const isHomePage = createMemo(() => {
+    const path = location.pathname;
+    return path === "/" || 
+           path === "/home" || 
+           path === "/friends" || 
+           path === "/notes" || 
+           path.startsWith("/rooms");
+  });
 
   // Get user's spaces from auth provider signal
   const userSpaces = createMemo(() => {
     const spaceData = spaces();
     console.log('[SpacesList] Spaces from auth signal:', spaceData);
     return spaceData;
+  });
+
+  // Memoized space positions for indicators
+  const spacePositions = createMemo(() => {
+    return userSpaces().map((space, index) => ({
+      id: space.id,
+      top: INDICATOR_POSITIONS.SPACES_BASE + index * INDICATOR_POSITIONS.SPACE_SPACING
+    }));
   });
 
   const unreadCount = createMemo(() => {
@@ -84,13 +124,43 @@ const SpacesList: Component = () => {
   };
 
   return (
-    <div class="flex flex-col items-center h-full py-3 pb-14 md:pb-3 gap-2 bg-[var(--background)]">
+    <div class="flex flex-col items-center h-full py-3 pb-14 md:pb-3 gap-2 bg-[var(--background)] relative">
+      {/* Active page indicator - positioned at left edge of screen */}
+      <Show when={isHomePage()}>
+        <div class={`fixed left-0 ${INDICATOR_STYLES.ACTIVE} bg-accent rounded-r-full z-50`} style={{top: `${INDICATOR_POSITIONS.HOME_TOP}px`}}></div>
+      </Show>
+      
+      {/* Hover indicator for home */}
+      <Show when={hoveredHome() && !isHomePage()}>
+        <div class={`fixed left-0 ${INDICATOR_STYLES.HOVER} bg-accent bg-opacity-60 rounded-r-full z-50`} style={{top: `${INDICATOR_POSITIONS.HOME_TOP + 8}px`}}></div>
+      </Show>
+      
+      {/* Active space indicators */}
+      <For each={spacePositions()}>
+        {(spacePos) => (
+          <Show when={isSpaceActive() === String(spacePos.id)}>
+            <div class={`fixed left-0 ${INDICATOR_STYLES.ACTIVE} bg-accent rounded-r-full z-50`} style={{top: `${spacePos.top}px`}}></div>
+          </Show>
+        )}
+      </For>
+      
+      {/* Hover indicators for spaces */}
+      <For each={spacePositions()}>
+        {(spacePos) => (
+          <Show when={hoveredSpace() === String(spacePos.id) && isSpaceActive() !== String(spacePos.id)}>
+            <div class={`fixed left-0 ${INDICATOR_STYLES.HOVER} bg-accent bg-opacity-60 rounded-r-full z-50`} style={{top: `${spacePos.top + 8}px`}}></div>
+          </Show>
+        )}
+      </For>
+      
       {/* Home button */}
       <Tooltip content={"Home"} position="right">
         <button
-          class="w-12 h-12 rounded-full bg-surface hover:bg-accent transition-all group relative"
-          onClick={() => navigate("/")}
-        >
+            class="w-12 h-12 rounded-full bg-surface hover:bg-accent transition-all group relative"
+            onClick={() => navigate("/")}
+            onMouseEnter={() => setHoveredHome(true)}
+            onMouseLeave={() => setHoveredHome(false)}
+          >
           <svg
             xmlns="http://www.w3.org/2000/svg"
             class="w-6 h-6 mx-auto"
@@ -176,6 +246,8 @@ const SpacesList: Component = () => {
                     setCurrentView("content");
                   }
                 }}
+                onMouseEnter={() => setHoveredSpace(String(space.id))}
+                onMouseLeave={() => setHoveredSpace(null)}
               >
                 <Show
                   when={space.icon}

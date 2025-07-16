@@ -78,7 +78,14 @@ export const Message: Component<MessageProps> = (props) => {
   const [t] = useTransContext();
 
   // Invite embed detection and caching
-  const [inviteInfos, setInviteInfos] = createSignal<InviteInfo[]>([]);
+  type InviteState = {
+    code: string;
+    info?: InviteInfo;
+    loading: boolean;
+    error?: string;
+  };
+  
+  const [inviteStates, setInviteStates] = createSignal<InviteState[]>([]);
   
   const getInviteCodes = () => {
     const content = props.content;
@@ -92,15 +99,23 @@ export const Message: Component<MessageProps> = (props) => {
   createEffect(async () => {
     const codes = getInviteCodes();
     if (codes.length === 0) {
-      setInviteInfos([]);
+      setInviteStates([]);
       return;
     }
 
-    const infos: InviteInfo[] = [];
-    for (const code of codes) {
+    // Initialize loading states for all codes
+    const initialStates: InviteState[] = codes.map(code => ({
+      code: code!,
+      loading: true
+    }));
+    setInviteStates(initialStates);
+
+    // Load each invite info
+    for (let i = 0; i < codes.length; i++) {
+      const code = codes[i];
+      if (!code) continue;
+      
       try {
-        if (!code) continue;
-        
         // Try to get from cache first
         let info = cache.getInvite(code);
         
@@ -109,15 +124,22 @@ export const Message: Component<MessageProps> = (props) => {
           info = await cache.getInviteInfo(code, () => api.spaces.invites.getInfo(code) as Promise<InviteInfo>);
         }
         
-        if (info) {
-          infos.push(info);
-        }
+        // Update the specific invite state
+        setInviteStates(prev => prev.map((state, index) => 
+          index === i ? { ...state, info, loading: false } : state
+        ));
       } catch (e) {
-        console.warn("Failed to fetch invite info for code:", code);
+        console.warn("Failed to fetch invite info for code:", code, e);
+        // Update with error state
+        setInviteStates(prev => prev.map((state, index) => 
+          index === i ? { 
+            ...state, 
+            loading: false, 
+            error: "Invalid invite link" 
+          } : state
+        ));
       }
     }
-    
-    setInviteInfos(infos);
   });
 
   // Users icon component for invite embeds
@@ -720,6 +742,28 @@ export const Message: Component<MessageProps> = (props) => {
     HTMLElement | undefined
   >();
   const [avatarBouncing, setAvatarBouncing] = createSignal(false);
+  const [replyMaxWidth, setReplyMaxWidth] = createSignal("calc(100% - 3rem)");
+
+  // Calculate dynamic width for message replies based on chat container
+  createEffect(() => {
+    const updateReplyWidth = () => {
+      const chatContainer = document.querySelector('[data-message-id]')?.closest('.overflow-y-auto');
+      if (chatContainer) {
+        const containerWidth = chatContainer.clientWidth;
+        // Set reply width to be slightly less than container width (about 85%)
+        const replyWidth = Math.max(300, containerWidth * 0.85);
+        setReplyMaxWidth(`${replyWidth}px`);
+      }
+    };
+
+    // Update on mount and when window resizes
+    updateReplyWidth();
+    window.addEventListener('resize', updateReplyWidth);
+    
+    onCleanup(() => {
+      window.removeEventListener('resize', updateReplyWidth);
+    });
+  });
 
   // Handler for clicking the author name/avatar (now inline, not extra row)
   const handleAuthorClick = (e: MouseEvent) => {
@@ -928,7 +972,8 @@ export const Message: Component<MessageProps> = (props) => {
                   {/* Connecting line - goes down from reply to main message */}
                   <div class="absolute left-[20px] bottom-[-2px] w-7 h-2.5 border-l-2 border-t-2 border-text-secondary opacity-40 rounded-tl-md"></div>
                   <div
-                    class="flex items-center gap-1.5 ml-[42px] px-3 rounded hover:bg-surface hover:bg-opacity-20 cursor-pointer transition-colors max-w-[calc(100%-3rem)] overflow-hidden"
+                    class="flex items-center gap-1.5 ml-[42px] px-3 rounded hover:bg-surface hover:bg-opacity-20 cursor-pointer transition-colors overflow-hidden"
+                    style={{ "max-width": replyMaxWidth() }}
                     onClick={() => scrollToMessage(refMessage.id)}
                   >
                     <Avatar
@@ -1247,52 +1292,110 @@ export const Message: Component<MessageProps> = (props) => {
 
               {/* Invite embeds */}
               <Show
-                when={Array.isArray(inviteInfos()) && inviteInfos()!.length > 0}
+                when={Array.isArray(inviteStates()) && inviteStates()!.length > 0}
               >
                 <div class="mt-2 space-y-2">
-                  <For each={inviteInfos()}>
-                    {(info: InviteInfo) => (
+                  <For each={inviteStates()}>
+                    {(state: InviteState) => (
                       <div class="border border-border rounded-lg p-4 bg-surface bg-opacity-20 max-w-md">
-                        <div class="flex items-center justify-center gap-3">
-                          <Show
-                            when={info?.space_icon}
-                            fallback={
-                              <div class="w-12 h-12 rounded-lg bg-primary flex items-center justify-center text-text-primary font-bold text-lg">
-                                {info?.space_name_acronym ||
-                                  info?.space_name?.charAt(0).toUpperCase()}
+                        {/* Consistent layout structure for all states */}
+                        <div class="flex items-center gap-3">
+                          {/* Icon/Avatar section - always 48x48 */}
+                          <div class="w-12 h-12 rounded-lg flex items-center justify-center flex-shrink-0">
+                            <Show when={state.loading}>
+                              <div class="w-full h-full bg-surface bg-opacity-50 animate-pulse rounded-lg"></div>
+                            </Show>
+                            <Show when={!state.loading && state.error}>
+                              <div class="w-full h-full bg-red-500 bg-opacity-20 flex items-center justify-center rounded-lg">
+                                <svg class="w-6 h-6 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.732-.833-2.464 0L4.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                                </svg>
                               </div>
-                            }
-                          >
-                            <img
-                              src={`${FS_URL}/space_icons/${info?.space_id}/${info?.space_icon}`}
-                              alt={info?.space_name}
-                              class="w-12 h-12 rounded-lg object-cover"
-                            />
-                          </Show>
-                          <div class="flex-1 min-w-0">
-                            <h4 class="font-semibold text-text-primary truncate">
-                              {info?.space_name}
-                            </h4>
-                            <p class="text-sm text-text-secondary truncate">
-                              Invited by{" "}
-                              {info?.inviter_display_name ||
-                                info?.inviter_username}
-                            </p>
-                            <p class="text-sm text-text-secondary flex items-center gap-1">
-                              <Users class="w-4 h-4" />
-                              {info?.member_count} member
-                              {info?.member_count !== 1 ? "s" : ""}
-                            </p>
+                            </Show>
+                            <Show when={!state.loading && !state.error && state.info}>
+                              <Show
+                                when={state.info?.space_icon}
+                                fallback={
+                                  <div class="w-full h-full bg-primary flex items-center justify-center text-text-primary font-bold text-lg rounded-lg">
+                                    {state.info?.space_name_acronym ||
+                                      state.info?.space_name?.charAt(0).toUpperCase()}
+                                  </div>
+                                }
+                              >
+                                <img
+                                  src={`${FS_URL}/space_icons/${state.info?.space_id}/${state.info?.space_icon}`}
+                                  alt={state.info?.space_name}
+                                  class="w-full h-full rounded-lg object-cover"
+                                />
+                              </Show>
+                            </Show>
+                          </div>
+                          
+                          {/* Content section - always same height */}
+                          <div class="flex-1 min-w-0 h-16 flex flex-col justify-center">
+                            <Show when={state.loading}>
+                              <div class="space-y-2">
+                                <div class="h-4 bg-surface bg-opacity-50 rounded animate-pulse w-3/4"></div>
+                                <div class="h-3 bg-surface bg-opacity-50 rounded animate-pulse w-1/2"></div>
+                                <div class="h-3 bg-surface bg-opacity-50 rounded animate-pulse w-1/3"></div>
+                              </div>
+                            </Show>
+                            <Show when={!state.loading && state.error}>
+                              <div class="space-y-1">
+                                <h4 class="font-semibold text-red-500 h-4 leading-4">Invalid Invite</h4>
+                                <p class="text-sm text-text-secondary h-3 leading-3">
+                                  This invite link is invalid or has expired
+                                </p>
+                                <p class="text-sm text-text-secondary h-3 leading-3">
+                                  Code: {state.code}
+                                </p>
+                              </div>
+                            </Show>
+                            <Show when={!state.loading && !state.error && state.info}>
+                              <div class="space-y-1">
+                                <h4 class="font-semibold text-text-primary truncate h-4 leading-4">
+                                  {state.info?.space_name}
+                                </h4>
+                                <p class="text-sm text-text-secondary truncate h-3 leading-3">
+                                  Invited by{" "}
+                                  {state.info?.inviter_display_name ||
+                                    state.info?.inviter_username}
+                                </p>
+                                <p class="text-sm text-text-secondary flex items-center gap-1 h-3 leading-3">
+                                  <Users class="w-4 h-4" />
+                                  {state.info?.member_count} member
+                                  {state.info?.member_count !== 1 ? "s" : ""}
+                                </p>
+                              </div>
+                            </Show>
                           </div>
                         </div>
-                        <button
-                          onClick={() =>
-                            (window.location.href = `/invite/${info?.code}`)
-                          }
-                          class="mt-3 w-full bg-primary text-white py-2 px-4 rounded-md hover:bg-primary-dark transition-colors font-medium"
-                        >
-                          Join Space
-                        </button>
+                        
+                        {/* Button section - always same height */}
+                        <div class="mt-3">
+                          <Show when={state.loading}>
+                            <div class="h-9 bg-surface bg-opacity-50 rounded-md animate-pulse w-full"></div>
+                          </Show>
+                          <Show when={!state.loading && state.error}>
+                            <button
+                              disabled
+                              class="w-full bg-red-500 bg-opacity-20 text-red-500 pb-0.5 px-4 rounded-md cursor-not-allowed font-medium h-9"
+
+                            >
+                              Invite Expired
+                            </button>
+                          </Show>
+                          <Show when={!state.loading && !state.error && state.info}>
+                            <button
+                              onClick={() =>
+                                (window.location.href = `/invite/${state.info?.code}`)
+                              }
+                              class="w-full bg-primary text-white pb-0.5 px-4 rounded-md hover:bg-primary-dark transition-colors font-medium h-9"
+                            >
+                              Join Space
+                            </button>
+                          </Show>
+                        </div>
                       </div>
                     )}
                   </For>

@@ -1,4 +1,4 @@
-import { Component, createMemo, createSignal, Show, For } from "solid-js";
+import { Component, createMemo, createSignal, Show, For, createEffect, onMount } from "solid-js";
 import DefaultGroupPM from "../shared/icons/DefaultGroupPM";
 import { useParams } from "@solidjs/router";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
@@ -27,6 +27,33 @@ const RoomView: Component = () => {
     if (!allRooms) return null;
     
     return allRooms.find(room => room.id === params.roomId);
+  });
+
+  // Auto-focus the chat input when entering a room
+  createEffect(() => {
+    const room = currentRoom();
+    if (room) {
+      // Use setTimeout to ensure the ChatArea component has fully rendered
+      setTimeout(() => {
+        const chatInput = document.querySelector('[data-placeholder]') as HTMLElement;
+        if (chatInput) {
+          console.log('[RoomView] Focusing chat input for room:', room.id);
+          chatInput.focus();
+        } else {
+          console.log('[RoomView] Chat input not found, retrying...');
+          // Retry after a longer delay if element not found
+          setTimeout(() => {
+            const retryInput = document.querySelector('[data-placeholder]') as HTMLElement;
+            if (retryInput) {
+              console.log('[RoomView] Retry successful, focusing chat input');
+              retryInput.focus();
+            } else {
+              console.log('[RoomView] Chat input still not found after retry');
+            }
+          }, 300);
+        }
+      }, 200);
+    }
   });
 
   // Function to fetch user data for uncached group PM members
@@ -271,6 +298,8 @@ const RoomView: Component = () => {
   const [removingMember, setRemovingMember] = createSignal(false);
 
 	const [initiateCall, setInitiateCall] = createSignal(false);
+
+  // Auto-focus is now handled directly in ChatArea component
 
   // Handle member context menu
   const handleMemberRightClick = (event: MouseEvent, memberId: string) => {

@@ -21,6 +21,7 @@ import LinkConfirmationHandler from "./components/LinkConfirmationHandler";
 import UpdateNotificationModal from "./components/modals/UpdateNotificationModal";
 import { useUpdateNotification } from "./lib/hooks/useUpdateNotification";
 import { useAuth } from "./lib/providers/auth/AuthProvider";
+import GlobalKeyboardHandler from "./components/common/GlobalKeyboardHandler";
 // Import test utilities for development
 import "./lib/utils/updateTestUtils";
 import EmailVerify from "./components/auth/EmailVerify";
@@ -94,6 +95,7 @@ const MountApp = (props: ParentProps) => {
 												<ModalProvider>
 													<LinkConfirmationHandler />
 													<UpdateNotificationWrapper />
+													<GlobalKeyboardHandler />
 													<div class="h-[100dvh] w-full overflow-hidden">{props.children}</div>
 												</ModalProvider>
 											</SettingsProvider>

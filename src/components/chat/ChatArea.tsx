@@ -289,6 +289,21 @@ const ChatArea: Component = () => {
     };
   });
 
+  // Auto-focus chat input when room changes
+  createEffect(() => {
+    const roomId = params.roomId;
+    if (roomId && chatInputRef) {
+      console.log("[ChatArea] Auto-focusing chat input for room:", roomId);
+      // Small delay to ensure the component is fully rendered
+      setTimeout(() => {
+        if (chatInputRef) {
+          chatInputRef.focus();
+          console.log("[ChatArea] Chat input focused successfully");
+        }
+      }, 50);
+    }
+  });
+
   // Helper function to check if a message is the first unread message
   const isFirstUnread = (message: CachedMessage) => {
     const unreads = currentRoomUnreadMessages();
@@ -1327,6 +1342,31 @@ const ChatArea: Component = () => {
 
   // Reference to the chat input element
   let chatInputRef: HTMLDivElement | undefined;
+
+  // Auto-focus effect for when the component mounts or room changes
+  createEffect(() => {
+    const roomId = params.roomId;
+    if (roomId && chatInputRef) {
+      // Longer delay to ensure all scroll operations are complete
+      // The room change effect calls scrollToBottom with multiple requestAnimationFrame
+      // and a 100ms setTimeout, so we need to wait longer
+      setTimeout(() => {
+        if (chatInputRef) {
+          console.log('[ChatArea] Auto-focusing chat input for room:', roomId);
+          chatInputRef.focus();
+          // Ensure the input stays focused by preventing any blur events briefly
+          const preventBlur = (e: FocusEvent) => {
+            e.preventDefault();
+            if (chatInputRef) chatInputRef.focus();
+          };
+          chatInputRef.addEventListener('blur', preventBlur, { once: true });
+          setTimeout(() => {
+            chatInputRef?.removeEventListener('blur', preventBlur);
+          }, 100);
+        }
+      }, 200); // Increased delay to 200ms to wait for all scroll operations
+    }
+  });
 
   // Function to handle message reply
   const handleReply = (messageId: string) => {

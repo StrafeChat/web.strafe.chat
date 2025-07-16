@@ -101,9 +101,10 @@ export const Interface = (props: { children: JSX.Element }) => {
            onTouchStart={handleTouchStart} 
            onTouchMove={handleTouchMove} 
            onTouchEnd={handleTouchEnd}>
-        <div class={`flex md:flex-1 w-screen overflow-x-auto snap-x snap-mandatory scroll-smooth hide-scrollbar ${showBottomNav() ? 'pb-14' : ''} md:pb-0 h-full`}>
+        {/* Mobile: Horizontal scroll layout */}
+        <div class={`md:hidden flex w-screen overflow-x-auto snap-x snap-mandatory scroll-smooth hide-scrollbar ${showBottomNav() ? 'pb-14' : ''} h-full`}>
           {/* First snap point - Lists */}
-          <div class={`flex ${showSidebar() ? 'w-[calc(92px+15rem)]' : 'w-[72px]'} md:w-auto flex-none snap-start`}>
+          <div class={`flex ${showSidebar() ? 'w-[calc(92px+15rem)]' : 'w-[72px]'} flex-none snap-start`}>
             <div class="w-[72px] h-full flex-none">
               <SpacesList />
             </div>
@@ -115,7 +116,27 @@ export const Interface = (props: { children: JSX.Element }) => {
           </div>
 
           {/* Second snap point - Content */}
-          <div class="w-screen md:flex-1 flex-none snap-start">
+          <div class="w-screen flex-none snap-start">
+            <div class="w-full h-full">{props.children}</div>
+          </div>
+        </div>
+
+        {/* Desktop: Flexible layout */}
+        <div class="hidden md:flex h-full w-full">
+          {/* Fixed sidebar */}
+          <div class="flex flex-none">
+            <div class="w-[72px] h-full flex-none">
+              <SpacesList />
+            </div>
+            {showSidebar() && (
+              <div class="w-[260px] h-full flex-none">
+                {showRoomsList() ? <RoomsList /> : showPMList() ? <PMList /> : null}
+              </div>
+            )}
+          </div>
+
+          {/* Flexible content area that adapts to page size */}
+          <div class="flex-1 min-w-0 h-full">
             <div class="w-full h-full">{props.children}</div>
           </div>
         </div>

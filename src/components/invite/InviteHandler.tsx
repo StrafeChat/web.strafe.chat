@@ -3,6 +3,7 @@ import { useParams, useNavigate } from "@solidjs/router";
 import { api } from "../../lib/api";
 import { FS_URL } from "../../constants";
 import { InviteInfo } from "../../types/api";
+import { useAuth } from "../../lib/providers/auth/AuthProvider";
 
 // Custom SVG Icons
 export const Loader2 = (props: any) => (
@@ -39,6 +40,7 @@ const CheckCircle = (props: any) => (
 
 const InviteHandler: Component = () => {
   const params = useParams();
+  const { user } = useAuth();
   
   const [loading, setLoading] = createSignal(false);
   const [inviteInfo, setInviteInfo] = createSignal<InviteInfo | null>(null);
@@ -103,6 +105,12 @@ const InviteHandler: Component = () => {
     } finally {
       setJoining(false);
     }
+  };
+
+  const handleLoginRedirect = () => {
+    // Store the current invite URL to redirect back after login
+    localStorage.setItem('redirectAfterLogin', window.location.pathname);
+    navigate('/login');
   };
   const navigate = useNavigate();
 
@@ -258,6 +266,14 @@ const InviteHandler: Component = () => {
                <CheckCircle class="w-6 h-6" />
                <span class="font-medium">Successfully joined the space!</span>
              </div>
+           ) : !user() ? (
+             <button
+               onClick={handleLoginRedirect}
+               class="w-full bg-primary hover:bg-primary-dark text-white font-semibold py-3 px-6 rounded-lg transition-colors flex items-center justify-center space-x-3"
+             >
+               <Users class="w-5 h-5" />
+               <span>Login to Strafe</span>
+             </button>
            ) : (
              <button
                onClick={handleJoinSpace}
