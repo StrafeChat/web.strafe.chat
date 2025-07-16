@@ -186,7 +186,7 @@ const SpacesList: Component = () => {
                   }
                 >
                   <img
-                    src={`${FS_URL}/icons/${space.id}/${space.icon}`}
+                    src={`${FS_URL}/space_icons/${space.id}/${space.icon}`}
                     alt={space.name}
                     class="w-full h-full object-cover"
                     draggable="false"

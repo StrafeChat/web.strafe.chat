@@ -7,6 +7,8 @@ import {
 } from "solid-js";
 import { MessageCache, CachedMessage } from "../../cache/MessageCache";
 import { SpaceCache, Space, SpaceMember, SpaceRole } from "../../cache/SpaceCache";
+import { InviteCache } from "./InviteCache";
+import { InviteInfo } from "../../../types/api";
 
 export type Presence = {
   status: string;
@@ -73,23 +75,32 @@ type CacheContextType = {
   setSpaceRole: (spaceId: string, role: SpaceRole) => void;
   getCachedSpaceRoles: (spaceId: string) => SpaceRole[] | null;
   setCachedSpaceRoles: (spaceId: string, roles: SpaceRole[]) => void;
+  // Invite management
+  getInvite: (code: string) => InviteInfo | undefined;
+  setInvite: (invite: InviteInfo) => void;
+  deleteInvite: (code: string) => void;
+  clearInvites: () => void;
+  getInviteInfo: (code: string, fetchFn: () => Promise<InviteInfo>) => Promise<InviteInfo>;
 };
 
 const CacheContext = createContext<CacheContextType>();
 const messageCache = new MessageCache();
 const spaceCache = new SpaceCache();
+const inviteCache = new InviteCache();
 
 // Make caches globally accessible for WebSocketClient
 declare global {
   interface Window {
     messageCache: MessageCache;
     spaceCache: SpaceCache;
+    inviteCache: InviteCache;
   }
 }
 
 // Expose caches globally
 window.messageCache = messageCache;
 window.spaceCache = spaceCache;
+window.inviteCache = inviteCache;
 
 export const CacheProvider: ParentComponent = (props) => {
   const [users, setUsers] = createSignal<Record<string, User>>({});
@@ -324,6 +335,12 @@ export const CacheProvider: ParentComponent = (props) => {
     setSpaceRole: (spaceId: string, role: SpaceRole) => spaceCache.setSpaceRole(spaceId, role),
     getCachedSpaceRoles: (spaceId: string) => spaceCache.getCachedSpaceRoles(spaceId),
     setCachedSpaceRoles: (spaceId: string, roles: SpaceRole[]) => spaceCache.setCachedSpaceRoles(spaceId, roles),
+    // Invite management
+    getInvite: (code: string) => inviteCache.getInvite(code),
+    setInvite: (invite: InviteInfo) => inviteCache.setInvite(invite),
+    deleteInvite: (code: string) => inviteCache.deleteInvite(code),
+    clearInvites: () => inviteCache.clearInvites(),
+    getInviteInfo: (code: string, fetchFn: () => Promise<InviteInfo>) => inviteCache.getInviteInfo(code, fetchFn),
   };
 
   return (

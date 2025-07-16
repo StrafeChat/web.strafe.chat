@@ -7,7 +7,7 @@ interface AudioPlayerProps {
   size?: number;
 }
 
-const AudioPlayer = (props: AudioPlayerProps) => {
+export const AudioPlayer = (props: AudioPlayerProps) => {
   const [isPlaying, setIsPlaying] = createSignal(false);
   const [currentTime, setCurrentTime] = createSignal(0);
   const [duration, setDuration] = createSignal(0);
@@ -229,5 +229,3 @@ const AudioPlayer = (props: AudioPlayerProps) => {
     </div>
   );
 };
-
-export default AudioPlayer;

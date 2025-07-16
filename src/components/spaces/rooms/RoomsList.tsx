@@ -1,14 +1,13 @@
 import { Component, Show, createMemo, For, createSignal, createEffect } from "solid-js";
 import { useAuth } from "../../../lib/providers/auth/AuthProvider";
-// import { useCache } from "../../../lib/providers/cache/CacheProvider";
+import { useCache } from "../../../lib/providers/cache/CacheProvider";
 import { ClientUserArea } from "../../shared/ClientUserArea";
-import { FS_URL, BASE_URL } from "../../../constants";
+import { BASE_URL } from "../../../constants";
 import Home from "../../shared/icons/Home";
 import { A, useNavigate, useLocation } from "@solidjs/router";
 import { RoomType } from "../../../types/roomTypes";
 import { Room, RoomWithRecipients } from "../../../types/rooms";
 import { SpaceHeaderDropdown } from "./SpaceHeaderDropdown";
-import { api } from "../../../lib/api";
 
 interface RoomsListProps {
   spaceId?: string;
@@ -497,22 +496,43 @@ const DraggableSection: Component<DraggableSectionProps> = (props) => {
 };
 
 const RoomsList: Component<RoomsListProps> = (props) => {
-  const { rooms } = useAuth();
-  // const cache = useCache();
+  const { rooms, user } = useAuth();
+  const cache = useCache();
   
   // Permission checking
   const [canManageChannels, setCanManageChannels] = createSignal(false);
   
-  // Check MANAGE_CHANNELS permission when spaceId changes
-  createEffect(async () => {
-    if (props.spaceId) {
-      try {
-        const result = await api.spaces.permissions.check(props.spaceId, 'MANAGE_CHANNELS');
-        setCanManageChannels(result.has_permission);
-      } catch (error) {
-        console.error('Error checking MANAGE_CHANNELS permission:', error);
-        setCanManageChannels(false);
+  // Client-side permission checking function
+  const checkPermission = (spaceId: string, permission: string): boolean => {
+    const currentUser = user();
+    if (!currentUser || !spaceId) return false;
+    
+    // Check if user is space owner
+    const space = cache.getSpace(spaceId);
+    if (space && space.owner_id === currentUser.id) {
+      return true;
+    }
+    
+    // Get user's roles in this space
+    const member = cache.getSpaceMember(spaceId, currentUser.id);
+    if (!member || !member.roles) return false;
+    
+    // Check permissions in user's roles
+    for (const roleId of member.roles) {
+      const role = cache.getSpaceRole(spaceId, roleId);
+      if (role && role.permissions && role.permissions.includes(permission)) {
+        return true;
       }
+    }
+    
+    return false;
+  };
+  
+  // Check MANAGE_CHANNELS permission when spaceId changes
+  createEffect(() => {
+    if (props.spaceId) {
+      const hasPermission = checkPermission(props.spaceId, 'MANAGE_CHANNELS');
+      setCanManageChannels(hasPermission);
     } else {
       setCanManageChannels(false);
     }
@@ -767,23 +787,12 @@ const RoomsList: Component<RoomsListProps> = (props) => {
   };
 
   return (
-    <div class="flex flex-col h-full bg-background1 rounded-tl-2xl overflow-hidden">
-      {/* Space banner */}
-      <Show when={props.currentSpace?.banner}>
-        <div class="h-[120px] relative overflow-hidden">
-          <img
-            src={`${FS_URL}/banners/${props.currentSpace?.id}/${props.currentSpace?.banner}`}
-            alt="Space banner"
-            class="w-full h-full object-cover"
-          />
-          <div class="absolute inset-0 bg-gradient-to-t from-background1 via-transparent to-transparent" />
-        </div>
-      </Show>
-      
+    <div class="flex flex-col h-full bg-background1 overflow-hidden">      
       {/* Space header with dropdown */}
       <SpaceHeaderDropdown 
         spaceId={props.spaceId}
         spaceName={props.currentSpace?.name}
+        currentSpace={props.currentSpace}
       />
       
       {/* Navigation and Rooms content area */}

@@ -125,6 +125,11 @@ export const api = {
     },
   },
   spaces: {
+    update: (spaceId: string, data: { name?: string; description?: string; name_acronym?: string; vanity_url_code?: string; preferred_locale?: string }) =>
+      apiRequest(`${API_ENDPOINTS.SPACES}/${spaceId}`, {
+        method: "PATCH",
+        body: data,
+      }),
     members: {
       list: (spaceId: string) => apiRequest(API_ENDPOINTS.SPACE_MEMBERS(spaceId)),
       updateRoles: (spaceId: string, userId: string, roleIds: string[]) =>

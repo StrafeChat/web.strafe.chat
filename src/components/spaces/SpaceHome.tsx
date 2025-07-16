@@ -10,8 +10,9 @@ export const SpaceHome: Component<SpaceHomeProps> = (props) => {
   return (
     <div class="h-full w-full flex flex-col bg-background2 overflow-y-auto">
       {/* Space Banner */}
-      <div class="relative h-48 overflow-hidden">
-        <Show when={props.space?.banner} fallback={
+      <div class="relative h-[120px] overflow-hidden">
+        {/* false is hardcoded here cause I don't really like the way the banner looks here, just gonna keep turtles for now.  */ }
+        <Show when={false} fallback={
           <>
             {/* Floating turtle background when no banner */}
             <div class="absolute inset-0 bg-[#1a1b26]">
@@ -52,7 +53,7 @@ export const SpaceHome: Component<SpaceHomeProps> = (props) => {
           </>
         }>
           <img
-            src={`${FS_URL}/banners/${props.space?.id}/${props.space?.banner}`}
+            src={`${FS_URL}/space_banners/${props.space?.id}/${props.space?.banner}`}
             alt="Space banner"
             class="w-full h-full object-cover"
           />
@@ -67,7 +68,7 @@ export const SpaceHome: Component<SpaceHomeProps> = (props) => {
               </span>
             }>
               <img
-                src={`${FS_URL}/icons/${props.space?.id}/${props.space?.icon}`}
+                src={`${FS_URL}/space_icons/${props.space?.id}/${props.space?.icon}`}
                 alt="Space icon"
                 class="w-full h-full object-cover"
               />

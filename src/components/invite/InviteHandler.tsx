@@ -2,6 +2,7 @@ import { Component, createSignal, onMount } from "solid-js";
 import { useParams, useNavigate } from "@solidjs/router";
 import { api } from "../../lib/api";
 import { FS_URL } from "../../constants";
+import { InviteInfo } from "../../types/api";
 
 // Custom SVG Icons
 export const Loader2 = (props: any) => (
@@ -34,22 +35,7 @@ const CheckCircle = (props: any) => (
   </svg>
 );
 
-interface InviteInfo {
-  space_id: number;
-  space_name: string;
-  space_icon?: string;
-  space_banner?: string;
-  space_name_acronym?: string;
-  inviter_id: string;
-  inviter_username: string;
-  inviter_display_name?: string;
-  inviter_avatar?: string;
-  member_count: number;
-  expires_at?: string;
-  max_uses?: number;
-  uses: number;
-  code: string;
-}
+
 
 const InviteHandler: Component = () => {
   const params = useParams();
@@ -124,7 +110,7 @@ const InviteHandler: Component = () => {
     return (
       <div class="min-h-screen flex items-center justify-center relative overflow-hidden">
         {inviteInfo()?.space_banner ? (
-          <div class="absolute inset-0 bg-cover bg-center" style={{ 'background-image': `url(${inviteInfo()?.space_banner})` }}></div>
+          <div class="absolute inset-0 bg-cover bg-center" style={{ 'background-image': `url(${FS_URL}/space_banners/${inviteInfo()?.space_id}/${inviteInfo()?.space_banner})` }}></div>
         ) : (
           <>
             <div class="absolute inset-0 opacity-40">
@@ -150,7 +136,7 @@ const InviteHandler: Component = () => {
     return (
       <div class="min-h-screen flex items-center justify-center relative overflow-hidden">
         {inviteInfo()?.space_banner ? (
-          <div class="absolute inset-0 bg-cover bg-center" style={{ 'background-image': `url(${inviteInfo()?.space_banner})` }}></div>
+          <div class="absolute inset-0 bg-cover bg-center" style={{ 'background-image': `url(${FS_URL}/space_banners/${inviteInfo()?.space_id}/${inviteInfo()?.space_banner})` }}></div>
         ) : (
           <>
             <div class="absolute inset-0 opacity-40">
@@ -178,7 +164,7 @@ const InviteHandler: Component = () => {
   return (
     <div class="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
       {inviteInfo()?.space_banner ? (
-        <div class="absolute inset-0 bg-cover bg-center" style={{ 'background-image': `url(${inviteInfo()?.space_banner})` }}></div>
+        <div class="absolute inset-0 bg-cover bg-center" style={{ 'background-image': `url(${FS_URL}/space_banners/${inviteInfo()?.space_id}/${inviteInfo()?.space_banner})` }}></div>
       ) : (
         <>
           <div class="absolute inset-0 opacity-40">
@@ -218,7 +204,7 @@ const InviteHandler: Component = () => {
               <div class="relative">
                 {inviteInfo()?.space_icon ? (
                   <img 
-                    src={inviteInfo()!.space_icon} 
+                    src={`${FS_URL}/space_icons/${inviteInfo()!.space_id}/${inviteInfo()!.space_icon}`} 
                     alt={inviteInfo()!.space_name}
                     class="w-16 h-16 rounded-lg object-cover"
                   />

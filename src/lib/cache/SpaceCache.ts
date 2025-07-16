@@ -64,6 +64,7 @@ export interface SpaceRole {
   name: string;
   description?: string;
   color?: string;
+  permissions?: string[];
   hoist?: boolean;
   mentionable?: boolean;
   position?: number;

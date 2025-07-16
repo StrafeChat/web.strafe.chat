@@ -82,7 +82,30 @@ export const SpaceMembersList: Component<SpaceMembersListProps> = (props) => {
     const offlineMembers = [];
     const processedMembers = new Set();
     
-    // First, group members by hoisted roles
+    // First, separate all members into offline and online groups
+    for (const member of members) {
+      const userData = cache.getUser(member.user_id);
+      if (userData) {
+        const memberData = {
+          id: userData.id,
+          username: userData.username,
+          discriminator: userData.discriminator,
+          display_name: userData.display_name,
+          avatar: userData.avatar,
+          banner: userData.banner,
+          presence: userData.presence,
+          spaceMember: member
+        };
+        
+        // Always put offline users in the offline section, regardless of roles
+        if (userData.presence?.status === "offline" || !userData.presence?.status) {
+          offlineMembers.push(memberData);
+          processedMembers.add(member.user_id);
+        }
+      }
+    }
+    
+    // Then, group online members by hoisted roles
     for (const role of hoistedRoles) {
       const roleMembers = [];
       
@@ -114,7 +137,7 @@ export const SpaceMembersList: Component<SpaceMembersListProps> = (props) => {
       }
     }
     
-    // Then, group remaining members by online/offline status
+    // Finally, add remaining online members without hoisted roles to the online section
     for (const member of members) {
       if (!processedMembers.has(member.user_id)) {
         const userData = cache.getUser(member.user_id);
@@ -129,12 +152,7 @@ export const SpaceMembersList: Component<SpaceMembersListProps> = (props) => {
             presence: userData.presence,
             spaceMember: member
           };
-          
-          if (userData.presence?.status === "offline" || !userData.presence?.status) {
-            offlineMembers.push(memberData);
-          } else {
-            onlineMembers.push(memberData);
-          }
+          onlineMembers.push(memberData);
         }
       }
     }

@@ -1,9 +1,11 @@
 import { Component, createSignal, onMount, onCleanup, Show } from "solid-js";
 import SpaceSettings from "../../settings/SpaceSettings";
+import { FS_URL } from "../../../constants";
 
 interface SpaceHeaderDropdownProps {
   spaceId?: string;
   spaceName?: string;
+  currentSpace?: any;
 }
 
 export const SpaceHeaderDropdown: Component<SpaceHeaderDropdownProps> = (props) => {
@@ -52,23 +54,57 @@ export const SpaceHeaderDropdown: Component<SpaceHeaderDropdownProps> = (props) 
   };
 
   return (
-    <div class="relative p-2 flex flex-col border-b border-surface border-opacity-20 flex-shrink-0" ref={dropdownRef}>
-      <div 
-        class="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-surface hover:bg-opacity-10 rounded-md transition-colors"
-        onClick={() => setIsOpen(!isOpen())}
-      >
-        <h3 class="text-xl font-bold text-text-primary truncate">
-          {props.spaceName || "Unknown Space"}
-        </h3>
-        <div
-          class="transition-transform duration-200"
-          classList={{ "rotate-180": isOpen() }}
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-text-secondary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="6,9 12,15 18,9" />
-          </svg>
+    <div class="relative flex flex-col border-b border-surface border-opacity-20 flex-shrink-0" ref={dropdownRef}>
+      {/* Space banner with header overlay */}
+      <Show when={props.currentSpace?.banner} fallback={
+        <div class="p-2">
+          <div 
+            class="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-surface hover:bg-opacity-10 rounded-md transition-colors"
+            onClick={() => setIsOpen(!isOpen())}
+          >
+            <h3 class="text-xl font-bold text-text-primary truncate">
+              {props.spaceName || "Unknown Space"}
+            </h3>
+            <div
+              class="transition-transform duration-200"
+              classList={{ "rotate-180": isOpen() }}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-text-secondary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <polyline points="6,9 12,15 18,9" />
+              </svg>
+            </div>
+          </div>
         </div>
-      </div>
+      }>
+        <div class="relative h-[120px] overflow-hidden">
+          <img
+            src={`${FS_URL}/space_banners/${props.currentSpace?.id}/${props.currentSpace?.banner}`}
+            alt="Space banner"
+            class="w-full h-full object-cover"
+          />
+          <div class="absolute inset-0 bg-gradient-to-b from-black/60 via-black/20 to-transparent" />
+          
+          {/* Space header with dropdown overlaid on banner */}
+          <div class="absolute top-0 left-0 right-0 p-2">
+            <div 
+              class="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-black hover:bg-opacity-20 rounded-md transition-colors"
+              onClick={() => setIsOpen(!isOpen())}
+            >
+              <h3 class="text-xl font-bold text-white truncate drop-shadow-lg">
+                {props.spaceName || "Unknown Space"}
+              </h3>
+              <div
+                class="transition-transform duration-200"
+                classList={{ "rotate-180": isOpen() }}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-white drop-shadow-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <polyline points="6,9 12,15 18,9" />
+                </svg>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Show>
       
       <Show when={isOpen()}>
         <div class="absolute top-full left-2 right-2 mt-1 py-1 bg-background1 border border-surface border-opacity-20 rounded-md shadow-lg z-50">

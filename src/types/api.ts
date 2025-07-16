@@ -86,6 +86,24 @@ export interface SpaceInvite {
   created_at: string;
 }
 
+export interface InviteInfo {
+  space_id: number;
+  space_name: string;
+  space_icon?: string;
+  space_banner?: string;
+  space_name_acronym?: string;
+  inviter_id: string;
+  inviter_username: string;
+  inviter_display_name?: string;
+  inviter_avatar?: string;
+  member_count: number;
+  expires_at?: string;
+  max_uses?: number;
+  uses: number;
+  code: string;
+}
+
 export type SpaceInvitesListResponse = ApiResponse<SpaceInvite[]>;
 export type SpaceInviteCreateResponse = ApiResponse<SpaceInvite>;
 export type SpaceInviteDeleteResponse = ApiResponse<{}>;
+export type InviteInfoResponse = ApiResponse<InviteInfo>;

@@ -14,18 +14,21 @@ This document describes the GitHub-integrated update notification system that sh
 ## Components
 
 ### 1. GitHub Service (`src/lib/services/githubService.ts`)
+
 - Handles GitHub API communication
 - Fetches latest releases and commits
 - Compares versions to detect updates
 - Configurable repository owner and name
 
 ### 2. Update Notification Hook (`src/lib/hooks/useUpdateNotification.ts`)
+
 - Manages update checking logic
 - Handles localStorage for tracking shown updates
 - Provides reactive signals for modal state
 - Implements automatic checking intervals
 
 ### 3. Update Notification Modal (`src/components/modals/UpdateNotificationModal.tsx`)
+
 - Beautiful modal component for displaying update information
 - Shows version, commit message/release notes, and publication date
 - Provides "Later" and "View Update" buttons
@@ -34,17 +37,19 @@ This document describes the GitHub-integrated update notification system that sh
 ## Configuration
 
 ### Repository Settings
+
 Update the repository information in `src/lib/services/githubService.ts`:
 
 ```typescript
 class GitHubService {
-  private readonly owner = 'StrafeChat'; // GitHub username/organization
-  private readonly repo = 'web'; // Repository name
+  private readonly owner = "StrafeChat"; // GitHub username/organization
+  private readonly repo = "web"; // Repository name
   // ...
 }
 ```
 
 ### App Version
+
 The current app version is defined in `src/constants.ts`:
 
 ```typescript
@@ -52,6 +57,7 @@ export const APP_VERSION = "0.1.5-INDEV";
 ```
 
 ### Check Interval
+
 Modify the checking interval in `src/lib/hooks/useUpdateNotification.ts`:
 
 ```typescript
@@ -61,10 +67,12 @@ const CHECK_INTERVAL = 30 * 60 * 1000; // 30 minutes in milliseconds
 ## How It Works
 
 1. **Commit-Based Updates**: The system checks for updates from recent commits:
+
    - **Development Branch**: Primarily checks the `dev` branch for latest commits
    - **Fallback Branches**: Falls back to `main` then `master` if `dev` doesn't exist
 
-2. **Smart Notifications**: 
+2. **Smart Notifications**:
+
    - Shows commit notifications for recent development activity (within 24 hours)
    - Prevents duplicate notifications using localStorage caching
    - Only notifies about commits, no release checking
@@ -81,16 +89,16 @@ The system includes built-in testing utilities available in the browser console:
 
 ```javascript
 // Test real GitHub API integration (checks dev branch commits)
-testUpdateNotification()
+testUpdateNotification();
 
 // Clear the notification cache (allows re-showing notifications)
-clearUpdateCache()
+clearUpdateCache();
 
 // Show a fake update notification for UI testing
-simulateUpdate()
+simulateUpdate();
 
 // View current cache status
-getUpdateCacheStatus()
+getUpdateCacheStatus();
 ```
 
 ### Testing Workflow
@@ -104,13 +112,13 @@ getUpdateCacheStatus()
 
 ## Storage
 
-The system uses localStorage with the key `strafe_chat_shown_updates` to store:
+The system uses localStorage with the key `sc_shown_updates` to store:
 
 ```typescript
 interface ShownUpdate {
-  version: string;        // Version or commit SHA
-  type: 'release' | 'commit'; // Type of update
-  timestamp: number;      // When it was shown
+  version: string; // Version or commit SHA
+  type: "release" | "commit"; // Type of update
+  timestamp: number; // When it was shown
 }
 ```
 
@@ -124,14 +132,17 @@ interface ShownUpdate {
 ## Customization
 
 ### Modal Styling
+
 The modal uses the app's existing CSS variables and can be customized in:
 `src/components/modals/UpdateNotificationModal.tsx`
 
 ### Update Logic
+
 Customize when updates are considered "new" in:
 `src/lib/services/githubService.ts` (see `isNewerVersion` method)
 
 ### Notification Frequency
+
 Adjust checking intervals and delays in:
 `src/lib/hooks/useUpdateNotification.ts`
 

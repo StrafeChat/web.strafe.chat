@@ -1,6 +1,8 @@
 import { Component, createSignal } from "solid-js";
 import { useAuth } from "../../../lib/providers/auth/AuthProvider";
 import { Space } from "../../../lib/cache/SpaceCache";
+import { api } from "../../../lib/api";
+import { BASE_URL, FS_URL } from "../../../constants";
 import Settings from "../../shared/icons/Settings";
 import Globe from "../../shared/icons/Globe";
 
@@ -15,18 +17,176 @@ const SpaceOverviewSettings: Component<SpaceOverviewSettingsProps> = (props) => 
   const [nameAcronym, setNameAcronym] = createSignal(props.space.name_acronym);
   const [vanityUrl, setVanityUrl] = createSignal(props.space.vanity_url_code || "");
   const [preferredLocale, setPreferredLocale] = createSignal(props.space.preferred_locale);
+  const [saving, setSaving] = createSignal(false);
+  const [uploadingIcon, setUploadingIcon] = createSignal(false);
+  const [uploadingBanner, setUploadingBanner] = createSignal(false);
 
   const isOwner = () => props.space.owner_id === user()?.id;
 
   const handleSave = async () => {
-    // TODO: Implement API call to update space settings
-    console.log("Saving space settings:", {
-      name: name(),
-      description: description(),
-      name_acronym: nameAcronym(),
-      vanity_url_code: vanityUrl(),
-      preferred_locale: preferredLocale(),
-    });
+    if (!isOwner() || saving()) return;
+    
+    setSaving(true);
+    try {
+      const updateData: any = {};
+      
+      // Only include fields that have changed
+      if (name().trim() !== props.space.name) {
+        updateData.name = name().trim();
+      }
+      if (description().trim() !== (props.space.description || "")) {
+        updateData.description = description().trim();
+      }
+      if (nameAcronym().trim() !== props.space.name_acronym) {
+        updateData.name_acronym = nameAcronym().trim();
+      }
+      if (vanityUrl().trim() !== (props.space.vanity_url_code || "")) {
+        updateData.vanity_url_code = vanityUrl().trim();
+      }
+      if (preferredLocale() !== props.space.preferred_locale) {
+        updateData.preferred_locale = preferredLocale();
+      }
+      
+      // Only make API call if there are changes
+      if (Object.keys(updateData).length > 0) {
+        await api.spaces.update(props.space.id, updateData);
+        console.log("Space settings updated successfully");
+      }
+    } catch (error) {
+      console.error("Failed to update space settings:", error);
+    } finally {
+      setSaving(false);
+    }
+  };
+  
+  const handleIconUpload = async (event: Event) => {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file || !isOwner() || uploadingIcon()) return;
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      return;
+    }
+    
+    // Validate file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      alert('File size must be less than 5MB');
+      return;
+    }
+    
+    setUploadingIcon(true);
+    try {
+      // Step 1: Upload file to Nebula service
+      const formData = new FormData();
+      formData.append('icon', file);
+      
+      const uploadResponse = await fetch(`${FS_URL}/api/v1/spaces/${props.space.id}/icon`, {
+        method: 'POST',
+        headers: {
+          'X-Session-Token': localStorage.getItem('sc_token') || '',
+        },
+        body: formData,
+      });
+      
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload icon to file service');
+      }
+      
+      const uploadResult = await uploadResponse.json();
+      console.log('Space icon uploaded to Nebula successfully:', uploadResult);
+      
+      // Step 2: Update space with the file ID in Equinox
+      const updateResponse = await fetch(`${BASE_URL}/spaces/${props.space.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Session-Token': localStorage.getItem('sc_token') || '',
+        },
+        body: JSON.stringify({
+          icon: uploadResult.filename
+        }),
+      });
+      
+      if (!updateResponse.ok) {
+        throw new Error('Failed to update space with new icon');
+      }
+      
+      console.log('Space icon updated successfully');
+    } catch (error) {
+      console.error('Failed to upload space icon:', error);
+      alert('Failed to upload space icon. Please try again.');
+    } finally {
+      setUploadingIcon(false);
+      // Reset the input
+      input.value = '';
+    }
+  };
+
+  const handleBannerUpload = async (event: Event) => {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file || !isOwner() || uploadingBanner()) return;
+    
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      alert('Please select an image file');
+      return;
+    }
+    
+    // Validate file size (10MB limit for banners)
+    if (file.size > 10 * 1024 * 1024) {
+      alert('File size must be less than 10MB');
+      return;
+    }
+    
+    setUploadingBanner(true);
+    try {
+      // Step 1: Upload file to Nebula service
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const uploadResponse = await fetch(`${FS_URL}/api/v1/spaces/${props.space.id}/banner`, {
+        method: 'POST',
+        headers: {
+          'X-Session-Token': localStorage.getItem('sc_token') || '',
+        },
+        body: formData,
+      });
+      
+      if (!uploadResponse.ok) {
+        throw new Error('Failed to upload banner to file service');
+      }
+      
+      const uploadResult = await uploadResponse.json();
+      console.log('Space banner uploaded to Nebula successfully:', uploadResult);
+      
+      // Step 2: Update space with the file ID in Equinox
+      const updateResponse = await fetch(`${BASE_URL}/spaces/${props.space.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-Session-Token': localStorage.getItem('sc_token') || '',
+        },
+        body: JSON.stringify({
+          banner: uploadResult.filename
+        }),
+      });
+      
+      if (!updateResponse.ok) {
+        throw new Error('Failed to update space with new banner');
+      }
+      
+      console.log('Space banner updated successfully');
+    } catch (error) {
+      console.error('Failed to upload space banner:', error);
+      alert('Failed to upload space banner. Please try again.');
+    } finally {
+      setUploadingBanner(false);
+      // Reset the input
+      input.value = '';
+    }
   };
 
   return (
@@ -112,23 +272,69 @@ const SpaceOverviewSettings: Component<SpaceOverviewSettingsProps> = (props) => 
           <div class="space-y-4">
             <div class="p-4 bg-background2 border border-border rounded-lg">
               <h4 class="text-text-primary font-medium mb-2">Space Icon</h4>
-              <p class="text-text-secondary text-sm mb-3">Upload a custom icon for your space</p>
-              <button 
-                disabled={!isOwner()}
-                class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Upload Icon
-              </button>
+              <p class="text-text-secondary text-sm mb-3">Upload a custom icon for your space (max 5MB)</p>
+              <div class="flex items-center gap-3">
+                {props.space.icon && (
+                  <img 
+                    src={props.space.icon} 
+                    alt="Space icon" 
+                    class="w-12 h-12 rounded-lg object-cover border border-border"
+                  />
+                )}
+                <div>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={handleIconUpload}
+                    disabled={!isOwner() || uploadingIcon()}
+                    class="hidden" 
+                    id="space-icon-upload"
+                  />
+                  <label 
+                    for="space-icon-upload"
+                    class={`inline-block px-4 py-2 rounded-lg transition-colors cursor-pointer ${
+                      !isOwner() || uploadingIcon() 
+                        ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
+                        : 'bg-primary text-white hover:bg-primary-dark'
+                    }`}
+                  >
+                    {uploadingIcon() ? 'Uploading...' : 'Upload Icon'}
+                  </label>
+                </div>
+              </div>
             </div>
             <div class="p-4 bg-background2 border border-border rounded-lg">
               <h4 class="text-text-primary font-medium mb-2">Space Banner</h4>
-              <p class="text-text-secondary text-sm mb-3">Upload a banner image for your space</p>
-              <button 
-                disabled={!isOwner()}
-                class="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Upload Banner
-              </button>
+              <p class="text-text-secondary text-sm mb-3">Upload a banner image for your space (max 10MB)</p>
+              <div class="flex items-center gap-3">
+                {props.space.banner && (
+                  <img 
+                    src={props.space.banner} 
+                    alt="Space banner" 
+                    class="w-20 h-12 rounded-lg object-cover border border-border"
+                  />
+                )}
+                <div>
+                  <input 
+                    type="file" 
+                    accept="image/*" 
+                    onChange={handleBannerUpload}
+                    disabled={!isOwner() || uploadingBanner()}
+                    class="hidden" 
+                    id="space-banner-upload"
+                  />
+                  <label 
+                    for="space-banner-upload"
+                    class={`inline-block px-4 py-2 rounded-lg transition-colors cursor-pointer ${
+                      !isOwner() || uploadingBanner() 
+                        ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
+                        : 'bg-primary text-white hover:bg-primary-dark'
+                    }`}
+                  >
+                    {uploadingBanner() ? 'Uploading...' : 'Upload Banner'}
+                  </label>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -187,9 +393,14 @@ const SpaceOverviewSettings: Component<SpaceOverviewSettingsProps> = (props) => 
           <div class="flex justify-end">
             <button
               onClick={handleSave}
-              class="px-6 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors"
+              disabled={saving()}
+              class={`px-6 py-2 rounded-lg transition-colors ${
+                saving() 
+                  ? 'bg-gray-400 text-gray-600 cursor-not-allowed' 
+                  : 'bg-green-500 text-white hover:bg-green-600'
+              }`}
             >
-              Save Changes
+              {saving() ? 'Saving...' : 'Save Changes'}
             </button>
           </div>
         )}
