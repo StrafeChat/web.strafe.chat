@@ -6,6 +6,7 @@ import { useLocation, useNavigate } from "@solidjs/router";
 import { PMList } from "../home/pms/PMList";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
 import { useMobileNav } from "../../lib/providers/mobile/MobileNavProvider";
+import { useNavigationTracker } from "../../lib/hooks/useNavigationTracker";
 import UserSettings from "../settings/UserSettings";
 import { Portal } from "solid-js/web";
 
@@ -16,6 +17,9 @@ export const Interface = (props: { children: JSX.Element }) => {
   const { currentView, setCurrentView, handleTouchStart, handleTouchMove, handleTouchEnd } = useMobileNav();
   const [showSettings, setShowSettings] = createSignal(false)
   const [, setIsSidebarVisible] = createSignal(true);
+  
+  // Track navigation changes automatically
+  useNavigationTracker();
 
   const showRoomsList = () => {
     // Only show RoomsList on general spaces list page, not individual space pages

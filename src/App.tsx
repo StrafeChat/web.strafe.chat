@@ -38,6 +38,7 @@ import { SpaceRoomView } from "./components/spaces/SpaceRoomView";
 import SpaceView from "./components/spaces/SpaceView";
 import InviteHandler from "./components/invite/InviteHandler";
 import { VoiceProvider } from "./lib/providers/voice/VoiceProvider";
+import { NavigationHistoryProvider } from "./lib/providers/navigation/NavigationHistoryProvider";
 
 const UpdateNotificationWrapper = () => {
   const { isAuthenticated } = useAuth();
@@ -90,16 +91,18 @@ const MountApp = (props: ParentProps) => {
               <UserSettingsProvider>
                 <AuthProvider>
 									<VoiceProvider>
-										<MobileNavProvider>
-											<SettingsProvider>
-												<ModalProvider>
-													<LinkConfirmationHandler />
-													<UpdateNotificationWrapper />
-													<GlobalKeyboardHandler />
-													<div class="h-[100dvh] w-full overflow-hidden">{props.children}</div>
-												</ModalProvider>
-											</SettingsProvider>
-										</MobileNavProvider>
+										<NavigationHistoryProvider>
+											<MobileNavProvider>
+												<SettingsProvider>
+													<ModalProvider>
+														<LinkConfirmationHandler />
+														<UpdateNotificationWrapper />
+														<GlobalKeyboardHandler />
+														<div class="h-[100dvh] w-full overflow-hidden">{props.children}</div>
+													</ModalProvider>
+												</SettingsProvider>
+											</MobileNavProvider>
+										</NavigationHistoryProvider>
 									</VoiceProvider>
                 </AuthProvider>
               </UserSettingsProvider>

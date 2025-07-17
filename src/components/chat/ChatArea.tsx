@@ -10,7 +10,7 @@ import {
 } from "solid-js";
 import { Key } from "@solid-primitives/keyed";
 import { useParams } from "@solidjs/router";
-import Message from "./Message";
+
 import { useTransContext } from "@mbarzda/solid-i18next";
 import { useCache } from "../../lib/providers/cache/CacheProvider";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
@@ -29,6 +29,7 @@ import UnreadDivider from "./UnreadDivider";
 import MessageSkeleton from "./MessageSkeleton";
 import { Avatar } from "../common/Avatar";
 import { MessageAttachment } from "../../types/messageTypes";
+import { Message } from "./Message/index";
 
 const ChatArea: Component = () => {
   const params = useParams();
@@ -1352,16 +1353,16 @@ const ChatArea: Component = () => {
       // and a 100ms setTimeout, so we need to wait longer
       setTimeout(() => {
         if (chatInputRef) {
-          console.log('[ChatArea] Auto-focusing chat input for room:', roomId);
+          console.log("[ChatArea] Auto-focusing chat input for room:", roomId);
           chatInputRef.focus();
           // Ensure the input stays focused by preventing any blur events briefly
           const preventBlur = (e: FocusEvent) => {
             e.preventDefault();
             if (chatInputRef) chatInputRef.focus();
           };
-          chatInputRef.addEventListener('blur', preventBlur, { once: true });
+          chatInputRef.addEventListener("blur", preventBlur, { once: true });
           setTimeout(() => {
-            chatInputRef?.removeEventListener('blur', preventBlur);
+            chatInputRef?.removeEventListener("blur", preventBlur);
           }, 100);
         }
       }, 200); // Increased delay to 200ms to wait for all scroll operations
@@ -1971,17 +1972,34 @@ const ChatArea: Component = () => {
                 </div>
               </Show>
               <Show when={displayMessages().length > 0}>
-                <Key each={groupedMessages()} by={(group) => group.date.getTime()}>
+                <Key
+                  each={groupedMessages()}
+                  by={(group) => group.date.getTime()}
+                >
                   {(group) => (
                     <>
                       <DateDivider date={group().date} />
-                      <Key each={group().messages} by={(message) => {
-                        const messages = group().messages;
-                        const currentIndex = messages.findIndex(m => (m.id && m.id === message.id) || (m.nonce && m.nonce === message.nonce));
-                        const prevMessage = currentIndex > 0 ? messages[currentIndex - 1] : null;
-                        const prevMessageKey = prevMessage ? (prevMessage.id || prevMessage.nonce || prevMessage.author_id) : "none";
-                        return `${message.id || message.nonce || ""}-${prevMessageKey}-${currentIndex}`;
-                      }}>
+                      <Key
+                        each={group().messages}
+                        by={(message) => {
+                          const messages = group().messages;
+                          const currentIndex = messages.findIndex(
+                            (m) =>
+                              (m.id && m.id === message.id) ||
+                              (m.nonce && m.nonce === message.nonce),
+                          );
+                          const prevMessage =
+                            currentIndex > 0
+                              ? messages[currentIndex - 1]
+                              : null;
+                          const prevMessageKey = prevMessage
+                            ? prevMessage.id ||
+                              prevMessage.nonce ||
+                              prevMessage.author_id
+                            : "none";
+                          return `${message.id || message.nonce || ""}-${prevMessageKey}-${currentIndex}`;
+                        }}
+                      >
                         {(message, index) => {
                           const prevMessage =
                             index() > 0 ? group().messages[index() - 1] : null;

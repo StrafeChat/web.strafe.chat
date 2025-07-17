@@ -3,6 +3,7 @@ import { useNavigate, useLocation } from "@solidjs/router";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
 // import { useCache } from "../../lib/providers/cache/CacheProvider";
 import { useMobileNav } from "../../lib/providers/mobile/MobileNavProvider";
+import { useNavigationHistory } from "../../lib/providers/navigation/NavigationHistoryProvider";
 import { Tooltip } from "../common/Tooltip";
 import { FS_URL } from "../../constants";
 import { RoomType } from "../../types/roomTypes";
@@ -27,6 +28,7 @@ const SpacesList: Component = () => {
   const location = useLocation();
   const { relationshipRequests, user, rooms, isMobile, spaces } = useAuth();
   const { setCurrentView } = useMobileNav();
+  const { getLastHomeRoute, getLastSpaceRoute } = useNavigationHistory();
   // const cache = useCache();
   const [showCreateModal, setShowCreateModal] = createSignal(false);
   const [hoveredSpace, setHoveredSpace] = createSignal<string | null>(null);
@@ -157,7 +159,10 @@ const SpacesList: Component = () => {
       <Tooltip content={"Home"} position="right">
         <button
             class="w-12 h-12 rounded-full bg-surface hover:bg-accent transition-all group relative"
-            onClick={() => navigate("/")}
+            onClick={() => {
+              const lastHomeRoute = getLastHomeRoute();
+              navigate(lastHomeRoute);
+            }}
             onMouseEnter={() => setHoveredHome(true)}
             onMouseLeave={() => setHoveredHome(false)}
           >
@@ -241,7 +246,8 @@ const SpacesList: Component = () => {
               <button
                 class={`w-12 h-12 ${isSpaceActive() === String(space.id) ? "rounded-2xl" : "rounded-full hover:rounded-2xl"} bg-surface hover:bg-accent relative overflow-hidden group`}
                 onClick={() => {
-                  navigate(`/spaces/${space.id}`);
+                  const lastSpaceRoute = getLastSpaceRoute(String(space.id));
+                  navigate(lastSpaceRoute);
                   if (isMobile()) {
                     setCurrentView("content");
                   }
