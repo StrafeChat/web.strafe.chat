@@ -238,7 +238,7 @@ export const SpaceMembersList: Component<SpaceMembersListProps> = (props) => {
           props.isMobile ? 'fixed inset-0 z-50' : 'relative h-full w-[250px] flex-shrink-0'
         }`}
         style={{ 
-          display: (!props.showMembers) ? 'none' : 'block'
+          display: (!props.showMembers) ? 'none' : 'flex'
         }}
       >
         <Show when={props.isMobile}>
@@ -256,7 +256,7 @@ export const SpaceMembersList: Component<SpaceMembersListProps> = (props) => {
           </div>
         </Show>
         
-        <div class="flex-1 overflow-y-auto min-h-0">
+        <div class="flex-1 overflow-y-auto min-h-0 max-h-full">
           <div class="p-2 pt-5">
             {/* Role Groups Section */}
             <For each={spaceMembers().roleGroups}>
