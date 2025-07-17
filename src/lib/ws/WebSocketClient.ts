@@ -836,8 +836,10 @@ export class WebSocketClient {
         owner_id: roomData.creator || roomData.owner_id || "",
         last_message_id: roomData.last_message_id || null,
         icon: roomData.icon || null,
+        parent_id: roomData.parent_id || null,
         created_at: roomData.created_at || new Date().toISOString(),
-        updated_at: roomData.updated_at || null
+        updated_at: roomData.updated_at || null,
+        space_id: roomData.space_id || null
       });
       
       // Also call the message handler directly to ensure it's processed

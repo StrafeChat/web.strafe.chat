@@ -130,6 +130,13 @@ export const api = {
         method: "PATCH",
         body: data,
       }),
+    rooms: {
+      create: (spaceId: string, data: { name: string; type: number; topic?: string; parent_id?: string; is_private?: boolean; allowed_roles?: string[] }) =>
+        apiRequest(`${API_ENDPOINTS.SPACES}/${spaceId}/rooms`, {
+          method: "POST",
+          body: data,
+        }),
+    },
     members: {
       list: (spaceId: string) => apiRequest(API_ENDPOINTS.SPACE_MEMBERS(spaceId)),
       updateRoles: (spaceId: string, userId: string, roleIds: string[]) =>

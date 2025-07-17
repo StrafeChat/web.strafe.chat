@@ -1,6 +1,7 @@
 import { Component, createSignal, For, Show, createEffect } from "solid-js";
 import { useCache } from "../../lib/providers/cache/CacheProvider";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
+import { usePermissions } from "../../lib/hooks/usePermissions";
 import { api } from "../../lib/api";
 import { SpaceMember } from "../../lib/cache/SpaceCache";
 import Modal from "./Modal";
@@ -15,6 +16,7 @@ interface RoleManagementModalProps {
 const RoleManagementModal: Component<RoleManagementModalProps> = (props) => {
   const cache = useCache();
   const { user } = useAuth();
+  const { checkPermission } = usePermissions();
   const [saving, setSaving] = createSignal(false);
   const [selectedRoles, setSelectedRoles] = createSignal<string[]>([]);
 
@@ -40,9 +42,8 @@ const RoleManagementModal: Component<RoleManagementModalProps> = (props) => {
     // Space owner can always manage roles
     if (currentSpace.owner_id === user()?.id) return true;
     
-    // TODO: Check for MANAGE_ROLES permission
-    // For now, only allow space owners
-    return false;
+    // Check for MANAGE_ROLES permission using global hook
+    return checkPermission(props.spaceId, "MANAGE_ROLES");
   };
 
   const toggleRole = (roleId: string) => {

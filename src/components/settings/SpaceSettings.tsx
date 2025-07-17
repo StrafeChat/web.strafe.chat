@@ -2,6 +2,7 @@ import { Component, createSignal, Show } from "solid-js";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
 import { useCache } from "../../lib/providers/cache/CacheProvider";
 // import { useTransContext } from "@mbarzda/solid-i18next";
+import { usePermissions } from "../../lib/hooks/usePermissions";
 import { useSettings } from "../../lib/providers/settings/SettingsProvider";
 // import { Space } from "../../lib/cache/SpaceCache";
 import Modal from "../modals/Modal";
@@ -33,12 +34,14 @@ interface SpaceSettingsProps {
 const SpaceSettings: Component<SpaceSettingsProps> = (props) => {
   const { isMobile, user } = useAuth();
   const { getSpace } = useCache();
+  const { checkPermission } = usePermissions();
   // const [t] = useTransContext();
   const [isSidebarOpen, setIsSidebarOpen] = createSignal(true);
   const { state, setActiveSection } = useSettings();
 
   const space = () => getSpace(props.spaceId);
   const isOwner = () => space()?.owner_id === user()?.id;
+  const canManageSpace = () => isOwner() || checkPermission(props.spaceId, "MANAGE_SPACE");
 
   const sections = [
     "overview",

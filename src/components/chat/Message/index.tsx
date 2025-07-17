@@ -67,6 +67,14 @@ export function Message(props: MessageProps) {
   const refMessages = referencedMessages(() => props, cache);
   const inviteStates = useInviteStates(props, cache);
   const author = createMemo(() => cache.getUser(props.author_id));
+  const currentRoom = createMemo(() => rooms().find((r) => r.id === props.room_id));
+  const currentSpaceId = createMemo(() => currentRoom()?.space_id);
+  const currentSpaceMember = createMemo(() => {
+    const spaceId = currentSpaceId();
+    const authorId = props.author_id;
+    if (!spaceId || !authorId) return undefined;
+    return cache.getSpaceMember(spaceId, authorId);
+  });
   const shouldShowCompact =
     props.isCompact && !props.message_references?.length;
 
@@ -260,6 +268,7 @@ export function Message(props: MessageProps) {
           setSystemUserPopupOpen(true);
         }}
         onClosePopup={() => setSystemUserPopupOpen(false)}
+        spaceId={currentSpaceId()}
       />
     );
   }
@@ -294,6 +303,8 @@ export function Message(props: MessageProps) {
           onClose={() => setUserPopupOpen(false)}
           triggerRef={userPopupTrigger()}
           userId={props.author_id}
+          spaceId={currentSpaceId()}
+          spaceMember={currentSpaceMember()}
         />
 
         <div

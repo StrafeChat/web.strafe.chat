@@ -94,41 +94,73 @@ const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
 
     const rect = props.triggerRef.getBoundingClientRect();
     const popupWidth = 300;
-    const gap = 10;
+    const gap = 8;
+    const minPopupHeight = 200;
+    const maxPopupHeight = 500;
     
-    // Position to the right of the trigger element
-    let left = rect.right + gap;
+    // Calculate available space in all directions
+    const spaceLeft = rect.left;
+    const spaceRight = window.innerWidth - rect.right;
+    const spaceAbove = rect.top;
+    const spaceBelow = window.innerHeight - rect.bottom;
     
-    // Check if popup would go off the right edge of screen
-    if (left + popupWidth > window.innerWidth - gap) {
-      // Position to the left of the trigger instead
+    let left: number;
+    let top: number;
+    let maxHeight = maxPopupHeight;
+    
+    // Horizontal positioning - prefer right, but use left if more space
+    if (spaceRight >= popupWidth + gap) {
+      // Position to the right of trigger
+      left = rect.right + gap;
+    } else if (spaceLeft >= popupWidth + gap) {
+      // Position to the left of trigger
       left = rect.left - popupWidth - gap;
-      // Ensure it doesn't go off the left edge
-      if (left < gap) {
-        left = gap;
-      }
+    } else {
+      // Center horizontally if neither side has enough space
+      left = Math.max(gap, (window.innerWidth - popupWidth) / 2);
     }
     
-    // Vertical positioning - align top of popup with top of trigger
-     let top = rect.top;
-     
-     // Check if popup would go off the top of screen
-     if (top < gap) {
-       top = gap;
+    // Vertical positioning - keep popup close to trigger
+     if (spaceBelow >= minPopupHeight) {
+       // Position below trigger, aligned with its top
+       top = rect.top;
+       maxHeight = Math.min(maxPopupHeight, spaceBelow - gap);
+     } else if (spaceAbove >= minPopupHeight) {
+       // Position above trigger, with bottom edge near trigger
+       const availableHeight = Math.min(maxPopupHeight, spaceAbove - gap);
+       top = rect.top - availableHeight;
+       maxHeight = availableHeight;
+     } else {
+       // Limited space - position to keep some part near trigger
+       maxHeight = Math.min(maxPopupHeight, window.innerHeight - gap * 2);
+       if (spaceBelow > spaceAbove) {
+         // More space below - align top with trigger
+         top = rect.top;
+       } else {
+         // More space above - align bottom with trigger
+         top = rect.bottom - maxHeight;
+       }
      }
-     
-     // Check if popup would go off the bottom of screen
-     const estimatedPopupHeight = 300; // Approximate popup height
-     if (top + estimatedPopupHeight > window.innerHeight - gap) {
-       // Reposition from bottom
-       top = window.innerHeight - estimatedPopupHeight - gap;
-       if (top < gap) top = gap;
-     }
+    
+    // Final bounds checking
+    if (left < gap) left = gap;
+    if (left + popupWidth > window.innerWidth - gap) {
+      left = window.innerWidth - popupWidth - gap;
+    }
+    
+    if (top < gap) {
+      top = gap;
+      maxHeight = Math.min(maxHeight, window.innerHeight - gap * 2);
+    }
+    
+    if (top + maxHeight > window.innerHeight - gap) {
+      maxHeight = window.innerHeight - top - gap;
+    }
 
     return {
       left: `${left}px`,
       top: `${top}px`,
-      maxHeight: `${Math.min(400, window.innerHeight - top - gap)}px`,
+      maxHeight: `${maxHeight}px`,
     };
   };
 
@@ -138,7 +170,7 @@ const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
         <Portal>
           <div
             ref={popupRef}
-            class="fixed z-50 bg-background2 rounded-lg shadow-lg w-[300px] overflow-hidden animate-fade-in"
+            class="fixed z-50 bg-background2 rounded-lg shadow-lg w-[300px] overflow-y-auto animate-fade-in"
             style={getPopupStyle()}
             onClick={(e) => e.stopPropagation()}
           >

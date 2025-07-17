@@ -97,7 +97,7 @@ export const SpaceInvitesSettings: Component<SpaceInvitesSettingsProps> = (props
         inviteData.expires_at = expirationDate.toISOString();
       }
       
-      const newInvite = await api.spaces.invites.create(props.space.id, inviteData);
+      // const newInvite = await api.spaces.invites.create(props.space.id, inviteData);
       
       toast.showToast("Invite created successfully!", "success");
       setShowCreateForm(false);
