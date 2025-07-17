@@ -234,18 +234,18 @@ export const SpaceMembersList: Component<SpaceMembersListProps> = (props) => {
     <>
       {/* Members sidebar - conditionally visible */}
       <div 
-        class={`space-member-list bg-[var(--background1)] overflow-y-auto shadow-lg transition-all pl-.5 duration-300 ${
-          props.isMobile ? 'fixed inset-0 z-50' : 'relative h-full w-[250px]'
+        class={`space-member-list bg-[var(--background1)] overflow-hidden shadow-lg transition-all pl-.5 duration-300 flex flex-col ${
+          props.isMobile ? 'fixed inset-0 z-50' : 'relative h-full w-[250px] flex-shrink-0'
         }`}
         style={{ 
           display: (!props.showMembers) ? 'none' : 'block'
         }}
       >
         <Show when={props.isMobile}>
-          <div class="p-3 flex items-center justify-end sticky top-2 bg-[var(--background1)] z-10">
+          <div class="p-3 flex items-center justify-end sticky top-0 bg-[var(--background1)] z-10 flex-shrink-0">
             <button 
               onClick={props.onToggleMembers}
-              class="p-2 rounded-full hover:bg-surface hover:bg-opacity-10 transition-colors text-text-secondary hover:text-text-primary"
+              class="p-2 rounded-full hover:bg-surface hover:bg-opacity-10 transition-colors text-text-secondary hover:text-text-primary flex-shrink-0"
               aria-label="Close members sidebar"
             >
               <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -256,48 +256,50 @@ export const SpaceMembersList: Component<SpaceMembersListProps> = (props) => {
           </div>
         </Show>
         
-        <div class="p-2 pt-5">
-          {/* Role Groups Section */}
-          <For each={spaceMembers().roleGroups}>
-            {(roleGroup) => (
+        <div class="flex-1 overflow-y-auto min-h-0">
+          <div class="p-2 pt-5">
+            {/* Role Groups Section */}
+            <For each={spaceMembers().roleGroups}>
+              {(roleGroup) => (
+                <div class="mb-4">
+                  <h4 class="text-xs font-bold text-text-secondary uppercase mb-2 px-2 flex items-center gap-2">
+                    <div
+                      class="w-3 h-3 rounded-full"
+                      style={{ "background-color": roleGroup.role.color || "#99aab5" }}
+                    />
+                    {roleGroup.role.name} — {roleGroup.members.length}
+                  </h4>
+                  <For each={roleGroup.members}>
+                    {(member) => renderMember(member)}
+                  </For>
+                </div>
+              )}
+            </For>
+            
+            {/* Online Members Section */}
+            <Show when={spaceMembers().online.length > 0}>
               <div class="mb-4">
-                <h4 class="text-xs font-bold text-text-secondary uppercase mb-2 px-2 flex items-center gap-2">
-                  <div
-                    class="w-3 h-3 rounded-full"
-                    style={{ "background-color": roleGroup.role.color || "#99aab5" }}
-                  />
-                  {roleGroup.role.name} — {roleGroup.members.length}
+                <h4 class="text-xs font-bold text-text-secondary uppercase mb-2 px-2">
+                  Online — {spaceMembers().online.length}
                 </h4>
-                <For each={roleGroup.members}>
+                <For each={spaceMembers().online}>
                   {(member) => renderMember(member)}
                 </For>
               </div>
-            )}
-          </For>
-          
-          {/* Online Members Section */}
-          <Show when={spaceMembers().online.length > 0}>
-            <div class="mb-4">
-              <h4 class="text-xs font-bold text-text-secondary uppercase mb-2 px-2">
-                Online — {spaceMembers().online.length}
-              </h4>
-              <For each={spaceMembers().online}>
-                {(member) => renderMember(member)}
-              </For>
-            </div>
-          </Show>
-          
-          {/* Offline Members Section */}
-          <Show when={spaceMembers().offline.length > 0}>
-            <div>
-              <h4 class="text-xs font-bold text-text-secondary uppercase mb-2 px-2">
-                Offline — {spaceMembers().offline.length}
-              </h4>
-              <For each={spaceMembers().offline}>
-                {(member) => renderMember(member, true)}
-              </For>
-            </div>
-          </Show>
+            </Show>
+            
+            {/* Offline Members Section */}
+            <Show when={spaceMembers().offline.length > 0}>
+              <div>
+                <h4 class="text-xs font-bold text-text-secondary uppercase mb-2 px-2">
+                  Offline — {spaceMembers().offline.length}
+                </h4>
+                <For each={spaceMembers().offline}>
+                  {(member) => renderMember(member, true)}
+                </For>
+              </div>
+            </Show>
+          </div>
         </div>
       </div>
       

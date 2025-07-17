@@ -53,9 +53,9 @@ export const SpaceRoomView: Component = () => {
 
 
   return (
-    <div class="h-full w-full flex bg-background2">
-      {/* Rooms list */}
-      <div class="w-[260px] bg-background1 flex flex-col">
+    <div class="h-full w-full flex bg-background2 overflow-hidden">
+      {/* Rooms list - fixed width, no shrink */}
+      <div class="w-[260px] bg-background1 flex flex-col flex-shrink-0">
           {(() => {
             const spaceId = currentSpace()?.id ? String(currentSpace()?.id) : undefined;
             console.log("[SpaceRoomView] Passing spaceId to RoomsList:", spaceId, "type:", typeof spaceId);
@@ -63,32 +63,31 @@ export const SpaceRoomView: Component = () => {
           })()}
       </div>
       
-      {/* Main content area */}
-      <div class="flex-1 flex flex-col">
+      {/* Main content area - flexible, can shrink */}
+      <div class="flex-1 flex flex-col min-w-0">
           {/* Header */}
-          <div class="p-2 flex flex-col border-b border-surface border-opacity-20 flex-shrink-0 bg-background2">
-            <div class="flex items-center justify-between px-3 py-1">
-              <div class="flex items-center gap-2">
+          <div class="p-2 flex flex-col border-b border-surface border-opacity-20 flex-shrink-0 bg-background2 overflow-hidden">
+            <div class="flex items-center justify-between px-3 py-1 min-w-0">
+              <div class="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
                 <Show when={currentRoom()?.type === RoomType.TEXT_ROOM} fallback={
-                  <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5 text-text-primary flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                     <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
                     <path d="M19 10v1a7 7 0 0 1-14 0v-1" />
                     <line x1="12" y1="19" x2="12" y2="23" />
                     <line x1="8" y1="23" x2="16" y2="23" />
                   </svg>
-                }>
-                  <span class="text-lg text-text-primary">#</span>
+                }>                  <span class="text-lg text-text-primary flex-shrink-0">#</span>
                 </Show>
-                <h2 class="text-lg font-bold text-text-primary truncate">
+                <h2 class="text-lg font-bold text-text-primary truncate min-w-0">
                   {getRoomName()}
                 </h2>
               </div>
               
               {/* Members toggle button */}
-              <div class="flex items-center gap-2">
+              <div class="flex items-center gap-2 flex-shrink-0">
                 <button
                   onClick={() => setShowMembers(!showMembers())}
-                  class="p-2 rounded-md hover:bg-surface hover:bg-opacity-10 transition-colors text-text-secondary hover:text-text-primary"
+                  class="p-2 rounded-md hover:bg-surface hover:bg-opacity-10 transition-colors text-text-secondary hover:text-text-primary flex-shrink-0"
                   aria-label="Toggle members sidebar"
                 >
                   <svg xmlns="http://www.w3.org/2000/svg" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -103,11 +102,9 @@ export const SpaceRoomView: Component = () => {
           </div>
           
           {/* Content area with chat and members sidebar */}
-          <div class="flex-1 overflow-hidden flex">
-            {/* Chat area */}
-            <div 
-               class={`${showMembers() && !isMobile() ? 'w-[calc(100%-250px)]' : 'w-full'} h-full transition-all duration-300`}
-             >
+          <div class="flex-1 overflow-hidden flex min-h-0">
+            {/* Chat area - flexible, can shrink */}
+            <div class="flex-1 h-full min-w-0 transition-all duration-300">
                <Show when={currentRoom()} fallback={
                  <div class="h-full flex items-center justify-center text-text-secondary">
                    <div class="text-center">
@@ -120,14 +117,29 @@ export const SpaceRoomView: Component = () => {
                </Show>
              </div>
              
-             {/* Members sidebar - conditionally visible */}
-             <SpaceMembersList
-                spaceId={currentSpace()?.id}
-                currentSpace={currentSpace()}
-                isMobile={isMobile()}
-                showMembers={showMembers()}
-                onToggleMembers={() => setShowMembers(!showMembers())}
-              />
+             {/* Members sidebar - fixed width when visible, no shrink */}
+             <Show when={showMembers() && !isMobile()}>
+               <div class="w-[250px] flex-shrink-0">
+                 <SpaceMembersList
+                    spaceId={currentSpace()?.id}
+                    currentSpace={currentSpace()}
+                    isMobile={isMobile()}
+                    showMembers={showMembers()}
+                    onToggleMembers={() => setShowMembers(!showMembers())}
+                  />
+               </div>
+             </Show>
+             
+             {/* Mobile members list */}
+             <Show when={isMobile()}>
+               <SpaceMembersList
+                  spaceId={currentSpace()?.id}
+                  currentSpace={currentSpace()}
+                  isMobile={isMobile()}
+                  showMembers={showMembers()}
+                  onToggleMembers={() => setShowMembers(!showMembers())}
+                />
+             </Show>
           </div>
         </div>
       

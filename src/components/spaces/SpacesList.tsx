@@ -124,7 +124,7 @@ const SpacesList: Component = () => {
   };
 
   return (
-    <div class="flex flex-col items-center h-full py-3 pb-14 md:pb-3 gap-2 bg-[var(--background)] relative">
+    <div class="flex flex-col items-center h-full py-3 pb-14 md:pb-3 gap-2 bg-[var(--background)] relative overflow-hidden">
       {/* Active page indicator - positioned at left edge of screen */}
       <Show when={isHomePage()}>
         <div class={`fixed left-0 ${INDICATOR_STYLES.ACTIVE} bg-accent rounded-r-full z-50`} style={{top: `${INDICATOR_POSITIONS.HOME_TOP}px`}}></div>
