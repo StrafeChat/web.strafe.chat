@@ -87,8 +87,10 @@ export class SpaceCache {
   private spaceUpdateCallbacks: ((spaceId: string, space: Space) => void)[] = [];
 
   public setSpace(space: Space): void {
-    this.spaces.set(space.id, space);
-    this.notifySpaceUpdate(space.id, space);
+    const existingSpace = this.spaces.get(space.id);
+    const updatedSpace = existingSpace ? { ...existingSpace, ...space } : space;
+    this.spaces.set(space.id, updatedSpace);
+    this.notifySpaceUpdate(space.id, updatedSpace);
   }
 
   public getSpace(spaceId: string): Space | undefined {

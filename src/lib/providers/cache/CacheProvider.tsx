@@ -7,8 +7,10 @@ import {
 } from "solid-js";
 import { MessageCache, CachedMessage } from "../../cache/MessageCache";
 import { SpaceCache, Space, SpaceMember, SpaceRole } from "../../cache/SpaceCache";
+import { RoomCache } from "../../cache/RoomCache";
 import { InviteCache } from "./InviteCache";
 import { InviteInfo } from "../../../types/api";
+import { Room } from "../../../types/rooms";
 
 export type Presence = {
   status: string;
@@ -75,6 +77,9 @@ type CacheContextType = {
   setSpaceRole: (spaceId: string, role: SpaceRole) => void;
   getCachedSpaceRoles: (spaceId: string) => SpaceRole[] | null;
   setCachedSpaceRoles: (spaceId: string, roles: SpaceRole[]) => void;
+  // Room management
+  getRoom: (roomId: string) => Room | undefined;
+  setRoom: (room: Room) => void;
   // Invite management
   getInvite: (code: string) => InviteInfo | undefined;
   setInvite: (invite: InviteInfo) => void;
@@ -86,6 +91,7 @@ type CacheContextType = {
 const CacheContext = createContext<CacheContextType>();
 const messageCache = new MessageCache();
 const spaceCache = new SpaceCache();
+const roomCache = new RoomCache();
 const inviteCache = new InviteCache();
 
 // Make caches globally accessible for WebSocketClient
@@ -93,6 +99,7 @@ declare global {
   interface Window {
     messageCache: MessageCache;
     spaceCache: SpaceCache;
+    roomCache: RoomCache;
     inviteCache: InviteCache;
   }
 }
@@ -100,6 +107,7 @@ declare global {
 // Expose caches globally
 window.messageCache = messageCache;
 window.spaceCache = spaceCache;
+window.roomCache = roomCache;
 window.inviteCache = inviteCache;
 
 export const CacheProvider: ParentComponent = (props) => {
@@ -137,6 +145,14 @@ export const CacheProvider: ParentComponent = (props) => {
         console.log("[CacheProvider] Adding space to cache:", space);
         spaceCache.setSpace(space);
         setSpaces(spaceCache.getAllSpaces());
+      }
+    };
+
+    const handleRoomCreate = (event: CustomEvent) => {
+      const room = event.detail;
+      if (room && room.id) {
+        console.log("[CacheProvider] Adding room to cache:", room);
+        roomCache.setRoom(room);
       }
     };
 
@@ -203,6 +219,7 @@ export const CacheProvider: ParentComponent = (props) => {
     window.addEventListener("messageCreate", handleMessageCreate as EventListener);
     window.addEventListener("messageDelete", handleMessageDelete as EventListener);
     window.addEventListener("spaceCreate", handleSpaceCreate as EventListener);
+    window.addEventListener("roomCreate", handleRoomCreate as EventListener);
     window.addEventListener("spaceUpdate", handleSpaceUpdate as EventListener);
     window.addEventListener("spaceDelete", handleSpaceDelete as EventListener);
     window.addEventListener("spaceMemberCreate", handleSpaceMemberCreate as EventListener);
@@ -215,6 +232,7 @@ export const CacheProvider: ParentComponent = (props) => {
       window.removeEventListener("messageCreate", handleMessageCreate as EventListener);
       window.removeEventListener("messageDelete", handleMessageDelete as EventListener);
       window.removeEventListener("spaceCreate", handleSpaceCreate as EventListener);
+      window.removeEventListener("roomCreate", handleRoomCreate as EventListener);
       window.removeEventListener("spaceUpdate", handleSpaceUpdate as EventListener);
       window.removeEventListener("spaceDelete", handleSpaceDelete as EventListener);
       window.removeEventListener("spaceMemberCreate", handleSpaceMemberCreate as EventListener);
@@ -340,6 +358,9 @@ export const CacheProvider: ParentComponent = (props) => {
     setSpaceRole: (spaceId: string, role: SpaceRole) => spaceCache.setSpaceRole(spaceId, role),
     getCachedSpaceRoles: (spaceId: string) => spaceCache.getCachedSpaceRoles(spaceId),
     setCachedSpaceRoles: (spaceId: string, roles: SpaceRole[]) => spaceCache.setCachedSpaceRoles(spaceId, roles),
+    // Room management
+    getRoom: (roomId: string) => roomCache.getRoom(roomId),
+    setRoom: (room: Room) => roomCache.setRoom(room),
     // Invite management
     getInvite: (code: string) => inviteCache.getInvite(code),
     setInvite: (invite: InviteInfo) => inviteCache.setInvite(invite),

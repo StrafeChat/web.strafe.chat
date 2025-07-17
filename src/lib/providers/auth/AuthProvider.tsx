@@ -196,6 +196,7 @@ export const AuthProvider: ParentComponent = (props) => {
     client.onMessage("ROOM_MEMBER_REMOVE", handleRoomMemberRemoveEvent);
     client.onMessage("ROOM_OWNERSHIP_TRANSFER", handleRoomOwnershipTransferEvent);
     client.onMessage("SPACE_CREATE", handleSpaceCreateEvent);
+    client.onMessage("SPACE_UPDATE", handleSpaceUpdateEvent);
     client.onMessage("SPACE_INVITE_CREATE", handleSpaceInviteCreateEvent);
     client.onMessage("SPACE_INVITE_DELETE", handleSpaceInviteDeleteEvent);
     client.onMessage("SPACE_INVITE_UPDATE", handleSpaceInviteUpdateEvent);
@@ -705,6 +706,53 @@ export const AuthProvider: ParentComponent = (props) => {
     
     // Also dispatch the event for the CacheProvider to handle
     window.dispatchEvent(new CustomEvent('spaceCreate', { detail: newSpace }));
+  };
+
+  const handleSpaceUpdateEvent = (data: any) => {
+    const spaceData = data.data || data;
+    // Extract space_id from the top level of the payload (as per backend structure)
+    const spaceId = String(data.space_id || data.id || '');
+    console.log("[AuthProvider] Space updated:", spaceData, "for space ID:", spaceId);
+    console.log("[AuthProvider] Full payload structure:", data);
+    console.log("[AuthProvider] Extracted space_id:", spaceId);
+    console.log("[AuthProvider] Available keys in data:", Object.keys(data));
+    
+    if (spaceId) {
+      // Update the space in the spaces signal
+      setSpaces(prev => prev.map(space => {
+        if (String(space.id) === spaceId) {
+          const updatedSpace = { ...space };
+          
+          // Update only the fields that are provided in the update
+          if (spaceData.name !== undefined) {
+            updatedSpace.name = spaceData.name;
+          }
+          if (spaceData.description !== undefined) {
+            updatedSpace.description = spaceData.description;
+          }
+          if (spaceData.icon !== undefined) {
+            updatedSpace.icon = spaceData.icon;
+          }
+          if (spaceData.banner !== undefined) {
+            updatedSpace.banner = spaceData.banner;
+          }
+          
+          // Always update the updated_at timestamp
+          updatedSpace.updated_at = new Date().toISOString();
+          
+          console.log("[AuthProvider] Updated space:", updatedSpace);
+          return updatedSpace;
+        }
+        return space;
+      }));
+      
+      // Also dispatch the event for the CacheProvider to handle
+      const updatedSpaceForEvent = {
+        id: spaceId,
+        ...spaceData
+      };
+      window.dispatchEvent(new CustomEvent('spaceUpdate', { detail: updatedSpaceForEvent }));
+    }
   };
 
   const handleSpaceInviteCreateEvent = (data: any) => {

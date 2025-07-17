@@ -126,7 +126,7 @@ const SpacesList: Component = () => {
   };
 
   return (
-    <div class="flex flex-col items-center h-full py-3 pb-14 md:pb-3 gap-2 bg-[var(--background)] relative overflow-hidden">
+    <div class="flex flex-col items-center h-full py-3 pb-14 md:pb-3 gap-2 bg-[var(--background)] relative">
       {/* Active page indicator - positioned at left edge of screen */}
       <Show when={isHomePage()}>
         <div class={`fixed left-0 ${INDICATOR_STYLES.ACTIVE} bg-accent rounded-r-full z-50`} style={{top: `${INDICATOR_POSITIONS.HOME_TOP}px`}}></div>
@@ -239,12 +239,12 @@ const SpacesList: Component = () => {
       <div class="w-8 h-0.5 rounded-full bg-border" />
 
       {/* Spaces List */}
-      <div class="flex flex-col gap-2 flex-1 overflow-y-auto">
+      <div class="flex flex-col gap-2 flex-1 overflow-y-auto min-h-0 hide-scrollbar">
         <For each={userSpaces()}>
           {(space) => (
             <Tooltip content={space.name} position="right">
               <button
-                class={`w-12 h-12 ${isSpaceActive() === String(space.id) ? "rounded-2xl" : "rounded-full hover:rounded-2xl"} bg-surface hover:bg-accent relative overflow-hidden group`}
+                class={`w-12 h-12 flex-shrink-0 ${isSpaceActive() === String(space.id) ? "rounded-2xl" : "rounded-full hover:rounded-2xl"} bg-surface hover:bg-accent relative overflow-hidden group transition-all duration-200`}
                 onClick={() => {
                   const lastSpaceRoute = getLastSpaceRoute(String(space.id));
                   navigate(lastSpaceRoute);

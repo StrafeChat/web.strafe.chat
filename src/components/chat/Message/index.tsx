@@ -279,7 +279,13 @@ export function Message(props: MessageProps) {
           canDelete={canDelete()}
           onReply={props.onReply}
           onEdit={handleEdit}
-          onDelete={() => setShowDeleteConfirm(true)}
+          onDelete={(shiftPressed) => {
+            if (shiftPressed) {
+              handleDelete();
+            } else {
+              setShowDeleteConfirm(true);
+            }
+          }}
           messageId={props.id}
         />
 

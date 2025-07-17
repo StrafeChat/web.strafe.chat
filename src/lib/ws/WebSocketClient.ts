@@ -684,6 +684,17 @@ export class WebSocketClient {
           }).catch((error: any) => {
             console.error("[WebSocket] Error handling presence update from worker:", error);
           });
+        } else if (payload.type === "spaceUpdate") {
+          console.log("[WebSocket] Handling space update from worker:", payload);
+          const spaceUpdateHandler = this.messageHandlers.get("SPACE_UPDATE");
+          if (spaceUpdateHandler) {
+            console.log("[WebSocket] Routing spaceUpdate to SPACE_UPDATE handler");
+            spaceUpdateHandler(payload);
+          } else {
+            console.warn("[WebSocket] No SPACE_UPDATE handler registered");
+          }
+          // Also call the internal handler for custom events
+          this.handleSpaceUpdate(payload);
         } else {
           const handler = this.messageHandlers.get(payload.type);
           if (handler) {
@@ -777,6 +788,19 @@ export class WebSocketClient {
         } else {
           console.warn("[WebSocket] No SPACE_CREATE handler registered");
         }
+        break;
+
+      case "spaceUpdate":
+        // Call the registered SPACE_UPDATE handler directly
+        const spaceUpdateHandler = this.messageHandlers.get("SPACE_UPDATE");
+        if (spaceUpdateHandler) {
+          console.log("[WebSocket] Routing spaceUpdate to SPACE_UPDATE handler");
+          spaceUpdateHandler(payload);
+        } else {
+          console.warn("[WebSocket] No SPACE_UPDATE handler registered");
+        }
+        // Also call the internal handler for custom events
+        this.handleSpaceUpdate(payload);
         break;
 
       case "ready":
@@ -911,11 +935,64 @@ export class WebSocketClient {
         updated_at: spaceData.updated_at || new Date().toISOString()
       });
       
+      // Cache rooms if they exist in the space creation event
+      if (spaceData.rooms && Array.isArray(spaceData.rooms)) {
+        console.log(`[WebSocket] Caching ${spaceData.rooms.length} rooms for space ${spaceData.id}`);
+        spaceData.rooms.forEach((room: any) => {
+          this.dispatchEvent("roomCreate", {
+            id: room.id,
+            creator: room.creator,
+            recipients: room.recipients || [],
+            type: room.type,
+            space_id: room.space_id,
+            parent_id: room.parent_id,
+            name: room.name,
+            topic: room.topic,
+            created_at: room.created_at,
+            updated_at: room.updated_at
+          });
+        });
+      }
+      
+      // Cache members if they exist in the space creation event
+      if (spaceData.members && Array.isArray(spaceData.members)) {
+        console.log(`[WebSocket] Caching ${spaceData.members.length} members for space ${spaceData.id}`);
+        this.dispatchEvent("spaceMembersCache", {
+          spaceId: spaceData.id,
+          members: spaceData.members.map((member: any) => ({
+            space_id: member.space_id || spaceData.id,
+            user_id: member.user_id,
+            joined_at: member.joined_at,
+            deaf: member.deaf || false,
+            mute: member.mute || false,
+            flags: member.flags || 0,
+            pending: member.pending || false
+          }))
+        });
+      }
+      
       // Also call the message handler directly to ensure it's processed
       const spaceCreateHandler = this.messageHandlers.get("SPACE_CREATE");
       if (spaceCreateHandler) {
         spaceCreateHandler(spaceData);
       }
+    }
+  }
+
+  private handleSpaceUpdate(data: any): void {
+    console.log("[WebSocket] Handling space update:", data);
+    const spaceData = data.data || data;
+    if (spaceData && data.space_id) {
+      console.log("[WebSocket] Dispatching space update event:", spaceData);
+      
+      // Create the updated space object with the changes
+      const updatedSpace = {
+        id: data.space_id,
+        ...spaceData
+      };
+      
+      // Dispatch spaceUpdate event for the cache provider
+      this.dispatchEvent("spaceUpdate", updatedSpace);
     }
   }
 

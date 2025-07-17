@@ -6,7 +6,7 @@ interface MessageHoverMenuProps {
   canDelete: boolean;
   onReply?: (messageId: string) => void;
   onEdit: () => void;
-  onDelete: () => void;
+  onDelete: (shiftPressed?: boolean) => void;
   messageId?: string;
 }
 
@@ -61,7 +61,7 @@ export const MessageHoverMenu: Component<MessageHoverMenuProps> = (props) => {
         <Tooltip content="Delete" position="top">
           <button
             class="p-1.5 hover:bg-surface hover:bg-opacity-10 rounded-md transition-colors"
-            onClick={props.onDelete}
+            onClick={(e) => props.onDelete(e.shiftKey)}
           >
             <svg
               class="w-4 h-4 text-text-secondary hover:text-red-500 transition-colors"
