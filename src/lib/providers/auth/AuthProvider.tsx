@@ -63,6 +63,8 @@ export type Clientuser = {
   banner?: string;
   bio?: string;
   about_me?: string;
+  created_at?: string;
+  updated_at?: string;
   presence?: {
     status: string;
     custom_status: string;
@@ -367,6 +369,8 @@ export const AuthProvider: ParentComponent = (props) => {
     bio: userData.bio || userData.Bio,
     about_me: userData.about_me || userData.AboutMe,
     date_of_birth: userData.date_of_birth || userData.DateOfBirth,
+    created_at: userData.created_at || userData.CreatedAt,
+    updated_at: userData.updated_at || userData.UpdatedAt,
     friends: userData.friends || userData.Friends || [],
     presence: (userData.presence || userData.Presence) ? {
       status: (userData.presence?.status || userData.Presence?.Status) || "offline",

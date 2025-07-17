@@ -10,6 +10,10 @@ export interface CachedUser {
   Bot?: boolean;
   System?: boolean;
   Flags?: number;
+  CreatedAt?: string;
+  created_at?: string;
+  UpdatedAt?: string;
+  updated_at?: string;
   Presence?: {
     Status: string;
     CustomStatus: string;
@@ -50,6 +54,10 @@ export class UserCache {
         Bot: user.Bot || user.bot,
         System: user.System || user.system,
         Flags: user.Flags || user.flags,
+        CreatedAt: user.CreatedAt || user.created_at,
+        created_at: user.created_at || user.CreatedAt,
+        UpdatedAt: user.UpdatedAt || user.updated_at,
+        updated_at: user.updated_at || user.UpdatedAt,
         Presence: user.Presence || {
           Status: user.presence?.status || "online",
           CustomStatus: user.presence?.custom_status || ""

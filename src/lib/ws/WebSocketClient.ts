@@ -1180,6 +1180,8 @@ export class WebSocketClient {
           banner: data.client_user.banner || data.client_user.Banner,
           bio: data.client_user.bio || data.client_user.Bio,
           about_me: data.client_user.about_me || data.client_user.AboutMe,
+          created_at: data.client_user.created_at || data.client_user.CreatedAt,
+          updated_at: data.client_user.updated_at || data.client_user.UpdatedAt,
           flags: data.client_user.flags || data.client_user.Flags || 0,
           presence: {
             status: data.client_user.presence?.status || data.client_user.Presence?.Status || "online",

@@ -11,9 +11,10 @@ import { StatusIndicator } from "./StatusIndicator";
 import { Avatar } from "./Avatar";
 import { Portal } from "solid-js/web";
 import { useCache } from "../../lib/providers/cache/CacheProvider";
-import { useAuth } from "../../lib/providers/auth/AuthProvider";
+// import { useAuth } from "../../lib/providers/auth/AuthProvider";
 import RoleManagementModal from "../modals/RoleManagementModal";
-import { SpaceMember } from "../../lib/cache/SpaceCache";
+import UserProfileModal from "../modals/UserProfileModal";
+import { SpaceMember, SpaceRole } from "../../lib/cache/SpaceCache";
 
 
 
@@ -29,9 +30,10 @@ interface UserPopupMenuProps {
 
 const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
   const cache = useCache();
-  const { user: currentUser } = useAuth();
+  // const { user: currentUser } = useAuth();
   const [user, setUser] = createSignal<any>(null);
   const [showRoleModal, setShowRoleModal] = createSignal(false);
+  const [showProfileModal, setShowProfileModal] = createSignal(false);
   let popupRef: HTMLDivElement | undefined;
 
   // Fetch user info from cache whenever props.userId changes
@@ -39,39 +41,27 @@ const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
     setUser(cache.getUser(props.userId));
   });
 
-  // Check if current user can manage roles in this space
-  const canManageRoles = () => {
-    if (!props.spaceId || !props.spaceMember || !currentUser()) return false;
+  // // Check if current user can manage roles in this space
+  // const canManageRoles = () => {
+  //   if (!props.spaceId || !props.spaceMember || !currentUser()) return false;
     
-    const currentSpace = cache.getSpace(props.spaceId);
-    if (!currentSpace) return false;
+  //   const currentSpace = cache.getSpace(props.spaceId);
+  //   if (!currentSpace) return false;
     
-    // Space owner can always manage roles
-    if (currentSpace.owner_id === currentUser()?.id) return true;
+  //   // Space owner can always manage roles
+  //   if (currentSpace.owner_id === currentUser()?.id) return true;
     
-    // Don't allow managing own roles
-    if (props.userId === currentUser()?.id) return false;
+  //   // Don't allow managing own roles
+  //   if (props.userId === currentUser()?.id) return false;
     
-    // TODO: Check for MANAGE_ROLES permission
-    // For now, only allow space owners
-    return false;
-  };
+  //   // TODO: Check for MANAGE_ROLES permission
+  //   // For now, only allow space owners
+  //   return false;
+  // };
 
   const [modalSpaceMember, setModalSpaceMember] = createSignal<any | null>(null);
 
-  const handleManageRoles = (e: MouseEvent) => {
-    e.stopPropagation();
-    console.log('[UserPopupMenu] handleManageRoles called');
-    console.log('[UserPopupMenu] props.spaceMember:', props.spaceMember);
-    console.log('[UserPopupMenu] canManageRoles():', canManageRoles());
-    
-    if (canManageRoles() && props.spaceMember) {
-      // Store the spaceMember data before opening the modal
-      setModalSpaceMember(props.spaceMember);
-      setShowRoleModal(true);
-      console.log('[UserPopupMenu] Modal opened with member:', props.spaceMember);
-    }
-  };
+
 
   // Handle clicking outside to close
   const handleClickOutside = (e: MouseEvent) => {
@@ -175,7 +165,14 @@ const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
               </Show>
               <div class="absolute -bottom-6 left-2">
                 <div class="relative w-[80px] h-[80px]">
-                  <div class="w-full h-full rounded-full overflow-hidden border-4 border-background2" style={{ "aspect-ratio": "1/1" }}>
+                  <div 
+                    class="w-full h-full rounded-full overflow-hidden border-4 border-background2 cursor-pointer hover:border-primary transition-colors" 
+                    style={{ "aspect-ratio": "1/1" }}
+                    onClick={() => {
+                      setShowProfileModal(true);
+                      props.onClose();
+                    }}
+                  >
                     <Avatar
                       userId={user()?.id || ''}
                       avatar={user()?.avatar}
@@ -213,7 +210,7 @@ const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
               {/* About Me Section */}
               <Show when={(user()?.about_me || user()?.AboutMe) && (user()?.about_me || user()?.AboutMe)?.trim().length > 0}>
                 <div class="w-full pt-4">
-                  <div class="w-full px-3 py-2 bg-surface bg-opacity-5 rounded-md">
+                  <div class="w-full py-2 bg-opacity-5 rounded-md">
                     <div class="text-xs font-semibold text-text-secondary mb-2 uppercase tracking-wide">About Me</div>
                     <div class="text-sm text-text-primary whitespace-pre-wrap break-words">
                       {user()?.about_me || user()?.AboutMe}
@@ -222,16 +219,39 @@ const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
                 </div>
               </Show>
 
-              {/* Actions Section */}
-              <Show when={props.spaceId && canManageRoles()}>
-                <div class="w-full pt-4 border-t border-surface border-opacity-20">
-                  <button
-                    onClick={handleManageRoles}
-                    class="w-full px-3 py-2 bg-primary hover:bg-primary-hover text-white rounded-md transition-colors text-sm font-medium"
-                  >
-                    Manage Roles
-                  </button>
-                </div>
+              {/* Roles Section (if in space context) */}
+              <Show when={props.spaceId && props.spaceMember}>
+                {(() => {
+                  const spaceRoles = cache.getSpaceRoles(props.spaceId!);
+                  const userRoles = spaceRoles.filter((role: SpaceRole) => 
+                    props.spaceMember?.roles?.includes(role.role_id)
+                  ) || [];
+                  
+                  return (
+                    <Show when={userRoles.length > 0}>
+                      <div class="w-full pt-4">
+                        <div class="w-full py-1 bg-opacity-5 rounded-md">
+                          <div class="text-xs font-semibold text-text-secondary mb-3 uppercase tracking-wide">
+                            Roles — {userRoles.length}
+                          </div>
+                          <div class="flex flex-wrap gap-2">
+                            {userRoles.map((role: SpaceRole) => (
+                              <div 
+                                class="px-2.5 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 border-[1px] border-border-primary"
+                                                            >
+                                <div
+                                  class="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                                  style={{ "background-color": role.color || "var(--surface)" }}
+                                />
+                                <span class="truncate">{role.name}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </Show>
+                  );
+                })()}
               </Show>
             </div>
           </div>
@@ -247,6 +267,14 @@ const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
         }}
         member={modalSpaceMember()}
         spaceId={props.spaceId || ""}
+      />
+      
+      {/* User Profile Modal */}
+      <UserProfileModal
+        isOpen={showProfileModal()}
+        onClose={() => setShowProfileModal(false)}
+        userId={props.userId}
+        spaceId={props.spaceId}
       />
     </div>
   );

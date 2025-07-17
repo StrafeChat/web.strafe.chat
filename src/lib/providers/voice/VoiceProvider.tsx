@@ -7,7 +7,7 @@ import {
 } from "solid-js"
 
 import { useAuth } from "../auth/AuthProvider"
-import { AudioCaptureOptions, DisconnectReason, LocalTrackPublication, Room, RoomEvent, TrackPublishOptions, VideoCaptureOptions } from "livekit-client";
+import { AudioCaptureOptions, DisconnectReason, LocalTrackPublication, Room, RoomEvent, VideoCaptureOptions } from "livekit-client";
 import { LIVEKIT_URL } from "../../../constants";
 
 export enum VoiceState {

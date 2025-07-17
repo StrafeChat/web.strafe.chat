@@ -1,4 +1,4 @@
-import { Component, createMemo, createSignal, Show, For, createEffect, onMount } from "solid-js";
+import { Component, createMemo, createSignal, Show, For, createEffect } from "solid-js";
 import DefaultGroupPM from "../shared/icons/DefaultGroupPM";
 import { useParams } from "@solidjs/router";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";

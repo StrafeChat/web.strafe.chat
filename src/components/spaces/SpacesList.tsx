@@ -239,7 +239,7 @@ const SpacesList: Component = () => {
           {(space) => (
             <Tooltip content={space.name} position="right">
               <button
-                class="w-12 h-12 rounded-full bg-surface hover:bg-accent transition-all relative overflow-hidden group"
+                class={`w-12 h-12 ${isSpaceActive() === String(space.id) ? "rounded-2xl" : "rounded-full hover:rounded-2xl"} bg-surface hover:bg-accent relative overflow-hidden group`}
                 onClick={() => {
                   navigate(`/spaces/${space.id}`);
                   if (isMobile()) {
