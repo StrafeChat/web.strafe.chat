@@ -3,7 +3,6 @@ import {
   Show,
   createSignal,
   onCleanup,
-  onMount,
   createEffect,
 } from "solid-js";
 import { FS_URL } from "../../constants";

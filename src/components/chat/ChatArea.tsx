@@ -292,10 +292,13 @@ const ChatArea: Component = () => {
     };
   });
 
-  // Auto-focus chat input when room changes
+  // Auto-focus chat input when room changes (but not on mobile)
   createEffect(() => {
     const roomId = params.roomId;
-    if (roomId && chatInputRef) {
+    const mobileStatus = isMobile();
+    console.log("[ChatArea] Room change effect - roomId:", roomId, "isMobile:", mobileStatus, "chatInputRef:", !!chatInputRef);
+    
+    if (roomId && chatInputRef && !mobileStatus) {
       console.log("[ChatArea] Auto-focusing chat input for room:", roomId);
       // Small delay to ensure the component is fully rendered
       setTimeout(() => {
@@ -304,6 +307,8 @@ const ChatArea: Component = () => {
           console.log("[ChatArea] Chat input focused successfully");
         }
       }, 50);
+    } else if (roomId && mobileStatus) {
+      console.log("[ChatArea] Skipping auto-focus on mobile for room:", roomId);
     }
   });
 
@@ -1367,7 +1372,7 @@ const ChatArea: Component = () => {
   // Auto-focus effect for when the component mounts or room changes
   createEffect(() => {
     const roomId = params.roomId;
-    if (roomId && chatInputRef) {
+    if (roomId && chatInputRef && !isMobile()) {
       // Longer delay to ensure all scroll operations are complete
       // The room change effect calls scrollToBottom with multiple requestAnimationFrame
       // and a 100ms setTimeout, so we need to wait longer

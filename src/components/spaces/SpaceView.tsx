@@ -3,7 +3,6 @@ import { useParams } from "@solidjs/router";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
 // import { useCache } from "../../lib/providers/cache/CacheProvider";
 import { SpaceHome } from "./SpaceHome";
-import RoomsList from "./rooms/RoomsList";
 import SpaceMembersList from "./SpaceMembersList";
 
 const SpaceView: Component = () => {

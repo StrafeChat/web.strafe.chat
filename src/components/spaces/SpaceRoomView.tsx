@@ -2,7 +2,6 @@ import { Component, createMemo, createSignal, Show } from "solid-js";
 import { useParams } from "@solidjs/router";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
 // import { useCache } from "../../lib/providers/cache/CacheProvider";
-import RoomsList from "./rooms/RoomsList";
 import ChatArea from "../chat/ChatArea";
 import { RoomType } from "../../types/roomTypes";
 import SpaceMembersList from "./SpaceMembersList";

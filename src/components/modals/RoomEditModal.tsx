@@ -61,8 +61,8 @@ interface MemberPermissionOverrides {
 }
 
 const RoomEditModal: Component<RoomEditModalProps> = (props) => {
-  const { isMobile, user } = useAuth();
-  const { setRoom, getSpace, getCachedSpaceRoles, getCachedSpaceMembers, setCachedSpaceRoles, setCachedSpaceMembers } = useCache();
+  const { isMobile } = useAuth();
+  const { setRoom, getCachedSpaceRoles, getCachedSpaceMembers, setCachedSpaceRoles, setCachedSpaceMembers } = useCache();
   const { showToast } = useToast();
   const [isSidebarOpen, setIsSidebarOpen] = createSignal(true);
   const [activeSection, setActiveSection] = createSignal("overview");
@@ -175,7 +175,7 @@ const RoomEditModal: Component<RoomEditModalProps> = (props) => {
     fetchMembersIfNeeded();
   });
 
-  const space = () => getSpace(props.room.space_id?.toString() || "");
+  // const space = () => getSpace(props.room.space_id?.toString() || "");
 
   const sections = ["overview", "permissions"];
 

@@ -1,5 +1,4 @@
 import { createSignal } from "solid-js";
-import { Show } from "solid-js";
 
 type ToggleState = "on" | "n/a" | "off";
 

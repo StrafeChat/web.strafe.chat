@@ -61,7 +61,7 @@ export function ContextMenuProvider(props: { children: JSX.Element }) {
   // Handle click outside to close context menu
   createEffect(() => {
     if (isOpen()) {
-      const handleClickOutside = (event: MouseEvent) => {
+      const handleClickOutside = (_event: MouseEvent) => {
         closeContextMenu();
       };
 
