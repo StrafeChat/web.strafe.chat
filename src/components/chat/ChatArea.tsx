@@ -14,6 +14,7 @@ import { useParams } from "@solidjs/router";
 import { useTransContext } from "@mbarzda/solid-i18next";
 import { useCache } from "../../lib/providers/cache/CacheProvider";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
+import { usePermissions } from "../../lib/hooks/usePermissions";
 import { BASE_URL, FS_URL } from "../../constants";
 import { CachedMessage } from "../../lib/cache/MessageCache";
 import { useUserSettings } from "../../lib/providers/userSettings/UserSettingsProvider";
@@ -46,6 +47,7 @@ const ChatArea: Component = () => {
   const cache = useCache();
   const [t] = useTransContext();
   const { userSettings } = useUserSettings();
+  const { checkPermission } = usePermissions();
   const [messageText, setMessageText] = createSignal("");
   const [sending, setSending] = createSignal(false);
   const [loading, setLoading] = createSignal(false);
@@ -437,6 +439,24 @@ const ChatArea: Component = () => {
     if (!allRooms) return null;
 
     return allRooms.find((room) => room.id === params.roomId);
+  });
+
+  // Check if user has permission to send messages
+  const canSendMessages = createMemo(() => {
+    const room = currentRoom();
+    if (!room) return false;
+    
+    // For PMs and Group PMs, users can always send messages
+    if (room.type === RoomType.PM || room.type === RoomType.GROUP_PM) {
+      return true;
+    }
+    
+    // For text rooms, check SEND_MESSAGES permission
+    if (room.space_id) {
+      return checkPermission(room.space_id.toString(), "SEND_MESSAGES");
+    }
+    
+    return false;
   });
 
   // Combined messages for display (cached + pending)
@@ -2293,9 +2313,21 @@ const ChatArea: Component = () => {
               </div>
             </div>
           </Show>
-          <div
-            class={`bg-[var(--background1)] p-2 flex items-center relative min-w-0 ${isMobile() ? "rounded-none mx-0 px-4" : "rounded-lg"}`}
+          <Show
+            when={canSendMessages()}
+            fallback={
+              <div
+                class={`bg-[var(--background1)] p-4 flex items-center justify-center relative min-w-0 ${isMobile() ? "rounded-none mx-0 px-4" : "rounded-lg"}`}
+              >
+                <div class="text-text-secondary text-center">
+                  You do not have permission to send messages in this room.
+                </div>
+              </div>
+            }
           >
+            <div
+              class={`bg-[var(--background1)] p-2 flex items-center relative min-w-0 ${isMobile() ? "rounded-none mx-0 px-4" : "rounded-lg"}`}
+            >
             {/* File attachment button */}
             <button
               onClick={() => {
@@ -2563,6 +2595,7 @@ const ChatArea: Component = () => {
                   />
                 </svg>
               </button>
+              </div>
               <Show when={editingMessageId()}>
                 <button
                   onClick={() => {
@@ -2654,7 +2687,7 @@ const ChatArea: Component = () => {
                 </button>
               </Show>
             </div>
-          </div>
+          </Show>
 
           {/* Emoji Picker Portal */}
           <Show when={showEmojiPicker()}>

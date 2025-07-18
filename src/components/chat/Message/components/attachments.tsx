@@ -1,6 +1,6 @@
 import { Component, Show, For } from "solid-js";
 import { MessageAttachment } from "../../../../types/messageTypes";
-import { StableAudioPlayer } from "./audio-player";
+import { StableAudioPlayer } from "./AudioPlayer";
 
 interface MessageAttachmentsProps {
   attachments: MessageAttachment[];

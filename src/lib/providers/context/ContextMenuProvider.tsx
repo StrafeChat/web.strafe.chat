@@ -4,7 +4,9 @@ import {
   JSX,
   useContext,
   createEffect,
+  onCleanup,
 } from "solid-js";
+import { Portal } from "solid-js/web";
 import { useTheme } from "../theme/ThemeProvider";
 import type { ContextMenuContextType } from "../types";
 
@@ -22,9 +24,9 @@ export function ContextMenuProvider(props: { children: JSX.Element }) {
   const [isOpen, setIsOpen] = createSignal(false);
   const [x, setX] = createSignal(0);
   const [y, setY] = createSignal(0);
-  const [content, setContent] = createSignal<JSX.Element | null>(null);
+  const [content, setContent] = createSignal<(() => JSX.Element) | null>(null);
 
-  const openContextMenu = (event: MouseEvent, menuContent: JSX.Element) => {
+  const openContextMenu = (event: MouseEvent, menuContent: () => JSX.Element) => {
     event.preventDefault();
     event.stopPropagation();
 
@@ -47,7 +49,7 @@ export function ContextMenuProvider(props: { children: JSX.Element }) {
 
     setX(posX);
     setY(posY);
-    setContent(menuContent);
+    setContent(() => menuContent);
     setIsOpen(true);
   };
 
@@ -56,17 +58,39 @@ export function ContextMenuProvider(props: { children: JSX.Element }) {
     setContent(null);
   };
 
+  // Handle click outside to close context menu
   createEffect(() => {
-    const handleClickOutside = (_event: MouseEvent) => {
-      if (isOpen()) {
+    if (isOpen()) {
+      const handleClickOutside = (event: MouseEvent) => {
         closeContextMenu();
-      }
-    };
+      };
 
-    document.addEventListener("click", handleClickOutside);
-    return () => {
-      document.removeEventListener("click", handleClickOutside);
-    };
+      // Add listener with a small delay to avoid immediate closure
+      const timeoutId = setTimeout(() => {
+        document.addEventListener("click", handleClickOutside);
+      }, 0);
+
+      onCleanup(() => {
+        clearTimeout(timeoutId);
+        document.removeEventListener("click", handleClickOutside);
+      });
+    }
+  });
+
+  // Handle escape key to close context menu
+  createEffect(() => {
+    if (isOpen()) {
+      const handleEscape = (event: KeyboardEvent) => {
+        if (event.key === "Escape") {
+          closeContextMenu();
+        }
+      };
+
+      document.addEventListener("keydown", handleEscape);
+      onCleanup(() => {
+        document.removeEventListener("keydown", handleEscape);
+      });
+    }
   });
 
   return (
@@ -81,25 +105,30 @@ export function ContextMenuProvider(props: { children: JSX.Element }) {
       }}
     >
       {props.children}
-
-      {isOpen() && (
-        <div
-          class="absolute z-[9999] rounded-md shadow-lg p-2"
-          style={{
-            position: "fixed",
-            left: `${x()}px`,
-            top: `${y()}px`,
-            width: "250px",
-            "max-height": "300px",
-            "overflow-y": "auto",
-            "background-color": theme().colors.surface,
-            border: `1px solid ${theme().colors.border}`,
-            color: theme().colors.text.primary,
-          }}
-        >
-          <div class="divide-y divide-border">{content()}</div>
-        </div>
-      )}
+      
+      {/* Render context menu using Portal to maintain provider context */}
+      <Portal>
+        {isOpen() && content() && (
+          <div
+            class="fixed z-[9999] rounded-md shadow-lg p-2 pointer-events-auto"
+            style={{
+              left: `${x()}px`,
+              top: `${y()}px`,
+              width: "250px",
+              "max-height": "400px",
+              "overflow-y": "auto",
+              "background-color": theme().colors.background2,
+              border: `1px solid ${theme().colors.border}`,
+              color: theme().colors.text.primary,
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div class="divide-y divide-border">
+              {content()!()}
+            </div>
+          </div>
+        )}
+      </Portal>
     </ContextMenuContext.Provider>
   );
 }

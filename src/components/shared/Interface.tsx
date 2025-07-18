@@ -1,4 +1,4 @@
-import { JSX, createSignal, onMount, createEffect } from "solid-js";
+import { JSX, createSignal, onMount, createEffect, createMemo } from "solid-js";
 import SpacesList from "../spaces/SpacesList";
 import RoomsList from "../spaces/rooms/RoomsList";
 import ProtectedRoute from "../auth/ProtectedRoute";
@@ -13,7 +13,7 @@ import { Portal } from "solid-js/web";
 export const Interface = (props: { children: JSX.Element }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isMobile } = useAuth();
+  const { isMobile, spaces } = useAuth();
   const { currentView, setCurrentView, handleTouchStart, handleTouchMove, handleTouchEnd } = useMobileNav();
   const [showSettings, setShowSettings] = createSignal(false)
   const [, setIsSidebarVisible] = createSignal(true);
@@ -21,9 +21,18 @@ export const Interface = (props: { children: JSX.Element }) => {
   // Track navigation changes automatically
   useNavigationTracker();
 
+  // Get current space data for RoomsList
+  const currentSpace = createMemo(() => {
+    const pathParts = location.pathname.split('/');
+    const spaceId = pathParts[2];
+    if (!spaceId || !spaces()) return null;
+    
+    return spaces()?.find(space => String(space.id) === String(spaceId)) || null;
+  });
+
   const showRoomsList = () => {
-    // Only show RoomsList on general spaces list page, not individual space pages
-    return location.pathname === "/spaces";
+    // Show RoomsList on spaces pages (both general and individual space pages)
+    return location.pathname.startsWith("/spaces");
   };
 
   const showPMList = () => {
@@ -32,9 +41,8 @@ export const Interface = (props: { children: JSX.Element }) => {
   };
 
   const showSidebar = () => {
-    // Show sidebar content except on individual space pages where SpaceView handles it
-    // Also hide for space room routes where SpaceRoomView handles it
-    return !location.pathname.match(/\/spaces\/[^/]+(\/.*)?$/);
+    // Always show sidebar content for mobile navigation
+    return true;
   };
 
   const handleScroll = () => {
@@ -113,7 +121,15 @@ export const Interface = (props: { children: JSX.Element }) => {
             </div>
             {showSidebar() && (
               <div class="w-[260px] h-full flex-none overflow-hidden">
-                {showRoomsList() ? <RoomsList /> : showPMList() ? <PMList /> : null}
+                {showRoomsList() ? (
+                  <RoomsList 
+                    spaceId={(() => {
+                      const pathParts = location.pathname.split('/');
+                      return pathParts[2]; // Extract spaceId from /spaces/:spaceId path
+                    })()} 
+                    currentSpace={currentSpace()}
+                  />
+                ) : showPMList() ? <PMList /> : null}
               </div>
             )}
           </div>

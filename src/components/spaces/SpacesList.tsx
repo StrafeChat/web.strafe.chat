@@ -11,17 +11,7 @@ import Plus from "../shared/icons/Plus";
 import DefaultGroupPM from "../shared/icons/DefaultGroupPM";
 import { CreateSpaceModal } from "../modals/CreateSpaceModal";
 
-// Constants for indicator positioning
-const INDICATOR_POSITIONS = {
-  HOME_TOP: 18,
-  SPACES_BASE: 86,
-  SPACE_SPACING: 56,
-} as const;
 
-const INDICATOR_STYLES = {
-  ACTIVE: "w-1 h-8",
-  HOVER: "w-1 h-5",
-} as const;
 
 const SpacesList: Component = () => {
   const navigate = useNavigate();
@@ -58,13 +48,7 @@ const SpacesList: Component = () => {
     return spaceData;
   });
 
-  // Memoized space positions for indicators
-  const spacePositions = createMemo(() => {
-    return userSpaces().map((space, index) => ({
-      id: space.id,
-      top: INDICATOR_POSITIONS.SPACES_BASE + index * INDICATOR_POSITIONS.SPACE_SPACING
-    }));
-  });
+
 
   const unreadCount = createMemo(() => {
     const currentUser = user();
@@ -127,34 +111,6 @@ const SpacesList: Component = () => {
 
   return (
     <div class="flex flex-col items-center h-full py-3 pb-14 md:pb-3 gap-2 bg-[var(--background)] relative">
-      {/* Active page indicator - positioned at left edge of screen */}
-      <Show when={isHomePage()}>
-        <div class={`fixed left-0 ${INDICATOR_STYLES.ACTIVE} bg-accent rounded-r-full z-50`} style={{top: `${INDICATOR_POSITIONS.HOME_TOP}px`}}></div>
-      </Show>
-      
-      {/* Hover indicator for home */}
-      <Show when={hoveredHome() && !isHomePage()}>
-        <div class={`fixed left-0 ${INDICATOR_STYLES.HOVER} bg-accent bg-opacity-60 rounded-r-full z-50`} style={{top: `${INDICATOR_POSITIONS.HOME_TOP + 8}px`}}></div>
-      </Show>
-      
-      {/* Active space indicators */}
-      <For each={spacePositions()}>
-        {(spacePos) => (
-          <Show when={isSpaceActive() === String(spacePos.id)}>
-            <div class={`fixed left-0 ${INDICATOR_STYLES.ACTIVE} bg-accent rounded-r-full z-50`} style={{top: `${spacePos.top}px`}}></div>
-          </Show>
-        )}
-      </For>
-      
-      {/* Hover indicators for spaces */}
-      <For each={spacePositions()}>
-        {(spacePos) => (
-          <Show when={hoveredSpace() === String(spacePos.id) && isSpaceActive() !== String(spacePos.id)}>
-            <div class={`fixed left-0 ${INDICATOR_STYLES.HOVER} bg-accent bg-opacity-60 rounded-r-full z-50`} style={{top: `${spacePos.top + 8}px`}}></div>
-          </Show>
-        )}
-      </For>
-      
       {/* Home button */}
       <Tooltip content={"Home"} position="right">
         <button
@@ -166,6 +122,14 @@ const SpacesList: Component = () => {
             onMouseEnter={() => setHoveredHome(true)}
             onMouseLeave={() => setHoveredHome(false)}
           >
+          {/* Active indicator */}
+          <Show when={isHomePage()}>
+            <div class="absolute -left-3 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-accent rounded-r-full"></div>
+          </Show>
+          {/* Hover indicator */}
+          <Show when={hoveredHome() && !isHomePage()}>
+            <div class="absolute -left-3 top-1/2 transform -translate-y-1/2 w-1 h-5 bg-accent bg-opacity-60 rounded-r-full"></div>
+          </Show>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             class="w-6 h-6 mx-auto"
@@ -255,6 +219,14 @@ const SpacesList: Component = () => {
                 onMouseEnter={() => setHoveredSpace(String(space.id))}
                 onMouseLeave={() => setHoveredSpace(null)}
               >
+                {/* Active indicator */}
+                <Show when={isSpaceActive() === String(space.id)}>
+                  <div class="absolute -left-3 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-accent rounded-r-full"></div>
+                </Show>
+                {/* Hover indicator */}
+                <Show when={hoveredSpace() === String(space.id) && isSpaceActive() !== String(space.id)}>
+                  <div class="absolute -left-3 top-1/2 transform -translate-y-1/2 w-1 h-5 bg-accent bg-opacity-60 rounded-r-full"></div>
+                </Show>
                 <Show
                   when={space.icon}
                   fallback={

@@ -79,13 +79,15 @@ const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
     }
   };
 
-  onMount(() => {
-    document.addEventListener("mousedown", handleClickOutside);
-    window.addEventListener("keydown", handleKeyDown);
-  });
-  onCleanup(() => {
-    document.removeEventListener("mousedown", handleClickOutside);
-    window.removeEventListener("keydown", handleKeyDown);
+  createEffect(() => {
+    if (props.isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      window.addEventListener("keydown", handleKeyDown);
+      onCleanup(() => {
+        document.removeEventListener("mousedown", handleClickOutside);
+        window.removeEventListener("keydown", handleKeyDown);
+      });
+    }
   });
 
   // Calculate position relative to trigger element

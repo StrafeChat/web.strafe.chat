@@ -21,7 +21,7 @@ const ToggleSwitch: Component<ToggleSwitchProps> = (props) => {
         onClick={handleToggle}
         disabled={props.disabled}
         class={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed ${
-          props.checked ? "bg-primary" : "bg-gray-400"
+          props.checked ? "bg-primary" : "bg-surface"
         }`}
         role="switch"
         aria-checked={props.checked}

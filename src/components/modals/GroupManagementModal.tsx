@@ -82,7 +82,34 @@ export const GroupManagementModal: Component<GroupManagementModalProps> = (props
         return;
       }
       
-      // Update room settings (name/topic)
+      // Step 1: Upload icon to Nebula first if changed
+      if (iconFile()) {
+        const formData = new FormData();
+        formData.append('icon', iconFile()!);
+        
+        const uploadResponse = await fetch(`${FS_URL}/api/v1/rooms/${props.room.id}/icon`, {
+          method: 'POST',
+          headers: {
+            'X-Session-Token': localStorage.getItem('sc_token') || '',
+          },
+          body: formData
+        });
+        
+        if (!uploadResponse.ok) {
+          const errorData = await uploadResponse.json();
+          throw new Error(errorData.error || 'Failed to upload icon');
+        }
+        
+        // Get the filename from the upload response and add to update data
+        const uploadData = await uploadResponse.json();
+        const iconFilename = uploadData.url || uploadData.file?.filename;
+        
+        if (iconFilename) {
+          updateData.icon = iconFilename;
+        }
+      }
+      
+      // Step 2: Send all updates to Equinox in a single request
       if (Object.keys(updateData).length > 0) {
         const response = await fetch(`${BASE_URL}/rooms/${props.room.id}`, {
           method: 'PATCH',
@@ -96,25 +123,6 @@ export const GroupManagementModal: Component<GroupManagementModalProps> = (props
         if (!response.ok) {
           const errorData = await response.json();
           throw new Error(errorData.message || 'Failed to update group settings');
-        }
-      }
-      
-      // Handle icon upload separately
-      if (iconFile()) {
-        const formData = new FormData();
-        formData.append('icon', iconFile()!);
-        
-        const response = await fetch(`${FS_URL}/api/v1/rooms/${props.room.id}/icon`, {
-          method: 'POST',
-          headers: {
-            'X-Session-Token': localStorage.getItem('sc_token') || '',
-          },
-          body: formData
-        });
-        
-        if (!response.ok) {
-          const errorData = await response.json();
-          throw new Error(errorData.error || 'Failed to upload icon');
         }
       }
       

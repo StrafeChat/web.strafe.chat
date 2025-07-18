@@ -1,4 +1,4 @@
-import { Component, createMemo, createSignal } from "solid-js";
+import { Component, createMemo, createSignal, Show } from "solid-js";
 import { useParams } from "@solidjs/router";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
 // import { useCache } from "../../lib/providers/cache/CacheProvider";
@@ -54,35 +54,51 @@ const SpaceView: Component = () => {
 
   return (
     <div class="h-full w-full flex flex-col bg-background2">
-      {/* Main content area with sidebar */}
+      {/* Main content area */}
       <div class="flex-1 overflow-hidden flex">
-        {/* Left sidebar - Rooms list */}
-        <div class="w-[260px] bg-background1 flex flex-col">
-          {(() => {
-            const spaceId = currentSpace()?.id ? String(currentSpace()?.id) : undefined;
-            console.log("[SpaceView] Passing spaceId to RoomsList:", spaceId, "type:", typeof spaceId);
-            return <RoomsList spaceId={spaceId} currentSpace={currentSpace()} />;
-          })()}
-        </div>
-        
-        {/* Right section with header and content */}
+        {/* Content section */}
         <div class="flex-1 flex flex-col">
           {/* Header */}
           <div class="p-2 flex flex-col border-b border-surface border-opacity-20 flex-shrink-0 bg-background2">
-            <div class="flex items-center gap-2 px-3 py-2">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="w-6 h-6 text-text-primary"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
+            <div class="flex items-center justify-between px-3 py-2">
+              <div class="flex items-center gap-2">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="w-6 h-6 text-text-primary"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                >
+                  <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+                </svg>
+                <h2 class="text-xl font-semibold text-text-primary">
+                  Home
+                </h2>
+              </div>
+              
+              {/* Members toggle button */}
+              <button
+                onClick={() => setShowMembers(!showMembers())}
+                class="p-2 rounded-md hover:bg-surface hover:bg-opacity-10 transition-colors text-text-secondary hover:text-text-primary"
+                aria-label="Toggle members sidebar"
               >
-                <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
-              </svg>
-              <h2 class="text-xl font-semibold text-text-primary">
-                Home
-              </h2>
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="w-5 h-5"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                  <circle cx="9" cy="7" r="4" />
+                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                </svg>
+              </button>
             </div>
           </div>
           
@@ -96,13 +112,28 @@ const SpaceView: Component = () => {
              </div>
              
              {/* Members sidebar - conditionally visible */}
-             <SpaceMembersList
-                spaceId={currentSpace()?.id}
-                currentSpace={currentSpace()}
-                isMobile={isMobile()}
-                showMembers={showMembers()}
-                onToggleMembers={() => setShowMembers(!showMembers())}
-              />
+             <Show when={showMembers() && !isMobile()}>
+               <div class="w-[250px] flex-shrink-0">
+                 <SpaceMembersList
+                    spaceId={currentSpace()?.id}
+                    currentSpace={currentSpace()}
+                    isMobile={isMobile()}
+                    showMembers={showMembers()}
+                    onToggleMembers={() => setShowMembers(!showMembers())}
+                  />
+               </div>
+             </Show>
+
+             {/* Mobile members list */}
+             <Show when={isMobile()}>
+               <SpaceMembersList
+                 spaceId={currentSpace()?.id}
+                 currentSpace={currentSpace()}
+                 isMobile={isMobile()}
+                 showMembers={showMembers()}
+                 onToggleMembers={() => setShowMembers(!showMembers())}
+               />
+             </Show>
            </div>
          </div>
       </div>

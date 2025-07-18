@@ -100,6 +100,11 @@ export const api = {
         method: "POST",
         body: data,
       }),
+    update: (roomId: string, data: { name?: string; topic?: string; icon?: string; position?: number }) =>
+      apiRequest(`${API_ENDPOINTS.ROOMS}/${roomId}`, {
+        method: "PATCH",
+        body: data,
+      }),
     messages: {
       list: (roomId: string) => apiRequest(API_ENDPOINTS.ROOM_MESSAGES(roomId)),
       send: (roomId: string, data: any) =>

@@ -31,7 +31,7 @@ import { MessageEditor } from "./components/editor";
 import { CompactTimestamp } from "./components/CompactTimestamp";
 import { EmojiDetailsPopup } from "./components/EmojiDetails";
 import { InviteEmbeds } from "./components/InviteEmbeds";
-import { SystemMessage } from "./components/system-message";
+import { SystemMessage } from "./components/SystemMessage";
 
 export function Message(props: MessageProps) {
   const cache = useCache();
@@ -171,7 +171,7 @@ export function Message(props: MessageProps) {
           const range = document.createRange();
           const selection = window.getSelection();
           range.selectNodeContents(chatInput);
-          range.collapse(false);
+          range.collapse(false); // Position cursor at the end for editing
           selection?.removeAllRanges();
           selection?.addRange(range);
         }
@@ -194,7 +194,7 @@ export function Message(props: MessageProps) {
             const range = document.createRange();
             const selection = window.getSelection();
             range.selectNodeContents(editInput);
-            range.collapse(false);
+            range.collapse(false); // Position cursor at the end for editing
             selection?.removeAllRanges();
             selection?.addRange(range);
 

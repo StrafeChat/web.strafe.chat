@@ -19,14 +19,7 @@ const RoleManagementModal: Component<RoleManagementModalProps> = (props) => {
   const { checkPermission } = usePermissions();
   const [saving, setSaving] = createSignal(false);
   const [selectedRoles, setSelectedRoles] = createSignal<string[]>([]);
-
-  // Initialize selected roles when member changes
-  const initializeRoles = () => {
-    if (props.member) {
-      setSelectedRoles([...props.member.roles]);
-    }
-  };
-
+  
   // Get available roles for the space
   const availableRoles = () => {
     const roles = cache.getCachedSpaceRoles(props.spaceId) || [];

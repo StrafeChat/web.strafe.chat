@@ -4,6 +4,7 @@ import { useToast } from '../common/Toast';
 import { useCache } from '../../lib/providers/cache/CacheProvider';
 import { SpaceRole } from '../../lib/cache/SpaceCache';
 import Modal from './Modal';
+import ToggleSwitch from '../shared/ToggleSwitch';
 import { BASE_URL } from '../../constants';
 
 interface CreateRoomModalProps {
@@ -139,40 +140,41 @@ const CreateRoomModal: Component<CreateRoomModalProps> = (props) => {
             <label class="block text-sm font-medium text-text-primary mb-3">
               Room Type
             </label>
-            <div class="grid grid-cols-2 gap-3">
+            <div class="relative bg-surface rounded-lg p-1 flex">
+              <div 
+                class={`absolute top-1 bottom-1 bg-primary rounded-md transition-all duration-300 ease-in-out ${
+                  roomType() === 2 ? 'left-1 right-1/2 mr-0.5' : 'left-1/2 right-1 ml-0.5'
+                }`}
+              />
               <button
                 type="button"
                 onClick={() => setRoomType(2)}
-                class={`p-4 rounded-lg border-2 transition-all ${
-                  roomType() === 2
-                    ? 'border-primary bg-primary bg-opacity-20'
-                    : 'border-border hover:border-surface'
+                class={`relative z-10 flex-1 py-2 px-3 rounded-md transition-all duration-200 flex items-center justify-center gap-2 ${
+                  roomType() === 2 ? 'text-white' : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 mx-auto mb-2 text-text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <line x1="4" y1="9" x2="20" y2="9"></line>
                   <line x1="4" y1="15" x2="20" y2="15"></line>
                   <line x1="10" y1="3" x2="8" y2="21"></line>
                   <line x1="16" y1="3" x2="14" y2="21"></line>
                 </svg>
-                <div class="text-sm font-medium text-text-primary">Text Room</div>
+                <span class="text-sm font-medium">Text</span>
               </button>
               <button
                 type="button"
                 onClick={() => setRoomType(3)}
-                class={`p-4 rounded-lg border-2 transition-all ${
-                  roomType() === 3
-                    ? 'border-primary bg-primary bg-opacity-20'
-                    : 'border-border hover:border-surface'
+                class={`relative z-10 flex-1 py-2 px-3 rounded-md transition-all duration-200 flex items-center justify-center gap-2 ${
+                  roomType() === 3 ? 'text-white' : 'text-text-secondary hover:text-text-primary'
                 }`}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 mx-auto mb-2 text-text-primary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z"></path>
                   <path d="M19 10v1a7 7 0 0 1-14 0v-1"></path>
                   <line x1="12" y1="19" x2="12" y2="23"></line>
                   <line x1="8" y1="23" x2="16" y2="23"></line>
                 </svg>
-                <div class="text-sm font-medium text-text-primary">Voice Room</div>
+                <span class="text-sm font-medium">Voice</span>
               </button>
             </div>
           </div>
@@ -209,13 +211,7 @@ const CreateRoomModal: Component<CreateRoomModalProps> = (props) => {
 
           {/* Private Room Toggle */}
           <div class="mb-6">
-            <label class="flex items-center space-x-3 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={isPrivate()}
-                onChange={(e) => setIsPrivate(e.currentTarget.checked)}
-                class="w-4 h-4 text-primary bg-background border-border rounded focus:ring-primary focus:ring-2"
-              />
+            <div class="flex items-center justify-between">
               <div class="flex items-center space-x-2">
                 <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-text-secondary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                   <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
@@ -224,9 +220,13 @@ const CreateRoomModal: Component<CreateRoomModalProps> = (props) => {
                 </svg>
                 <span class="text-sm font-medium text-text-primary">Private Room</span>
               </div>
-            </label>
+              <ToggleSwitch
+                checked={isPrivate()}
+                onChange={setIsPrivate}
+              />
+            </div>
             <Show when={isPrivate()}>
-              <p class="text-xs text-text-secondary mt-1 ml-7">
+              <p class="text-xs text-text-secondary mt-2">
                 Only selected roles will be able to access this room
               </p>
             </Show>
@@ -241,25 +241,21 @@ const CreateRoomModal: Component<CreateRoomModalProps> = (props) => {
             </p>
             
             <Show when={availableRoles().length === 0} fallback={
-              <div class="space-y-2 max-h-60 overflow-y-auto">
+              <div class="space-y-3 max-h-60 overflow-y-auto">
                 {availableRoles().map((role: SpaceRole) => (
-                  <label
-                    class="flex items-center space-x-3 p-2 rounded hover:bg-surface cursor-pointer"
-                  >
-                    <input
-                      type="checkbox"
-                      checked={selectedRoles().includes(role.role_id)}
-                      onChange={() => toggleRoleSelection(role.role_id)}
-                      class="w-4 h-4 text-primary bg-background border-border rounded focus:ring-primary focus:ring-2"
-                    />
-                    <div class="flex items-center space-x-2">
+                  <div class="flex items-center justify-between p-3 rounded-lg bg-surface hover:bg-opacity-80 transition-colors">
+                    <div class="flex items-center space-x-3">
                       <div
                         class="w-3 h-3 rounded-full"
                         style={{ "background-color": role.color || "#99aab5" }}
                       />
-                      <span class="text-sm text-text-primary">{role.name}</span>
+                      <span class="text-sm font-medium text-text-primary">{role.name}</span>
                     </div>
-                  </label>
+                    <ToggleSwitch
+                      checked={selectedRoles().includes(role.role_id)}
+                      onChange={() => toggleRoleSelection(role.role_id)}
+                    />
+                  </div>
                 ))}
               </div>
             }>

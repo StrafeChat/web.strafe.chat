@@ -7,8 +7,8 @@ import {
   createEffect,
 } from "solid-js";
 import { useAuth } from "../../../lib/providers/auth/AuthProvider";
-import { useCache } from "../../../lib/providers/cache/CacheProvider";
 import { usePermissions } from "../../../lib/hooks/usePermissions";
+import { useContextMenu } from "../../../lib/providers/context/ContextMenuProvider";
 import { ClientUserArea } from "../../shared/ClientUserArea";
 import { BASE_URL } from "../../../constants";
 import Home from "../../shared/icons/Home";
@@ -17,7 +17,9 @@ import { RoomType } from "../../../types/roomTypes";
 import { Room, RoomWithRecipients } from "../../../types/rooms";
 import { SpaceHeaderDropdown } from "./SpaceHeaderDropdown";
 import CreateRoomModal from "../../modals/CreateRoomModal";
+import RoomContextMenu from "../../rooms/RoomContextMenu";
 import { Tooltip } from "../../common/Tooltip";
+import RoomEditModal from "../../modals/RoomEditModal";
 
 interface RoomsListProps {
   spaceId?: string;
@@ -48,6 +50,8 @@ interface DraggableRoomItemProps {
     position: "before" | "after",
   ) => void;
   canDrag?: boolean;
+  setSelectedRoom: (room: RoomWithRecipients) => void;
+  setIsRoomEditModalOpen: (open: boolean) => void;
 }
 
 interface OrphanedRoomItemProps {
@@ -59,11 +63,14 @@ interface OrphanedRoomItemProps {
     position: "before" | "after",
   ) => void;
   canDrag?: boolean;
+  setSelectedRoom: (room: RoomWithRecipients) => void;
+  setIsRoomEditModalOpen: (open: boolean) => void;
 }
 
 const OrphanedRoomItem: Component<OrphanedRoomItemProps> = (props) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { openContextMenu } = useContextMenu();
   const isDragging = () => globalDragState().draggedId === props.room.id;
   const isActive = () =>
     location.pathname === `/spaces/${props.spaceId}/rooms/${props.room.id}`;
@@ -101,7 +108,7 @@ const OrphanedRoomItem: Component<OrphanedRoomItemProps> = (props) => {
       }`}
     >
       <div
-        class={`flex items-center gap-2 px-2 py-1 rounded-md transition-colors ${
+        class={`flex items-center gap-2 px-2 py-0.5 rounded-md transition-colors ${
           isActive()
             ? "bg-surface bg-opacity-10 text-text-primary"
             : "text-text-secondary hover:bg-surface hover:bg-opacity-10 hover:text-text-primary"
@@ -125,6 +132,19 @@ const OrphanedRoomItem: Component<OrphanedRoomItemProps> = (props) => {
               e.stopPropagation();
             }
           }}
+          onContextMenu={(e) => {
+             e.preventDefault();
+             e.stopPropagation();
+             openContextMenu(e, () => (
+               <RoomContextMenu
+                 room={props.room}
+                 onEditRoom={() => {
+                   props.setSelectedRoom(props.room);
+                   props.setIsRoomEditModalOpen(true);
+                 }}
+               />
+             ));
+           }}
         >
           <Show
             when={props.room.type === RoomType.TEXT_ROOM}
@@ -187,6 +207,7 @@ const OrphanedRoomItem: Component<OrphanedRoomItemProps> = (props) => {
 const DraggableRoomItem: Component<DraggableRoomItemProps> = (props) => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { openContextMenu } = useContextMenu();
   const isDragging = () => globalDragState().draggedId === props.room.id;
   const isActive = () =>
     location.pathname === `/spaces/${props.spaceId}/rooms/${props.room.id}`;
@@ -226,7 +247,7 @@ const DraggableRoomItem: Component<DraggableRoomItemProps> = (props) => {
       }`}
     >
       <div
-        class={`flex items-center gap-1 px-2 py-1 rounded-md transition-colors ${
+        class={`flex items-center gap-1 px-2 py-0.5 rounded-md transition-colors ${
           isActive()
             ? "bg-surface bg-opacity-10 text-text-primary font-semibold"
             : "text-text-secondary hover:bg-surface hover:bg-opacity-10 hover:text-text-primary"
@@ -250,6 +271,19 @@ const DraggableRoomItem: Component<DraggableRoomItemProps> = (props) => {
               e.stopPropagation();
             }
           }}
+          onContextMenu={(e) => {
+             e.preventDefault();
+             e.stopPropagation();
+             openContextMenu(e, () => (
+               <RoomContextMenu
+                 room={props.room}
+                 onEditRoom={() => {
+                   props.setSelectedRoom(props.room);
+                   props.setIsRoomEditModalOpen(true);
+                 }}
+               />
+             ));
+           }}
         >
           <Show
             when={props.room.type === RoomType.TEXT_ROOM}
@@ -389,7 +423,7 @@ const DropZone: Component<DropZoneProps> = (props) => {
               ? "h-2 bg-blue-200 border-blue-200 opacity-30"
               : "h-2 bg-green-200 border-green-200 opacity-30"
             : "h-1 bg-transparent border-transparent opacity-0"
-      } mx-2 my-1 rounded-md border-2 border-dashed ${props.class || ""}`}
+      } mx-2 rounded-md border-2 border-dashed ${props.class || ""}`}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
@@ -420,6 +454,8 @@ interface DraggableSectionProps {
   ) => void;
   canDrag: boolean;
   onCreateRoom: (parentId: string) => void;
+  setSelectedRoom: (room: RoomWithRecipients) => void;
+  setIsRoomEditModalOpen: (open: boolean) => void;
 }
 
 const DraggableSection: Component<DraggableSectionProps> = (props) => {
@@ -647,6 +683,8 @@ const DraggableSection: Component<DraggableSectionProps> = (props) => {
                   spaceId={props.spaceId}
                   onReorder={props.onRoomReorder}
                   canDrag={props.canDrag}
+                  setSelectedRoom={props.setSelectedRoom}
+                  setIsRoomEditModalOpen={props.setIsRoomEditModalOpen}
                 />
                 <Show
                   when={
@@ -687,10 +725,7 @@ const DraggableSection: Component<DraggableSectionProps> = (props) => {
 };
 
 const RoomsList: Component<RoomsListProps> = (props) => {
-  const { rooms, user } = useAuth();
-  const cache = useCache();
-  const navigate = useNavigate();
-  const location = useLocation();
+  const { rooms } = useAuth();
   const { checkPermission } = usePermissions();
 
   // Permission checking
@@ -699,6 +734,8 @@ const RoomsList: Component<RoomsListProps> = (props) => {
   // Modal state
   const [isCreateRoomModalOpen, setIsCreateRoomModalOpen] = createSignal(false);
   const [selectedSectionId, setSelectedSectionId] = createSignal<string | undefined>();
+  const [isRoomEditModalOpen, setIsRoomEditModalOpen] = createSignal(false);
+  const [selectedRoom, setSelectedRoom] = createSignal<RoomWithRecipients | null>(null);
 
   // Check MANAGE_CHANNELS permission when spaceId changes
   createEffect(() => {
@@ -1080,7 +1117,7 @@ const RoomsList: Component<RoomsListProps> = (props) => {
       />
 
       {/* Navigation and Rooms content area */}
-      <div class="flex flex-col gap-1 p-2 flex-1 overflow-y-auto min-h-0">
+      <div class="flex flex-col gap-0.5 p-2 flex-1 overflow-y-auto min-h-0">
         <A
           href={`/spaces/${props.spaceId}`}
           class="flex items-center gap-2 p-3 rounded-md hover:bg-surface hover:bg-opacity-10 transition-colors"
@@ -1131,6 +1168,8 @@ const RoomsList: Component<RoomsListProps> = (props) => {
                     spaceId={props.spaceId || ""}
                     onReorder={handleRoomReorder}
                     canDrag={canManageChannels()}
+                    setSelectedRoom={setSelectedRoom}
+                    setIsRoomEditModalOpen={setIsRoomEditModalOpen}
                   />
                   <Show
                     when={
@@ -1187,6 +1226,8 @@ const RoomsList: Component<RoomsListProps> = (props) => {
                   }
                   canDrag={canManageChannels()}
                   onCreateRoom={handleCreateRoom}
+                  setSelectedRoom={setSelectedRoom}
+                  setIsRoomEditModalOpen={setIsRoomEditModalOpen}
                 />
                 <Show
                   when={
@@ -1216,6 +1257,18 @@ const RoomsList: Component<RoomsListProps> = (props) => {
         spaceId={props.spaceId || ""}
         parentId={selectedSectionId()}
       />
+      
+      {/* Room Edit Modal */}
+      <Show when={selectedRoom()}>
+        <RoomEditModal
+          isOpen={isRoomEditModalOpen()}
+          onClose={() => {
+            setIsRoomEditModalOpen(false);
+            setSelectedRoom(null);
+          }}
+          room={selectedRoom()!}
+        />
+      </Show>
     </div>
   );
 };
