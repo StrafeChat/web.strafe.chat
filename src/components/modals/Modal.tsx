@@ -11,6 +11,8 @@ interface ModalProps {
 }
 
 const Modal: Component<ModalProps> = (props) => {
+  console.log('Modal rendered with isOpen:', props.isOpen);
+  
   onMount(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape" && props.isOpen && props.onClose) {
@@ -25,7 +27,10 @@ const Modal: Component<ModalProps> = (props) => {
   return (
     <Portal>
       <Presence>
-        {props.isOpen && (
+        {(() => {
+          console.log('Presence condition check - isOpen:', props.isOpen);
+          return props.isOpen;
+        })() && (
           <Motion
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

@@ -455,8 +455,75 @@ const ChatArea: Component = () => {
     if (room.type === RoomType.PM || room.type === RoomType.GROUP_PM) {
       return true;
     }
+
+    // For space rooms (types 2, 3, 4), check room permission overrides first
+    if (room.type >= 2 && room.type <= 4 && room.permission_overrides) {
+      const SEND_MESSAGES = 1 << 11; // SEND_MESSAGES permission bit (2048)
+
+      const space = cache.getSpace(room.space_id!);
+      if (user()!.id == space?.owner_id) return true;
+      
+      console.log('[canSendMessages] Checking permission overrides for room:', room.id, {
+        roomType: room.type,
+        permissionOverrides: room.permission_overrides,
+        SEND_MESSAGES_BIT: SEND_MESSAGES
+      });
+      
+      // Check member-specific overrides first
+      if (room.permission_overrides.member) {
+        const { granted, denied } = room.permission_overrides.member;
+        console.log('[canSendMessages] Member overrides:', { granted, denied, SEND_MESSAGES });
+        if (denied & SEND_MESSAGES) {
+          console.log('[canSendMessages] Member explicitly denied SEND_MESSAGES');
+          return false; // Explicitly denied
+        }
+        if (granted & SEND_MESSAGES) {
+          console.log('[canSendMessages] Member explicitly granted SEND_MESSAGES');
+          return true; // Explicitly granted
+        }
+      }
+      
+      // Check role-specific overrides
+         if (room.permission_overrides.roles) {
+           const currentUserId = user()?.id;
+           console.log('[canSendMessages] Checking role overrides for user:', currentUserId);
+           if (currentUserId && room.space_id) {
+             // Get user's space membership to access their roles
+             const spaceMember = cache.getSpaceMember(room.space_id.toString(), currentUserId);
+             const userRoles = spaceMember?.roles || [];
+             console.log('[canSendMessages] User roles:', userRoles, 'Space member:', spaceMember);
+             
+             let hasRoleDenial = false;
+             let hasRoleGrant = false;
+             
+             for (const roleId of userRoles) {
+               const roleOverride = room.permission_overrides.roles[roleId];
+               console.log('[canSendMessages] Checking role override for role:', roleId, roleOverride);
+               if (roleOverride) {
+                 if (roleOverride.denied & SEND_MESSAGES) {
+                   console.log('[canSendMessages] Role', roleId, 'explicitly denies SEND_MESSAGES');
+                   hasRoleDenial = true;
+                 }
+                 if (roleOverride.granted & SEND_MESSAGES) {
+                   console.log('[canSendMessages] Role', roleId, 'explicitly grants SEND_MESSAGES');
+                   hasRoleGrant = true;
+                 }
+               }
+             }
+             
+             if (hasRoleDenial) {
+               console.log('[canSendMessages] Role denial takes precedence');
+               return false; // Role explicitly denies
+             }
+             if (hasRoleGrant) {
+               console.log('[canSendMessages] Role grant takes precedence');
+               return true; // Role explicitly grants
+             }
+           }
+         }
+    }
     
-    // For text rooms, check SEND_MESSAGES permission
+    // For text rooms, check SEND_MESSAGES permission from space
     if (room.space_id) {
       return checkPermission(room.space_id.toString(), "SEND_MESSAGES");
     }
@@ -2322,9 +2389,9 @@ const ChatArea: Component = () => {
             when={canSendMessages()}
             fallback={
               <div
-                class={`bg-[var(--background1)] p-4 flex items-center justify-center relative min-w-0 ${isMobile() ? "rounded-none mx-0 px-4" : "rounded-lg"}`}
+                class={`bg-[var(--background1)] p-3.5 flex select-none relative min-w-0 ${isMobile() ? "rounded-none mx-0 px-4" : "rounded-lg"}`}
               >
-                <div class="text-text-secondary text-center">
+                <div class="text-text-secondary">
                   You do not have permission to send messages in this room.
                 </div>
               </div>

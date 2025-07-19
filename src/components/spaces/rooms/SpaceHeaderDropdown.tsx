@@ -1,6 +1,7 @@
 import { Component, createSignal, onMount, onCleanup, Show } from "solid-js";
 import SpaceSettings from "../../settings/SpaceSettings";
 import CreateRoomModal from "../../modals/CreateRoomModal";
+import CreateSectionModal from "../../modals/CreateSectionModal";
 import { FS_URL } from "../../../constants";
 
 interface SpaceHeaderDropdownProps {
@@ -13,6 +14,7 @@ export const SpaceHeaderDropdown: Component<SpaceHeaderDropdownProps> = (props) 
   const [isOpen, setIsOpen] = createSignal(false);
   const [isSpaceSettingsOpen, setIsSpaceSettingsOpen] = createSignal(false);
   const [isCreateRoomModalOpen, setIsCreateRoomModalOpen] = createSignal(false);
+  const [isCreateSectionModalOpen, setIsCreateSectionModalOpen] = createSignal(false);
   let dropdownRef: HTMLDivElement | undefined;
 
   // Handle clicking outside dropdown to close it
@@ -52,7 +54,7 @@ export const SpaceHeaderDropdown: Component<SpaceHeaderDropdownProps> = (props) 
   const handleCreateSection = () => {
     console.log('Create Section clicked for space:', props.spaceId);
     setIsOpen(false);
-    // TODO: Implement create section functionality
+    setIsCreateSectionModalOpen(true);
   };
 
   return (
@@ -178,6 +180,15 @@ export const SpaceHeaderDropdown: Component<SpaceHeaderDropdownProps> = (props) 
         <CreateRoomModal
           isOpen={isCreateRoomModalOpen()}
           onClose={() => setIsCreateRoomModalOpen(false)}
+          spaceId={props.spaceId || ""}
+        />
+      </Show>
+      
+      {/* Create Section Modal */}
+      <Show when={isCreateSectionModalOpen()}>
+        <CreateSectionModal
+          isOpen={isCreateSectionModalOpen()}
+          onClose={() => setIsCreateSectionModalOpen(false)}
           spaceId={props.spaceId || ""}
         />
       </Show>

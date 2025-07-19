@@ -406,6 +406,7 @@ export const AuthProvider: ParentComponent = (props) => {
         topic: room.Topic || room.topic || "",
         created_at: room.CreatedAt || room.created_at || new Date().toISOString(),
         updated_at: room.UpdatedAt || room.updated_at || null,
+        permission_overrides: room.permission_overrides,
         space_id: spaceId ? String(spaceId) : undefined,
         parent_id: parentId ? String(parentId) : undefined,
         position: room.Position ?? room.position ?? undefined,

@@ -17,7 +17,7 @@ import { RoomType } from "../../../types/roomTypes";
 import { Room, RoomWithRecipients } from "../../../types/rooms";
 import { SpaceHeaderDropdown } from "./SpaceHeaderDropdown";
 import CreateRoomModal from "../../modals/CreateRoomModal";
-import RoomContextMenu from "../../rooms/RoomContextMenu";
+import RoomContextMenu from "../../contextMenus/RoomContextMenu";
 import { Tooltip } from "../../common/Tooltip";
 import RoomEditModal from "../../modals/RoomEditModal";
 
@@ -75,31 +75,31 @@ const OrphanedRoomItem: Component<OrphanedRoomItemProps> = (props) => {
   const isActive = () =>
     location.pathname === `/spaces/${props.spaceId}/rooms/${props.room.id}`;
 
-  const handleDragStart = (e: DragEvent) => {
-    e.stopPropagation();
-    e.dataTransfer!.setData("text/plain", `room:${props.room.id}`);
-    e.dataTransfer!.effectAllowed = "move";
-    setGlobalDragState({
-      isDragging: true,
-      draggedId: props.room.id,
-      draggedType: "room",
-      dragOverId: null,
-      dragOverType: null,
-    });
-    console.log("Drag started for room:", props.room.id);
-  };
+  // const handleDragStart = (e: DragEvent) => {
+  //   e.stopPropagation();
+  //   e.dataTransfer!.setData("text/plain", `room:${props.room.id}`);
+  //   e.dataTransfer!.effectAllowed = "move";
+  //   setGlobalDragState({
+  //     isDragging: true,
+  //     draggedId: props.room.id,
+  //     draggedType: "room",
+  //     dragOverId: null,
+  //     dragOverType: null,
+  //   });
+  //   console.log("Drag started for room:", props.room.id);
+  // };
 
-  const handleDragEnd = (e: DragEvent) => {
-    e.stopPropagation();
-    setGlobalDragState({
-      isDragging: false,
-      draggedId: null,
-      draggedType: null,
-      dragOverId: null,
-      dragOverType: null,
-    });
-    console.log("Drag ended for room:", props.room.id);
-  };
+  // const handleDragEnd = (e: DragEvent) => {
+  //   e.stopPropagation();
+  //   setGlobalDragState({
+  //     isDragging: false,
+  //     draggedId: null,
+  //     draggedType: null,
+  //     dragOverId: null,
+  //     dragOverType: null,
+  //   });
+  //   console.log("Drag ended for room:", props.room.id);
+  // };
 
   return (
     <div
@@ -170,8 +170,8 @@ const OrphanedRoomItem: Component<OrphanedRoomItemProps> = (props) => {
           </Show>
           <span class="flex-1 select-none">{props.room.name}</span>
         </div>
-
-        {/* Drag indicator */}
+{/* 
+        Drag indicator
         <Show when={props.canDrag}>
           <div
             draggable="true"
@@ -198,7 +198,7 @@ const OrphanedRoomItem: Component<OrphanedRoomItemProps> = (props) => {
               <circle cx="15" cy="19" r="1" />
             </svg>
           </div>
-        </Show>
+        </Show> */}
       </div>
     </div>
   );
@@ -212,31 +212,31 @@ const DraggableRoomItem: Component<DraggableRoomItemProps> = (props) => {
   const isActive = () =>
     location.pathname === `/spaces/${props.spaceId}/rooms/${props.room.id}`;
 
-  const handleDragStart = (e: DragEvent) => {
-    e.stopPropagation();
-    e.dataTransfer!.setData("text/plain", `room:${props.room.id}`);
-    e.dataTransfer!.effectAllowed = "move";
-    setGlobalDragState({
-      isDragging: true,
-      draggedId: props.room.id,
-      draggedType: "room",
-      dragOverId: null,
-      dragOverType: null,
-    });
-    console.log("Drag started for room:", props.room.id);
-  };
+  // const handleDragStart = (e: DragEvent) => {
+  //   e.stopPropagation();
+  //   e.dataTransfer!.setData("text/plain", `room:${props.room.id}`);
+  //   e.dataTransfer!.effectAllowed = "move";
+  //   setGlobalDragState({
+  //     isDragging: true,
+  //     draggedId: props.room.id,
+  //     draggedType: "room",
+  //     dragOverId: null,
+  //     dragOverType: null,
+  //   });
+  //   console.log("Drag started for room:", props.room.id);
+  // };
 
-  const handleDragEnd = (e: DragEvent) => {
-    e.stopPropagation();
-    setGlobalDragState({
-      isDragging: false,
-      draggedId: null,
-      draggedType: null,
-      dragOverId: null,
-      dragOverType: null,
-    });
-    console.log("Drag ended for room:", props.room.id);
-  };
+  // const handleDragEnd = (e: DragEvent) => {
+  //   e.stopPropagation();
+  //   setGlobalDragState({
+  //     isDragging: false,
+  //     draggedId: null,
+  //     draggedType: null,
+  //     dragOverId: null,
+  //     dragOverType: null,
+  //   });
+  //   console.log("Drag ended for room:", props.room.id);
+  // };
 
   // Remove drop functionality from room items - only drop zones should accept drops
 
@@ -310,7 +310,7 @@ const DraggableRoomItem: Component<DraggableRoomItemProps> = (props) => {
           <span class="flex-1 select-none">{props.room.name}</span>
         </div>
 
-        {/* Drag indicator */}
+        {/* Drag indicator
         <Show when={props.canDrag}>
           <div
             draggable="true"
@@ -337,7 +337,7 @@ const DraggableRoomItem: Component<DraggableRoomItemProps> = (props) => {
               <circle cx="15" cy="19" r="1" />
             </svg>
           </div>
-        </Show>
+        </Show> */}
       </div>
     </div>
   );
@@ -554,7 +554,7 @@ const DraggableSection: Component<DraggableSectionProps> = (props) => {
 
   return (
     <div
-      class={`transition-all duration-200 ${
+      class={`transition-all duration-200 mt-3 ${
         isDragging() ? "opacity-50" : "opacity-100"
       } ${
         isRoomDropTarget()

@@ -179,7 +179,7 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
           name: newRoleName(),
           color: newRoleColor(),
           permissions: {
-            "VIEW_CHANNELS": true,
+            "VIEW_ROOMS": true,
             "SEND_MESSAGES": true,
             "READ_MESSAGE_HISTORY": true
           },
@@ -475,12 +475,12 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
                 <div
                   class={`p-3 rounded-lg transition-colors ${
                     selectedRole()?.id === role.id
-                      ? "bg-primary/20 border border-primary"
-                      : role.id === "@everyone" 
-                        ? "bg-background2 hover:bg-background2/80 cursor-pointer"
-                        : "bg-background2/50 cursor-not-allowed opacity-60"
+                      ? "bg-primary/20 border border-primary bg-background2 hover:bg-background2/80 cursor-pointer"
+                      : 
+                         "bg-background2 hover:bg-background2/80 cursor-pointer"
+                        
                   }`}
-                  onClick={() => role.id === "@everyone" ? selectRole(role) : null}
+                  onClick={() => selectRole(role)}
                 >
                   <div class="flex items-center justify-between">
                     <div class="flex items-center gap-3">
@@ -504,11 +504,6 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
                       >
                         <Trash />
                       </button>
-                    )}
-                    {role.id !== "@everyone" && (
-                      <div class="text-xs text-yellow-500 font-medium">
-                        Read-only
-                      </div>
                     )}
                   </div>
                 </div>
@@ -534,7 +529,7 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
                     </span>
                   )}
                 </div>
-                {canManageRoles() && selectedRole()!.id === "@everyone" && (
+                {canManageRoles() && (
                   <div class="flex gap-2">
                     {hasUnsavedChanges() && (
                       <button
@@ -556,7 +551,6 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
               </div>
 
               {/* Tab Navigation - Only show permissions tab for @everyone */}
-              {selectedRole()!.id === "@everyone" && (
                 <div class="flex border-b border-border mb-6">
                   <button
                     onClick={() => setActiveTab('permissions')}
@@ -565,21 +559,9 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
                     Permissions
                   </button>
                 </div>
-              )}
               
-              {/* Show message for non-@everyone roles */}
-              {selectedRole()!.id !== "@everyone" && (
-                <div class="text-center py-8 bg-background2 rounded-lg">
-                  <div class="text-text-secondary mb-2">
-                    <Crown class="w-8 h-8 mx-auto mb-2 opacity-50" />
-                    <p class="text-sm">Only @everyone role permissions can be edited</p>
-                    <p class="text-xs mt-1">Other roles are read-only for security</p>
-                  </div>
-                </div>
-              )}
-
+             
               {/* Tab Content - Only show permissions for @everyone */}
-              {selectedRole()!.id === "@everyone" && (
                 <div class="space-y-6">
                   <div class="bg-background2 rounded-lg p-4">
                     <div class="flex items-center justify-between mb-4">
@@ -626,7 +608,6 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
                     </div>
                   </div>
                 </div>
-              )}
             </div>
           ) : (
             <div class="text-center py-12">
