@@ -131,9 +131,17 @@
       loadingScreen.style.zIndex = "50";
       document.body.appendChild(loadingScreen);
 
+      // --- Minimal loading time logic ---
+      let minLoadingTimePassed = false;
+      let appReady = false;
+      let dotInterval;
+      const minLoadingPromise = new Promise(resolve => setTimeout(() => {
+        minLoadingTimePassed = true;
+        resolve();
+      }, 500));
       // Animate dots after the bottom text
       let dots = "";
-      let dotInterval = setInterval(() => {
+      dotInterval = setInterval(() => {
         if (dots.length >= 3) {
           dots = "";
         } else {
@@ -145,16 +153,20 @@
 
       // Expose function to remove loading screen from SolidJS app
       window.removeInitialLoadingScreen = function() {
-        clearInterval(dotInterval);
-        if (document.body.contains(loadingScreen)) {
-          loadingScreen.firstElementChild.style.opacity = "0";
-          setTimeout(() => {
-            if (document.body.contains(loadingScreen)) {
-              document.body.removeChild(loadingScreen);
-            }
-          }, 300);
-        }
+        appReady = true;
+        Promise.all([minLoadingPromise]).then(() => {
+          clearInterval(dotInterval);
+          if (document.body.contains(loadingScreen)) {
+            loadingScreen.firstElementChild.style.opacity = "0";
+            setTimeout(() => {
+              if (document.body.contains(loadingScreen)) {
+                document.body.removeChild(loadingScreen);
+              }
+            }, 300);
+          }
+        });
       };
+      // Fallback: remove after 10 seconds regardless
       setTimeout(() => {
         if (window.removeInitialLoadingScreen) {
           window.removeInitialLoadingScreen();
