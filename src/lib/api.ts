@@ -100,6 +100,15 @@ export const api = {
         method: "POST",
         body: data,
       }),
+    update: (roomId: string, data: { name?: string; topic?: string; icon?: string; position?: number }) =>
+      apiRequest(`${API_ENDPOINTS.ROOMS}/${roomId}`, {
+        method: "PATCH",
+        body: data,
+      }),
+    delete: (roomId: string) =>
+      apiRequest(`${API_ENDPOINTS.ROOMS}/${roomId}`, {
+        method: "DELETE",
+      }),
     messages: {
       list: (roomId: string) => apiRequest(API_ENDPOINTS.ROOM_MESSAGES(roomId)),
       send: (roomId: string, data: any) =>
@@ -117,6 +126,43 @@ export const api = {
           method: "DELETE",
         }),
     },
+    permissions: {
+      get: (roomId: string) => apiRequest(`${API_ENDPOINTS.ROOMS}/${roomId}/permissions`),
+      setRoleOverrides: (roomId: string, roleId: string, overrides: Array<{permission: string, value: string}>) =>
+        apiRequest(`${API_ENDPOINTS.ROOMS}/${roomId}/permissions/roles`, {
+          method: "POST",
+          body: {
+            role_id: roleId,
+            overrides: overrides.map(o => ({ permission_id: o.permission, override: o.value }))
+          },
+        }),
+      setMemberOverrides: (roomId: string, userId: string, overrides: Array<{permission: string, value: string}>) =>
+        apiRequest(`${API_ENDPOINTS.ROOMS}/${roomId}/permissions/members`, {
+          method: "POST",
+          body: {
+            user_id: userId,
+            overrides: overrides.map(o => ({ permission_id: o.permission, override: o.value }))
+          },
+        }),
+      updateRolePermission: (roomId: string, roleId: string, permissionId: string, override: string) =>
+        apiRequest(`${API_ENDPOINTS.ROOMS}/${roomId}/permissions/roles/${roleId}/${permissionId}`, {
+          method: "PUT",
+          body: { override },
+        }),
+      updateMemberPermission: (roomId: string, userId: string, permissionId: string, override: string) =>
+        apiRequest(`${API_ENDPOINTS.ROOMS}/${roomId}/permissions/members/${userId}/${permissionId}`, {
+          method: "PUT",
+          body: { override },
+        }),
+      deleteRoleOverrides: (roomId: string, roleId: string) =>
+        apiRequest(`${API_ENDPOINTS.ROOMS}/${roomId}/permissions/roles/${roleId}`, {
+          method: "DELETE",
+        }),
+      deleteMemberOverrides: (roomId: string, userId: string) =>
+        apiRequest(`${API_ENDPOINTS.ROOMS}/${roomId}/permissions/members/${userId}`, {
+          method: "DELETE",
+        }),
+    },
     typing: {
       indicate: (roomId: string) =>
         apiRequest(API_ENDPOINTS.TYPING_INDICATOR(roomId), {
@@ -130,6 +176,13 @@ export const api = {
         method: "PATCH",
         body: data,
       }),
+    rooms: {
+      create: (spaceId: string, data: { name: string; type: number; topic?: string; parent_id?: string; is_private?: boolean; allowed_roles?: string[] }) =>
+        apiRequest(`${API_ENDPOINTS.SPACES}/${spaceId}/rooms`, {
+          method: "POST",
+          body: data,
+        }),
+    },
     members: {
       list: (spaceId: string) => apiRequest(API_ENDPOINTS.SPACE_MEMBERS(spaceId)),
       updateRoles: (spaceId: string, userId: string, roleIds: string[]) =>

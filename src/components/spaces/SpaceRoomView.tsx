@@ -2,7 +2,6 @@ import { Component, createMemo, createSignal, Show } from "solid-js";
 import { useParams } from "@solidjs/router";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
 // import { useCache } from "../../lib/providers/cache/CacheProvider";
-import RoomsList from "./rooms/RoomsList";
 import ChatArea from "../chat/ChatArea";
 import { RoomType } from "../../types/roomTypes";
 import SpaceMembersList from "./SpaceMembersList";
@@ -57,29 +56,13 @@ export const SpaceRoomView: Component = () => {
 
   return (
     <div class="h-full w-full flex bg-background2 overflow-hidden">
-      {/* Rooms list - fixed width, no shrink */}
-      <div class="w-[260px] bg-background1 flex flex-col flex-shrink-0">
-        {(() => {
-          const spaceId = currentSpace()?.id
-            ? String(currentSpace()?.id)
-            : undefined;
-          console.log(
-            "[SpaceRoomView] Passing spaceId to RoomsList:",
-            spaceId,
-            "type:",
-            typeof spaceId,
-          );
-          return <RoomsList spaceId={spaceId} currentSpace={currentSpace()} />;
-        })()}
-      </div>
-
       {/* Main content area - flexible, can shrink */}
       <div class="flex-1 flex flex-col min-w-0">
         {/* Header */}
         <div class="p-2 flex flex-col border-b border-surface border-opacity-20 flex-shrink-0 bg-background2 overflow-hidden">
           <div class="flex items-center justify-between px-3 py-1 min-w-0">
-            <div class="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
-              <Show
+              <div class="flex items-center gap-2 min-w-0 flex-1 overflow-hidden">
+                <Show
                 when={currentRoom()?.type === RoomType.TEXT_ROOM}
                 fallback={
                   <svg
@@ -108,29 +91,29 @@ export const SpaceRoomView: Component = () => {
             </div>
 
             {/* Members toggle button */}
-            <div class="flex items-center gap-2 flex-shrink-0">
-              <button
-                onClick={() => setShowMembers(!showMembers())}
-                class="p-2 rounded-md hover:bg-surface hover:bg-opacity-10 transition-colors text-text-secondary hover:text-text-primary flex-shrink-0"
-                aria-label="Toggle members sidebar"
-              >
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  class="w-5 h-5"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <button
+                  onClick={() => setShowMembers(!showMembers())}
+                  class="p-2 rounded-md hover:bg-surface hover:bg-opacity-10 transition-colors text-text-secondary hover:text-text-primary flex-shrink-0"
+                  aria-label="Toggle members sidebar"
                 >
-                  <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                  <circle cx="9" cy="7" r="4" />
-                  <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                  <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-                </svg>
-              </button>
-            </div>
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="w-5 h-5"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                  >
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+                    <circle cx="9" cy="7" r="4" />
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                  </svg>
+                </button>
+              </div>
           </div>
         </div>
 

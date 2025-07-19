@@ -90,6 +90,39 @@ const GlobalKeyboardHandler: Component = () => {
         return;
       }
 
+      // Check if a message is being edited by looking for the message editor
+      // Multiple approaches to detect message editing state:
+      
+      // 1. Look for the MessageEditor's contenteditable element with its specific classes
+      const messageEditor = document.querySelector('.bg-surface.bg-opacity-30.p-3.rounded-md[contenteditable="true"]');
+      if (messageEditor) {
+        return;
+      }
+      
+      // 2. Look for any contenteditable element that might be a message editor
+      const anyMessageEditor = document.querySelector('[contenteditable="true"]');
+      if (anyMessageEditor) {
+        // Check if it's within a message editing context
+        const editingContainer = anyMessageEditor.closest('.rounded-md');
+        if (editingContainer) {
+          return;
+        }
+      }
+      
+      // 3. Check for editing UI elements by looking for the help text
+      const editingHelpElements = document.querySelectorAll('.text-xs.text-text-secondary');
+      for (const element of editingHelpElements) {
+        if (element.textContent?.includes('escape to') && element.textContent?.includes('cancel')) {
+          return;
+        }
+      }
+      
+      // 4. Check if any element with contenteditable is currently focused
+      const focusedElement = document.activeElement;
+      if (focusedElement && focusedElement.getAttribute('contenteditable') === 'true') {
+        return;
+      }
+
       // Check if an input, textarea, or contenteditable element is already focused
       const activeElement = document.activeElement;
       const isInputFocused = activeElement &&
@@ -112,9 +145,30 @@ const GlobalKeyboardHandler: Component = () => {
         return;
       }
 
-      // Only focus the chat input, don't interfere with typing
-      // Let the normal input handling take care of the character input
+      // Focus the chat input and position cursor at the end
       chatInput.focus();
+      
+      // Move cursor to the end of the content
+      const range = document.createRange();
+      const selection = window.getSelection();
+      if (selection && chatInput.childNodes.length > 0) {
+        // If there's content, move to the end of the last text node
+        const lastNode = chatInput.childNodes[chatInput.childNodes.length - 1];
+        if (lastNode.nodeType === Node.TEXT_NODE) {
+          range.setStart(lastNode, lastNode.textContent?.length || 0);
+        } else {
+          range.setStartAfter(lastNode);
+        }
+        range.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(range);
+      } else {
+        // If no content, just position at the start
+        range.selectNodeContents(chatInput);
+        range.collapse(false);
+        selection?.removeAllRanges();
+        selection?.addRange(range);
+      }
       
       // Don't prevent default - let the normal input handling work
       // The focus will cause the next keystroke to be handled normally by the input

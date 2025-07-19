@@ -14,6 +14,7 @@ import { useParams } from "@solidjs/router";
 import { useTransContext } from "@mbarzda/solid-i18next";
 import { useCache } from "../../lib/providers/cache/CacheProvider";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
+import { usePermissions } from "../../lib/hooks/usePermissions";
 import { BASE_URL, FS_URL } from "../../constants";
 import { CachedMessage } from "../../lib/cache/MessageCache";
 import { useUserSettings } from "../../lib/providers/userSettings/UserSettingsProvider";
@@ -46,6 +47,7 @@ const ChatArea: Component = () => {
   const cache = useCache();
   const [t] = useTransContext();
   const { userSettings } = useUserSettings();
+  const { checkPermission } = usePermissions();
   const [messageText, setMessageText] = createSignal("");
   const [sending, setSending] = createSignal(false);
   const [loading, setLoading] = createSignal(false);
@@ -290,10 +292,13 @@ const ChatArea: Component = () => {
     };
   });
 
-  // Auto-focus chat input when room changes
+  // Auto-focus chat input when room changes (but not on mobile)
   createEffect(() => {
     const roomId = params.roomId;
-    if (roomId && chatInputRef) {
+    const mobileStatus = isMobile();
+    console.log("[ChatArea] Room change effect - roomId:", roomId, "isMobile:", mobileStatus, "chatInputRef:", !!chatInputRef);
+    
+    if (roomId && chatInputRef && !mobileStatus) {
       console.log("[ChatArea] Auto-focusing chat input for room:", roomId);
       // Small delay to ensure the component is fully rendered
       setTimeout(() => {
@@ -302,6 +307,8 @@ const ChatArea: Component = () => {
           console.log("[ChatArea] Chat input focused successfully");
         }
       }, 50);
+    } else if (roomId && mobileStatus) {
+      console.log("[ChatArea] Skipping auto-focus on mobile for room:", roomId);
     }
   });
 
@@ -437,6 +444,91 @@ const ChatArea: Component = () => {
     if (!allRooms) return null;
 
     return allRooms.find((room) => room.id === params.roomId);
+  });
+
+  // Check if user has permission to send messages
+  const canSendMessages = createMemo(() => {
+    const room = currentRoom();
+    if (!room) return false;
+    
+    // For PMs and Group PMs, users can always send messages
+    if (room.type === RoomType.PM || room.type === RoomType.GROUP_PM) {
+      return true;
+    }
+
+    // For space rooms (types 2, 3, 4), check room permission overrides first
+    if (room.type >= 2 && room.type <= 4 && room.permission_overrides) {
+      const SEND_MESSAGES = 1 << 11; // SEND_MESSAGES permission bit (2048)
+
+      const space = cache.getSpace(room.space_id!);
+      if (user()!.id == space?.owner_id) return true;
+      
+      console.log('[canSendMessages] Checking permission overrides for room:', room.id, {
+        roomType: room.type,
+        permissionOverrides: room.permission_overrides,
+        SEND_MESSAGES_BIT: SEND_MESSAGES
+      });
+      
+      // Check member-specific overrides first
+      if (room.permission_overrides.member) {
+        const { granted, denied } = room.permission_overrides.member;
+        console.log('[canSendMessages] Member overrides:', { granted, denied, SEND_MESSAGES });
+        if (denied & SEND_MESSAGES) {
+          console.log('[canSendMessages] Member explicitly denied SEND_MESSAGES');
+          return false; // Explicitly denied
+        }
+        if (granted & SEND_MESSAGES) {
+          console.log('[canSendMessages] Member explicitly granted SEND_MESSAGES');
+          return true; // Explicitly granted
+        }
+      }
+      
+      // Check role-specific overrides
+         if (room.permission_overrides.roles) {
+           const currentUserId = user()?.id;
+           console.log('[canSendMessages] Checking role overrides for user:', currentUserId);
+           if (currentUserId && room.space_id) {
+             // Get user's space membership to access their roles
+             const spaceMember = cache.getSpaceMember(room.space_id.toString(), currentUserId);
+             const userRoles = spaceMember?.roles || [];
+             console.log('[canSendMessages] User roles:', userRoles, 'Space member:', spaceMember);
+             
+             let hasRoleDenial = false;
+             let hasRoleGrant = false;
+             
+             for (const roleId of userRoles) {
+               const roleOverride = room.permission_overrides.roles[roleId];
+               console.log('[canSendMessages] Checking role override for role:', roleId, roleOverride);
+               if (roleOverride) {
+                 if (roleOverride.denied & SEND_MESSAGES) {
+                   console.log('[canSendMessages] Role', roleId, 'explicitly denies SEND_MESSAGES');
+                   hasRoleDenial = true;
+                 }
+                 if (roleOverride.granted & SEND_MESSAGES) {
+                   console.log('[canSendMessages] Role', roleId, 'explicitly grants SEND_MESSAGES');
+                   hasRoleGrant = true;
+                 }
+               }
+             }
+             
+             if (hasRoleDenial) {
+               console.log('[canSendMessages] Role denial takes precedence');
+               return false; // Role explicitly denies
+             }
+             if (hasRoleGrant) {
+               console.log('[canSendMessages] Role grant takes precedence');
+               return true; // Role explicitly grants
+             }
+           }
+         }
+    }
+    
+    // For text rooms, check SEND_MESSAGES permission from space
+    if (room.space_id) {
+      return checkPermission(room.space_id.toString(), "SEND_MESSAGES");
+    }
+    
+    return false;
   });
 
   // Combined messages for display (cached + pending)
@@ -1347,7 +1439,7 @@ const ChatArea: Component = () => {
   // Auto-focus effect for when the component mounts or room changes
   createEffect(() => {
     const roomId = params.roomId;
-    if (roomId && chatInputRef) {
+    if (roomId && chatInputRef && !isMobile()) {
       // Longer delay to ensure all scroll operations are complete
       // The room change effect calls scrollToBottom with multiple requestAnimationFrame
       // and a 100ms setTimeout, so we need to wait longer
@@ -2293,9 +2385,21 @@ const ChatArea: Component = () => {
               </div>
             </div>
           </Show>
-          <div
-            class={`bg-[var(--background1)] p-2 flex items-center relative min-w-0 ${isMobile() ? "rounded-none mx-0 px-4" : "rounded-lg"}`}
+          <Show
+            when={canSendMessages()}
+            fallback={
+              <div
+                class={`bg-[var(--background1)] p-3.5 flex select-none relative min-w-0 ${isMobile() ? "rounded-none mx-0 px-4" : "rounded-lg"}`}
+              >
+                <div class="text-text-secondary">
+                  You do not have permission to send messages in this room.
+                </div>
+              </div>
+            }
           >
+            <div
+              class={`bg-[var(--background1)] p-2 flex items-center relative min-w-0 ${isMobile() ? "rounded-none mx-0 px-4" : "rounded-lg"}`}
+            >
             {/* File attachment button */}
             <button
               onClick={() => {
@@ -2563,6 +2667,7 @@ const ChatArea: Component = () => {
                   />
                 </svg>
               </button>
+              </div>
               <Show when={editingMessageId()}>
                 <button
                   onClick={() => {
@@ -2654,7 +2759,7 @@ const ChatArea: Component = () => {
                 </button>
               </Show>
             </div>
-          </div>
+          </Show>
 
           {/* Emoji Picker Portal */}
           <Show when={showEmojiPicker()}>

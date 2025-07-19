@@ -235,6 +235,7 @@ interface SystemMessageProps {
   systemSelectedUserId: string | null;
   onSystemUserClick: (e: MouseEvent, userId: string) => void;
   onClosePopup: () => void;
+  spaceId?: string;
 }
 
 export const SystemMessage: Component<SystemMessageProps> = (props) => {
@@ -244,6 +245,14 @@ export const SystemMessage: Component<SystemMessageProps> = (props) => {
     props.appearance,
   );
 
+  // Get space member for the selected user in system messages
+  const selectedUserSpaceMember = () => {
+    const spaceId = props.spaceId;
+    const userId = props.systemSelectedUserId;
+    if (!spaceId || !userId) return undefined;
+    return props.cache.getSpaceMember(spaceId, userId);
+  };
+
   return (
     <>
       <UserPopupMenu
@@ -251,6 +260,8 @@ export const SystemMessage: Component<SystemMessageProps> = (props) => {
         onClose={props.onClosePopup}
         triggerRef={props.systemUserPopupTrigger}
         userId={props.systemSelectedUserId || ""}
+        spaceId={props.spaceId}
+        spaceMember={selectedUserSpaceMember()}
       />
       <div class="flex flex-col mt-2 group hover:bg-surface hover:bg-opacity-10 transition-colors px-4 w-full relative overflow-visible">
         <div

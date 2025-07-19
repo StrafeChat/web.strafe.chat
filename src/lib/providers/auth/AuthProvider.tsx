@@ -406,6 +406,7 @@ export const AuthProvider: ParentComponent = (props) => {
         topic: room.Topic || room.topic || "",
         created_at: room.CreatedAt || room.created_at || new Date().toISOString(),
         updated_at: room.UpdatedAt || room.updated_at || null,
+        permission_overrides: room.permission_overrides,
         space_id: spaceId ? String(spaceId) : undefined,
         parent_id: parentId ? String(parentId) : undefined,
         position: room.Position ?? room.position ?? undefined,
@@ -449,18 +450,24 @@ export const AuthProvider: ParentComponent = (props) => {
   };
 
   const handleRoomCreateEvent = (data: any) => {
-    const roomData = data.data || data;
+    const roomData = data.room || data.data || data;
+    console.log("[AuthProvider] Room create event received:", roomData);
+    
     const newRoom = {
-      id: roomData.id,
-      name: roomData.name || "",
-      type: roomData.type || 0,
-      recipients: roomData.recipients || [],
-      owner_id: roomData.creator || roomData.owner_id || "",
-      last_message_id: roomData.last_message_id || null,
-      icon: roomData.icon || null,
-      created_at: roomData.created_at || new Date().toISOString(),
-      updated_at: roomData.updated_at || null,
-      recipients_data: roomData.recipients?.map((recipientId: string) => {
+      id: roomData.id || roomData.ID,
+      name: roomData.name || roomData.Name || "",
+      type: roomData.type || roomData.Type || 0,
+      recipients: roomData.recipients || roomData.Recipients || [],
+      owner_id: roomData.creator || roomData.Creator || roomData.owner_id || roomData.OwnerID || "",
+      last_message_id: roomData.last_message_id || roomData.LastMessageID || null,
+      icon: roomData.icon || roomData.Icon || null,
+      topic: roomData.topic || roomData.Topic || "",
+      created_at: roomData.created_at || roomData.CreatedAt || new Date().toISOString(),
+      updated_at: roomData.updated_at || roomData.UpdatedAt || null,
+      space_id: roomData.space_id || roomData.SpaceID ? String(roomData.space_id || roomData.SpaceID) : undefined,
+      parent_id: roomData.parent_id || roomData.ParentID ? String(roomData.parent_id || roomData.ParentID) : undefined,
+      position: roomData.position || roomData.Position || undefined,
+      recipients_data: (roomData.recipients || roomData.Recipients || [])?.map((recipientId: string) => {
         const userData = cache.getUser(recipientId);
         return userData ? {
           id: recipientId,
@@ -473,6 +480,7 @@ export const AuthProvider: ParentComponent = (props) => {
       }).filter(Boolean)
     };
     
+    console.log("[AuthProvider] Adding new room:", newRoom);
     setRooms(prev => [...prev, newRoom as RoomWithRecipients]);
   };
 

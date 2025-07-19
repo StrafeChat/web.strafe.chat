@@ -1,5 +1,6 @@
 import { Component, createSignal } from "solid-js";
 import { useAuth } from "../../../lib/providers/auth/AuthProvider";
+import { usePermissions } from "../../../lib/hooks/usePermissions";
 import { Space } from "../../../lib/cache/SpaceCache";
 import User from "../../shared/icons/User";
 import Shield from "../../shared/icons/Shield";
@@ -10,13 +11,14 @@ interface SpaceSecuritySettingsProps {
 
 const SpaceSecuritySettings: Component<SpaceSecuritySettingsProps> = (props) => {
   const { isMobile, user } = useAuth();
+  const { checkPermission } = usePermissions();
   const [verificationLevel, setVerificationLevel] = createSignal(props.space.verification_level);
   const [explicitContentFilter, setExplicitContentFilter] = createSignal(props.space.explicit_content_filter);
   const [nsfwLevel, setNsfwLevel] = createSignal(props.space.nsfw_level);
   const [defaultMessageNotifications, setDefaultMessageNotifications] = createSignal(props.space.default_message_notifications);
 
   const isOwner = () => props.space.owner_id === user()?.id;
-  const canManage = () => isOwner(); // TODO: Add role-based permissions
+  const canManage = () => isOwner() || checkPermission(props.space.id.toString(), "MANAGE_SPACE");
 
   const handleSave = async () => {
     // TODO: Implement API call to update space security settings

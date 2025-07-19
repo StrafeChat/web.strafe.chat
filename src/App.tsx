@@ -86,10 +86,10 @@ const MountApp = (props: ParentProps) => {
     >
       <ThemeProvider>
         <ToastProvider>
-          <ContextMenuProvider>
             <CacheProvider>
               <UserSettingsProvider>
                 <AuthProvider>
+                  <ContextMenuProvider>
 									<VoiceProvider>
 										<NavigationHistoryProvider>
 											<MobileNavProvider>
@@ -104,10 +104,10 @@ const MountApp = (props: ParentProps) => {
 											</MobileNavProvider>
 										</NavigationHistoryProvider>
 									</VoiceProvider>
+                  </ContextMenuProvider>
                 </AuthProvider>
               </UserSettingsProvider>
             </CacheProvider>
-          </ContextMenuProvider>
         </ToastProvider>
       </ThemeProvider>
     </TransProvider>

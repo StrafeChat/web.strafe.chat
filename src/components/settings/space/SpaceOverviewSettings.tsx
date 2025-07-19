@@ -276,7 +276,7 @@ const SpaceOverviewSettings: Component<SpaceOverviewSettingsProps> = (props) => 
               <div class="flex items-center gap-3">
                 {props.space.icon && (
                   <img 
-                    src={props.space.icon} 
+                    src={`${FS_URL}/space_icons/${props.space.id}/${props.space.icon}`} 
                     alt="Space icon" 
                     class="w-12 h-12 rounded-lg object-cover border border-border"
                   />
@@ -309,7 +309,7 @@ const SpaceOverviewSettings: Component<SpaceOverviewSettingsProps> = (props) => 
               <div class="flex items-center gap-3">
                 {props.space.banner && (
                   <img 
-                    src={props.space.banner} 
+                    src={`${FS_URL}/space_banners/${props.space.id}/${props.space.banner}`} 
                     alt="Space banner" 
                     class="w-20 h-12 rounded-lg object-cover border border-border"
                   />

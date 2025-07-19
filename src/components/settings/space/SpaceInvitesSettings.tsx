@@ -92,17 +92,20 @@ export const SpaceInvitesSettings: Component<SpaceInvitesSettingsProps> = (props
       }
       
       if (expiresIn()) {
-        const now = new Date();
-        const expirationDate = new Date(now.getTime() + parseInt(expiresIn()) * 60 * 60 * 1000);
-        inviteData.expires_at = expirationDate.toISOString();
+        inviteData.expires_in = parseInt(expiresIn()) * 60 * 60; // Convert hours to seconds
       }
       
       const newInvite = await api.spaces.invites.create(props.space.id, inviteData);
       
-      toast.showToast("Invite created successfully!", "success");
+      // Add the new invite to the current list for immediate UI update
+      setInvites(prev => [newInvite, ...prev]);
+      
+      toast.showToast(`Invite created successfully! Code: ${newInvite.code}`, "success");
       setShowCreateForm(false);
       setMaxUses(undefined);
       setExpiresIn("");
+      
+      // Still fetch to ensure consistency with server state
       await fetchInvites();
     } catch (err) {
       console.error("Error creating invite:", err);

@@ -1,4 +1,4 @@
-import { Component, createSignal, onCleanup } from "solid-js";
+import { Component, createSignal, onCleanup, createEffect } from "solid-js";
 import { Portal } from "solid-js/web";
 import { Tooltip } from "../../common/Tooltip";
 import Modal from "../../modals/Modal";
@@ -15,16 +15,20 @@ export const FriendMenu: Component<FriendMenuProps> = (props) => {
   const [showConfirmation, setShowConfirmation] = createSignal(false);
 
   // Close menu when clicking outside
-  const handleClickOutside = (e: MouseEvent) => {
-    const target = e.target as HTMLElement;
-    if (!target.closest(".friend-menu")) {
-      setIsMenuOpen(false);
-    }
-  };
+  createEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(".friend-menu")) {
+        setIsMenuOpen(false);
+      }
+    };
 
-  document.addEventListener("click", handleClickOutside);
-  onCleanup(() => {
-    document.removeEventListener("click", handleClickOutside);
+    if (isMenuOpen()) {
+      document.addEventListener("click", handleClickOutside);
+      onCleanup(() => {
+        document.removeEventListener("click", handleClickOutside);
+      });
+    }
   });
 
   const handleRemoveFriend = async () => {

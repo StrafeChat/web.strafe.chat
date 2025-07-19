@@ -1,4 +1,5 @@
-import { Component, Show } from "solid-js";
+import { Component, Show, onMount, createEffect } from "solid-js";
+import { useAuth } from "../../../../lib/providers/auth/AuthProvider";
 
 interface MessageEditorProps {
   content: string;
@@ -11,23 +12,91 @@ interface MessageEditorProps {
 }
 
 export const MessageEditor: Component<MessageEditorProps> = (props) => {
+  let editorRef: HTMLDivElement | undefined;
+  let isInitialized = false;
+  const { isMobile } = useAuth();
+
+  const setEditorRef = (el: HTMLDivElement) => {
+    editorRef = el;
+    if (props.ref) {
+      props.ref(el);
+    }
+  };
+
+  onMount(() => {
+    if (editorRef && props.content) {
+      editorRef.textContent = props.content;
+      // Position cursor at the end on initial mount
+      const range = document.createRange();
+      const selection = window.getSelection();
+      if (editorRef.childNodes.length > 0) {
+        range.setStartAfter(editorRef.childNodes[editorRef.childNodes.length - 1]);
+      } else {
+        range.setStart(editorRef, 0);
+      }
+      range.collapse(true);
+      selection?.removeAllRanges();
+      selection?.addRange(range);
+      isInitialized = true;
+    }
+  });
+
+  createEffect(() => {
+    // Only update content if it's different and not from user input
+    if (editorRef && !isInitialized && props.content !== editorRef.textContent) {
+      const selection = window.getSelection();
+      const range = selection?.getRangeAt(0);
+      const cursorPosition = range?.startOffset || 0;
+      
+      editorRef.textContent = props.content;
+      
+      // Restore cursor position
+      if (selection && editorRef.childNodes.length > 0) {
+        const newRange = document.createRange();
+        const textNode = editorRef.childNodes[0];
+        const maxOffset = textNode?.textContent?.length || 0;
+        newRange.setStart(textNode, Math.min(cursorPosition, maxOffset));
+        newRange.collapse(true);
+        selection.removeAllRanges();
+        selection.addRange(newRange);
+      }
+    }
+  });
+
   return (
-    <div class="bg-background border border-border rounded-md p-3 mt-1">
+    <div class="rounded-md pt-2">
       <div
-        ref={props.ref}
+        ref={setEditorRef}
         contentEditable
-        class="text-text-primary whitespace-pre-wrap overflow-hidden max-w-full bg-surface bg-opacity-30 p-3 rounded-md focus:outline-none border border-transparent focus:border-primary min-h-[40px] resize-none"
+        class="text-text-primary whitespace-pre-wrap overflow-hidden max-w-full bg-surface bg-opacity-30 p-3 rounded-md focus:outline-none focus:border-primary min-h-[40px] resize-none border border-border"
         style="word-break: break-word; overflow-wrap: break-word;"
-        onInput={(e) =>
-          props.onContentChange(e.currentTarget.textContent || "")
-        }
+        onInput={(e) => {
+          isInitialized = true;
+          props.onContentChange(e.currentTarget.textContent || "");
+        }}
+        onKeyDown={(e) => {       
+          if (!isMobile && e.key === "Enter") {
+            if (e.shiftKey) {
+              // Shift+Enter: Allow new line (default behavior)
+              return;
+            } else {
+              // Enter only: Save the message
+              e.preventDefault();
+              props.onSave();
+            }
+          }
+          
+          if (e.key === "Escape") {
+            e.preventDefault();
+            props.onCancel();
+          }
+        }}
       >
-        {props.content}
       </div>
       <Show when={props.error}>
         <div class="text-xs text-red-500 mt-2">{props.error}</div>
       </Show>
-      <div class="flex items-center justify-between mt-3">
+      <div class="flex items-center justify-between mt-1">
         <div class="text-xs text-text-secondary">
           escape to{" "}
           <span
@@ -43,24 +112,6 @@ export const MessageEditor: Component<MessageEditorProps> = (props) => {
           >
             save
           </span>
-        </div>
-        <div class="flex gap-2">
-          <button
-            class="px-3 py-1.5 text-sm text-text-secondary hover:text-text-primary transition-colors"
-            onClick={props.onCancel}
-            disabled={props.isLoading}
-          >
-            Cancel
-          </button>
-          <button
-            class="px-3 py-1.5 text-sm bg-primary text-white rounded hover:bg-primary-dark transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            onClick={props.onSave}
-            disabled={props.isLoading || !props.content.trim()}
-          >
-            <Show when={props.isLoading} fallback="Save">
-              Saving...
-            </Show>
-          </button>
         </div>
       </div>
     </div>

@@ -32,6 +32,18 @@ export type RoomWithRecipients = {
   space_id?: string;
   parent_id?: string;
   position?: number;
+  permission_overrides?: {
+    member?: {
+      granted: number;
+      denied: number;
+    };
+    roles?: {
+      [roleId: string]: {
+        granted: number;
+        denied: number;
+      };
+    };
+  };
 };
 
 export { RoomType };
