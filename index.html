@@ -59,69 +59,19 @@
         root.style.setProperty("--warning", "#ffcc00");
       }
 
-      // Turtle animation keyframes
-      const style = document.createElement("style");
-      style.textContent = `
-        @keyframes swim1 {
-          0% { transform: translateY(0) rotate(-10deg) scale(1); }
-          20% { transform: translateY(-10px) rotate(-5deg) scale(1.05); }
-          40% { transform: translateY(5px) rotate(0deg) scale(1.1); }
-          60% { transform: translateY(-8px) rotate(5deg) scale(1.05); }
-          80% { transform: translateY(0) rotate(-5deg) scale(1); }
-          100% { transform: translateY(0) rotate(-10deg) scale(1); }
-        }
-        @keyframes swim2 {
-          0% { transform: translateY(0) rotate(8deg) scale(1); }
-          25% { transform: translateY(-12px) rotate(0deg) scale(1.08); }
-          50% { transform: translateY(8px) rotate(-8deg) scale(1.12); }
-          75% { transform: translateY(-6px) rotate(0deg) scale(1.08); }
-          100% { transform: translateY(0) rotate(8deg) scale(1); }
-        }
-        @keyframes swim3 {
-          0% { transform: translateY(0) rotate(0deg) scale(1); }
-          15% { transform: translateY(-8px) rotate(5deg) scale(1.04); }
-          30% { transform: translateY(6px) rotate(-5deg) scale(1.08); }
-          45% { transform: translateY(-10px) rotate(0deg) scale(1.12); }
-          60% { transform: translateY(0) rotate(-5deg) scale(1.08); }
-          100% { transform: translateY(0) rotate(0deg) scale(1); }
-        }
-        .animate-swim-1 { animation: swim1 4s ease-in-out infinite; }
-        .animate-swim-2 { animation: swim2 5s ease-in-out infinite; }
-        .animate-swim-3 { animation: swim3 6s ease-in-out infinite; }
-        .strafe-shadow { color: #21c35e; text-shadow: 0 2px 16px #21c35e55, 0 1px 0 #fff; letter-spacing: 0.05em; }
-      `;
-      document.head.appendChild(style);
-
-      // Custom bottom texts
-      const bottomTexts = [
-        "Connecting to STRAFE",
-        "Loading your experience",
-        "Making things awesome",
-        "Almost there"
-      ];
-      const text = bottomTexts[Math.floor(Math.random() * bottomTexts.length)];
-
-      const TURTLE_SRC = "https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/512/emoji_u1f422.png";
-
       const loadingScreen = document.createElement("div");
       loadingScreen.innerHTML = `
-        <div class="fixed inset-0 flex flex-col justify-center items-center transition-opacity duration-500 z-50" style="background: #1a1b26; z-index: 50;">
-          <div class="absolute inset-0 opacity-40 pointer-events-none select-none">
-            <img src='${TURTLE_SRC}' alt="Turtle" class="absolute w-24 h-24 animate-swim-1" style="top: 20%; left: 10%;" />
-            <img src='${TURTLE_SRC}' alt="Turtle" class="absolute w-16 h-16 animate-swim-2" style="top: 60%; right: 15%;" />
-            <img src='${TURTLE_SRC}' alt="Turtle" class="absolute w-20 h-20 animate-swim-3" style="bottom: 15%; left: 30%;" />
-            <img src='${TURTLE_SRC}' alt="Turtle" class="absolute w-16 h-16 animate-swim-1" style="top: 40%; right: 30%;" />
-            <img src='${TURTLE_SRC}' alt="Turtle" class="absolute w-24 h-24 animate-swim-2" style="bottom: 30%; right: 40%;" />
-          </div>
-          <div class="absolute inset-0 bg-gradient-to-br from-[#1a1b26]/80 via-[#1a1b26]/60 to-[#1a1b26]/90 pointer-events-none select-none"></div>
-          <div class="relative flex flex-col items-center justify-center w-full h-full z-10">
-            <h1 class="text-5xl md:text-6xl font-extrabold tracking-tight text-center strafe-shadow">STRAFE</h1>
-            <div class="mt-8 flex flex-col items-center">
-              <div class="w-16 h-16 border-4 rounded-full animate-spin" style="border-color: #21c35e; border-top-color: transparent;"></div>
+        <div class="fixed inset-0 flex flex-col justify-center items-center transition-opacity duration-500" style="background-color: var(--background); background-opacity: 0.95; z-index: 50;">
+          <div class="flex flex-col items-center space-y-6">
+            <div class="w-16 h-16 border-4 rounded-full animate-spin" style="border-color: var(--primary); border-top-color: transparent;"></div>
+            <div class="text-center">
+              <p class="text-lg font-medium mb-2" style="color: var(--text-primary);">Loading Strafe...</p>
+              <p class="text-sm" style="color: var(--text-secondary);">Please wait while we prepare everything for you</p>
             </div>
-            <div class="absolute bottom-10 left-0 w-full flex flex-col items-center">
-              <p id="strafe-loading-text" class="text-lg font-medium text-text-primary drop-shadow mb-2" style="color: #fff; text-shadow: 0 1px 8px #21c35e55;">${text}<span id="strafe-dots"></span></p>
-              <p class="text-sm text-text-secondary" style="color: #b5ffcb;">Please wait while we prepare everything for you</p>
+            <div class="flex space-x-2">
+              <div class="w-2 h-2 rounded-full animate-pulse" style="background-color: var(--primary);"></div>
+              <div class="w-2 h-2 rounded-full animate-pulse" style="background-color: var(--primary); animation-delay: 0.2s;"></div>
+              <div class="w-2 h-2 rounded-full animate-pulse" style="background-color: var(--primary); animation-delay: 0.4s;"></div>
             </div>
           </div>
         </div>
@@ -129,43 +79,47 @@
       loadingScreen.style.position = "fixed";
       loadingScreen.style.inset = "0";
       loadingScreen.style.zIndex = "50";
+
       document.body.appendChild(loadingScreen);
 
-      // --- Minimal loading time logic ---
-      let minLoadingTimePassed = false;
-      let appReady = false;
-      let dotInterval;
-      const minLoadingPromise = new Promise(resolve => setTimeout(() => {
-        minLoadingTimePassed = true;
-        resolve();
-      }, 500));
-      // Animate dots after the bottom text
-      let dots = "";
-      dotInterval = setInterval(() => {
-        if (dots.length >= 3) {
-          dots = "";
-        } else {
-          dots += ".";
-        }
-        const dotsEl = document.getElementById("strafe-dots");
-        if (dotsEl) dotsEl.textContent = dots;
-      }, 500);
+      const style = document.createElement("style");
+      style.textContent = `
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .animate-spin { animation: spin 1s linear infinite; }
+        .animate-pulse { animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite; }
+        .space-y-6 > * + * { margin-top: 1.5rem; }
+        .space-x-2 > * + * { margin-left: 0.5rem; }
+        .flex { display: flex; }
+        .flex-col { flex-direction: column; }
+        .items-center { align-items: center; }
+        .justify-center { justify-content: center; }
+        .text-center { text-align: center; }
+        .text-lg { font-size: 1.125rem; }
+        .text-sm { font-size: 0.875rem; }
+        .font-medium { font-weight: 500; }
+        .mb-2 { margin-bottom: 0.5rem; }
+        .w-16 { width: 4rem; }
+        .h-16 { height: 4rem; }
+        .w-2 { width: 0.5rem; }
+        .h-2 { height: 0.5rem; }
+        .border-4 { border-width: 4px; }
+        .rounded-full { border-radius: 9999px; }
+      `;
+      document.head.appendChild(style);
 
       // Expose function to remove loading screen from SolidJS app
       window.removeInitialLoadingScreen = function() {
-        appReady = true;
-        Promise.all([minLoadingPromise]).then(() => {
-          clearInterval(dotInterval);
-          if (document.body.contains(loadingScreen)) {
-            loadingScreen.firstElementChild.style.opacity = "0";
-            setTimeout(() => {
-              if (document.body.contains(loadingScreen)) {
-                document.body.removeChild(loadingScreen);
-              }
-            }, 300);
-          }
-        });
+        if (document.body.contains(loadingScreen)) {
+          loadingScreen.firstElementChild.style.opacity = "0";
+          setTimeout(() => {
+            if (document.body.contains(loadingScreen)) {
+              document.body.removeChild(loadingScreen);
+            }
+          }, 300);
+        }
       };
+      
       // Fallback: remove after 10 seconds regardless
       setTimeout(() => {
         if (window.removeInitialLoadingScreen) {
