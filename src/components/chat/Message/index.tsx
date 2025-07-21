@@ -354,6 +354,9 @@ export function Message(props: MessageProps) {
                 pending={props.pending ?? false}
                 error={props.error}
                 onMessageClick={() => {}}
+                roomId={props.room_id}
+                messageId={props.id}
+                senderId={props.author_id}
               />
               <Show when={props.attachments}>
                 <MessageAttachments

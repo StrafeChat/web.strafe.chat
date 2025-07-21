@@ -59,7 +59,7 @@ const SpaceView: Component = () => {
         <div class="flex-1 flex flex-col">
           {/* Header */}
           <div class="p-2 flex flex-col border-b border-surface border-opacity-20 flex-shrink-0 bg-background2">
-            <div class="flex items-center justify-between px-3 py-2">
+            <div class="flex items-center justify-between px-3 py-1">
               <div class="flex items-center gap-2">
                 <svg
                   xmlns="http://www.w3.org/2000/svg"

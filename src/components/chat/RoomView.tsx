@@ -1,11 +1,10 @@
 import { Component, createMemo, createSignal, Show, For, createEffect } from "solid-js";
-import DefaultGroupPM from "../shared/icons/DefaultGroupPM";
 import { useParams } from "@solidjs/router";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
 import { useCache } from "../../lib/providers/cache/CacheProvider";
 // import { useTransContext } from "@mbarzda/solid-i18next";
 import { StatusIndicator, UserStatus } from "../common/StatusIndicator";
-import { BASE_URL, FS_URL } from "../../constants";
+import { BASE_URL } from "../../constants";
 import { Avatar } from "../common/Avatar";
 import { RoomType } from "../../types/roomTypes";
 import ChatArea from "./ChatArea";
@@ -14,6 +13,7 @@ import UserPopupMenu from "../common/UserPopupMenu";
 import { GroupManagementModal } from "../modals/GroupManagementModal";
 import { AddMemberModal } from "../modals/AddMemberModal";
 import { PMCall } from "../voice/PMCall";
+import RoomHeader from "./RoomHeader";
 
 const RoomView: Component = () => {
   const params = useParams();
@@ -162,33 +162,7 @@ const RoomView: Component = () => {
     return "Unknown Chat";
   };
 
-  // Helper function to get room status (for PMs)
-  const getRoomStatus = () => {
-    const room = currentRoom();
-    if (!room) return "offline" as UserStatus;
 
-    if (room.type === RoomType.PM && room.recipients && room.recipients.length > 0) {
-      const currentUserId = user()?.id;
-      
-      // Find the recipient that isn't the current user
-      const recipientId = room.recipients.find((id) => id !== currentUserId);
-      if (!recipientId) return "offline" as UserStatus;
-      
-      const cachedUser = cache.getUser(recipientId);
-      
-      // Prioritize cached user data for more accurate status
-      if (cachedUser?.presence?.status) {
-        return cachedUser.presence.status as UserStatus;
-      } else if (room.recipients_data && room.recipients_data.length > 0) {
-        // Find the recipient data that matches our recipient ID
-        const recipient = room.recipients_data.find((r) => r.id === recipientId);
-        if (recipient) {
-          return (recipient.presence?.status || "offline") as UserStatus;
-        }
-      }
-    }
-    return "offline" as UserStatus;
-  };
 
   // Get the room type
   const roomType = createMemo(() => {
@@ -196,12 +170,7 @@ const RoomView: Component = () => {
     return room?.type;
   });
 
-  // Get the number of recipients for group PMs
- const recipientCount = createMemo(() => {
-    const room = currentRoom();
-    if (!room || !room.recipients) return 0;
-    return room.recipients.length;
-  });
+
 
   // Get members list for the sidebar
   const roomMembers = createMemo(() => {
@@ -409,81 +378,15 @@ const RoomView: Component = () => {
     <div class="h-full w-full flex flex-col bg-background2">
       {/* Header with consistent styling */}
       <div class="px-4 flex items-center justify-between h-[61px] bg-background2 relative z-10 border-b border-surface border-opacity-20">
-        <div class="flex items-center gap-2">
-          <div class="relative flex-shrink-0 flex items-center">
-            <div class="w-8 h-8 rounded-full overflow-hidden">
-              {roomType() === RoomType.GROUP_PM ? (
-                currentRoom()?.icon ? (
-                  <img
-                    src={`${FS_URL}/icons/${currentRoom()?.id}/${currentRoom()?.icon}`}
-                    alt="Group icon"
-                    class="w-full h-full object-cover"
-                  />
-                ) : (
-                  <div class="w-full h-full bg-surface bg-opacity-20 text-text-primary flex items-center justify-center">
-                    <DefaultGroupPM />
-                  </div>
-                )
-              ) : roomType() === RoomType.PM ? (
-                <Show
-                  when={Boolean(currentRoom()?.recipients_data?.length)}
-                  fallback={
-                    <Avatar
-                      userId="default"
-                      avatar="default.webp"
-                      alt="Room avatar"
-                      size="sm"
-                    />
-                  }
-                >
-                  {(() => {
-                    const room = currentRoom();
-                    const currentUserId = user()?.id;
-                    const recipient = room?.recipients_data?.find((r) => r.id !== currentUserId);
-                    return (
-                      <Avatar
-                        userId={recipient?.id || "default"}
-                        avatar={recipient?.avatar || "default.webp"}
-                        alt="Room avatar"
-                        size="sm"
-                      />
-                    );
-                  })()}
-                </Show>
-              ) : (
-                <Avatar
-                  userId="default"
-                  avatar="default.webp"
-                  alt="Room avatar"
-                  size="sm"
-                />
-              )}
-            </div>
-            {roomType() === RoomType.PM && (
-              <StatusIndicator
-                status={getRoomStatus()}
-                class="border-background1 absolute bottom-[-2px] right-[-2px]"
-              />
-            )}
-          </div>
-          <div class="flex flex-col justify-center">
-            <h2 class="text-sm font-semibold text-text-primary">{getRoomName()}</h2>
-            <Show when={roomType() === RoomType.GROUP_PM}>
-              <Show 
-                when={currentRoom()?.topic && currentRoom()?.topic.trim()}
-                fallback={
-                  <p class="text-xs text-text-secondary">
-                    {recipientCount()} Members
-                  </p>
-                }
-              >
-                <p class="text-xs text-text-secondary truncate max-w-[200px]">
-                  {currentRoom()?.topic}
-                </p>
-              </Show>
-            </Show>
-          </div>
-					
+        <div class="flex-1 min-w-0">
+          <Show when={currentRoom()}>
+            <RoomHeader 
+              roomName={getRoomName()}
+              roomTopic={currentRoom()?.topic}
+              roomId={currentRoom()?.id}
+              roomType={currentRoom()?.type}
+            />
+          </Show>
         </div>
 
 				{/* Voice Call Controls */}

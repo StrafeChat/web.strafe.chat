@@ -39,6 +39,17 @@ export const API_ENDPOINTS = {
   SPACE_INVITES: (spaceId: string) => `${BASE_URL}/spaces/${spaceId}/invites`,
   GET_INVITE_INFO: (code: string) => `${BASE_URL}/invite/${code}`,
   USE_INVITE: (code: string) => `${BASE_URL}/invite/${code}/use`,
+  // E2EE Endpoints
+  E2EE_INITIALIZE: `${BASE_URL}/e2ee/initialize`,
+  E2EE_STATUS: `${BASE_URL}/e2ee/status`,
+  E2EE_USER_STATUS: (userId: string) => `${BASE_URL}/e2ee/users/${userId}/status`,
+  E2EE_PRE_KEY_BUNDLE: (userId: string) => `${BASE_URL}/e2ee/users/${userId}/pre-key-bundle`,
+  E2EE_REFRESH_PRE_KEYS: `${BASE_URL}/e2ee/refresh-pre-keys`,
+  E2EE_ENCRYPT_DIRECT: `${BASE_URL}/e2ee/encrypt/direct`,
+  E2EE_DECRYPT_DIRECT: `${BASE_URL}/e2ee/decrypt/direct`,
+  E2EE_ENCRYPT_GROUP: `${BASE_URL}/e2ee/encrypt/group`,
+  E2EE_DECRYPT_GROUP: `${BASE_URL}/e2ee/decrypt/group`,
+  E2EE_CREATE_GROUP_SESSION: `${BASE_URL}/e2ee/group-session`,
 };
 
 export const API_HEADERS = {
@@ -159,6 +170,20 @@ export const AuthProvider: ParentComponent = (props) => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
+  });
+
+  // Cache rooms when they are updated
+  createEffect(() => {
+    const currentRooms = rooms();
+    if (currentRooms && currentRooms.length > 0) {
+      console.log("[AuthProvider] Caching", currentRooms.length, "rooms");
+      currentRooms.forEach(room => {
+        cache.setRoom({
+          ...room,
+          updated_at: room.updated_at || undefined
+        });
+      });
+    }
   });
 
   const initializeWebSocket = (token: string = localStorage.getItem("sc_token") || "") => {
@@ -482,6 +507,9 @@ export const AuthProvider: ParentComponent = (props) => {
     
     console.log("[AuthProvider] Adding new room:", newRoom);
     setRooms(prev => [...prev, newRoom as RoomWithRecipients]);
+    
+    // Cache the new room immediately
+    cache.setRoom(newRoom);
   };
 
   const handleRoomDeleteEvent = (data: any) => {
@@ -528,6 +556,12 @@ export const AuthProvider: ParentComponent = (props) => {
           
           // Update timestamp
           updatedRoom.updated_at = new Date().toISOString();
+          
+          // Cache the updated room
+          cache.setRoom({
+            ...updatedRoom,
+            updated_at: updatedRoom.updated_at || undefined
+          });
           
           return updatedRoom;
         }
@@ -1069,13 +1103,49 @@ export const AuthProvider: ParentComponent = (props) => {
         return { success: false, error: "Room ID and message content or attachments are required" };
       }
 
+      // Get room information for E2EE encryption
+      const currentRooms = rooms();
+      const room = currentRooms.find(r => r.id === roomId);
+      let processedMessageData = { ...messageData };
+
+      // Apply E2EE encryption if applicable
+      if (room && messageData.content.trim()) {
+        try {
+          // Import E2EE service dynamically to avoid circular dependencies
+          const { e2eeService } = await import('../../e2ee/E2EEService');
+          
+          // Check if E2EE should be applied (PM = 0, GROUP_PM = 1, TEXT_ROOM = 2)
+          if (room.type === 0 || room.type === 1 || room.type === 2) {
+            let encryptedContent = messageData.content;
+            
+            if (room.type === 0 && room.recipients && room.recipients.length > 0) {
+              // Direct PM - encrypt for the recipient
+              const currentUserId = user()?.id;
+              const recipientId = room.recipients.find(id => id !== currentUserId);
+              if (recipientId) {
+                encryptedContent = await e2eeService.encryptDirectMessage(recipientId, messageData.content);
+              }
+            } else if (room.type === 1 || room.type === 2) {
+              // Group PM and TEXT_ROOM - encrypt for the group/room
+              encryptedContent = await e2eeService.encryptGroupMessage(roomId, messageData.content);
+            }
+            
+            processedMessageData.content = encryptedContent;
+            console.log('[AuthProvider] Message encrypted for E2EE');
+          }
+        } catch (e2eeError) {
+          console.warn('[AuthProvider] E2EE encryption failed, sending plaintext:', e2eeError);
+          // Continue with original content if encryption fails
+        }
+      }
+
       const response = await fetch(API_ENDPOINTS.ROOM_MESSAGES(roomId), {
         method: "POST",
         headers: {
           ...API_HEADERS.JSON,
           ...API_HEADERS.SESSION(),
         },
-        body: JSON.stringify(messageData),
+        body: JSON.stringify(processedMessageData),
       });
 
       if (!response.ok) {

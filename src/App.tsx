@@ -39,6 +39,7 @@ import SpaceView from "./components/spaces/SpaceView";
 import InviteHandler from "./components/invite/InviteHandler";
 import { VoiceProvider } from "./lib/providers/voice/VoiceProvider";
 import { NavigationHistoryProvider } from "./lib/providers/navigation/NavigationHistoryProvider";
+import { E2EEProvider } from "./lib/providers/e2ee/E2EEProvider";
 
 const UpdateNotificationWrapper = () => {
   const { isAuthenticated } = useAuth();
@@ -89,22 +90,24 @@ const MountApp = (props: ParentProps) => {
             <CacheProvider>
               <UserSettingsProvider>
                 <AuthProvider>
-                  <ContextMenuProvider>
-									<VoiceProvider>
-										<NavigationHistoryProvider>
-											<MobileNavProvider>
-												<SettingsProvider>
-													<ModalProvider>
-														<LinkConfirmationHandler />
-														<UpdateNotificationWrapper />
-														<GlobalKeyboardHandler />
-														<div class="h-[100dvh] w-full overflow-hidden">{props.children}</div>
-													</ModalProvider>
-												</SettingsProvider>
-											</MobileNavProvider>
-										</NavigationHistoryProvider>
-									</VoiceProvider>
-                  </ContextMenuProvider>
+                  <E2EEProvider>
+                    <ContextMenuProvider>
+										<VoiceProvider>
+											<NavigationHistoryProvider>
+												<MobileNavProvider>
+													<SettingsProvider>
+														<ModalProvider>
+															<LinkConfirmationHandler />
+															<UpdateNotificationWrapper />
+															<GlobalKeyboardHandler />
+															<div class="h-[100dvh] w-full overflow-hidden">{props.children}</div>
+														</ModalProvider>
+													</SettingsProvider>
+												</MobileNavProvider>
+											</NavigationHistoryProvider>
+										</VoiceProvider>
+                    </ContextMenuProvider>
+                  </E2EEProvider>
                 </AuthProvider>
               </UserSettingsProvider>
             </CacheProvider>

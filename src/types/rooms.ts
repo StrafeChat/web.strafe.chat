@@ -8,7 +8,7 @@ export interface Room {
   recipients?: string[];
   owner_id?: string;
   last_message_id?: string | null;
-  icon?: string;
+  icon?: string | null;
   created_at: string;
   updated_at?: string;
   space_id?: string;

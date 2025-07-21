@@ -75,9 +75,9 @@ export const SpaceHome: Component<SpaceHomeProps> = (props) => {
             </Show>
           </div>
           <div class="">
-            <h1 class="text-2xl font-bold text-white">{props.space?.name || "Unknown Space"}</h1>
+            <h1 class="text-2xl font-bold text-white truncate">{props.space?.name || "Unknown Space"}</h1>
             <Show when={props.space?.description}>
-              <p class="text-white text-opacity-80">{props.space?.description}</p>
+              <p class="text-white text-opacity-80 truncate">{props.space?.description}</p>
             </Show>
           </div>
         </div>
