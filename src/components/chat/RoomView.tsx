@@ -14,11 +14,13 @@ import { GroupManagementModal } from "../modals/GroupManagementModal";
 import { AddMemberModal } from "../modals/AddMemberModal";
 import { PMCall } from "../voice/PMCall";
 import RoomHeader from "./RoomHeader";
+import { useVoice, VoiceState } from "../../lib/providers/voice/VoiceProvider";
 
 const RoomView: Component = () => {
   const params = useParams();
   const { user, rooms, isMobile } = useAuth();
   const cache = useCache();
+  const { state: voiceState, room: voiceRoom, connect: connectVoice } = useVoice();
   // const [t] = useTransContext();
 
   // Get the current room based on the roomId parameter
@@ -268,6 +270,12 @@ const RoomView: Component = () => {
 
 	const [initiateCall, setInitiateCall] = createSignal(false);
 
+	// Check if we're in a voice call for this room
+	const isInVoiceCall = createMemo(() => {
+		const room = currentRoom();
+		return room && voiceState() === VoiceState.CONNECTED && voiceRoom() === room.id;
+	});
+
   // Auto-focus is now handled directly in ChatArea component
 
   // Handle member context menu
@@ -394,7 +402,13 @@ const RoomView: Component = () => {
 					<div>
 						<button 
 							style="width: 1.5rem"
-							onClick={() => setInitiateCall(true)}
+							onClick={() => {
+								const room = currentRoom();
+								if (room) {
+									connectVoice(room.id);
+								}
+							}}
+							disabled={voiceState() === VoiceState.CONNECTING}
 						>
 							<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" style="fill: #a6a6a6">
 								{/*!Font Awesome Free 6.7.2 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free Copyright 2025 Fonticons, Inc.-->*/}
@@ -455,10 +469,7 @@ const RoomView: Component = () => {
         </Show>
       </div>
 
-			<Show when={initiateCall() && currentRoom()?.type === RoomType.PM}>
-				{
-					// just for testing
-				}
+			<Show when={isInVoiceCall() && currentRoom()?.type === RoomType.PM}>
 				<PMCall room={currentRoom()!}>
 				</PMCall>
 			</Show>

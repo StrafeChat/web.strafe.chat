@@ -1,11 +1,13 @@
 import { Participant, ParticipantEvent, RemoteTrack, RemoteTrackPublication, Track, TrackPublication } from "livekit-client";
-import { Component, createEffect, createSignal } from "solid-js";
+import { Component, createEffect, createSignal, Show } from "solid-js";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
 import { useCache } from "../../lib/providers/cache/CacheProvider";
+import { Avatar } from "../common/Avatar";
 
 type ParticipantProps = {
 	p: Participant,
-	isLocal: boolean
+	isLocal: boolean,
+	onFocus?: () => void
 }
 
 export const ParticipantElement: Component<ParticipantProps> = (props) => {
@@ -46,8 +48,22 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 			// attach it to a new HTMLVideoElement or HTMLAudioElement
 			const element = track.attach();
 			if (!!props.isLocal && track.kind === Track.Kind.Audio) {
+				// Mute local audio to prevent feedback
 				element.muted = true;
-				//setupSpeakingIndicator(track as Track<Track.Kind.Audio>);
+			}
+			if (track.kind === Track.Kind.Audio) {
+				setupSpeakingIndicator(track as Track<Track.Kind.Audio>);
+			}
+			// Style video elements properly
+			if (track.kind === Track.Kind.Video) {
+				element.style.width = '100%';
+				element.style.height = '100%';
+				element.style.objectFit = 'cover';
+				// Check if this is a screen share track
+				if (track.source === Track.Source.ScreenShare) {
+					element.style.objectFit = 'contain';
+					element.classList.add('screen-share-track');
+				}
 			}
 			mediaCon.appendChild(element);
 			pubElements.set(pub.trackSid, element);
@@ -92,6 +108,22 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 		if (track.kind === Track.Kind.Video || track.kind === Track.Kind.Audio) {
 			// attach it to a new HTMLVideoElement or HTMLAudioElement
 			const element = track.attach();
+			if (track.kind === Track.Kind.Audio) {
+				// Ensure remote audio is not muted
+				element.muted = false;
+				setupSpeakingIndicator(track as Track<Track.Kind.Audio>);
+			}
+			// Style video elements properly
+			if (track.kind === Track.Kind.Video) {
+				element.style.width = '100%';
+				element.style.height = '100%';
+				element.style.objectFit = 'cover';
+				// Check if this is a screen share track
+				if (track.source === Track.Source.ScreenShare) {
+					element.style.objectFit = 'contain';
+					element.classList.add('screen-share-track');
+				}
+			}
 			mediaCon.appendChild(element);
 			pubElements.set(pub.trackSid, element);
 		}
@@ -137,51 +169,40 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 		.on(ParticipantEvent.TrackUnmuted, onUnmute)
 
 	return (
-		<div>
-			<div 
-				style="
-				aspect-ratio: 1/1;
-  		  height: 20rem;
-   			background-color: #559353;
-   			display: flex;
-				flex-direction: row;
-				align-items: center;
-    		border-radius: 5px;
-				position: relative"
-			>
-				<div ref={mediaCon}>
-					{/* Media Tracks are automatically inserted here */}
-				</div>
-				<div
-					style="
-					position: absolute;
-					z-index: 10;
-					bottom: 0;
-					padding: 0.1rem;
-					padding-left: 0.2rem;
-					background-color: rgba(0, 0, 0, 0.6);
-					border-radius: 5px;
-					margin: 0.1rem;"
-				>
-					<h1>{pUser?.username}#{pUser?.discriminator}</h1>
-				</div>
-				<div
-					style={{
-						position: "absolute",
-						width: "100%",
-						height: "100%",
-						"z-index": 20,
-						border: "2px solid red",
-						"border-radius": "5px",
-						top: 0,
-						left: 0,
-						transition: "0.2s opacity",
-						opacity: (soundDetected()) ? 1 : 0,
-					}}
-				>
-
-				</div>
+		<div class="relative aspect-video bg-surface-secondary rounded-lg overflow-hidden border border-border">
+			{/* Media Container */}
+			<div ref={mediaCon} class="w-full h-full">
+				{/* Media Tracks are automatically inserted here */}
 			</div>
+			
+			{/* Fallback Avatar when no video */}
+			<Show when={!p.videoTrackPublications.size}>
+				<div class="absolute inset-0 flex items-center justify-center bg-surface-secondary">
+					<Avatar 
+						userId={pUser?.id || ''} 
+						avatar={pUser?.avatar} 
+						size="lg" 
+						class="w-20 h-20" 
+					/>
+				</div>
+			</Show>
+			
+			{/* User Info Overlay */}
+			<div class="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white text-sm px-2 py-1 rounded flex items-center gap-2">
+				{/* Speaking Indicator */}
+				<Show when={soundDetected()}>
+					<div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+				</Show>
+				<span>{pUser?.username}#{pUser?.discriminator}</span>
+			</div>
+			
+			{/* Speaking Border */}
+			<div
+				class="absolute inset-0 border-2 border-green-500 rounded-lg transition-opacity duration-200 pointer-events-none"
+				style={{
+					opacity: soundDetected() ? 1 : 0,
+				}}
+			></div>
 		</div>
 	)
 }

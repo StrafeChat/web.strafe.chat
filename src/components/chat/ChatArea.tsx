@@ -14,6 +14,8 @@ import { useParams } from "@solidjs/router";
 import { useTransContext } from "@mbarzda/solid-i18next";
 import { useCache } from "../../lib/providers/cache/CacheProvider";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
+import { useE2EE } from "../../lib/providers/e2ee/E2EEProvider";
+import { isE2EEContent } from "../../lib/utils/e2eeReplyUtils";
 import { usePermissions } from "../../lib/hooks/usePermissions";
 import { BASE_URL, FS_URL } from "../../constants";
 import { CachedMessage } from "../../lib/cache/MessageCache";
@@ -45,6 +47,7 @@ const ChatArea: Component = () => {
     markMessagesAsRead,
   } = useAuth();
   const cache = useCache();
+  const e2ee = useE2EE();
   const [t] = useTransContext();
   const { userSettings } = useUserSettings();
   const { checkPermission } = usePermissions();
@@ -1475,11 +1478,30 @@ const ChatArea: Component = () => {
   };
 
   // Function to handle message edit
-  const handleEdit = (message: CachedMessage) => {
+  const handleEdit = async (message: CachedMessage) => {
     if (message.id) {
       setEditingMessageId(message.id);
       setEditingRoomId(params.roomId);
-      setMessageText(message.content || "");
+      
+      // Check if the message content is E2EE encrypted
+      const content = message.content || "";
+      if (isE2EEContent(content)) {
+        try {
+          // Decrypt the content before setting it in the editor
+          const room = cache.getRoom(params.roomId);
+          if (room && e2ee.isE2EEInitialized()) {
+            const decryptedContent = await e2ee.decryptMessage(room.type, params.roomId, content, message.author_id);
+            setMessageText(decryptedContent);
+          } else {
+            setMessageText(content); // Fallback to encrypted content
+          }
+        } catch (error) {
+          console.error('Error decrypting message for editing:', error);
+          setMessageText(content); // Fallback to encrypted content
+        }
+      } else {
+        setMessageText(content);
+      }
     }
   };
 
@@ -1954,7 +1976,26 @@ const ChatArea: Component = () => {
     try {
       setSending(true);
 
-      const result = await editMessage(roomId, messageId, content);
+      // Get the original message to check if it was E2EE encrypted
+      const originalMessage = cache.getMessage(roomId, messageId);
+      let processedContent = content;
+
+      // If the original message was E2EE encrypted, re-encrypt the edited content
+      if (originalMessage && originalMessage.content && isE2EEContent(originalMessage.content)) {
+        const room = cache.getRoom(roomId);
+        if (room && e2ee.isE2EEInitialized()) {
+          try {
+            // Encrypt the content based on room type
+            processedContent = await e2ee.encryptMessage(room.type, roomId, content);
+          } catch (encryptError) {
+            console.error('Failed to encrypt edited message:', encryptError);
+            setError(t("chat.errors.encryptionFailed") || "Failed to encrypt message");
+            return;
+          }
+        }
+      }
+
+      const result = await editMessage(roomId, messageId, processedContent);
 
       if (!result.success) {
         setError(result.error || t("chat.errors.editFailed"));

@@ -12,6 +12,8 @@ import { FS_URL } from "../../../constants";
 import { useAuth } from "../../../lib/providers/auth/AuthProvider";
 import { useCache } from "../../../lib/providers/cache/CacheProvider";
 import { useUserSettings } from "../../../lib/providers/userSettings/UserSettingsProvider";
+import { useE2EE } from "../../../lib/providers/e2ee/E2EEProvider";
+import { isE2EEContent } from "../../../lib/utils/e2eeReplyUtils";
 import { RoomType } from "../../../types/roomTypes";
 import { MessageAttachment, MessageType } from "../../../types/messageTypes";
 
@@ -37,6 +39,7 @@ export function Message(props: MessageProps) {
   const cache = useCache();
   const { appearance } = useUserSettings();
   const { user, rooms, deleteMessage, editMessage, isMobile } = useAuth();
+  const e2ee = useE2EE();
   const [t] = useTransContext();
 
   const [isEditing, setIsEditing] = createSignal(false);
@@ -61,8 +64,9 @@ export function Message(props: MessageProps) {
   >(null);
 
   const [showEmojiDetails, setShowEmojiDetails] = createSignal(false);
-  const [selectedEmoji] = createSignal<any>(null);
-  const [popupPosition] = createSignal({ x: 0, y: 0 });
+  const [selectedEmoji, setSelectedEmoji] = createSignal<any>(null);
+  const [popupPosition, setPopupPosition] = createSignal({ x: 0, y: 0 });
+  const [isDecrypting, setIsDecrypting] = createSignal(false);
 
   const refMessages = referencedMessages(() => props, cache);
   const inviteStates = useInviteStates(props, cache);
@@ -148,23 +152,42 @@ export function Message(props: MessageProps) {
         setIsEditLoading(false);
       }
     } else {
-      setEditContent(props.content);
+      // Check if the message content is E2EE encrypted and decrypt it for editing
+      const content = props.content || "";
+      if (isE2EEContent(content)) {
+        try {
+          // Decrypt the content before setting it in the editor
+          const room = cache.getRoom(props.room_id);
+          if (room && e2ee.isE2EEInitialized()) {
+            const decryptedContent = await e2ee.decryptMessage(room.type, props.room_id, content, props.author_id);
+            setEditContent(decryptedContent);
+          } else {
+            setEditContent(content); // Fallback to encrypted content
+          }
+        } catch (error) {
+          console.error('Error decrypting message for editing:', error);
+          setEditContent(content); // Fallback to encrypted content
+        }
+      } else {
+        setEditContent(content);
+      }
 
       if (isMobile()) {
         const chatInput = document.querySelector(
           "[data-placeholder]",
         ) as HTMLDivElement;
         if (chatInput) {
+          const editContentValue = editContent();
           window.dispatchEvent(
             new CustomEvent("edit-message", {
               detail: {
                 messageId: props.id,
                 roomId: props.room_id,
-                content: props.content,
+                content: editContentValue,
               },
             }),
           );
-          chatInput.textContent = props.content;
+          chatInput.textContent = editContentValue;
           chatInput.dispatchEvent(new Event("input", { bubbles: true }));
           chatInput.focus();
 
@@ -238,6 +261,16 @@ export function Message(props: MessageProps) {
     }
   };
 
+  const handleEmojiClick = (emoji: { shortcode: string; emoji: { name: string; code: string } }, position: { x: number; y: number }) => {
+    setSelectedEmoji(emoji);
+    setPopupPosition(position);
+    setShowEmojiDetails(true);
+  };
+
+  const handleDecryptionStateChange = (decrypting: boolean) => {
+    setIsDecrypting(decrypting);
+  };
+
   createEffect(() => {
     const updateReplyWidth = () => {
       const chatContainer = document
@@ -275,113 +308,116 @@ export function Message(props: MessageProps) {
 
   return (
     <>
-      <div
-        class={`flex flex-col ${shouldShowCompact ? "mt-1" : "mt-5"} group hover:bg-surface hover:bg-opacity-10 transition-colors px-4 w-full relative overflow-visible min-w-0`}
-      >
-        <MessageReplies
-          refMessages={refMessages()}
-          replyMaxWidth={replyMaxWidth()}
-        />
-
-        <MessageHoverMenu
-          canEdit={canEdit()}
-          canDelete={canDelete()}
-          onReply={props.onReply}
-          onEdit={handleEdit}
-          onDelete={(shiftPressed) => {
-            if (shiftPressed) {
-              handleDelete();
-            } else {
-              setShowDeleteConfirm(true);
-            }
-          }}
-          messageId={props.id}
-        />
-
-        <UserPopupMenu
-          isOpen={userPopupOpen()}
-          onClose={() => setUserPopupOpen(false)}
-          triggerRef={userPopupTrigger()}
-          userId={props.author_id}
-          spaceId={currentSpaceId()}
-          spaceMember={currentSpaceMember()}
-        />
-
+      <Show when={!isDecrypting()}>
         <div
-          class={`flex gap-3 w-full overflow-visible min-w-0 transition-all duration-300 ease-in-out ${props.pending && !props.id ? "opacity-60" : "opacity-100"}`}
+          class={`flex flex-col ${shouldShowCompact ? "mt-1" : "mt-5"} group hover:bg-surface hover:bg-opacity-10 transition-colors px-4 w-full relative overflow-visible min-w-0`}
         >
-          <MessageHeader
-            author={author()}
-            authorId={props.author_id}
-            createdAt={props.created_at ?? ""}
-            isCompact={shouldShowCompact}
-            pending={props.pending ?? false}
-            error={props.error}
-            deleteError={deleteError()}
-            onAuthorClick={handleAuthorClick}
-            avatarBouncing={avatarBouncing()}
-            appearance={appearance}
-            t={t}
+          <MessageReplies
+            refMessages={refMessages()}
+            replyMaxWidth={replyMaxWidth()}
+          />
+
+          <MessageHoverMenu
+            canEdit={canEdit()}
+            canDelete={canDelete()}
+            onReply={props.onReply}
+            onEdit={handleEdit}
+            onDelete={(shiftPressed) => {
+              if (shiftPressed) {
+                handleDelete();
+              } else {
+                setShowDeleteConfirm(true);
+              }
+            }}
+            messageId={props.id}
+          />
+
+          <UserPopupMenu
+            isOpen={userPopupOpen()}
+            onClose={() => setUserPopupOpen(false)}
+            triggerRef={userPopupTrigger()}
+            userId={props.author_id}
+            spaceId={currentSpaceId()}
+            spaceMember={currentSpaceMember()}
           />
 
           <div
-            class={`flex-1 min-w-0 flex flex-col justify-center ${shouldShowCompact ? "ml-[52px]" : ""} relative overflow-hidden`}
+            class={`flex gap-3 w-full overflow-visible min-w-0 transition-all duration-300 ease-in-out ${props.pending && !props.id ? "opacity-60" : "opacity-100"}`}
           >
-            <Show when={shouldShowCompact}>
-              <CompactTimestamp
-                createdAt={props.created_at ?? ""}
-                appearance={appearance}
-              />
-            </Show>
-
-            <MessageAuthorInfo
+            <MessageHeader
               author={author()}
+              authorId={props.author_id}
               createdAt={props.created_at ?? ""}
+              isCompact={shouldShowCompact}
               pending={props.pending ?? false}
               error={props.error}
               deleteError={deleteError()}
-              isCompact={shouldShowCompact}
               onAuthorClick={handleAuthorClick}
+              avatarBouncing={avatarBouncing()}
               appearance={appearance}
               t={t}
             />
 
-            <Show when={!isEditing()}>
-              <MessageContent
-                content={props.content}
-                editedAt={props.edited_at ?? undefined}
-                isCompact={shouldShowCompact}
-                pending={props.pending ?? false}
-                error={props.error}
-                onMessageClick={() => {}}
-                roomId={props.room_id}
-                messageId={props.id}
-                senderId={props.author_id}
-              />
-              <Show when={props.attachments}>
-                <MessageAttachments
-                  attachments={props.attachments || []}
-                  getAttachmentUrl={getAttachmentUrl}
-                  onDownload={handleDownload}
-                  messageId={props.id}
+            <div
+              class={`flex-1 min-w-0 flex flex-col justify-center ${shouldShowCompact ? "ml-[52px]" : ""} relative overflow-hidden`}
+            >
+              <Show when={shouldShowCompact}>
+                <CompactTimestamp
+                  createdAt={props.created_at ?? ""}
+                  appearance={appearance}
                 />
               </Show>
-              <InviteEmbeds inviteStates={inviteStates() || []} />
-            </Show>
 
-            <Show when={isEditing()}>
-              <MessageEditor
-                content={editContent()}
-                error={editError()}
-                isLoading={isEditLoading()}
-                onContentChange={setEditContent}
-                onSave={handleEdit}
-                onCancel={handleCancelEdit}
+              <MessageAuthorInfo
+                author={author()}
+                createdAt={props.created_at ?? ""}
+                pending={props.pending ?? false}
+                error={props.error}
+                deleteError={deleteError()}
+                isCompact={shouldShowCompact}
+                onAuthorClick={handleAuthorClick}
+                appearance={appearance}
+                t={t}
               />
-            </Show>
+
+              <Show when={!isEditing()}>
+                <MessageContent
+                  content={props.content}
+                  editedAt={props.edited_at ?? undefined}
+                  isCompact={shouldShowCompact}
+                  pending={props.pending ?? false}
+                  error={props.error}
+                  onMessageClick={() => {}}
+                  onEmojiClick={handleEmojiClick}
+                  roomId={props.room_id}
+                  messageId={props.id}
+                  senderId={props.author_id}
+                />
+                <Show when={props.attachments}>
+                  <MessageAttachments
+                    attachments={props.attachments || []}
+                    getAttachmentUrl={getAttachmentUrl}
+                    onDownload={handleDownload}
+                    messageId={props.id}
+                  />
+                </Show>
+                <InviteEmbeds inviteStates={inviteStates() || []} />
+              </Show>
+
+              <Show when={isEditing()}>
+                <MessageEditor
+                  content={editContent()}
+                  error={editError()}
+                  isLoading={isEditLoading()}
+                  onContentChange={setEditContent}
+                  onSave={handleEdit}
+                  onCancel={handleCancelEdit}
+                />
+              </Show>
+            </div>
           </div>
         </div>
-      </div>
+      </Show>
 
       <Portal>
         <ConfirmModal

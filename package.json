@@ -16,6 +16,8 @@
     "@motionone/dom": "^10.18.0",
     "@motionone/solid": "^10.16.4",
     "@msgpack/msgpack": "^3.0.0-beta2",
+    "@noble/curves": "^1.9.4",
+    "@noble/hashes": "^1.8.0",
     "@solid-primitives/keyed": "^1.5.2",
     "@solidjs/router": "^0.15.1",
     "@thisbeyond/solid-dnd": "^0.7.5",

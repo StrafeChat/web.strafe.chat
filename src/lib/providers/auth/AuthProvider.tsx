@@ -1114,24 +1114,20 @@ export const AuthProvider: ParentComponent = (props) => {
           // Import E2EE service dynamically to avoid circular dependencies
           const { e2eeService } = await import('../../e2ee/E2EEService');
           
-          // Check if E2EE should be applied (PM = 0, GROUP_PM = 1, TEXT_ROOM = 2)
-          if (room.type === 0 || room.type === 1 || room.type === 2) {
+          // Check if E2EE should be applied (GROUP_PM = 1, TEXT_ROOM = 2)
+          // Direct PMs (type 0) are NOT encrypted
+          if (room.type === 1 || room.type === 2) {
             let encryptedContent = messageData.content;
             
-            if (room.type === 0 && room.recipients && room.recipients.length > 0) {
-              // Direct PM - encrypt for the recipient
-              const currentUserId = user()?.id;
-              const recipientId = room.recipients.find(id => id !== currentUserId);
-              if (recipientId) {
-                encryptedContent = await e2eeService.encryptDirectMessage(recipientId, messageData.content);
-              }
-            } else if (room.type === 1 || room.type === 2) {
+            if (room.type === 1 || room.type === 2) {
               // Group PM and TEXT_ROOM - encrypt for the group/room
               encryptedContent = await e2eeService.encryptGroupMessage(roomId, messageData.content);
             }
             
             processedMessageData.content = encryptedContent;
             console.log('[AuthProvider] Message encrypted for E2EE');
+          } else if (room.type === 0) {
+            console.log('[AuthProvider] Direct PM detected - sending as plaintext (not encrypted)');
           }
         } catch (e2eeError) {
           console.warn('[AuthProvider] E2EE encryption failed, sending plaintext:', e2eeError);

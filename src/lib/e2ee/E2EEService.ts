@@ -1,12 +1,12 @@
 import { API_ENDPOINTS, API_HEADERS } from '../providers/auth/AuthProvider';
+import { SignalProtocol, PreKeyBundle } from './signalProtocol';
 
 // E2EE Key Management and Encryption Service
 export class E2EEService {
   private static instance: E2EEService | null = null;
   private isInitialized = false;
-  private identityKeyPair: CryptoKeyPair | null = null;
-  private signedPreKeyPair: CryptoKeyPair | null = null;
-  private preKeys: Map<number, CryptoKeyPair> = new Map();
+  private signalProtocol: SignalProtocol | null = null;
+  private userSessions: Map<string, string> = new Map(); // userId -> sessionId
 
 
   private constructor() {}
@@ -26,15 +26,20 @@ export class E2EEService {
       // Check if user already has E2EE keys
       const status = await this.checkE2EEStatus();
       if (status.initialized) {
-        console.log('[E2EE] User already has E2EE keys initialized');
+        console.log('[E2EE] User already has E2EE keys initialized on server');
+        // Just initialize the Signal protocol for local operations
+        // Don't send keys to server since they already exist
+        this.signalProtocol = new SignalProtocol();
+        await this.signalProtocol.initialize();
         this.isInitialized = true;
         return true;
       }
 
-      // Generate new keys
-      await this.generateKeys();
+      // Initialize Signal protocol for new user
+      this.signalProtocol = new SignalProtocol();
+      await this.signalProtocol.initialize();
       
-      // Initialize E2EE on the server
+      // Initialize E2EE on the server with new keys
       const success = await this.initializeE2EEOnServer();
       if (success) {
         this.isInitialized = true;
@@ -48,71 +53,53 @@ export class E2EEService {
     }
   }
 
-  // Generate cryptographic keys
-  private async generateKeys(): Promise<void> {
-    try {
-      // Generate identity key pair using X25519 (Ed25519 for signing, X25519 for ECDH)
-      // Note: Using P-256 as fallback since X25519 support is limited in browsers
-      // In production, consider using a WebAssembly implementation of Curve25519
-      this.identityKeyPair = await window.crypto.subtle.generateKey(
-        {
-          name: 'ECDH',
-          namedCurve: 'P-256', // TODO: Replace with X25519 when browser support improves
-        },
-        true,
-        ['deriveKey', 'deriveBits']
-      );
 
-      // Generate signed pre-key pair
-      this.signedPreKeyPair = await window.crypto.subtle.generateKey(
-        {
-          name: 'ECDH',
-          namedCurve: 'P-256',
-        },
-        true,
-        ['deriveKey', 'deriveBits']
-      );
-
-      // Generate one-time pre-keys (reduced count for better performance)
-      for (let i = 0; i < 50; i++) {
-        const preKeyPair = await window.crypto.subtle.generateKey(
-          {
-            name: 'ECDH',
-            namedCurve: 'P-256',
-          },
-          true,
-          ['deriveKey', 'deriveBits']
-        );
-        this.preKeys.set(i, preKeyPair);
-      }
-
-      console.log('[E2EE] Generated all cryptographic keys');
-    } catch (error) {
-      console.error('[E2EE] Failed to generate keys:', error);
-      throw error;
-    }
-  }
 
   // Initialize E2EE on the server
   private async initializeE2EEOnServer(): Promise<boolean> {
     try {
-      if (!this.identityKeyPair || !this.signedPreKeyPair) {
-        throw new Error('Keys not generated');
+      if (!this.signalProtocol) {
+        throw new Error('Signal protocol not initialized');
       }
 
-      // Export public keys
-      const identityPublicKey = await this.exportPublicKey(this.identityKeyPair.publicKey);
-      const signedPreKeyPublic = await this.exportPublicKey(this.signedPreKeyPair.publicKey);
+      // Get pre-key bundle from Signal protocol
+      const preKeyBundle = this.signalProtocol.getPreKeyBundle();
       
-      // Export one-time pre-keys
-      const preKeyBundles = [];
-      for (const [keyId, keyPair] of this.preKeys) {
-        const publicKey = await this.exportPublicKey(keyPair.publicKey);
-        preKeyBundles.push({
-          key_id: keyId,
-          public_key: publicKey,
-        });
+      console.log('[E2EE] Pre-key bundle from Signal protocol:', {
+        hasBundle: !!preKeyBundle,
+        identityKeyLength: preKeyBundle?.identityKey?.length || 0,
+        signedPreKeyLength: preKeyBundle?.signedPreKey?.publicKey?.length || 0,
+        signatureLength: preKeyBundle?.signedPreKey?.signature?.length || 0,
+        preKeyLength: preKeyBundle?.preKey?.publicKey?.length || 0
+      });
+      
+      if (!preKeyBundle) {
+        throw new Error('Failed to get pre-key bundle from Signal protocol');
       }
+
+      // Prepare pre-key bundles for server
+      const preKeyBundles = [{
+        key_id: preKeyBundle.preKey?.keyId || 0,
+        public_key: Array.from(preKeyBundle.preKey?.publicKey || new Uint8Array()),
+      }];
+
+      const payload = {
+        identity_key: Array.from(preKeyBundle.identityKey),
+        signed_pre_key: {
+          key_id: preKeyBundle.signedPreKey.keyId,
+          public_key: Array.from(preKeyBundle.signedPreKey.publicKey),
+          signature: Array.from(preKeyBundle.signedPreKey.signature),
+        },
+        pre_keys: preKeyBundles,
+      };
+
+      console.log('[E2EE] Payload being sent to server:', {
+        identity_key_length: payload.identity_key.length,
+        signed_pre_key_length: payload.signed_pre_key.public_key.length,
+        signature_length: payload.signed_pre_key.signature.length,
+        pre_keys_length: payload.pre_keys[0]?.public_key?.length || 0
+      });
+      console.log('[E2EE] Full payload:', JSON.stringify(payload, null, 2));
 
       const response = await fetch(API_ENDPOINTS.E2EE_INITIALIZE, {
         method: 'POST',
@@ -120,15 +107,7 @@ export class E2EEService {
           ...API_HEADERS.JSON,
           ...API_HEADERS.SESSION(),
         },
-        body: JSON.stringify({
-          identity_key: identityPublicKey,
-          signed_pre_key: {
-            key_id: 1,
-            public_key: signedPreKeyPublic,
-            signature: 'placeholder_signature', // In a real implementation, this would be signed
-          },
-          pre_keys: preKeyBundles,
-        }),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {
@@ -190,10 +169,10 @@ export class E2EEService {
     }
   }
 
-  // Get pre-key bundle for a user
-  private async getPreKeyBundle(_userId: string): Promise<any> {
+  // Fetch user's pre-key bundle for session establishment
+  private async fetchUserPreKeyBundle(userId: string): Promise<PreKeyBundle | null> {
     try {
-      const response = await fetch(API_ENDPOINTS.E2EE_PRE_KEY_BUNDLE(_userId), {
+      const response = await fetch(API_ENDPOINTS.E2EE_PRE_KEY_BUNDLE(userId), {
         method: 'GET',
         headers: {
           ...API_HEADERS.JSON,
@@ -202,96 +181,109 @@ export class E2EEService {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to get pre-key bundle');
+        console.error('[E2EE] Failed to fetch pre-key bundle for user:', userId);
+        return null;
       }
 
-      return await response.json();
+      const data = await response.json();
+      
+      // Convert the server response to PreKeyBundle format
+      const preKeyBundle: PreKeyBundle = {
+        registrationId: data.registration_id || 0,
+        deviceId: data.device_id || 1,
+        identityKey: new Uint8Array(data.identity_key),
+        signedPreKey: {
+          keyId: data.signed_pre_key.key_id,
+          publicKey: new Uint8Array(data.signed_pre_key.public_key),
+          signature: new Uint8Array(data.signed_pre_key.signature)
+        },
+        preKey: data.pre_key ? {
+          keyId: data.pre_key.key_id,
+          publicKey: new Uint8Array(data.pre_key.public_key)
+        } : undefined
+      };
+
+      return preKeyBundle;
     } catch (error) {
-      console.error('[E2EE] Failed to get pre-key bundle:', error);
-      throw error;
+      console.error('[E2EE] Failed to fetch pre-key bundle:', error);
+      return null;
     }
   }
 
-  // Encrypt message for direct PM using proper Signal-like protocol
+
+
+  // Encrypt message for direct PM using Signal protocol
   public async encryptDirectMessage(recipientId: string, content: string): Promise<string> {
     try {
-      if (!this.isInitialized) {
+      if (!this.isInitialized || !this.signalProtocol) {
         throw new Error('E2EE not initialized');
       }
 
-      // Get recipient's pre-key bundle (in real implementation)
-      // For now, we'll use a simplified approach with proper AES-GCM
-      const encoder = new TextEncoder();
-      const data = encoder.encode(content);
-      
-      // Derive a session key using HKDF-like approach
-      // In real implementation, this would use X3DH key agreement
-      const sessionKeyMaterial = window.crypto.getRandomValues(new Uint8Array(32));
-      
-      // Import the session key material
-      const sessionKey = await window.crypto.subtle.importKey(
-        'raw',
-        sessionKeyMaterial,
-        { name: 'HKDF' },
-        false,
-        ['deriveKey']
-      );
+      // Get or create session for this user
+      let sessionId = this.userSessions.get(recipientId);
+      if (!sessionId) {
+        // Fetch recipient's pre-key bundle and create session
+        const preKeyBundle = await this.fetchUserPreKeyBundle(recipientId);
+        if (!preKeyBundle) {
+          throw new Error('Failed to fetch pre-key bundle for recipient');
+        }
+        sessionId = await this.signalProtocol.createSession(preKeyBundle);
+        this.userSessions.set(recipientId, sessionId);
+      }
 
-      // Derive encryption key using HKDF
-      const encryptionKey = await window.crypto.subtle.deriveKey(
-        {
-          name: 'HKDF',
-          hash: 'SHA-256',
-          salt: new Uint8Array(32), // In real implementation, use proper salt
-          info: new TextEncoder().encode(`Signal_MessageKey_${recipientId}`),
-        },
-        sessionKey,
-        { name: 'AES-GCM', length: 256 },
-        false,
-        ['encrypt']
-      );
-
-      // Generate random IV/nonce
-      const iv = window.crypto.getRandomValues(new Uint8Array(12));
+      // Encrypt the message using Signal protocol
+      const encryptedMessage = await this.signalProtocol.encryptMessage(sessionId, content);
       
-      // Create additional authenticated data (AAD)
-      const aad = new TextEncoder().encode(`${recipientId}_${Date.now()}`);
-      
-      // Encrypt the content with AES-GCM
-      const encrypted = await window.crypto.subtle.encrypt(
-        {
-          name: 'AES-GCM',
-          iv: iv,
-          additionalData: aad,
-        },
-        encryptionKey,
-        data
-      );
-
-      // Combine IV, AAD, session key material, and encrypted data
-      const result = {
-        iv: Array.from(iv),
-        aad: Array.from(aad),
-        sessionKeyMaterial: Array.from(sessionKeyMaterial), // In real implementation, this would be encrypted with recipient's public key
-        data: Array.from(new Uint8Array(encrypted)),
-        version: 2, // Updated version for improved security
-      };
-
-      return `E2EE:${btoa(JSON.stringify(result))}`;
+      // Return the encrypted message with Signal prefix
+      return `SIGNAL:${btoa(JSON.stringify(encryptedMessage))}`;
     } catch (error) {
       console.error('[E2EE] Failed to encrypt direct message:', error);
       throw error;
     }
   }
 
-  // Decrypt message for direct PM using proper Signal-like protocol
+  // Decrypt message for direct PM using Signal protocol
   public async decryptDirectMessage(senderId: string, encryptedContent: string): Promise<string> {
     try {
-      if (!encryptedContent.startsWith('E2EE:')) {
-        // Not encrypted, return as-is
-        return encryptedContent;
+      // Handle Signal protocol messages
+      if (encryptedContent.startsWith('SIGNAL:')) {
+        if (!this.isInitialized || !this.signalProtocol) {
+          throw new Error('E2EE not initialized');
+        }
+
+        // Get session for this user
+        let sessionId = this.userSessions.get(senderId);
+        if (!sessionId) {
+          // Create session if it doesn't exist (this shouldn't happen in normal flow)
+          const preKeyBundle = await this.fetchUserPreKeyBundle(senderId);
+          if (!preKeyBundle) {
+            throw new Error('Failed to fetch pre-key bundle for sender');
+          }
+          sessionId = await this.signalProtocol.createSession(preKeyBundle);
+          this.userSessions.set(senderId, sessionId);
+        }
+
+        const encryptedMessage = JSON.parse(atob(encryptedContent.substring(7)));
+        return await this.signalProtocol.decryptMessage(sessionId, encryptedMessage);
       }
 
+      // Handle legacy E2EE messages for backward compatibility
+      if (encryptedContent.startsWith('E2EE:')) {
+        return await this.decryptLegacyMessage(encryptedContent);
+      }
+
+      // Not encrypted, return as-is
+      return encryptedContent;
+    } catch (error) {
+      console.error('[E2EE] Failed to decrypt direct message:', error);
+      // Return original content if decryption fails
+      return encryptedContent;
+    }
+  }
+
+  // Legacy decryption for backward compatibility
+  private async decryptLegacyMessage(encryptedContent: string): Promise<string> {
+    try {
       const encryptedData = JSON.parse(atob(encryptedContent.substring(5)));
       
       // Handle both old and new versions for backward compatibility
@@ -330,17 +322,12 @@ export class E2EEService {
         );
 
         // Derive decryption key using HKDF
-        // Note: We need to use the recipient ID from the AAD to match the encryption key derivation
-        // Extract recipient ID from AAD (format: "recipientId_timestamp")
         const aadString = new TextDecoder().decode(new Uint8Array(encryptedData.aad));
-        // For group messages, the format is "group_roomId_timestamp", so we need to handle this properly
         const aadParts = aadString.split('_');
         let recipientId;
         if (aadParts[0] === 'group' && aadParts.length >= 3) {
-          // Group message: reconstruct "group_roomId" from first two parts
           recipientId = `${aadParts[0]}_${aadParts[1]}`;
         } else {
-          // Direct message: just use the first part
           recipientId = aadParts[0];
         }
         
@@ -348,7 +335,7 @@ export class E2EEService {
           {
             name: 'HKDF',
             hash: 'SHA-256',
-            salt: new Uint8Array(32), // Same salt as encryption
+            salt: new Uint8Array(32),
             info: new TextEncoder().encode(`Signal_MessageKey_${recipientId}`),
           },
           sessionKey,
@@ -357,7 +344,6 @@ export class E2EEService {
           ['decrypt']
         );
 
-        // Decrypt the content with AAD verification
         const decrypted = await window.crypto.subtle.decrypt(
           {
             name: 'AES-GCM',
@@ -374,22 +360,53 @@ export class E2EEService {
       
       throw new Error(`Unsupported encryption version: ${encryptedData.version}`);
     } catch (error) {
-      console.error('[E2EE] Failed to decrypt direct message:', error);
-      // Return original content if decryption fails
-      return encryptedContent;
+      console.error('[E2EE] Failed to decrypt legacy message:', error);
+      throw error;
     }
   }
 
-  // Encrypt message for group PM using group session key
+  // Encrypt message for group PM using simplified group encryption
+  // Note: This is a simplified implementation. A full Signal group protocol
+  // would use Sender Keys for better forward secrecy and scalability.
   public async encryptGroupMessage(roomId: string, content: string): Promise<string> {
     try {
       if (!this.isInitialized) {
         throw new Error('E2EE not initialized');
       }
 
-      // For group messages, use room-specific encryption
-      // In a real implementation, this would use a shared group session key
-      return await this.encryptDirectMessage(`group_${roomId}`, content);
+      // For now, use a simplified group encryption approach
+      // In a full implementation, this would use the Signal group protocol with Sender Keys
+      const sessionKey = await this.getOrCreateGroupSessionKey(roomId);
+      const iv = window.crypto.getRandomValues(new Uint8Array(16));
+      const plaintextBytes = new TextEncoder().encode(content);
+      
+      const key = await window.crypto.subtle.importKey(
+        'raw',
+        sessionKey,
+        { name: 'AES-GCM' },
+        false,
+        ['encrypt']
+      );
+      
+      const ciphertext = await window.crypto.subtle.encrypt(
+        {
+          name: 'AES-GCM',
+          iv: iv,
+          additionalData: new TextEncoder().encode(roomId)
+        },
+        key,
+        plaintextBytes
+      );
+      
+      const encryptedMessage = {
+        version: 1,
+        roomId: roomId,
+        iv: Array.from(iv),
+        ciphertext: Array.from(new Uint8Array(ciphertext))
+      };
+      
+      // Return the encrypted message with Signal group prefix
+      return `SIGNAL_GROUP:${btoa(JSON.stringify(encryptedMessage))}`;
     } catch (error) {
       console.error('[E2EE] Failed to encrypt group message:', error);
       throw error;
@@ -399,9 +416,45 @@ export class E2EEService {
   // Decrypt message for group PM using group session key
   public async decryptGroupMessage(roomId: string, encryptedContent: string): Promise<string> {
     try {
-      // For group messages, use room-specific decryption
-      // In a real implementation, this would use a shared group session key
-      return await this.decryptDirectMessage(`group_${roomId}`, encryptedContent);
+      // Handle Signal group protocol messages
+      if (encryptedContent.startsWith('SIGNAL_GROUP:')) {
+        if (!this.isInitialized) {
+          throw new Error('E2EE not initialized');
+        }
+
+        const encryptedMessage = JSON.parse(atob(encryptedContent.substring(13)));
+        
+        // Get group session key
+        const sessionKey = await this.getOrCreateGroupSessionKey(roomId);
+        
+        const key = await window.crypto.subtle.importKey(
+          'raw',
+          sessionKey,
+          { name: 'AES-GCM' },
+          false,
+          ['decrypt']
+        );
+        
+        const plaintext = await window.crypto.subtle.decrypt(
+          {
+            name: 'AES-GCM',
+            iv: new Uint8Array(encryptedMessage.iv),
+            additionalData: new TextEncoder().encode(roomId)
+          },
+          key,
+          new Uint8Array(encryptedMessage.ciphertext)
+        );
+        
+        return new TextDecoder().decode(plaintext);
+      }
+
+      // Handle legacy group messages for backward compatibility
+      if (encryptedContent.startsWith('E2EE:')) {
+        return await this.decryptLegacyMessage(encryptedContent);
+      }
+
+      // Not encrypted, return as-is
+      return encryptedContent;
     } catch (error) {
       console.error('[E2EE] Failed to decrypt group message:', error);
       // Return original content if decryption fails
@@ -409,12 +462,30 @@ export class E2EEService {
     }
   }
 
-  // Helper function to export public key
-  private async exportPublicKey(publicKey: CryptoKey): Promise<string> {
-    const exported = await window.crypto.subtle.exportKey('spki', publicKey);
-    const exportedAsBase64 = btoa(String.fromCharCode(...new Uint8Array(exported)));
-    return exportedAsBase64;
+  // Get or create group session key (simplified implementation)
+  private async getOrCreateGroupSessionKey(roomId: string): Promise<Uint8Array> {
+    const storageKey = `${this.storagePrefix}group_${roomId}`;
+    
+    if (typeof localStorage !== 'undefined') {
+      const stored = localStorage.getItem(storageKey);
+      if (stored) {
+        return new Uint8Array(JSON.parse(stored));
+      }
+    }
+    
+    // Generate new session key
+    const sessionKey = window.crypto.getRandomValues(new Uint8Array(32));
+    
+    if (typeof localStorage !== 'undefined') {
+      localStorage.setItem(storageKey, JSON.stringify(Array.from(sessionKey)));
+    }
+    
+    return sessionKey;
   }
+
+  private storagePrefix = 'signal_e2ee_';
+
+
 
   // Check if E2EE is initialized
   public isE2EEInitialized(): boolean {
@@ -427,8 +498,13 @@ export class E2EEService {
       return 'disabled';
     }
 
-    // For PM (type 0), GROUP_PM (type 1), and TEXT_ROOM (type 2), E2EE is enabled
-    if (roomType === 0 || roomType === 1 || roomType === 2) {
+    // Direct PMs (type 0) are not encrypted
+    if (roomType === 0) {
+      return 'disabled';
+    }
+
+    // For GROUP_PM (type 1) and TEXT_ROOM (type 2), E2EE is enabled
+    if (roomType === 1 || roomType === 2) {
       return 'enabled';
     }
 

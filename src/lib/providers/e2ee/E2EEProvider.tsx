@@ -29,42 +29,47 @@ export const E2EEProvider: ParentComponent = (props) => {
   // Initialize E2EE when user is authenticated
   createEffect(() => {
     const user = auth?.user();
-    if (user && auth?.isAuthenticated()) {
+    console.log('[E2EE Provider] Auth effect triggered:', {
+      user: !!user,
+      isAuthenticated: auth?.isAuthenticated(),
+      isE2EEInitialized: isE2EEInitialized(),
+      loading: loading()
+    });
+    if (user && auth?.isAuthenticated() && !isE2EEInitialized() && !loading()) {
+      console.log('[E2EE Provider] Starting E2EE initialization...');
       checkAndInitializeE2EE();
     }
   });
 
-  // Periodic sync check to ensure provider state matches service state
-  createEffect(() => {
-    const interval = setInterval(() => {
-      const serviceInitialized = e2eeService.isE2EEInitialized();
-      const providerInitialized = isE2EEInitialized();
-      
-      if (serviceInitialized && !providerInitialized) {
-        console.log('[E2EE Provider] Syncing provider state with service state');
-        setIsE2EEInitialized(true);
-      }
-    }, 1000); // Check every second
-
-    // Cleanup interval on component unmount
-    return () => clearInterval(interval);
-  });
-
   const checkAndInitializeE2EE = async () => {
+    // Prevent multiple simultaneous initialization attempts
+    if (loading() || isE2EEInitialized()) {
+      return;
+    }
+
     try {
       setLoading(true);
       console.log('[E2EE Provider] Checking E2EE status...');
       
-      // Check if E2EE is already initialized
+      // Check if E2EE service is already initialized
+      if (e2eeService.isE2EEInitialized()) {
+        setIsE2EEInitialized(true);
+        console.log('[E2EE Provider] E2EE service already initialized');
+        return;
+      }
+
+      // Check if E2EE is already initialized on server
       const status = await e2eeService.checkE2EEStatus();
       if (status.initialized) {
-        setIsE2EEInitialized(true);
-        console.log('[E2EE Provider] E2EE already initialized');
+        // Initialize the service with existing keys
+        const success = await e2eeService.initialize();
+        setIsE2EEInitialized(success);
+        console.log('[E2EE Provider] E2EE initialized with existing keys');
         return;
       }
 
       // Auto-initialize E2EE for new users
-      console.log('[E2EE Provider] Initializing E2EE...');
+      console.log('[E2EE Provider] Initializing E2EE for new user...');
       const success = await e2eeService.initialize();
       setIsE2EEInitialized(success);
       
@@ -105,16 +110,7 @@ export const E2EEProvider: ParentComponent = (props) => {
   };
 
   const getE2EEStatusForRoom = (roomType: number, recipients?: string[]): 'enabled' | 'partial' | 'disabled' => {
-    const initialized = isE2EEInitialized();
-    const serviceInitialized = e2eeService.isE2EEInitialized();
-    
-    // Sync provider state with service state if they're out of sync
-    if (!initialized && serviceInitialized) {
-      setIsE2EEInitialized(true);
-      return e2eeService.getE2EEStatusForRoom(roomType, recipients);
-    }
-    
-    if (!initialized) {
+    if (!isE2EEInitialized()) {
       return 'disabled';
     }
     
@@ -133,10 +129,11 @@ export const E2EEProvider: ParentComponent = (props) => {
         return content;
       }
 
-      // Room type 0 = PM, Room type 1 = GROUP_PM, Room type 2 = TEXT_ROOM
-      if (roomType === 0 && recipientId) {
-        // Direct message encryption
-        return await e2eeService.encryptDirectMessage(recipientId, content);
+      // Room type 0 = PM (not encrypted), Room type 1 = GROUP_PM, Room type 2 = TEXT_ROOM
+      if (roomType === 0) {
+        // Direct PMs are not encrypted
+        console.log('[E2EE Provider] Direct PM detected - sending as plaintext (not encrypted)');
+        return content;
       } else if (roomType === 1 || roomType === 2) {
         // Group message encryption (for both GROUP_PM and TEXT_ROOM)
         return await e2eeService.encryptGroupMessage(roomId, content);
@@ -162,10 +159,10 @@ export const E2EEProvider: ParentComponent = (props) => {
         return encryptedContent;
       }
 
-      // Room type 0 = PM, Room type 1 = GROUP_PM, Room type 2 = TEXT_ROOM
-      if (roomType === 0 && senderId) {
-        // Direct message decryption
-        return await e2eeService.decryptDirectMessage(senderId, encryptedContent);
+      // Room type 0 = PM (not encrypted), Room type 1 = GROUP_PM, Room type 2 = TEXT_ROOM
+      if (roomType === 0) {
+        // Direct PMs are not encrypted, return as-is
+        return encryptedContent;
       } else if (roomType === 1 || roomType === 2) {
         // Group message decryption (for both GROUP_PM and TEXT_ROOM)
         return await e2eeService.decryptGroupMessage(roomId, encryptedContent);
