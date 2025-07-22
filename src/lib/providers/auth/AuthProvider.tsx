@@ -1244,13 +1244,43 @@ export const AuthProvider: ParentComponent = (props) => {
 
   const editMessage = async (roomId: string, messageId: string, content: string) => {
     try {
+      if (!roomId || !content.trim()) {
+        return { success: false, error: "Room ID and message content are required" };
+      }
+
+      // Get room information for E2EE encryption
+      const currentRooms = rooms();
+      const room = currentRooms.find(r => r.id === roomId);
+      let processedContent = content;
+
+      // Apply E2EE encryption if applicable
+      if (room && content.trim()) {
+        try {
+          // Import E2EE service dynamically to avoid circular dependencies
+          const { e2eeService } = await import('../../e2ee/E2EEService');
+          
+          // Check if E2EE should be applied (GROUP_PM = 1, TEXT_ROOM = 2)
+          // Direct PMs (type 0) are NOT encrypted
+          if (room.type === 1 || room.type === 2) {
+            // Group PM and TEXT_ROOM - encrypt for the group/room
+            processedContent = await e2eeService.encryptGroupMessage(roomId, content);
+            console.log('[AuthProvider] Edit message encrypted for E2EE');
+          } else if (room.type === 0) {
+            console.log('[AuthProvider] Direct PM edit detected - sending as plaintext (not encrypted)');
+          }
+        } catch (e2eeError) {
+          console.warn('[AuthProvider] E2EE encryption failed for edit, sending plaintext:', e2eeError);
+          // Continue with original content if encryption fails
+        }
+      }
+
       const response = await fetch(`${API_ENDPOINTS.ROOM_MESSAGES(roomId)}/${messageId}`, {
         method: "PATCH",
         headers: {
           ...API_HEADERS.JSON,
           ...API_HEADERS.SESSION(),
         },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content: processedContent }),
       });
 
       if (!response.ok) {

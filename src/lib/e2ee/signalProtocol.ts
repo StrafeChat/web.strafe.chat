@@ -14,12 +14,7 @@ import {
   SIGNAL_PROTOCOL_VERSION,
   MAX_SKIP_MESSAGES,
   MAX_CACHE_SIZE,
-  CURVE25519_KEY_LENGTH,
-  SIGNATURE_LENGTH,
-  MAC_LENGTH,
-  IV_LENGTH,
   HKDF_INFO_ROOT_KEY,
-  HKDF_INFO_CHAIN_KEY,
   HKDF_INFO_MESSAGE_KEYS
 } from './curve25519';
 
@@ -140,23 +135,64 @@ export class SignalProtocol {
   private storagePrefix = 'signal_protocol_';
 
   async initialize(): Promise<void> {
-    // Try to restore from storage
-    await this.restoreFromStorage();
-    
-    console.log('[Signal Protocol] After restore - identityKeyPair exists:', !!this.identityKeyPair);
-    console.log('[Signal Protocol] After restore - signedPreKeys count:', this.signedPreKeys.size);
-    console.log('[Signal Protocol] After restore - preKeys count:', this.preKeys.size);
-    
-    // Generate new keys if not found
-    if (!this.identityKeyPair) {
-      console.log('[Signal Protocol] Generating new keys...');
-      await this.generateKeys();
-      await this.saveToStorage();
-      console.log('[Signal Protocol] Keys generated - signedPreKeys count:', this.signedPreKeys.size);
-      console.log('[Signal Protocol] Keys generated - preKeys count:', this.preKeys.size);
+    try {
+      // Try to restore from storage
+      await this.restoreFromStorage();
+      
+      console.log('[Signal Protocol] After restore - identityKeyPair exists:', !!this.identityKeyPair);
+      console.log('[Signal Protocol] After restore - signedPreKeys count:', this.signedPreKeys.size);
+      console.log('[Signal Protocol] After restore - preKeys count:', this.preKeys.size);
+      
+      // Check if we have valid keys after restore
+      const needsNewKeys = !this.identityKeyPair || 
+                          !this.identityKeyPair.publicKey || 
+                          !this.identityKeyPair.privateKey || 
+                          this.identityKeyPair.publicKey.length === 0 || 
+                          this.signedPreKeys.size === 0 || 
+                          this.preKeys.size === 0;
+      
+      // Generate new keys if not found or invalid
+      if (needsNewKeys) {
+        console.log('[Signal Protocol] Generating new keys (reason: ' + 
+          (!this.identityKeyPair ? 'no identity key pair' : 
+           !this.identityKeyPair.publicKey ? 'no public key' : 
+           !this.identityKeyPair.privateKey ? 'no private key' : 
+           this.identityKeyPair.publicKey.length === 0 ? 'empty public key' : 
+           this.signedPreKeys.size === 0 ? 'no signed pre-keys' : 
+           'no pre-keys') + ')');
+        
+        // Clear existing keys
+        this.identityKeyPair = null;
+        this.signedPreKeys.clear();
+        this.preKeys.clear();
+        
+        // Generate fresh keys
+        await this.generateKeys();
+        
+        // Verify keys were generated properly
+        if (!this.identityKeyPair || 
+            !this.identityKeyPair || !('publicKey' in this.identityKeyPair!) ||
+            !this.identityKeyPair || !('publicKey' in this.identityKeyPair) || (this.identityKeyPair as IdentityKeyPair).publicKey.length === 0 ||
+            this.signedPreKeys.size === 0 || 
+            this.preKeys.size === 0) {
+          throw new Error('Failed to generate valid keys');
+        }
+        
+        // Save to storage
+        await this.saveToStorage();
+        
+        console.log('[Signal Protocol] Keys generated - signedPreKeys count:', this.signedPreKeys.size);
+        console.log('[Signal Protocol] Keys generated - preKeys count:', this.preKeys.size);
+        console.log('[Signal Protocol] Identity key length:', (this.identityKeyPair as IdentityKeyPair | null)?.publicKey?.length || 0);
+        console.log('[Signal Protocol] First signed pre-key length:', 
+          Array.from(this.signedPreKeys.values())[0]?.keyPair?.publicKey?.length || 0);
+      }
+      
+      console.log('[Signal Protocol] Initialized successfully');
+    } catch (error) {
+      console.error('[Signal Protocol] Failed to initialize:', error);
+      throw error;
     }
-    
-    console.log('[Signal Protocol] Initialized successfully');
   }
 
   private async generateKeys(): Promise<void> {
@@ -630,22 +666,65 @@ export class SignalProtocol {
     console.log('[Signal Protocol] signedPreKeys count:', this.signedPreKeys.size);
     console.log('[Signal Protocol] preKeys count:', this.preKeys.size);
     
-    if (!this.identityKeyPair) {
-      console.log('[Signal Protocol] No identity key pair, returning null');
+    // Validate identity key pair
+    if (!this.identityKeyPair || 
+        !this.identityKeyPair.publicKey || 
+        this.identityKeyPair.publicKey.length === 0) {
+      console.error('[Signal Protocol] Invalid identity key pair, returning null');
       return null;
     }
 
+    // Get signed pre-key and validate
     const signedPreKey = Array.from(this.signedPreKeys.values())[0];
-    const preKey = Array.from(this.preKeys.values())[0];
-    
-    console.log('[Signal Protocol] signedPreKey exists:', !!signedPreKey);
-    console.log('[Signal Protocol] preKey exists:', !!preKey);
-    
-    if (!signedPreKey) {
-      console.log('[Signal Protocol] No signed pre-key, returning null');
+    if (!signedPreKey || 
+        !signedPreKey.keyPair || 
+        !signedPreKey.keyPair.publicKey || 
+        signedPreKey.keyPair.publicKey.length === 0 || 
+        !signedPreKey.signature || 
+        signedPreKey.signature.length === 0) {
+      console.error('[Signal Protocol] Invalid signed pre-key, returning null');
       return null;
     }
+    
+    // Get pre-key and validate
+    const preKey = Array.from(this.preKeys.values())[0];
+    if (!preKey || 
+        !preKey.keyPair || 
+        !preKey.keyPair.publicKey || 
+        preKey.keyPair.publicKey.length === 0) {
+      console.error('[Signal Protocol] Invalid pre-key, regenerating...');
+      // Try to regenerate a pre-key
+      try {
+        this.generatePreKey(Math.floor(Math.random() * 100) + 1);
+        // Get the newly generated pre-key
+        const newPreKey = Array.from(this.preKeys.values())[0];
+        if (!newPreKey || !newPreKey.keyPair || !newPreKey.keyPair.publicKey) {
+          console.error('[Signal Protocol] Failed to regenerate pre-key');
+          // Continue without a pre-key
+        } else {
+          console.log('[Signal Protocol] Successfully regenerated pre-key');
+        }
+      } catch (error) {
+        console.error('[Signal Protocol] Error regenerating pre-key:', error);
+        // Continue without a pre-key
+      }
+    }
+    
+    // Get the latest pre-key after potential regeneration
+    const finalPreKey = Array.from(this.preKeys.values())[0];
+    
+    console.log('[Signal Protocol] Final validation:', {
+      identityKeyValid: !!this.identityKeyPair && !!this.identityKeyPair.publicKey,
+      identityKeyLength: this.identityKeyPair?.publicKey?.length || 0,
+      signedPreKeyValid: !!signedPreKey && !!signedPreKey.keyPair && !!signedPreKey.keyPair.publicKey,
+      signedPreKeyLength: signedPreKey?.keyPair?.publicKey?.length || 0,
+      signatureValid: !!signedPreKey?.signature,
+      signatureLength: signedPreKey?.signature?.length || 0,
+      preKeyValid: !!finalPreKey && !!finalPreKey.keyPair && !!finalPreKey.keyPair.publicKey,
+      preKeyLength: finalPreKey?.keyPair?.publicKey?.length || 0
+    });
 
+    // Create the bundle with validated keys
     const bundle = {
       registrationId: this.registrationId,
       deviceId: this.deviceId,
@@ -655,17 +734,33 @@ export class SignalProtocol {
         publicKey: signedPreKey.keyPair.publicKey,
         signature: signedPreKey.signature
       },
-      preKey: preKey ? {
-        keyId: preKey.keyId,
-        publicKey: preKey.keyPair.publicKey
+      preKey: finalPreKey ? {
+        keyId: finalPreKey.keyId,
+        publicKey: finalPreKey.keyPair.publicKey
       } : undefined
     };
+    
+    // Final validation of the bundle
+    if (bundle.identityKey.length === 0 || 
+        bundle.signedPreKey.publicKey.length === 0 || 
+        bundle.signedPreKey.signature.length === 0) {
+      console.error('[Signal Protocol] Bundle validation failed, keys have zero length');
+      return null;
+    }
     
     console.log('[Signal Protocol] Bundle created with key lengths:', {
       identityKey: bundle.identityKey.length,
       signedPreKeyPublic: bundle.signedPreKey.publicKey.length,
       signature: bundle.signedPreKey.signature.length,
       preKeyPublic: bundle.preKey?.publicKey?.length || 0
+    });
+    
+    // Log the first few bytes of each key for debugging
+    console.log('[Signal Protocol] Key samples:', {
+      identityKey: Array.from(bundle.identityKey.slice(0, 4)),
+      signedPreKeyPublic: Array.from(bundle.signedPreKey.publicKey.slice(0, 4)),
+      signature: Array.from(bundle.signedPreKey.signature.slice(0, 4)),
+      preKeyPublic: bundle.preKey ? Array.from(bundle.preKey.publicKey.slice(0, 4)) : []
     });
     
     return bundle;
@@ -682,43 +777,118 @@ export class SignalProtocol {
   private async saveToStorage(): Promise<void> {
     if (typeof localStorage === 'undefined') return;
     
-    const data = {
-      identityKeyPair: this.identityKeyPair,
-      registrationId: this.registrationId,
-      deviceId: this.deviceId,
-      signedPreKeys: Array.from(this.signedPreKeys.entries()),
-      preKeys: Array.from(this.preKeys.entries()),
-      sessions: Array.from(this.sessions.entries()).map(([id, session]) => [
-        id,
-        this.serializeSession(session)
-      ])
-    };
-    
-    localStorage.setItem(this.storagePrefix + 'data', JSON.stringify(data));
+    try {
+      // Verify we have valid data before saving
+      if (!this.identityKeyPair || !this.identityKeyPair.publicKey || !this.identityKeyPair.privateKey) {
+        console.error('[Signal Protocol] Cannot save to storage: Invalid identity key pair');
+        return;
+      }
+      
+      if (this.signedPreKeys.size === 0) {
+        console.error('[Signal Protocol] Cannot save to storage: No signed pre-keys');
+        return;
+      }
+      
+      if (this.preKeys.size === 0) {
+        console.error('[Signal Protocol] Cannot save to storage: No pre-keys');
+        return;
+      }
+      
+      const data = {
+        identityKeyPair: this.identityKeyPair,
+        registrationId: this.registrationId,
+        deviceId: this.deviceId,
+        signedPreKeys: Array.from(this.signedPreKeys.entries()),
+        preKeys: Array.from(this.preKeys.entries()),
+        sessions: Array.from(this.sessions.entries()).map(([id, session]) => [
+          id,
+          this.serializeSession(session)
+        ])
+      };
+      
+      // Verify data can be serialized properly
+      const serialized = JSON.stringify(data);
+      if (!serialized) {
+        throw new Error('Failed to serialize data');
+      }
+      
+      localStorage.setItem(this.storagePrefix + 'data', serialized);
+      console.log('[Signal Protocol] Successfully saved data to storage');
+    } catch (error) {
+      console.error('[Signal Protocol] Failed to save to storage:', error);
+    }
   }
 
   private async restoreFromStorage(): Promise<void> {
     if (typeof localStorage === 'undefined') return;
     
     const dataStr = localStorage.getItem(this.storagePrefix + 'data');
-    if (!dataStr) return;
+    if (!dataStr) {
+      console.log('[Signal Protocol] No data found in storage');
+      return;
+    }
     
     try {
       const data = JSON.parse(dataStr);
       
-      this.identityKeyPair = data.identityKeyPair;
+      // Validate identity key pair
+      if (!data.identityKeyPair || 
+          !data.identityKeyPair.publicKey || 
+          !data.identityKeyPair.privateKey ||
+          data.identityKeyPair.publicKey.length === 0 ||
+          data.identityKeyPair.privateKey.length === 0) {
+        console.error('[Signal Protocol] Invalid identity key pair in storage');
+        return;
+      }
+      
+      // Restore identity key pair with proper Uint8Array conversion
+      this.identityKeyPair = {
+        publicKey: new Uint8Array(data.identityKeyPair.publicKey),
+        privateKey: new Uint8Array(data.identityKeyPair.privateKey)
+      };
+      
       this.registrationId = data.registrationId || 0;
       this.deviceId = data.deviceId || 1;
       
-      if (data.signedPreKeys) {
-        this.signedPreKeys = new Map(data.signedPreKeys);
+      // Restore signed pre-keys with proper Uint8Array conversion
+      if (data.signedPreKeys && Array.isArray(data.signedPreKeys)) {
+        this.signedPreKeys = new Map();
+        for (const [keyId, signedPreKey] of data.signedPreKeys) {
+          if (signedPreKey && signedPreKey.keyPair) {
+            // Ensure keyPair has proper Uint8Array values
+            const restoredSignedPreKey = {
+              ...signedPreKey,
+              keyPair: {
+                publicKey: new Uint8Array(signedPreKey.keyPair.publicKey),
+                privateKey: new Uint8Array(signedPreKey.keyPair.privateKey)
+              },
+              signature: new Uint8Array(signedPreKey.signature)
+            };
+            this.signedPreKeys.set(Number(keyId), restoredSignedPreKey);
+          }
+        }
       }
       
-      if (data.preKeys) {
-        this.preKeys = new Map(data.preKeys);
+      // Restore pre-keys with proper Uint8Array conversion
+      if (data.preKeys && Array.isArray(data.preKeys)) {
+        this.preKeys = new Map();
+        for (const [keyId, preKey] of data.preKeys) {
+          if (preKey && preKey.keyPair) {
+            // Ensure keyPair has proper Uint8Array values
+            const restoredPreKey = {
+              ...preKey,
+              keyPair: {
+                publicKey: new Uint8Array(preKey.keyPair.publicKey),
+                privateKey: new Uint8Array(preKey.keyPair.privateKey)
+              }
+            };
+            this.preKeys.set(Number(keyId), restoredPreKey);
+          }
+        }
       }
       
-      if (data.sessions) {
+      // Restore sessions
+      if (data.sessions && Array.isArray(data.sessions)) {
         this.sessions = new Map(
           data.sessions.map(([id, serializedSession]: [string, any]) => [
             id,
@@ -726,8 +896,15 @@ export class SignalProtocol {
           ])
         );
       }
+      
+      console.log('[Signal Protocol] Successfully restored from storage');
+      console.log('[Signal Protocol] Identity key length:', this.identityKeyPair.publicKey.length);
+      console.log('[Signal Protocol] Signed pre-keys count:', this.signedPreKeys.size);
+      console.log('[Signal Protocol] Pre-keys count:', this.preKeys.size);
     } catch (error) {
       console.error('[Signal Protocol] Failed to restore from storage:', error);
+      // Clear potentially corrupted data
+      localStorage.removeItem(this.storagePrefix + 'data');
     }
   }
 

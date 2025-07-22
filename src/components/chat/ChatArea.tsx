@@ -1976,22 +1976,25 @@ const ChatArea: Component = () => {
     try {
       setSending(true);
 
-      // Get the original message to check if it was E2EE encrypted
-      const originalMessage = cache.getMessage(roomId, messageId);
+      // Get room information for E2EE encryption
+      const room = cache.getRoom(roomId);
       let processedContent = content;
 
-      // If the original message was E2EE encrypted, re-encrypt the edited content
-      if (originalMessage && originalMessage.content && isE2EEContent(originalMessage.content)) {
-        const room = cache.getRoom(roomId);
-        if (room && e2ee.isE2EEInitialized()) {
-          try {
-            // Encrypt the content based on room type
+      // Apply E2EE encryption if applicable
+      if (room && content.trim() && e2ee.isE2EEInitialized()) {
+        try {
+          // Check if E2EE should be applied (GROUP_PM = 1, TEXT_ROOM = 2)
+          // Direct PMs (type 0) are NOT encrypted
+          if (room.type === 1 || room.type === 2) {
+            // Group PM and TEXT_ROOM - encrypt for the group/room
             processedContent = await e2ee.encryptMessage(room.type, roomId, content);
-          } catch (encryptError) {
-            console.error('Failed to encrypt edited message:', encryptError);
-            setError(t("chat.errors.encryptionFailed") || "Failed to encrypt message");
-            return;
+            console.log('[ChatArea] Message edit encrypted for E2EE');
+          } else if (room.type === 0) {
+            console.log('[ChatArea] Direct PM detected - editing as plaintext (not encrypted)');
           }
+        } catch (e2eeError) {
+          console.warn('[ChatArea] E2EE encryption failed for edit, sending plaintext:', e2eeError);
+          // Continue with original content if encryption fails
         }
       }
 

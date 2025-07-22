@@ -32,6 +32,10 @@ export class E2EEService {
         this.signalProtocol = new SignalProtocol();
         await this.signalProtocol.initialize();
         this.isInitialized = true;
+        
+        // Synchronize group session keys between storage systems
+        await this.synchronizeGroupSessionKeys();
+        
         return true;
       }
 
@@ -44,6 +48,9 @@ export class E2EEService {
       if (success) {
         this.isInitialized = true;
         console.log('[E2EE] E2EE service initialized successfully');
+        
+        // Synchronize group session keys between storage systems
+        await this.synchronizeGroupSessionKeys();
       }
       
       return success;
@@ -73,6 +80,16 @@ export class E2EEService {
         preKeyLength: preKeyBundle?.preKey?.publicKey?.length || 0
       });
       
+      // Debug the actual content of the keys
+      if (preKeyBundle) {
+        console.log('[E2EE] Identity key first bytes:', Array.from(preKeyBundle.identityKey.slice(0, 8)));
+        console.log('[E2EE] Signed pre-key first bytes:', Array.from(preKeyBundle.signedPreKey.publicKey.slice(0, 8)));
+        console.log('[E2EE] Signature first bytes:', Array.from(preKeyBundle.signedPreKey.signature.slice(0, 8)));
+        if (preKeyBundle.preKey) {
+          console.log('[E2EE] Pre-key first bytes:', Array.from(preKeyBundle.preKey.publicKey.slice(0, 8)));
+        }
+      }
+      
       if (!preKeyBundle) {
         throw new Error('Failed to get pre-key bundle from Signal protocol');
       }
@@ -100,7 +117,68 @@ export class E2EEService {
         pre_keys_length: payload.pre_keys[0]?.public_key?.length || 0
       });
       console.log('[E2EE] Full payload:', JSON.stringify(payload, null, 2));
+      
+      // Check if the payload has empty arrays
+      if (payload.identity_key.length === 0 || 
+          payload.signed_pre_key.public_key.length === 0 || 
+          payload.signed_pre_key.signature.length === 0) {
+        console.error('[E2EE] WARNING: Empty arrays detected in payload!');
+        
+        // Force regeneration of keys
+        console.log('[E2EE] Attempting to regenerate keys...');
+        if (this.signalProtocol) {
+          // Clear localStorage to force regeneration
+          localStorage.removeItem('signal_protocol_data');
+          
+          // Reinitialize the Signal protocol
+          this.signalProtocol = new SignalProtocol();
+          await this.signalProtocol.initialize();
+          
+          // Try to get the pre-key bundle again
+          const newPreKeyBundle = this.signalProtocol.getPreKeyBundle();
+          if (newPreKeyBundle) {
+            console.log('[E2EE] Regenerated keys - new lengths:', {
+              identityKeyLength: newPreKeyBundle.identityKey.length,
+              signedPreKeyLength: newPreKeyBundle.signedPreKey.publicKey.length,
+              signatureLength: newPreKeyBundle.signedPreKey.signature.length,
+              preKeyLength: newPreKeyBundle.preKey?.publicKey.length || 0
+            });
+            
+            // Update the payload with the new keys
+            const newPayload = {
+              identity_key: Array.from(newPreKeyBundle.identityKey),
+              signed_pre_key: {
+                key_id: newPreKeyBundle.signedPreKey.keyId,
+                public_key: Array.from(newPreKeyBundle.signedPreKey.publicKey),
+                signature: Array.from(newPreKeyBundle.signedPreKey.signature),
+              },
+              pre_keys: [{
+                key_id: newPreKeyBundle.preKey?.keyId || 0,
+                public_key: Array.from(newPreKeyBundle.preKey?.publicKey || new Uint8Array()),
+              }],
+            };
+            
+            // Check if the new payload has valid keys
+            if (newPayload.identity_key.length > 0 && 
+                newPayload.signed_pre_key.public_key.length > 0 && 
+                newPayload.signed_pre_key.signature.length > 0) {
+              console.log('[E2EE] Successfully regenerated keys, using new payload');
+              return await this.sendPayloadToServer(newPayload);
+            }
+          }
+        }
+      }
 
+      return await this.sendPayloadToServer(payload);
+    } catch (error) {
+      console.error('[E2EE] Failed to initialize E2EE on server:', error);
+      return false;
+    }
+  }
+
+  // Send payload to server
+  private async sendPayloadToServer(payload: any): Promise<boolean> {
+    try {
       const response = await fetch(API_ENDPOINTS.E2EE_INITIALIZE, {
         method: 'POST',
         headers: {
@@ -419,33 +497,77 @@ export class E2EEService {
       // Handle Signal group protocol messages
       if (encryptedContent.startsWith('SIGNAL_GROUP:')) {
         if (!this.isInitialized) {
-          throw new Error('E2EE not initialized');
+          console.warn('[E2EE] Cannot decrypt: E2EE not initialized');
+          return encryptedContent;
         }
 
         const encryptedMessage = JSON.parse(atob(encryptedContent.substring(13)));
         
-        // Get group session key
-        const sessionKey = await this.getOrCreateGroupSessionKey(roomId);
-        
-        const key = await window.crypto.subtle.importKey(
-          'raw',
-          sessionKey,
-          { name: 'AES-GCM' },
-          false,
-          ['decrypt']
-        );
-        
-        const plaintext = await window.crypto.subtle.decrypt(
-          {
-            name: 'AES-GCM',
-            iv: new Uint8Array(encryptedMessage.iv),
-            additionalData: new TextEncoder().encode(roomId)
-          },
-          key,
-          new Uint8Array(encryptedMessage.ciphertext)
-        );
-        
-        return new TextDecoder().decode(plaintext);
+        try {
+          // Get group session key
+          const sessionKey = await this.getOrCreateGroupSessionKey(roomId);
+          
+          const key = await window.crypto.subtle.importKey(
+            'raw',
+            sessionKey,
+            { name: 'AES-GCM' },
+            false,
+            ['decrypt']
+          );
+          
+          const plaintext = await window.crypto.subtle.decrypt(
+            {
+              name: 'AES-GCM',
+              iv: new Uint8Array(encryptedMessage.iv),
+              additionalData: new TextEncoder().encode(roomId)
+            },
+            key,
+            new Uint8Array(encryptedMessage.ciphertext)
+          );
+          
+          console.log('[E2EE] Successfully decrypted SIGNAL_GROUP message for room:', roomId);
+          return new TextDecoder().decode(plaintext);
+        } catch (decryptError) {
+          console.error('[E2EE] Failed to decrypt SIGNAL_GROUP message:', decryptError);
+          
+          // Try to get the session key directly from SignalClient's storage
+          try {
+            const groupSessionsData = localStorage.getItem('strafe_e2ee_group_sessions');
+            if (groupSessionsData) {
+              const parsed = JSON.parse(groupSessionsData);
+              if (parsed[roomId] && parsed[roomId].sessionKey) {
+                console.log('[E2EE] Found group session key in SignalClient storage, trying again...');
+                const sessionKey = new Uint8Array(parsed[roomId].sessionKey);
+                
+                const key = await window.crypto.subtle.importKey(
+                  'raw',
+                  sessionKey,
+                  { name: 'AES-GCM' },
+                  false,
+                  ['decrypt']
+                );
+                
+                const plaintext = await window.crypto.subtle.decrypt(
+                  {
+                    name: 'AES-GCM',
+                    iv: new Uint8Array(encryptedMessage.iv),
+                    additionalData: new TextEncoder().encode(roomId)
+                  },
+                  key,
+                  new Uint8Array(encryptedMessage.ciphertext)
+                );
+                
+                console.log('[E2EE] Successfully decrypted SIGNAL_GROUP message with direct key');
+                return new TextDecoder().decode(plaintext);
+              }
+            }
+          } catch (retryError) {
+            console.error('[E2EE] Failed to decrypt with direct key:', retryError);
+          }
+          
+          // If we get here, all decryption attempts failed
+          throw new Error('Failed to decrypt SIGNAL_GROUP message after multiple attempts');
+        }
       }
 
       // Handle legacy group messages for backward compatibility
@@ -464,26 +586,152 @@ export class E2EEService {
 
   // Get or create group session key (simplified implementation)
   private async getOrCreateGroupSessionKey(roomId: string): Promise<Uint8Array> {
-    const storageKey = `${this.storagePrefix}group_${roomId}`;
+    // Use the same prefix as SignalClient to ensure compatibility
+    const storageKey = `strafe_e2ee_group_sessions_${roomId}`;
     
     if (typeof localStorage !== 'undefined') {
+      // First try to get from SignalClient's group sessions storage
+      const groupSessionsData = localStorage.getItem('strafe_e2ee_group_sessions');
+      if (groupSessionsData) {
+        try {
+          const parsed = JSON.parse(groupSessionsData);
+          if (parsed[roomId] && parsed[roomId].sessionKey) {
+            console.log('[E2EE] Found group session key in SignalClient storage for room:', roomId);
+            return new Uint8Array(parsed[roomId].sessionKey);
+          }
+        } catch (e) {
+          console.error('[E2EE] Error parsing group sessions data:', e);
+        }
+      }
+      
+      // Fall back to direct key storage
       const stored = localStorage.getItem(storageKey);
       if (stored) {
+        console.log('[E2EE] Found direct group session key for room:', roomId);
         return new Uint8Array(JSON.parse(stored));
       }
     }
     
     // Generate new session key
+    console.log('[E2EE] Generating new group session key for room:', roomId);
     const sessionKey = window.crypto.getRandomValues(new Uint8Array(32));
     
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem(storageKey, JSON.stringify(Array.from(sessionKey)));
+      
+      // Also try to update SignalClient's group sessions storage for compatibility
+      try {
+        const groupSessionsData = localStorage.getItem('strafe_e2ee_group_sessions');
+        let parsed = groupSessionsData ? JSON.parse(groupSessionsData) : {};
+        
+        parsed[roomId] = {
+          sessionKey: Array.from(sessionKey),
+          sessionId: Array.from(window.crypto.getRandomValues(new Uint8Array(16)))
+            .map(b => b.toString(16).padStart(2, '0'))
+            .join(''),
+          messageNumber: 0
+        };
+        
+        localStorage.setItem('strafe_e2ee_group_sessions', JSON.stringify(parsed));
+        console.log('[E2EE] Updated SignalClient group sessions storage for room:', roomId);
+      } catch (e) {
+        console.error('[E2EE] Error updating SignalClient group sessions storage:', e);
+      }
     }
     
     return sessionKey;
   }
 
+  // Legacy storage prefix, kept for backward compatibility
   private storagePrefix = 'signal_e2ee_';
+  
+  // Synchronize group session keys between different storage systems
+  private async synchronizeGroupSessionKeys(): Promise<void> {
+    if (typeof localStorage === 'undefined') return;
+    
+    try {
+      console.log('[E2EE] Synchronizing group session keys between storage systems...');
+      
+      // Get all keys from both storage systems
+      const legacyKeys = new Map<string, Uint8Array>();
+      const signalClientKeys = new Map<string, any>();
+      
+      // Get legacy keys (signal_e2ee_group_*)
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith(this.storagePrefix + 'group_')) {
+          const roomId = key.substring((this.storagePrefix + 'group_').length);
+          const stored = localStorage.getItem(key);
+          if (stored) {
+            legacyKeys.set(roomId, new Uint8Array(JSON.parse(stored)));
+          }
+        }
+      }
+      
+      // Get SignalClient keys (strafe_e2ee_group_sessions)
+      const groupSessionsData = localStorage.getItem('strafe_e2ee_group_sessions');
+      if (groupSessionsData) {
+        const parsed = JSON.parse(groupSessionsData);
+        for (const [roomId, data] of Object.entries(parsed)) {
+          signalClientKeys.set(roomId, data);
+        }
+      }
+      
+      // Merge keys from both systems
+      let updated = false;
+      
+      // First, update SignalClient storage with legacy keys
+      if (legacyKeys.size > 0) {
+        let groupSessions: Record<string, any> = {};
+        if (groupSessionsData) {
+          groupSessions = JSON.parse(groupSessionsData);
+        }
+        
+        for (const [roomId, sessionKey] of legacyKeys.entries()) {
+          if (!signalClientKeys.has(roomId)) {
+            // Add legacy key to SignalClient storage
+            groupSessions[roomId] = {
+              sessionKey: Array.from(sessionKey),
+              sessionId: Array.from(window.crypto.getRandomValues(new Uint8Array(16)))
+                .map(b => b.toString(16).padStart(2, '0'))
+                .join(''),
+              messageNumber: 0
+            };
+            updated = true;
+            console.log(`[E2EE] Added legacy key for room ${roomId} to SignalClient storage`);
+          }
+        }
+        
+        if (updated) {
+          localStorage.setItem('strafe_e2ee_group_sessions', JSON.stringify(groupSessions));
+        }
+      }
+      
+      // Then, update legacy storage with SignalClient keys
+      if (signalClientKeys.size > 0) {
+        for (const [roomId, data] of signalClientKeys.entries()) {
+          const legacyKey = `${this.storagePrefix}group_${roomId}`;
+          if (!localStorage.getItem(legacyKey) && data.sessionKey) {
+            localStorage.setItem(legacyKey, JSON.stringify(Array.from(data.sessionKey)));
+            console.log(`[E2EE] Added SignalClient key for room ${roomId} to legacy storage`);
+          }
+        }
+      }
+      
+      // Also update direct storage keys
+      for (const [roomId, data] of signalClientKeys.entries()) {
+        const directKey = `strafe_e2ee_group_sessions_${roomId}`;
+        if (!localStorage.getItem(directKey) && data.sessionKey) {
+          localStorage.setItem(directKey, JSON.stringify(Array.from(data.sessionKey)));
+          console.log(`[E2EE] Added SignalClient key for room ${roomId} to direct storage`);
+        }
+      }
+      
+      console.log('[E2EE] Group session key synchronization complete');
+    } catch (error) {
+      console.error('[E2EE] Error synchronizing group session keys:', error);
+    }
+  }
 
 
 
