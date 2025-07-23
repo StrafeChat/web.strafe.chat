@@ -2516,13 +2516,15 @@ const ChatArea: Component = () => {
                     );
                     const emojiMatch = beforeCursor.match(/:([a-zA-Z_]*)$/);
 
-                    // Calculate position for autocomplete menu - position like reply popup
+                    // Calculate position for autocomplete menu - position above the input
                     const inputContainer = e.currentTarget
                       .parentElement as HTMLElement;
                     const rect = inputContainer ? inputContainer.getBoundingClientRect() : null;
-                    const autocompleteHeight = 250; // Approximate height including padding and content
+                    
+                    // Calculate position that ensures the autocomplete is above the input
+                    // We're using the top position as a reference point for the bottom-based positioning
                     const autocompletePosition = rect ? {
-                      top: rect.top + window.scrollY - autocompleteHeight - 15, // Position so bottom is above input with 8px gap
+                      top: rect.top + window.scrollY, // Just pass the top position as reference
                       left: rect.left + window.scrollX,
                       width: rect.width, // Match the width of the input container
                     } : { top: 0, left: 0, width: 0 };
@@ -2614,6 +2616,8 @@ const ChatArea: Component = () => {
                     e.key === "Escape"
                   ) {
                     // Let the EmojiAutocomplete component handle these keys
+                    e.preventDefault(); // Prevent default to ensure the event is captured
+                    e.stopPropagation(); // Stop propagation to ensure the event is not handled by other handlers
                     return;
                   }
                 }
@@ -2627,6 +2631,8 @@ const ChatArea: Component = () => {
                     e.key === "Escape"
                   ) {
                     // Let the MentionAutocomplete component handle these keys
+                    e.preventDefault(); // Prevent default to ensure the event is captured
+                    e.stopPropagation(); // Stop propagation to ensure the event is not handled by other handlers
                     return;
                   }
                 }
@@ -2914,7 +2920,7 @@ const ChatArea: Component = () => {
               query={mentionAutocompleteQuery()}
               position={mentionAutocompletePosition()}
               currentRoomId={params.roomId} // Pass current room ID for context
-              onSelect={(id, type) => {
+              onSelect={(id, displayName, type) => {
                 const range = mentionAutocompleteRange();
                 if (range) {
                   // Replace the @query, @&query, or #query with the formatted mention

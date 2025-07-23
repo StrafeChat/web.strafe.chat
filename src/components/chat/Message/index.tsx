@@ -362,7 +362,7 @@ export function Message(props: MessageProps) {
     <>
       <>
         <div
-          class={`flex flex-col ${shouldShowCompact ? "mt-1" : "mt-5"} group hover:bg-surface hover:bg-opacity-10 transition-colors px-4 w-full relative overflow-visible min-w-0 ${isCurrentUserMentioned() ? "bg-yellow-900/30 border-l-4 border-yellow-700" : ""}`}
+          class={`flex flex-col ${shouldShowCompact ? "mt-1" : "mt-5"} group hover:bg-surface hover:bg-opacity-10 transition-colors px-4 w-full relative overflow-visible min-w-0 ${isCurrentUserMentioned() ? "bg-yellow-900/30 border-l-4 border-yellow-700 pl-3" : ""}`}
         >
           <MessageReplies
             refMessages={refMessages()}

@@ -173,9 +173,10 @@ export const MentionAutocomplete: Component<MentionAutocompleteProps> = (props) 
       <Portal>
         <div
           ref={autocompleteRef}
-          class="fixed z-50 bg-background1 border border-border rounded-lg shadow-lg"
+          class="fixed z-50 bg-background1 border border-border rounded-lg shadow-lg flex flex-col"
           style={{
-            top: `${props.position.top}px`,
+            top: 'auto',
+            bottom: `calc(100vh - ${props.position.top}px)`,
             left: `${props.position.left}px`,
             width: props.position.width ? `${props.position.width}px` : '256px',
           }}
