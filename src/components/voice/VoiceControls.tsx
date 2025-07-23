@@ -2,7 +2,7 @@ import { Component } from "solid-js";
 import { useVoice } from "../../lib/providers/voice/VoiceProvider";
 
 export const VoiceControls: Component = () => {
-	const { enableCamera, enableMicrophone, enabledMedia } = useVoice();
+	const { enableCamera, enableMicrophone, enabledMedia, currentDevices } = useVoice();
 
 	return (
 		<div
@@ -17,7 +17,7 @@ export const VoiceControls: Component = () => {
 				Camera
 			</button>
 			<button class="p-2 text-text-secondary hover:bg-surface hover:bg-opacity-20 transition-colors flex-shrink-0" onClick={() => {
-				enableMicrophone(!enabledMedia().audio);
+				enableMicrophone(!enabledMedia().audio, {deviceId: currentDevices.audio()?.deviceId || undefined });
 			}}
 			style={{
 				"text-decoration": (enabledMedia().audio) ? "none" : "strikethrough",

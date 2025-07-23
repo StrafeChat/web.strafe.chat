@@ -25,6 +25,12 @@ type VoiceContextType = {
 	enableMicrophone: (enable: boolean, options?: AudioCaptureOptions) => Promise<void>;
 	enabledMedia: () => { video: boolean, audio: boolean };
 
+	setDevice: (device: MediaDeviceInfo) => void;
+	currentDevices: {
+		audio: Accessor<MediaDeviceInfo | null>;
+		video: Accessor<MediaDeviceInfo | null>;
+	};
+
 	state: Accessor<VoiceState>;
 	room: Accessor<String>;
 
@@ -41,6 +47,8 @@ export const VoiceProvider: ParentComponent = (props) => {
 	const [room, setRoom] = createSignal("");
 	const [localTrack, setLocalTrack] = createSignal<LocalTrackPublication | null>(null);
 	const [livekitRoom, setLivekitRoom] = createSignal<Room | null>(null);
+	const [audio, setAudio] = createSignal<MediaDeviceInfo | null>(null);
+	const [video, setVideo] = createSignal<MediaDeviceInfo | null>(null);
 
 	var token: string, lvRoom: Room;
 
@@ -125,6 +133,16 @@ export const VoiceProvider: ParentComponent = (props) => {
 		});*/
 	}
 
+	const setDevice = (device: MediaDeviceInfo) => {
+		if (device.kind === "audioinput") {
+			setAudio(device);
+		} else if (device.kind === "videoinput") {
+			setVideo(device);
+		} else if (device.kind === "audiooutput") {
+			// TODO:
+		}
+	}
+
 	const disconnect = async () => { // TODO:
 		lvRoom.disconnect();
 	}
@@ -139,6 +157,11 @@ export const VoiceProvider: ParentComponent = (props) => {
 				enableCamera,
 				enableMicrophone,
 				enabledMedia,
+				setDevice,
+				currentDevices: {
+					audio,
+					video
+				},
 				localTrack,
 				livekitRoom
 			}}
