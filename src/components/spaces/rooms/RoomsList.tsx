@@ -20,6 +20,8 @@ import CreateRoomModal from "../../modals/CreateRoomModal";
 import RoomContextMenu from "../../contextMenus/RoomContextMenu";
 import { Tooltip } from "../../common/Tooltip";
 import RoomEditModal from "../../modals/RoomEditModal";
+import { User } from "../../../lib/providers/cache/CacheProvider";
+import { Avatar } from "../../common/Avatar";
 
 interface RoomsListProps {
   spaceId?: string;
@@ -208,6 +210,10 @@ const DraggableRoomItem: Component<DraggableRoomItemProps> = (props) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { openContextMenu } = useContextMenu();
+
+	const { getRoomParticipants } = useAuth();
+	const [participants, setParticipants] = createSignal<User[]>([]);
+
   const isDragging = () => globalDragState().draggedId === props.room.id;
   const isActive = () =>
     location.pathname === `/spaces/${props.spaceId}/rooms/${props.room.id}`;
@@ -239,6 +245,18 @@ const DraggableRoomItem: Component<DraggableRoomItemProps> = (props) => {
   // };
 
   // Remove drop functionality from room items - only drop zones should accept drops
+
+	createEffect(async () => {
+		setParticipants((await getRoomParticipants(props.room.id)).filter(e => e !== null));
+	});
+
+	const { wsClient } = useAuth();
+
+	wsClient()?.onMessage("DISPATCH", (d) => {
+		console.log(d);
+	})
+
+	console.log(wsClient());
 
   return (
     <div
@@ -339,6 +357,30 @@ const DraggableRoomItem: Component<DraggableRoomItemProps> = (props) => {
           </div>
         </Show> */}
       </div>
+
+			{/* Voice Participants */}
+			<Show when={props.room.type === RoomType.VOICE_ROOM}>
+				<ul>
+					<For each={participants()}>
+						{(user) => {
+								return (
+									<li style="margin-left: 1rem;">
+										<div style="display: flex; flex-direction: row; gap: 0.2rem; align-items: center;">
+											<Avatar
+												userId={user.id}
+												avatar={user.avatar}
+												alt={`${user.display_name || user.username}'s avatar`}
+												size="xs">
+
+											</Avatar>
+											<p>{ user.display_name || user.username }</p>
+										</div>
+									</li>
+								)
+						}}
+					</For>
+				</ul>
+			</Show>
     </div>
   );
 };

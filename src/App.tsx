@@ -43,102 +43,102 @@ import { NavigationHistoryProvider } from "./lib/providers/navigation/Navigation
 
 
 const UpdateNotificationWrapper = () => {
-  const { isAuthenticated } = useAuth();
-  const {
-    updateInfo,
-    isModalOpen,
-    handleModalClose
-  } = useUpdateNotification();
+	const { isAuthenticated } = useAuth();
+	const {
+		updateInfo,
+		isModalOpen,
+		handleModalClose
+	} = useUpdateNotification();
 
-  return (
-    <Show when={isAuthenticated()}>
-      <UpdateNotificationModal
-        isOpen={isModalOpen()}
-        onClose={handleModalClose}
-        updateInfo={updateInfo()}
-      />
-    </Show>
-  );
+	return (
+		<Show when={isAuthenticated()}>
+			<UpdateNotificationModal
+				isOpen={isModalOpen()}
+				onClose={handleModalClose}
+				updateInfo={updateInfo()}
+			/>
+		</Show>
+	);
 };
 
 const MountApp = (props: ParentProps) => {
-  const savedLang = localStorage.getItem("sc_lang") || "en_us";
+	const savedLang = localStorage.getItem("sc_lang") || "en_us";
 
-  createEffect(() => {
-    // Set language and direction
-    document.documentElement.dir = getDirection(savedLang);
-    document.documentElement.lang = savedLang.split("_")[0];
+	createEffect(() => {
+		// Set language and direction
+		document.documentElement.dir = getDirection(savedLang);
+		document.documentElement.lang = savedLang.split("_")[0];
 
-    // Apply custom styles
-    applyCustomStyles();
-  });
+		// Apply custom styles
+		applyCustomStyles();
+	});
 
-  return (
-    <TransProvider
-      options={{
-        fallbackLng: "en_us",
-        lng: savedLang,
-        resources: {
-          en_us: { translation: en },
-          es_es: { translation: es },
-          fr_fr: { translation: fr },
-          ar_sa: { translation: ar },
-        },
-      }}
-    >
-      <ThemeProvider>
-        <ToastProvider>
-            <CacheProvider>
-              <UserSettingsProvider>
-                <AuthProvider>
-                    <ContextMenuProvider>
-												<VoiceProvider>
-													<NavigationHistoryProvider>
-														<MobileNavProvider>
-															<SettingsProvider>
-																<ModalProvider>
-																	<LinkConfirmationHandler />
-																	<UpdateNotificationWrapper />
-																	<GlobalKeyboardHandler />
-																	<div class="h-[100dvh] w-full overflow-hidden">{props.children}</div>
-																</ModalProvider>
-															</SettingsProvider>
-														</MobileNavProvider>
-													</NavigationHistoryProvider>
-												</VoiceProvider>
-                    </ContextMenuProvider>
-                </AuthProvider>
-              </UserSettingsProvider>
-            </CacheProvider>
-        </ToastProvider>
-      </ThemeProvider>
-    </TransProvider>
-  );
+	return (
+		<TransProvider
+			options={{
+				fallbackLng: "en_us",
+				lng: savedLang,
+				resources: {
+					en_us: { translation: en },
+					es_es: { translation: es },
+					fr_fr: { translation: fr },
+					ar_sa: { translation: ar },
+				},
+			}}
+		>
+			<ThemeProvider>
+				<ToastProvider>
+					<CacheProvider>
+						<UserSettingsProvider>
+							<AuthProvider>
+								<VoiceProvider>
+									<ContextMenuProvider>
+										<NavigationHistoryProvider>
+											<MobileNavProvider>
+												<SettingsProvider>
+													<ModalProvider>
+														<LinkConfirmationHandler />
+														<UpdateNotificationWrapper />
+														<GlobalKeyboardHandler />
+														<div class="h-[100dvh] w-full overflow-hidden">{props.children}</div>
+													</ModalProvider>
+												</SettingsProvider>
+											</MobileNavProvider>
+										</NavigationHistoryProvider>
+									</ContextMenuProvider>
+								</VoiceProvider>
+							</AuthProvider>
+						</UserSettingsProvider>
+					</CacheProvider>
+				</ToastProvider>
+			</ThemeProvider>
+		</TransProvider>
+	);
 };
 
 const App = () => {
 
-  return (
-    <MountApp>
-      <Router>
-        <Route path="/login" component={Login} />
-        <Route path="/register" component={Register} />
-        <Route path="/verify-email" component={EmailVerify} />
-        <Route path="/password-reset" component={PasswordReset} />
-        <Route path="/password-reset/verify" component={PasswordResetVerify} />
-        <Route path="/password-reset/complete" component={PasswordResetComplete} />
-        <Route path="/invite/:code" component={InviteHandler} />
-        <Route path="/" component={Interface as never}>
-          <Route path="/" component={Home} />
-          <Route path="/friends" component={Friends} />
-          <Route path="/notes" component={Notes} />
-          <Route path="/rooms/:roomId" component={RoomView} />
-          <Route path="/spaces/:spaceId" component={SpaceView} />
-          <Route path="/spaces/:spaceId/rooms/:roomId" component={SpaceRoomView} />
-        </Route>
-      </Router>
-    </MountApp>
-  );
+	return (
+		<MountApp>
+			<Router>
+				<Route path="/login" component={Login} />
+				<Route path="/register" component={Register} />
+				<Route path="/verify-email" component={EmailVerify} />
+				<Route path="/password-reset" component={PasswordReset} />
+				<Route path="/password-reset/verify" component={PasswordResetVerify} />
+				<Route path="/password-reset/complete" component={PasswordResetComplete} />
+				<Route path="/invite/:code" component={InviteHandler} />
+				<Route path="/" component={Interface as never}>
+					<Route path="/" component={Home} />
+					<Route path="/friends" component={Friends} />
+					<Route path="/notes" component={Notes} />
+					<Route path="/rooms/:roomId" component={RoomView} />
+					<Route path="/spaces/:spaceId" component={SpaceView} />
+					<Route path="/spaces/:spaceId/rooms/:roomId" component={SpaceRoomView} />
+				</Route>
+			</Router>
+		</MountApp>
+	);
 };
 
 export default App;

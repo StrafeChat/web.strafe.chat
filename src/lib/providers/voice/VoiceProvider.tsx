@@ -11,10 +11,11 @@ import { AudioCaptureOptions, DisconnectReason, LocalTrackPublication, Room, Roo
 import { LIVEKIT_URL } from "../../../constants";
 
 export enum VoiceState {
-	DISCONNECTED,
+	DISCONNECTED, // order is important
+	ERROR,
+
 	CONNECTING,
 	CONNECTED,
-	ERROR
 }
 
 type VoiceContextType = {
