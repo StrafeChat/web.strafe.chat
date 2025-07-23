@@ -1,6 +1,7 @@
 import { Component, Show, createEffect } from "solid-js";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
 import { useNavigate } from "@solidjs/router";
+import LoadingScreen from "../shared/LoadingScreen";
 
 interface ProtectedRouteProps {
   children: any;
@@ -20,7 +21,7 @@ const ProtectedRoute: Component<ProtectedRouteProps> = (props) => {
   return (
     <Show
       when={!loading()}
-      fallback={null}
+      fallback={<LoadingScreen />}
     >
       <Show
         when={isAuthenticated()}

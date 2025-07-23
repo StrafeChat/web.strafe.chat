@@ -576,6 +576,13 @@ class WebSocketWorkerHandler {
               payload: data.d,
             });
           }
+          // Handle space creation events
+          else if (data.d && (data.d.type === "SPACE_CREATE" || data.d.event_type === "SPACE_CREATE") && data.d.data) {
+            this.broadcast({
+              type: "spaceCreate",
+              payload: data.d,
+            });
+          }
           // Handle room ownership transfer events
           else if (data.d && (data.d.type === "ROOM_OWNERSHIP_TRANSFER" || data.d.event_type === "ROOM_OWNERSHIP_TRANSFER") && data.d.data) {
             this.broadcast({

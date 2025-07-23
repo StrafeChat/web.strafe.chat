@@ -1,4 +1,4 @@
-import { JSX, createSignal, onMount, createEffect } from "solid-js";
+import { JSX, createSignal, onMount, createEffect, createMemo } from "solid-js";
 import SpacesList from "../spaces/SpacesList";
 import RoomsList from "../spaces/rooms/RoomsList";
 import ProtectedRoute from "../auth/ProtectedRoute";
@@ -6,18 +6,44 @@ import { useLocation, useNavigate } from "@solidjs/router";
 import { PMList } from "../home/pms/PMList";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
 import { useMobileNav } from "../../lib/providers/mobile/MobileNavProvider";
+import { useNavigationTracker } from "../../lib/hooks/useNavigationTracker";
 import UserSettings from "../settings/UserSettings";
 import { Portal } from "solid-js/web";
 
 export const Interface = (props: { children: JSX.Element }) => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { isMobile } = useAuth();
+  const { isMobile, spaces } = useAuth();
   const { currentView, setCurrentView, handleTouchStart, handleTouchMove, handleTouchEnd } = useMobileNav();
   const [showSettings, setShowSettings] = createSignal(false)
   const [, setIsSidebarVisible] = createSignal(true);
+  
+  // Track navigation changes automatically
+  useNavigationTracker();
 
-  const showRoomsList = () => location.pathname.startsWith("/spaces");
+  // Get current space data for RoomsList
+  const currentSpace = createMemo(() => {
+    const pathParts = location.pathname.split('/');
+    const spaceId = pathParts[2];
+    if (!spaceId || !spaces()) return null;
+    
+    return spaces()?.find(space => String(space.id) === String(spaceId)) || null;
+  });
+
+  const showRoomsList = () => {
+    // Show RoomsList on spaces pages (both general and individual space pages)
+    return location.pathname.startsWith("/spaces");
+  };
+
+  const showPMList = () => {
+    // Show PMList on home, friends, and other non-space pages
+    return !location.pathname.startsWith("/spaces");
+  };
+
+  const showSidebar = () => {
+    // Always show sidebar content for mobile navigation
+    return true;
+  };
 
   const handleScroll = () => {
     const container = document.querySelector(".snap-x");
@@ -89,26 +115,28 @@ export const Interface = (props: { children: JSX.Element }) => {
            onTouchEnd={handleTouchEnd}>
         <div class={`flex md:flex-1 w-screen overflow-x-auto snap-x snap-mandatory scroll-smooth hide-scrollbar ${showBottomNav() ? 'pb-14' : ''} md:pb-0 h-full`}>
           {/* First snap point - Lists */}
-          <div class="flex w-[calc(92px+15rem)] md:w-auto flex-none snap-start">
-            <div class="w-[72px] h-full flex-none">
+          <div class={`flex ${showSidebar() ? 'w-[calc(92px+15rem)]' : 'w-[72px]'} md:w-auto flex-none snap-start overflow-hidden`}>
+            <div class="w-[72px] h-full flex-none overflow-hidden">
               <SpacesList />
             </div>
-            <div class="w-[260px] h-full flex-none">
-              {showRoomsList() ? <RoomsList /> : <PMList />}
-            </div>
+            {showSidebar() && (
+              <div class="w-[260px] h-full flex-none overflow-hidden">
+                {showRoomsList() ? (
+                  <RoomsList 
+                    spaceId={(() => {
+                      const pathParts = location.pathname.split('/');
+                      return pathParts[2]; // Extract spaceId from /spaces/:spaceId path
+                    })()} 
+                    currentSpace={currentSpace()}
+                  />
+                ) : showPMList() ? <PMList /> : null}
+              </div>
+            )}
           </div>
 
           {/* Second snap point - Content */}
           <div class="w-screen md:flex-1 flex-none snap-start">
-            <div class="w-full h-full flex">
-              <div class="flex-1 h-full w-full">{props.children}</div>
-              {/* Members List (desktop only) */}
-              {location.pathname.startsWith("/spaces") && (
-                <div class="w-64 h-full flex-none hidden md:block">
-                  {/* Add your MembersList component here */}
-                </div>
-              )}
-            </div>
+            <div class="w-full h-full">{props.children}</div>
           </div>
         </div>
 

@@ -5,15 +5,15 @@ import { useSettings } from "../../lib/providers/settings/SettingsProvider";
 import { APP_VERSION } from "../../constants";
 import Modal from "../modals/Modal";
 import SwipeableView from "../shared/SwipeableView";
-import AccountSettings from "./pages/AccountSettings";
-import ProfileSettings from "./pages/ProfileSettings";
-import AppearanceSettings from "./pages/AppearanceSettings";
-import DefaultSettings from "./pages/DefaultSettings";
-import LanguageSettings from "./pages/LanguageSettings";
-import SessionsSettings from "./pages/SessionsSettings";
-import PrivacySettings from "./pages/PrivacySettings";
-import BotsSettings from "./pages/BotsSettings";
-import OAuth2Settings from "./pages/OAuth2Settings";
+import AccountSettings from "./user/AccountSettings";
+import ProfileSettings from "./user/ProfileSettings";
+import AppearanceSettings from "./user/AppearanceSettings";
+import DefaultSettings from "./user/DefaultSettings";
+import LanguageSettings from "./user/LanguageSettings";
+import SessionsSettings from "./user/SessionsSettings";
+import PrivacySettings from "./user/PrivacySettings";
+import BotsSettings from "./user/BotsSettings";
+import OAuth2Settings from "./user/OAuth2Settings";
 import { ToastProvider } from "../common/Toast";
 
 // Import icons

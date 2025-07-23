@@ -14,6 +14,7 @@ import { handleWebSocketMessage } from "../../events";
 import { BASE_URL, WS_URL } from "../../../constants";
 import { api } from "../../api";
 import { RoomWithRecipients } from "../../../types/rooms";
+import { Space } from "../cache/CacheProvider";
 
 export const API_ENDPOINTS = {
   REGISTER: `${BASE_URL}/auth/register`,
@@ -31,9 +32,17 @@ export const API_ENDPOINTS = {
   TYPING_INDICATOR: (roomId: string) => `${BASE_URL}/rooms/${roomId}/typing`,
   SESSIONS: `${BASE_URL}/users/@me/sessions`,
   ROOMS: `${BASE_URL}/rooms`,
+  SPACES: `${BASE_URL}/spaces`,
+  SPACE_MEMBERS: (spaceId: string) => `${BASE_URL}/spaces/${spaceId}/members`,
+  SPACE_MEMBER_ROLES: (spaceId: string, userId: string) => `${BASE_URL}/spaces/${spaceId}/members/${userId}/roles`,
+  SPACE_ROLES: (spaceId: string) => `${BASE_URL}/spaces/${spaceId}/roles`,
+  SPACE_INVITES: (spaceId: string) => `${BASE_URL}/spaces/${spaceId}/invites`,
+  GET_INVITE_INFO: (code: string) => `${BASE_URL}/invite/${code}`,
+  USE_INVITE: (code: string) => `${BASE_URL}/invite/${code}/use`,
+
 };
 
-const API_HEADERS = {
+export const API_HEADERS = {
   JSON: {
     "Content-Type": "application/json",
     Accept: "application/json",
@@ -55,6 +64,8 @@ export type Clientuser = {
   banner?: string;
   bio?: string;
   about_me?: string;
+  created_at?: string;
+  updated_at?: string;
   presence?: {
     status: string;
     custom_status: string;
@@ -71,6 +82,8 @@ type AuthContextType = {
   setRelationshipRequests: (requests: Relationship[]) => void;
   rooms: () => RoomWithRecipients[];
   setRooms: (rooms: RoomWithRecipients[] | ((prev: RoomWithRecipients[]) => RoomWithRecipients[])) => void;
+  spaces: () => Space[];
+  setSpaces: (spaces: Space[] | ((prev: Space[]) => Space[])) => void;
   login: (credentials: LoginCredentials) => Promise<AuthResponse>;
   register: (data: RegisterData) => Promise<AuthResponse>;
   logout: () => void;
@@ -133,6 +146,7 @@ export const AuthProvider: ParentComponent = (props) => {
   const [relationships, setRelationships] = createSignal<string[]>([]);
   const [relationshipRequests, setRelationshipRequests] = createSignal<Relationship[]>([]);
   const [rooms, setRooms] = createSignal<RoomWithRecipients[]>([]);
+  const [spaces, setSpaces] = createSignal<Space[]>([]);
   const [isAuthenticated, setIsAuthenticated] = createSignal(false);
   const [loading, setLoading] = createSignal(true);
   const [isMobile, setIsMobile] = createSignal(window.innerWidth <= 768);
@@ -146,6 +160,20 @@ export const AuthProvider: ParentComponent = (props) => {
     const handleResize = () => setIsMobile(window.innerWidth <= 768);
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
+  });
+
+  // Cache rooms when they are updated
+  createEffect(() => {
+    const currentRooms = rooms();
+    if (currentRooms && currentRooms.length > 0) {
+      console.log("[AuthProvider] Caching", currentRooms.length, "rooms");
+      currentRooms.forEach(room => {
+        cache.setRoom({
+          ...room,
+          updated_at: room.updated_at || undefined
+        });
+      });
+    }
   });
 
   const initializeWebSocket = (token: string = localStorage.getItem("sc_token") || "") => {
@@ -178,9 +206,16 @@ export const AuthProvider: ParentComponent = (props) => {
     client.onMessage("ROOM_CREATE", handleRoomCreateEvent);
     client.onMessage("ROOM_DELETE", handleRoomDeleteEvent);
     client.onMessage("ROOM_UPDATE", handleRoomUpdateEvent);
+    client.onMessage("ROOM_POSITIONS_UPDATE", handleRoomPositionsUpdateEvent);
     client.onMessage("ROOM_MEMBER_ADD", handleRoomMemberAddEvent);
     client.onMessage("ROOM_MEMBER_REMOVE", handleRoomMemberRemoveEvent);
     client.onMessage("ROOM_OWNERSHIP_TRANSFER", handleRoomOwnershipTransferEvent);
+    client.onMessage("SPACE_CREATE", handleSpaceCreateEvent);
+    client.onMessage("SPACE_UPDATE", handleSpaceUpdateEvent);
+    client.onMessage("SPACE_INVITE_CREATE", handleSpaceInviteCreateEvent);
+    client.onMessage("SPACE_INVITE_DELETE", handleSpaceInviteDeleteEvent);
+    client.onMessage("SPACE_INVITE_UPDATE", handleSpaceInviteUpdateEvent);
+    client.onMessage("SPACE_MEMBER_ROLE_UPDATE", handleSpaceMemberRoleUpdateEvent);
     client.onMessage("presence", handlePresenceEvent);
     console.log("[AuthProvider] Registering MESSAGE_CREATE handler");
     client.onMessage("MESSAGE_CREATE", handleMessageCreateEvent);
@@ -189,6 +224,8 @@ export const AuthProvider: ParentComponent = (props) => {
   };
 
   const handleReadyEvent = (data: any) => {
+    console.log("[AuthProvider] READY event received:", data);
+    
     if (data.client_user) {
       const userData = normalizeUserData(data.client_user);
       setUser(userData);
@@ -210,8 +247,100 @@ export const AuthProvider: ParentComponent = (props) => {
     }
 
     if (data.rooms) {
+      console.log("[AuthProvider] Raw rooms from READY:", data.rooms);
+      console.log("[AuthProvider] Number of rooms:", Array.isArray(data.rooms) ? data.rooms.length : Object.keys(data.rooms).length);
       const roomsData = normalizeRoomsData(data.rooms, data.users);
       setRooms(roomsData);
+    } else {
+      console.log("[AuthProvider] No rooms data in READY event");
+    }
+
+    if (data.spaces) {
+      const spacesData = data.spaces.map((space: any) => {
+        const spaceId = String(space.id || space.ID);
+        
+        // Cache space members if they exist in the space object
+        if (space.members && Array.isArray(space.members)) {
+          console.log(`[AuthProvider] Caching ${space.members.length} members for space ${spaceId}`);
+          const normalizedMembers = space.members.map((member: any) => ({
+            space_id: member.space_id || member.SpaceID || spaceId,
+            user_id: member.user_id || member.UserID,
+            nick: member.nick || member.Nick,
+            avatar: member.avatar || member.Avatar,
+            roles: member.roles || member.Roles || [],
+            joined_at: member.joined_at || member.JoinedAt,
+            deaf: member.deaf || member.Deaf || false,
+            mute: member.mute || member.Mute || false,
+            flags: member.flags || member.Flags || 0,
+            pending: member.pending || member.Pending || false,
+            user: member.user || member.User || {
+              id: member.user_id || member.UserID,
+              username: member.user?.username || member.User?.Username || '',
+              display_name: member.user?.display_name || member.User?.DisplayName || member.user?.username || member.User?.Username || '',
+              discriminator: member.user?.discriminator || member.User?.Discriminator || 0,
+              avatar: member.user?.avatar || member.User?.Avatar || '',
+              banner: member.user?.banner || member.User?.Banner || '',
+              bot: member.user?.bot || member.User?.Bot || false,
+              system: member.user?.system || member.User?.System || false,
+              bio: member.user?.bio || member.User?.Bio || '',
+              about_me: member.user?.about_me || member.User?.AboutMe || '',
+              flags: member.user?.flags || member.User?.Flags || 0,
+              presence: member.user?.presence || member.User?.Presence || {
+                status: 'offline',
+                custom_status: ''
+              }
+            }
+          }));
+          cache.setCachedSpaceMembers(spaceId, normalizedMembers);
+        }
+        
+        // Cache space roles if they exist in the space object
+        if (space.roles && Array.isArray(space.roles)) {
+          console.log(`[AuthProvider] Caching ${space.roles.length} roles for space ${spaceId}`);
+          const normalizedRoles = space.roles.map((role: any) => ({
+            space_id: role.space_id || role.SpaceID || spaceId,
+            role_id: role.role_id || role.RoleID,
+            name: role.name || role.Name,
+            color: role.color || role.Color,
+            permissions: role.permissions || role.Permissions || [],
+            position: role.position || role.Position || 0,
+            mentionable: role.mentionable || role.Mentionable || false,
+            hoist: role.hoist || role.Hoist || false,
+            created_at: role.created_at || role.CreatedAt,
+            updated_at: role.updated_at || role.UpdatedAt
+          }));
+          cache.setCachedSpaceRoles(spaceId, normalizedRoles);
+        }
+        
+        return {
+          id: spaceId,
+          name: space.name || space.Name || "",
+          name_acronym: space.name_acronym || space.NameAcronym || "",
+          description: space.description || space.Description,
+          icon: space.icon || space.Icon,
+          banner: space.banner || space.Banner,
+          owner_id: space.owner_id || space.OwnerID || "",
+          verification_level: space.verification_level || space.VerificationLevel || 0,
+          default_message_notifications: space.default_message_notifications || space.DefaultMessageNotifications || 0,
+          explicit_content_filter: space.explicit_content_filter || space.ExplicitContentFilter || 0,
+          features: space.features || space.Features || [],
+          afk_room_id: space.afk_room_id || space.AfkRoomID,
+          afk_timeout: space.afk_timeout || space.AfkTimeout || 0,
+          system_room_id: space.system_room_id || space.SystemRoomID,
+          system_room_flags: space.system_room_flags || space.SystemRoomFlags || 0,
+          rules_room_id: space.rules_room_id || space.RulesRoomID,
+          max_presences: space.max_presences || space.MaxPresences,
+          max_members: space.max_members || space.MaxMembers,
+          vanity_url_code: space.vanity_url_code || space.VanityUrlCode,
+          preferred_locale: space.preferred_locale || space.PreferredLocale || "en-US",
+          public_updates_room_id: space.public_updates_room_id || space.PublicUpdatesRoomID,
+          max_video_room_users: space.max_video_room_users || space.MaxVideoRoomUsers,
+          nsfw_level: space.nsfw_level || space.NsfwLevel || 0,
+          created_at: space.created_at || space.CreatedAt || new Date().toISOString(),
+          updated_at: space.updated_at || space.UpdatedAt || new Date().toISOString()
+        };
+      });
+      setSpaces(spacesData);
     }
 
     // Handle unread messages from READY event
@@ -256,6 +385,8 @@ export const AuthProvider: ParentComponent = (props) => {
     bio: userData.bio || userData.Bio,
     about_me: userData.about_me || userData.AboutMe,
     date_of_birth: userData.date_of_birth || userData.DateOfBirth,
+    created_at: userData.created_at || userData.CreatedAt,
+    updated_at: userData.updated_at || userData.UpdatedAt,
     friends: userData.friends || userData.Friends || [],
     presence: (userData.presence || userData.Presence) ? {
       status: (userData.presence?.status || userData.Presence?.Status) || "offline",
@@ -271,29 +402,45 @@ export const AuthProvider: ParentComponent = (props) => {
       created_at: request.created_at || request.CreatedAt || new Date().toISOString(),
     }));
 
-  const normalizeRoomsData = (rooms: any, users: any): RoomWithRecipients[] =>
-    Object.values(rooms).map((room: any) => ({
-      id: room.ID || room.id,
-      name: room.Name || room.name || "",
-      type: room.Type || room.type || 0,
-      recipients: room.Recipients || room.recipients || [],
-      owner_id: room.Creator || room.creator || room.OwnerID || room.owner_id || "",
-      last_message_id: room.LastMessageID || room.LastMessageId || room.last_message_id || null,
-      icon: room.Icon || room.icon || null,
-      topic: room.Topic || room.topic || "",
-      created_at: room.CreatedAt || room.created_at || new Date().toISOString(),
-      updated_at: room.UpdatedAt || room.updated_at || null,
-      recipients_data: (room.Recipients || room.recipients || [])?.map((recipientId: string) =>
-        users?.[recipientId] ? {
-          id: recipientId,
-          username: users[recipientId].Username || users[recipientId].username,
-          discriminator: users[recipientId].Discriminator || users[recipientId].discriminator,
-          display_name: (users[recipientId].DisplayName || users[recipientId].display_name || users[recipientId].Username || users[recipientId].username),
-          avatar: users[recipientId].Avatar || users[recipientId].avatar,
-          presence: users[recipientId].Presence || users[recipientId].presence,
-        } : null
-      ).filter(Boolean)
-    }));
+  const normalizeRoomsData = (rooms: any, users: any): RoomWithRecipients[] => {
+    console.log("[AuthProvider] Raw rooms data:", rooms);
+    const roomsArray = Array.isArray(rooms) ? rooms : Object.values(rooms);
+    const normalizedRooms = roomsArray.map((room: any) => {
+      const spaceId = room.SpaceID || room.space_id;
+      const parentId = room.ParentID || room.parent_id;
+      console.log(`[AuthProvider] Room ${room.ID || room.id}: space_id=${spaceId}, parent_id=${parentId}, type=${room.Type || room.type}`);
+      
+      return {
+        id: room.ID || room.id,
+        name: room.Name || room.name || "",
+        type: room.Type || room.type || 0,
+        recipients: room.Recipients || room.recipients || [],
+        owner_id: room.Creator || room.creator || room.OwnerID || room.owner_id || "",
+        last_message_id: room.LastMessageID || room.LastMessageId || room.last_message_id || null,
+        icon: room.Icon || room.icon || null,
+        topic: room.Topic || room.topic || "",
+        created_at: room.CreatedAt || room.created_at || new Date().toISOString(),
+        updated_at: room.UpdatedAt || room.updated_at || null,
+        permission_overrides: room.permission_overrides,
+        space_id: spaceId ? String(spaceId) : undefined,
+        parent_id: parentId ? String(parentId) : undefined,
+        position: room.Position ?? room.position ?? undefined,
+        recipients_data: (room.Recipients || room.recipients || [])?.map((recipientId: string) =>
+          users?.[recipientId] ? {
+            id: recipientId,
+            username: users[recipientId].Username || users[recipientId].username,
+            discriminator: users[recipientId].Discriminator || users[recipientId].discriminator,
+            display_name: (users[recipientId].DisplayName || users[recipientId].display_name || users[recipientId].Username || users[recipientId].username),
+            avatar: users[recipientId].Avatar || users[recipientId].avatar,
+            presence: users[recipientId].Presence || users[recipientId].presence,
+          } : null
+        ).filter(Boolean)
+      };
+    });
+    
+    console.log("[AuthProvider] Normalized rooms:", normalizedRooms);
+    return normalizedRooms;
+  };
 
   const handleRelationshipEvent = (data: any) => {
     handleWebSocketMessage(
@@ -318,18 +465,24 @@ export const AuthProvider: ParentComponent = (props) => {
   };
 
   const handleRoomCreateEvent = (data: any) => {
-    const roomData = data.data || data;
+    const roomData = data.room || data.data || data;
+    console.log("[AuthProvider] Room create event received:", roomData);
+    
     const newRoom = {
-      id: roomData.id,
-      name: roomData.name || "",
-      type: roomData.type || 0,
-      recipients: roomData.recipients || [],
-      owner_id: roomData.creator || roomData.owner_id || "",
-      last_message_id: roomData.last_message_id || null,
-      icon: roomData.icon || null,
-      created_at: roomData.created_at || new Date().toISOString(),
-      updated_at: roomData.updated_at || null,
-      recipients_data: roomData.recipients?.map((recipientId: string) => {
+      id: roomData.id || roomData.ID,
+      name: roomData.name || roomData.Name || "",
+      type: roomData.type || roomData.Type || 0,
+      recipients: roomData.recipients || roomData.Recipients || [],
+      owner_id: roomData.creator || roomData.Creator || roomData.owner_id || roomData.OwnerID || "",
+      last_message_id: roomData.last_message_id || roomData.LastMessageID || null,
+      icon: roomData.icon || roomData.Icon || null,
+      topic: roomData.topic || roomData.Topic || "",
+      created_at: roomData.created_at || roomData.CreatedAt || new Date().toISOString(),
+      updated_at: roomData.updated_at || roomData.UpdatedAt || null,
+      space_id: roomData.space_id || roomData.SpaceID ? String(roomData.space_id || roomData.SpaceID) : undefined,
+      parent_id: roomData.parent_id || roomData.ParentID ? String(roomData.parent_id || roomData.ParentID) : undefined,
+      position: roomData.position || roomData.Position || undefined,
+      recipients_data: (roomData.recipients || roomData.Recipients || [])?.map((recipientId: string) => {
         const userData = cache.getUser(recipientId);
         return userData ? {
           id: recipientId,
@@ -342,7 +495,11 @@ export const AuthProvider: ParentComponent = (props) => {
       }).filter(Boolean)
     };
     
+    console.log("[AuthProvider] Adding new room:", newRoom);
     setRooms(prev => [...prev, newRoom as RoomWithRecipients]);
+    
+    // Cache the new room immediately
+    cache.setRoom(newRoom);
   };
 
   const handleRoomDeleteEvent = (data: any) => {
@@ -390,10 +547,50 @@ export const AuthProvider: ParentComponent = (props) => {
           // Update timestamp
           updatedRoom.updated_at = new Date().toISOString();
           
+          // Cache the updated room
+          cache.setRoom({
+            ...updatedRoom,
+            updated_at: updatedRoom.updated_at || undefined
+          });
+          
           return updatedRoom;
         }
         return room;
       }));
+    }
+  };
+
+  const handleRoomPositionsUpdateEvent = (data: any) => {
+    const eventData = data.data || data;
+    const roomPositions = eventData.room_positions;
+    
+    if (roomPositions && Array.isArray(roomPositions)) {
+      console.log("[AuthProvider] Room positions updated:", roomPositions);
+      
+      setRooms(prev => {
+        const updated = prev.map(room => {
+          const positionUpdate = roomPositions.find((pos: any) => pos.room_id === room.id);
+          if (positionUpdate) {
+            const updatedRoom = {
+              ...room,
+              position: positionUpdate.position
+            };
+            
+            // Update parent_id if it's provided in the update
+            if (positionUpdate.hasOwnProperty('parent_id')) {
+              updatedRoom.parent_id = positionUpdate.parent_id;
+              console.log(`[AuthProvider] Updated room ${room.id} parent_id from ${room.parent_id} to ${positionUpdate.parent_id}`);
+            }
+            
+            console.log(`[AuthProvider] Updated room ${room.id} position from ${room.position} to ${positionUpdate.position}`);
+            return updatedRoom;
+          }
+          return room;
+        });
+        
+        console.log("[AuthProvider] Rooms after update:", updated.filter(r => roomPositions.some((pos: any) => pos.room_id === r.id)));
+        return updated;
+      });
     }
   };
 
@@ -502,6 +699,148 @@ export const AuthProvider: ParentComponent = (props) => {
         }
         return room;
       }));
+    }
+  };
+
+  const handleSpaceCreateEvent = (data: any) => {
+    const spaceData = data.data || data;
+    console.log("[AuthProvider] Space created:", spaceData);
+    
+    // Add space to spaces signal
+    const newSpace: Space = {
+      id: String(spaceData.id || spaceData.ID),
+      name: spaceData.name || spaceData.Name || "",
+      name_acronym: spaceData.name_acronym || spaceData.NameAcronym || "",
+      description: spaceData.description || spaceData.Description,
+      icon: spaceData.icon || spaceData.Icon,
+      banner: spaceData.banner || spaceData.Banner,
+      owner_id: spaceData.owner_id || spaceData.OwnerID || "",
+      verification_level: spaceData.verification_level || spaceData.VerificationLevel || 0,
+      default_message_notifications: spaceData.default_message_notifications || spaceData.DefaultMessageNotifications || 0,
+      explicit_content_filter: spaceData.explicit_content_filter || spaceData.ExplicitContentFilter || 0,
+      features: spaceData.features || spaceData.Features || [],
+      afk_room_id: spaceData.afk_room_id || spaceData.AfkRoomID,
+      afk_timeout: spaceData.afk_timeout || spaceData.AfkTimeout || 0,
+      system_room_id: spaceData.system_room_id || spaceData.SystemRoomID,
+      system_room_flags: spaceData.system_room_flags || spaceData.SystemRoomFlags || 0,
+      rules_room_id: spaceData.rules_room_id || spaceData.RulesRoomID,
+      max_presences: spaceData.max_presences || spaceData.MaxPresences,
+      max_members: spaceData.max_members || spaceData.MaxMembers,
+      vanity_url_code: spaceData.vanity_url_code || spaceData.VanityUrlCode,
+      preferred_locale: spaceData.preferred_locale || spaceData.PreferredLocale || "en-US",
+      public_updates_room_id: spaceData.public_updates_room_id || spaceData.PublicUpdatesRoomID,
+      max_video_room_users: spaceData.max_video_room_users || spaceData.MaxVideoRoomUsers,
+      nsfw_level: spaceData.nsfw_level || spaceData.NsfwLevel || 0,
+      created_at: spaceData.created_at || spaceData.CreatedAt || new Date().toISOString(),
+      updated_at: spaceData.updated_at || spaceData.UpdatedAt || new Date().toISOString()
+    };
+    setSpaces(prev => [...prev, newSpace]);
+    
+    // Also dispatch the event for the CacheProvider to handle
+    window.dispatchEvent(new CustomEvent('spaceCreate', { detail: newSpace }));
+  };
+
+  const handleSpaceUpdateEvent = (data: any) => {
+    const spaceData = data.data || data;
+    // Extract space_id from the top level of the payload (as per backend structure)
+    const spaceId = String(data.space_id || data.id || '');
+    console.log("[AuthProvider] Space updated:", spaceData, "for space ID:", spaceId);
+    console.log("[AuthProvider] Full payload structure:", data);
+    console.log("[AuthProvider] Extracted space_id:", spaceId);
+    console.log("[AuthProvider] Available keys in data:", Object.keys(data));
+    
+    if (spaceId) {
+      // Update the space in the spaces signal
+      setSpaces(prev => prev.map(space => {
+        if (String(space.id) === spaceId) {
+          const updatedSpace = { ...space };
+          
+          // Update only the fields that are provided in the update
+          if (spaceData.name !== undefined) {
+            updatedSpace.name = spaceData.name;
+          }
+          if (spaceData.description !== undefined) {
+            updatedSpace.description = spaceData.description;
+          }
+          if (spaceData.icon !== undefined) {
+            updatedSpace.icon = spaceData.icon;
+          }
+          if (spaceData.banner !== undefined) {
+            updatedSpace.banner = spaceData.banner;
+          }
+          
+          // Always update the updated_at timestamp
+          updatedSpace.updated_at = new Date().toISOString();
+          
+          console.log("[AuthProvider] Updated space:", updatedSpace);
+          return updatedSpace;
+        }
+        return space;
+      }));
+      
+      // Also dispatch the event for the CacheProvider to handle
+      const updatedSpaceForEvent = {
+        id: spaceId,
+        ...spaceData
+      };
+      window.dispatchEvent(new CustomEvent('spaceUpdate', { detail: updatedSpaceForEvent }));
+    }
+  };
+
+  const handleSpaceInviteCreateEvent = (data: any) => {
+    const inviteData = data.data || data;
+    console.log("[AuthProvider] Space invite created:", inviteData);
+    
+    // Dispatch event for components to handle
+    window.dispatchEvent(new CustomEvent('spaceInviteCreate', { detail: inviteData }));
+  };
+
+  const handleSpaceInviteDeleteEvent = (data: any) => {
+    const inviteData = data.data || data;
+    console.log("[AuthProvider] Space invite deleted:", inviteData);
+    
+    // Dispatch event for components to handle
+    window.dispatchEvent(new CustomEvent('spaceInviteDelete', { detail: inviteData }));
+  };
+
+  const handleSpaceInviteUpdateEvent = (data: any) => {
+    const inviteData = data.data || data;
+    console.log("[AuthProvider] Space invite updated:", inviteData);
+    
+    // Dispatch event for components to handle
+    window.dispatchEvent(new CustomEvent('spaceInviteUpdate', { detail: inviteData }));
+  };
+
+  const handleSpaceMemberRoleUpdateEvent = (eventData: any) => {
+    console.log("[AuthProvider] Space member role updated:", eventData);
+    
+    const spaceId = String(eventData.space_id);
+    const userId = String(eventData.user_id);
+    const roles = eventData.data?.roles || [];
+    
+    if (spaceId && userId && roles.length > 0) {
+      // Get current member from cache
+      const currentMember = cache.getSpaceMember(spaceId, userId);
+      if (currentMember) {
+        // Update member with new roles
+        const updatedMember = {
+          ...currentMember,
+          roles
+        };
+        
+        // Update cache
+        cache.updateCachedSpaceMember(spaceId, updatedMember);
+        
+        // Dispatch event for components to handle real-time updates
+        window.dispatchEvent(new CustomEvent('spaceMemberRoleUpdate', { 
+          detail: {
+            spaceId,
+            userId,
+            member: updatedMember,
+            roles
+          }
+        }));
+      }
     }
   };
 
@@ -754,13 +1093,15 @@ export const AuthProvider: ParentComponent = (props) => {
         return { success: false, error: "Room ID and message content or attachments are required" };
       }
 
+      let processedMessageData = { ...messageData };
+
       const response = await fetch(API_ENDPOINTS.ROOM_MESSAGES(roomId), {
         method: "POST",
         headers: {
           ...API_HEADERS.JSON,
           ...API_HEADERS.SESSION(),
         },
-        body: JSON.stringify(messageData),
+        body: JSON.stringify(processedMessageData),
       });
 
       if (!response.ok) {
@@ -863,13 +1204,19 @@ export const AuthProvider: ParentComponent = (props) => {
 
   const editMessage = async (roomId: string, messageId: string, content: string) => {
     try {
+      if (!roomId || !content.trim()) {
+        return { success: false, error: "Room ID and message content are required" };
+      }
+
+      let processedContent = content;
+
       const response = await fetch(`${API_ENDPOINTS.ROOM_MESSAGES(roomId)}/${messageId}`, {
         method: "PATCH",
         headers: {
           ...API_HEADERS.JSON,
           ...API_HEADERS.SESSION(),
         },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ content: processedContent }),
       });
 
       if (!response.ok) {
@@ -1241,6 +1588,8 @@ export const AuthProvider: ParentComponent = (props) => {
         setRelationships,
         rooms: () => rooms(),
         setRooms,
+        spaces: () => spaces(),
+        setSpaces,
         login,
         register,
         logout,

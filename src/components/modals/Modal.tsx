@@ -8,9 +8,12 @@ interface ModalProps {
   type?: "default" | "full";
   children: JSX.Element;
   hideCloseButton?: boolean;
+  class?: string;
 }
 
 const Modal: Component<ModalProps> = (props) => {
+  console.log('Modal rendered with isOpen:', props.isOpen);
+  
   onMount(() => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape" && props.isOpen && props.onClose) {
@@ -25,13 +28,16 @@ const Modal: Component<ModalProps> = (props) => {
   return (
     <Portal>
       <Presence>
-        {props.isOpen && (
+        {(() => {
+          console.log('Presence condition check - isOpen:', props.isOpen);
+          return props.isOpen;
+        })() && (
           <Motion
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
-            class="fixed inset-0 z-50"
+            class={`fixed inset-0 z-[100] ${props.class || ''}`}
           >
             <Motion
               initial={{ opacity: 0 }}

@@ -2,8 +2,6 @@ import { Component, createSignal, createMemo, Show, For, onCleanup, createEffect
 import { useAuth } from "../../../lib/providers/auth/AuthProvider";
 import { useCache } from "../../../lib/providers/cache/CacheProvider";
 import { useMobileNav } from "../../../lib/providers/mobile/MobileNavProvider";
-import UserSettings from "../../settings/UserSettings";
-import ClientUserPopup from "../../common/ClientUserPopup";
 import { A, useNavigate, useLocation } from "@solidjs/router";
 import { Tooltip } from "../../common/Tooltip";
 import { useTransContext } from "@mbarzda/solid-i18next";
@@ -12,7 +10,6 @@ import Home from "../../shared/icons/Home";
 import Friends from "../../shared/icons/Friends";
 import Notes from "../../shared/icons/Notes";
 import PlusSmall from "../../shared/icons/PlusSmall";
-import Settings from "../../shared/icons/Settings";
 import DefaultGroupPM from "../../shared/icons/DefaultGroupPM";
 import { FS_URL } from "../../../constants";
 import { capitalizeStatus } from "../../../lib/utils/status";
@@ -20,6 +17,7 @@ import { CreatePMModal } from "../../modals/CreatePMModal";
 import { RoomType } from "../../../types/roomTypes";
 import { Portal } from "solid-js/web";
 import { Avatar } from "../../common/Avatar";
+import { ClientUserArea } from "../../shared/ClientUserArea";
 
 export const PMList: Component = () => {              
   const { user, rooms, setRooms, relationshipRequests, isMobile } = useAuth();
@@ -28,12 +26,6 @@ export const PMList: Component = () => {
   const location = useLocation();
   const cache = useCache();
   const [t] = useTransContext();
-  const [showSettings, setShowSettings] = createSignal(false);
-  const [showUserPopup, setShowUserPopup] = createSignal(false);
-  const [userProfileTrigger, setUserProfileTrigger] =
-    createSignal<HTMLDivElement>();
-  const [customStatus, setCustomStatus] = createSignal("");
-  const [customEmoji, setCustomEmoji] = createSignal("");
   const [showCreatePM, setShowCreatePM] = createSignal(false);
 
   // Helper function to check if a room is currently active
@@ -197,6 +189,67 @@ export const PMList: Component = () => {
     return "Unknown Chat";
   };
 
+  // Helper function to get last message preview
+  const getLastMessagePreview = (room: any) => {
+    if (!room.last_message_id) return "";
+    
+    const message = cache.getMessage(room.id, room.last_message_id);
+    if (!message) return "";
+    
+    // Get the sender's name
+    const currentUserId = user()?.id;
+    let senderName = "";
+    
+    if (message.author_id === currentUserId) {
+      senderName = "You";
+    } else {
+      const sender = cache.getUser(message.author_id);
+      if (sender) {
+        senderName = sender.display_name || sender.username;
+      } else {
+        senderName = "Unknown";
+      }
+    }
+    
+    // Get message content preview
+    let content = message.content || "";
+    
+    // Handle different message types
+    if (message.attachments && message.attachments.length > 0) {
+      if (content) {
+        content = "📎 " + content;
+      } else {
+        content = "📎 Attachment";
+      }
+    }
+    
+    // if (message.embeds && message.embeds.length > 0 && !content) {
+    //   content = "🔗 Embed";
+    // }
+    
+    if (!content) {
+      content = "Message";
+    }
+    
+    // Truncate content if too long
+    if (content.length > 50) {
+      content = content.substring(0, 47) + "...";
+    }
+    
+    // For group PMs, show sender name
+    if (room.type === RoomType.GROUP_PM) {
+      return `${senderName}: ${content}`;
+    }
+    
+    // For direct PMs, only show content if it's from the other user
+    // If it's from current user, show "You: content"
+    if (message.author_id === currentUserId) {
+      return `You: ${content}`;
+    }
+    
+    return content;
+  };
+
   // Helper function to get room status (for PMs)
   const getRoomStatus = (room: any) => {
     // Only show status indicators for direct PMs (type 0), not group PMs (type 1)
@@ -291,7 +344,7 @@ export const PMList: Component = () => {
 
   return (
     <div class="flex flex-col h-full bg-background1 rounded-tl-2xl overflow-hidden">
-      <div class="p-2 flex flex-col [box-shadow:0_2px_4px_-2px_rgba(0,0,0,0.2)] flex-shrink-0">
+      <div class="p-2 flex flex-col border-b border-surface border-opacity-20 flex-shrink-0">
         <h2 class="text-xl px-3 py-2 font-bold text-text-primary select-none">
           {t("pms.title")}
         </h2>
@@ -362,7 +415,7 @@ export const PMList: Component = () => {
           when={directMessages().length > 0}
           fallback={
             <div class="text-text-secondary text-sm px-3 py-2 select-none">
-              {t("pms.comingSoon")}
+             You don't have any private messages.
             </div>
           }
         >
@@ -425,7 +478,12 @@ export const PMList: Component = () => {
                     <div class="text-sm font-medium text-text-primary truncate select-none">
                       {getRoomName(room)}
                     </div>
-                    {room.type === RoomType.PM && getRoomStatus(room) !== "offline" ? (
+                    {/* Get last message preview if available */}
+                    {room.last_message_id ? (
+                      <div class="text-xs text-text-secondary truncate select-none">
+                        {getLastMessagePreview(room)}
+                      </div>
+                    ) : room.type === RoomType.PM && getRoomStatus(room) !== "offline" ? (
                       <div class="text-xs text-text-secondary truncate select-none">
                         {getRoomCustomStatus(room)}
                       </div>
@@ -454,74 +512,13 @@ export const PMList: Component = () => {
         </Show>
       </div>
       
-      <Show when={window.innerWidth > 768}>      
-      <div class="border-t border-border mt-auto">
-        <div class="flex items-center bg-background1 pl-1.5 pr-2 py-1 w-full">
-          <div class="flex-1 min-w-0 flex items-center overflow-hidden">
-            <div
-              class="group inline-flex items-center gap-2 hover:bg-surface hover:bg-opacity-10 transition-colors hover:cursor-pointer rounded-md pl-1 pr-2 py-1 overflow-hidden"
-              onClick={() => setShowUserPopup(true)}
-              ref={setUserProfileTrigger}
-            >
-              <div class="relative flex items-center flex-shrink-0">
-                <div class="relative w-8 h-8">
-                <Avatar
-                userId={user()?.id!}
-                size="sm"
-                avatar={user()?.avatar}
-                alt="Avatar"
-              />
-                </div>
-                <StatusIndicator
-                  status={(user()?.presence?.status || "offline") as UserStatus}
-                  class="border-background1 group-hover:border-surface group-hover:border-opacity-10 transition-colors"
-                />
-              </div>
-              <div class="min-w-0 overflow-hidden">
-                <div class="text-sm font-medium truncate select-none">
-                  {user()?.display_name}
-                </div>
-                <div class="text-xs text-text-secondary truncate select-none">
-                  {user()?.presence?.custom_status ||
-                    capitalizeStatus(user()?.presence?.status || "offline")}
-                </div>
-              </div>
-            </div>
-          </div>
-            <div class="flex items-center gap-1 flex-shrink-0 ml-2">
-              {/* Client User Popup */}
-              <ClientUserPopup
-                isOpen={showUserPopup()}
-                onClose={() => setShowUserPopup(false)}
-                triggerRef={userProfileTrigger()}
-                customStatus={customStatus()}
-                setCustomStatus={setCustomStatus}
-                customEmoji={customEmoji()}
-                setCustomEmoji={setCustomEmoji}
-              />
-              {/* User Settings Modal */}
-              <Tooltip content={t("settings.sections.user")} position="top">
-                <button
-                  class="p-2 text-text-secondary hover:text-text-primary transition-colors rounded-md hover:bg-surface hover:bg-opacity-10"
-                  onClick={() => setShowSettings(true)}
-                >
-                  <Settings />
-                </button>
-              </Tooltip>
-            </div>
-        </div>
-      </div>
-      </Show>
+      <ClientUserArea />
       <Portal>
-      <UserSettings
-        isOpen={showSettings()}
-        onClose={() => setShowSettings(false)}
-      />
 
-      <CreatePMModal
-        isOpen={showCreatePM()}
-        onClose={() => setShowCreatePM(false)}
-      />
+        <CreatePMModal
+          isOpen={showCreatePM()}
+          onClose={() => setShowCreatePM(false)}
+        />
       </Portal>
     </div>
   );

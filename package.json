@@ -9,11 +9,18 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@dnd-kit/core": "^6.3.1",
+    "@dnd-kit/sortable": "^10.0.0",
+    "@dnd-kit/utilities": "^3.2.2",
     "@mbarzda/solid-i18next": "^1.4.1",
     "@motionone/dom": "^10.18.0",
     "@motionone/solid": "^10.16.4",
     "@msgpack/msgpack": "^3.0.0-beta2",
+    "@noble/curves": "^1.9.4",
+    "@noble/hashes": "^1.8.0",
+    "@solid-primitives/keyed": "^1.5.2",
     "@solidjs/router": "^0.15.1",
+    "@thisbeyond/solid-dnd": "^0.7.5",
     "@types/bun": "^1.1.11",
     "@types/highlight.js": "^10.1.0",
     "caniuse-lite": "^1.0.30001712",

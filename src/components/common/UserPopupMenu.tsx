@@ -3,7 +3,6 @@ import {
   Show,
   createSignal,
   onCleanup,
-  onMount,
   createEffect,
 } from "solid-js";
 import { FS_URL } from "../../constants";
@@ -11,6 +10,10 @@ import { StatusIndicator } from "./StatusIndicator";
 import { Avatar } from "./Avatar";
 import { Portal } from "solid-js/web";
 import { useCache } from "../../lib/providers/cache/CacheProvider";
+// import { useAuth } from "../../lib/providers/auth/AuthProvider";
+import RoleManagementModal from "../modals/RoleManagementModal";
+import UserProfileModal from "../modals/UserProfileModal";
+import { SpaceMember, SpaceRole } from "../../lib/cache/SpaceCache";
 
 
 
@@ -20,17 +23,44 @@ interface UserPopupMenuProps {
   triggerRef?: HTMLElement;
   userId: string;
   placement?: "left" | "right";
+  spaceId?: string; // Optional space context for role management
+  spaceMember?: SpaceMember; // Space member data if in space context
 }
 
 const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
   const cache = useCache();
+  // const { user: currentUser } = useAuth();
   const [user, setUser] = createSignal<any>(null);
+  const [showRoleModal, setShowRoleModal] = createSignal(false);
+  const [showProfileModal, setShowProfileModal] = createSignal(false);
   let popupRef: HTMLDivElement | undefined;
 
   // Fetch user info from cache whenever props.userId changes
   createEffect(() => {
     setUser(cache.getUser(props.userId));
   });
+
+  // // Check if current user can manage roles in this space
+  // const canManageRoles = () => {
+  //   if (!props.spaceId || !props.spaceMember || !currentUser()) return false;
+    
+  //   const currentSpace = cache.getSpace(props.spaceId);
+  //   if (!currentSpace) return false;
+    
+  //   // Space owner can always manage roles
+  //   if (currentSpace.owner_id === currentUser()?.id) return true;
+    
+  //   // Don't allow managing own roles
+  //   if (props.userId === currentUser()?.id) return false;
+    
+  //   // TODO: Check for MANAGE_ROLES permission
+  //   // For now, only allow space owners
+  //   return false;
+  // };
+
+  const [modalSpaceMember, setModalSpaceMember] = createSignal<any | null>(null);
+
+
 
   // Handle clicking outside to close
   const handleClickOutside = (e: MouseEvent) => {
@@ -48,13 +78,15 @@ const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
     }
   };
 
-  onMount(() => {
-    document.addEventListener("mousedown", handleClickOutside);
-    window.addEventListener("keydown", handleKeyDown);
-  });
-  onCleanup(() => {
-    document.removeEventListener("mousedown", handleClickOutside);
-    window.removeEventListener("keydown", handleKeyDown);
+  createEffect(() => {
+    if (props.isOpen) {
+      document.addEventListener("mousedown", handleClickOutside);
+      window.addEventListener("keydown", handleKeyDown);
+      onCleanup(() => {
+        document.removeEventListener("mousedown", handleClickOutside);
+        window.removeEventListener("keydown", handleKeyDown);
+      });
+    }
   });
 
   // Calculate position relative to trigger element
@@ -63,41 +95,73 @@ const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
 
     const rect = props.triggerRef.getBoundingClientRect();
     const popupWidth = 300;
-    const gap = 10;
+    const gap = 8;
+    const minPopupHeight = 200;
+    const maxPopupHeight = 500;
     
-    // Position to the right of the trigger element
-    let left = rect.right + gap;
+    // Calculate available space in all directions
+    const spaceLeft = rect.left;
+    const spaceRight = window.innerWidth - rect.right;
+    const spaceAbove = rect.top;
+    const spaceBelow = window.innerHeight - rect.bottom;
     
-    // Check if popup would go off the right edge of screen
-    if (left + popupWidth > window.innerWidth - gap) {
-      // Position to the left of the trigger instead
+    let left: number;
+    let top: number;
+    let maxHeight = maxPopupHeight;
+    
+    // Horizontal positioning - prefer right, but use left if more space
+    if (spaceRight >= popupWidth + gap) {
+      // Position to the right of trigger
+      left = rect.right + gap;
+    } else if (spaceLeft >= popupWidth + gap) {
+      // Position to the left of trigger
       left = rect.left - popupWidth - gap;
-      // Ensure it doesn't go off the left edge
-      if (left < gap) {
-        left = gap;
-      }
+    } else {
+      // Center horizontally if neither side has enough space
+      left = Math.max(gap, (window.innerWidth - popupWidth) / 2);
     }
     
-    // Vertical positioning - align top of popup with top of trigger
-     let top = rect.top;
-     
-     // Check if popup would go off the top of screen
-     if (top < gap) {
-       top = gap;
+    // Vertical positioning - keep popup close to trigger
+     if (spaceBelow >= minPopupHeight) {
+       // Position below trigger, aligned with its top
+       top = rect.top;
+       maxHeight = Math.min(maxPopupHeight, spaceBelow - gap);
+     } else if (spaceAbove >= minPopupHeight) {
+       // Position above trigger, with bottom edge near trigger
+       const availableHeight = Math.min(maxPopupHeight, spaceAbove - gap);
+       top = rect.top - availableHeight;
+       maxHeight = availableHeight;
+     } else {
+       // Limited space - position to keep some part near trigger
+       maxHeight = Math.min(maxPopupHeight, window.innerHeight - gap * 2);
+       if (spaceBelow > spaceAbove) {
+         // More space below - align top with trigger
+         top = rect.top;
+       } else {
+         // More space above - align bottom with trigger
+         top = rect.bottom - maxHeight;
+       }
      }
-     
-     // Check if popup would go off the bottom of screen
-     const estimatedPopupHeight = 300; // Approximate popup height
-     if (top + estimatedPopupHeight > window.innerHeight - gap) {
-       // Reposition from bottom
-       top = window.innerHeight - estimatedPopupHeight - gap;
-       if (top < gap) top = gap;
-     }
+    
+    // Final bounds checking
+    if (left < gap) left = gap;
+    if (left + popupWidth > window.innerWidth - gap) {
+      left = window.innerWidth - popupWidth - gap;
+    }
+    
+    if (top < gap) {
+      top = gap;
+      maxHeight = Math.min(maxHeight, window.innerHeight - gap * 2);
+    }
+    
+    if (top + maxHeight > window.innerHeight - gap) {
+      maxHeight = window.innerHeight - top - gap;
+    }
 
     return {
       left: `${left}px`,
       top: `${top}px`,
-      maxHeight: `${Math.min(400, window.innerHeight - top - gap)}px`,
+      maxHeight: `${maxHeight}px`,
     };
   };
 
@@ -107,7 +171,7 @@ const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
         <Portal>
           <div
             ref={popupRef}
-            class="fixed z-50 bg-background2 rounded-lg shadow-lg w-[300px] overflow-hidden animate-fade-in"
+            class="fixed z-50 bg-background2 rounded-lg shadow-sm w-[300px] overflow-y-auto animate-fade-in"
             style={getPopupStyle()}
             onClick={(e) => e.stopPropagation()}
           >
@@ -134,7 +198,14 @@ const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
               </Show>
               <div class="absolute -bottom-6 left-2">
                 <div class="relative w-[80px] h-[80px]">
-                  <div class="w-full h-full rounded-full overflow-hidden border-4 border-background2" style={{ "aspect-ratio": "1/1" }}>
+                  <div 
+                    class="w-full h-full rounded-full overflow-hidden border-4 border-background2 cursor-pointer hover:border-primary transition-colors" 
+                    style={{ "aspect-ratio": "1/1" }}
+                    onClick={() => {
+                      setShowProfileModal(true);
+                      props.onClose();
+                    }}
+                  >
                     <Avatar
                       userId={user()?.id || ''}
                       avatar={user()?.avatar}
@@ -172,7 +243,7 @@ const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
               {/* About Me Section */}
               <Show when={(user()?.about_me || user()?.AboutMe) && (user()?.about_me || user()?.AboutMe)?.trim().length > 0}>
                 <div class="w-full pt-4">
-                  <div class="w-full px-3 py-2 bg-surface bg-opacity-5 rounded-md">
+                  <div class="w-full py-2 bg-opacity-5 rounded-md">
                     <div class="text-xs font-semibold text-text-secondary mb-2 uppercase tracking-wide">About Me</div>
                     <div class="text-sm text-text-primary whitespace-pre-wrap break-words">
                       {user()?.about_me || user()?.AboutMe}
@@ -180,10 +251,64 @@ const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
                   </div>
                 </div>
               </Show>
+
+              {/* Roles Section (if in space context) */}
+              <Show when={props.spaceId && props.spaceMember}>
+                {(() => {
+                  const spaceRoles = cache.getSpaceRoles(props.spaceId!);
+                  const userRoles = spaceRoles.filter((role: SpaceRole) => 
+                    props.spaceMember?.roles?.includes(role.role_id)
+                  ) || [];
+                  
+                  return (
+                    <Show when={userRoles.length > 0}>
+                      <div class="w-full pt-4">
+                        <div class="w-full py-1 bg-opacity-5 rounded-md">
+                          <div class="text-xs font-semibold text-text-secondary mb-3 uppercase tracking-wide">
+                            Roles — {userRoles.length}
+                          </div>
+                          <div class="flex flex-wrap gap-2">
+                            {userRoles.map((role: SpaceRole) => (
+                              <div 
+                                class="px-2.5 py-1.5 rounded-md text-xs font-medium flex items-center gap-1.5 border-[1px] border-border-primary"
+                                                            >
+                                <div
+                                  class="w-2.5 h-2.5 rounded-full flex-shrink-0"
+                                  style={{ "background-color": role.color || "var(--surface)" }}
+                                />
+                                <span class="truncate">{role.name}</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </Show>
+                  );
+                })()}
+              </Show>
             </div>
           </div>
         </Portal>
       </Show>
+      
+      {/* Role Management Modal */}
+      <RoleManagementModal
+        isOpen={showRoleModal()}
+        onClose={() => {
+          setShowRoleModal(false);
+          setModalSpaceMember(null);
+        }}
+        member={modalSpaceMember()}
+        spaceId={props.spaceId || ""}
+      />
+      
+      {/* User Profile Modal */}
+      <UserProfileModal
+        isOpen={showProfileModal()}
+        onClose={() => setShowProfileModal(false)}
+        userId={props.userId}
+        spaceId={props.spaceId}
+      />
     </div>
   );
 };

@@ -8,7 +8,7 @@ export const Home: Component = () => {
 
   return (
     <div class="flex flex-col h-full bg-background2">
-      <div class="p-2 flex flex-col [box-shadow:0_2px_4px_-2px_rgba(0,0,0,0.2)]">
+      <div class="p-2 flex flex-col border-b border-surface border-opacity-20">
         <div class="flex items-center gap-2 px-3 py-2">
           <svg
             xmlns="http://www.w3.org/2000/svg"

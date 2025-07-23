@@ -181,7 +181,7 @@ const ProfileSettings: Component = () => {
       <div class="bg-background1 rounded-lg p-4">
         <div class="flex flex-col gap-6">
           {/* Banner Upload */}
-          <div class="relative group w-full h-[150px] rounded-lg overflow-hidden">
+          <div class="relative group w-full h-[120px] rounded-lg overflow-hidden">
             <Show
               when={user()?.banner}
               fallback={<div class="w-full h-full bg-primary" />}
@@ -189,7 +189,7 @@ const ProfileSettings: Component = () => {
               <img
                 src={`${FS_URL}/banners/${user()?.id}/${user()?.banner}`}
                 alt={t("settings.profile.banner.alt")}
-                class="w-full h-full object-fill bg-background2"
+                class="w-full h-full object-cover bg-background2"
               />
             </Show>
             <label

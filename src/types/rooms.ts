@@ -8,9 +8,12 @@ export interface Room {
   recipients?: string[];
   owner_id?: string;
   last_message_id?: string | null;
-  icon?: string;
+  icon?: string | null;
   created_at: string;
   updated_at?: string;
+  space_id?: string;
+  parent_id?: string;
+  position?: number;
 }
 
 export type RoomWithRecipients = {
@@ -26,6 +29,21 @@ export type RoomWithRecipients = {
   updated_at: string | null;
   recipients_data: any[];
   unread_count?: number;
+  space_id?: string;
+  parent_id?: string;
+  position?: number;
+  permission_overrides?: {
+    member?: {
+      granted: number;
+      denied: number;
+    };
+    roles?: {
+      [roleId: string]: {
+        granted: number;
+        denied: number;
+      };
+    };
+  };
 };
 
 export { RoomType };

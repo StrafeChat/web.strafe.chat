@@ -1,6 +1,8 @@
 import { marked, Tokens } from 'marked';
-import { parseEmojis } from './emojiUtils';
+// import { parseEmojis } from './emojiUtils';
 import { getEmojiByShortcode, getTwemojiUrl } from '../data/twemojiData';
+import { USER_MENTION_REGEX, ROLE_MENTION_REGEX, ROOM_MENTION_REGEX, EVERYONE_MENTION_REGEX } from './mentions';
+import { renderMentionPlaceholders } from './mentionRenderer';
 import DOMPurify from 'isomorphic-dompurify';
 import hljs from 'highlight.js';
 import { initializeCodeBlockCopyButtons, initializeCodeBlockHoverEffects } from './codeBlockUtils';
@@ -129,6 +131,37 @@ const escapeHtml = (text: string): string => {
 };
 
 /**
+ * Process mentions in text and replace them with placeholder components
+ * @param text The text to process
+ * @returns Text with mentions replaced with component placeholders
+ */
+const processMentionsForMarkdown = (text: string): string => {
+  let processedText = text;
+  
+  // Process user mentions
+  processedText = processedText.replace(USER_MENTION_REGEX, (_match, userId) => {
+    return `{{MENTION:USER:${userId}}}`;
+  });
+  
+  // Process role mentions
+  processedText = processedText.replace(ROLE_MENTION_REGEX, (_match, roleId) => {
+    return `{{MENTION:ROLE:${roleId}}}`;
+  });
+  
+  // Process room mentions
+  processedText = processedText.replace(ROOM_MENTION_REGEX, (_match, roomId) => {
+    return `{{MENTION:ROOM:${roomId}}}`;
+  });
+  
+  // Process everyone mentions
+  processedText = processedText.replace(EVERYONE_MENTION_REGEX, () => {
+    return `{{MENTION:EVERYONE}}`;
+  });
+  
+  return processedText;
+};
+
+/**
  * Process emojis in text and replace shortcodes with Twemoji images
  * @param text The text to process
  * @returns Text with emoji shortcodes replaced with Twemoji images
@@ -174,10 +207,13 @@ const processEmojisForMarkdown = (text: string): string => {
 export const parseMarkdown = (text: string): string => {
   if (!text) return '';
   
-  // Escape HTML tags first to display them as plain text
-  let processedText = escapeHtml(text);
+  // Process mentions BEFORE escaping HTML to avoid escaping mention syntax
+  let processedText = processMentionsForMarkdown(text);
   
-  // Process emojis first to avoid interference with underline processing
+  // Escape HTML tags after mention processing to display them as plain text
+  processedText = escapeHtml(processedText);
+  
+  // Process emojis after mentions to avoid interference with underline processing
   processedText = processEmojisForMarkdown(processedText);
   
   // Process Discord-style underlines after emojis
@@ -213,10 +249,14 @@ export const parseMarkdown = (text: string): string => {
     ],
     ALLOWED_ATTR: [
       'href', 'target', 'rel', 'class', 'title', 'src', 'alt',
-      'aria-label', 'data-language', 'style', 'loading', 'data-emoji-shortcode', 'data-emoji-name', 'data-emoji-code'
+      'aria-label', 'data-language', 'style', 'loading', 'data-emoji-shortcode', 'data-emoji-name', 'data-emoji-code',
+      'data-mention-type', 'data-mention-id'
     ],
     ALLOW_DATA_ATTR: true
   });
+  
+  // Replace mention placeholders with rendered HTML components
+  sanitizedHtml = renderMentionPlaceholders(sanitizedHtml);
   
   // Convert any remaining line break markers to actual newlines
   sanitizedHtml = sanitizedHtml.replace(/{{LINEBREAK}}/g, '\n');

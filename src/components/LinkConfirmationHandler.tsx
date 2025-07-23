@@ -5,11 +5,11 @@ import LinkConfirmModal from "./modals/LinkConfirmModal";
 const TRUSTED_DOMAINS = [
   "strafe.chat",
   "github.com/StrafeChat",
-  "alpha.strafechat.dev"
+  "alpha.strafechat.dev",
 ];
 
 // Key for storing user trusted domains in localStorage
-const USER_TRUSTED_DOMAINS_KEY = "strafe-user-trusted-domains";
+const USER_TRUSTED_DOMAINS_KEY = "sc_trusted_domains";
 
 /**
  * Get user trusted domains from localStorage
@@ -32,7 +32,10 @@ const addUserTrustedDomain = (domain: string): void => {
     const currentDomains = getUserTrustedDomains();
     if (!currentDomains.includes(domain)) {
       const updatedDomains = [...currentDomains, domain];
-      localStorage.setItem(USER_TRUSTED_DOMAINS_KEY, JSON.stringify(updatedDomains));
+      localStorage.setItem(
+        USER_TRUSTED_DOMAINS_KEY,
+        JSON.stringify(updatedDomains),
+      );
     }
   } catch (e) {
     console.error("Error adding user trusted domain:", e);
@@ -46,23 +49,23 @@ const isTrustedDomain = (url: string): boolean => {
   try {
     const urlObj = new URL(url);
     const hostname = urlObj.hostname;
-    
+
     // Check built-in trusted domains
-    const isBuiltInTrusted = TRUSTED_DOMAINS.some(domain => 
-      hostname === domain || 
-      hostname.endsWith(`.${domain}`) ||
-      hostname.includes(domain)
+    const isBuiltInTrusted = TRUSTED_DOMAINS.some(
+      (domain) =>
+        hostname === domain ||
+        hostname.endsWith(`.${domain}`) ||
+        hostname.includes(domain),
     );
-    
+
     if (isBuiltInTrusted) {
       return true;
     }
-    
+
     // Check user trusted domains
     const userTrustedDomains = getUserTrustedDomains();
-    return userTrustedDomains.some(domain => 
-      hostname === domain || 
-      hostname.endsWith(`.${domain}`)
+    return userTrustedDomains.some(
+      (domain) => hostname === domain || hostname.endsWith(`.${domain}`),
     );
   } catch (e) {
     console.error("Error checking trusted domain:", e);
@@ -89,37 +92,37 @@ const getDomainFromUrl = (url: string): string => {
 const LinkConfirmationHandler: Component = () => {
   const [isModalOpen, setIsModalOpen] = createSignal(false);
   const [activeHref, setActiveHref] = createSignal<string | null>(null);
-  
+
   const handleLinkClick = (event: MouseEvent) => {
     const target = event.target as HTMLElement;
-    const link = target.closest('a') as HTMLAnchorElement;
-    
+    const link = target.closest("a") as HTMLAnchorElement;
+
     // Only process if the target is or is inside an anchor tag with href
     if (!link || !link.href) {
       return;
     }
-    
+
     try {
       const url = new URL(link.href);
-      
+
       // Check if it's an external link (different origin)
       const isExternal = url.origin !== window.location.origin;
-      
+
       if (isExternal) {
         // For external links, prevent default behavior
         event.preventDefault();
-        
+
         // If ctrl key (or metaKey for Mac) is pressed or it's a trusted domain, open directly
-        if ((event.ctrlKey || event.metaKey) || isTrustedDomain(link.href)) {
+        if (event.ctrlKey || event.metaKey || isTrustedDomain(link.href)) {
           window.open(link.href, "_blank", "noopener,noreferrer");
           return;
         }
-        
+
         // If modal is already open, don't open another one
         if (isModalOpen()) {
           return;
         }
-        
+
         // Store the href and open the modal
         setActiveHref(link.href);
         setIsModalOpen(true);
@@ -142,18 +145,18 @@ const LinkConfirmationHandler: Component = () => {
 
   onMount(() => {
     // Remove any existing click handlers first
-    document.removeEventListener('click', handleLinkClick, { capture: true });
-    
+    document.removeEventListener("click", handleLinkClick, { capture: true });
+
     // Add a global click handler for all links
-    document.addEventListener('click', handleLinkClick, { capture: true });
-    
+    document.addEventListener("click", handleLinkClick, { capture: true });
+
     console.log("LinkConfirmationHandler mounted");
   });
 
   onCleanup(() => {
     // Clean up the event listener when the component is unmounted
-    document.removeEventListener('click', handleLinkClick, { capture: true });
-    
+    document.removeEventListener("click", handleLinkClick, { capture: true });
+
     console.log("LinkConfirmationHandler unmounted");
   });
 

@@ -7,7 +7,7 @@ import {
 } from "solid-js"
 
 import { useAuth } from "../auth/AuthProvider"
-import { AudioCaptureOptions, DisconnectReason, LocalTrackPublication, Room, RoomEvent, TrackPublishOptions, VideoCaptureOptions } from "livekit-client";
+import { AudioCaptureOptions, DisconnectReason, LocalTrackPublication, Room, RoomEvent, VideoCaptureOptions } from "livekit-client";
 import { LIVEKIT_URL } from "../../../constants";
 
 export enum VoiceState {
@@ -23,7 +23,9 @@ type VoiceContextType = {
 
 	enableCamera: (enable: boolean, options?: VideoCaptureOptions) => Promise<void>;
 	enableMicrophone: (enable: boolean, options?: AudioCaptureOptions) => Promise<void>;
-	enabledMedia: () => { video: boolean, audio: boolean };
+	enableScreenShare: (enable: boolean) => Promise<void>;
+	setDeafened: (deafened: boolean) => void;
+	enabledMedia: () => { video: boolean, audio: boolean, screenShare: boolean, deafened: boolean };
 
 	setDevice: (device: MediaDeviceInfo) => void;
 	currentDevices: {
@@ -49,11 +51,18 @@ export const VoiceProvider: ParentComponent = (props) => {
 	const [livekitRoom, setLivekitRoom] = createSignal<Room | null>(null);
 	const [audio, setAudio] = createSignal<MediaDeviceInfo | null>(null);
 	const [video, setVideo] = createSignal<MediaDeviceInfo | null>(null);
+	
+	// Reactive signals for media states
+	const [isCameraEnabled, setIsCameraEnabled] = createSignal(false);
+	const [isMicrophoneEnabled, setIsMicrophoneEnabled] = createSignal(false);
+	const [isScreenShareEnabled, setIsScreenShareEnabled] = createSignal(false);
+	const [isDeafened, setIsDeafened] = createSignal(false);
 
 	var token: string, lvRoom: Room;
 
 	const connect = async (roomId: string) => {
 		try {
+			console.log("[VoiceProvider] Connecting to voice room:", roomId);
 			setRoom(roomId);
 
 			setState(VoiceState.CONNECTING);
@@ -64,9 +73,16 @@ export const VoiceProvider: ParentComponent = (props) => {
 			await lvRoom.connect(LIVEKIT_URL, token);
 			setupListeners();
 
+			// Initialize media states
+			const p = lvRoom.localParticipant;
+			setIsCameraEnabled(p.isCameraEnabled);
+			setIsMicrophoneEnabled(p.isMicrophoneEnabled);
+			setIsScreenShareEnabled(p.isScreenShareEnabled);
+
 			setState(VoiceState.CONNECTED);
+			console.log("[VoiceProvider] Successfully connected to voice room:", roomId);
 		} catch(e) {
-			console.error(e);
+			console.error("[VoiceProvider] Failed to connect to voice room:", e);
 			setState(VoiceState.ERROR);
 			setRoom("")
 		}
@@ -76,61 +92,147 @@ export const VoiceProvider: ParentComponent = (props) => {
 		const p = lvRoom.localParticipant;
 		const track = await p.setCameraEnabled(enable, options);
 		if (track) setLocalTrack(track);
+		// Update reactive signal
+		setIsCameraEnabled(p.isCameraEnabled);
 	}
 	const enableMicrophone = async (enable: boolean, options?: AudioCaptureOptions) => {
 		const p = lvRoom.localParticipant;
 		await p.setMicrophoneEnabled(enable, options);
+		// Update reactive signal
+		setIsMicrophoneEnabled(p.isMicrophoneEnabled);
 	}
-	const enabledMedia = () => {
-		if (!lvRoom) return { video: false, audio: false }
+	const enableScreenShare = async (enable: boolean) => {
 		const p = lvRoom.localParticipant;
-		
+		await p.setScreenShareEnabled(enable);
+		// Update reactive signal
+		setIsScreenShareEnabled(p.isScreenShareEnabled);
+	}
+
+	const setDeafened = (deafened: boolean) => {
+		setIsDeafened(deafened);
+		// Mute/unmute all remote audio tracks by setting volume on attached elements
+		if (lvRoom) {
+			lvRoom.remoteParticipants.forEach(participant => {
+				participant.audioTrackPublications.forEach(publication => {
+					if (publication.track && publication.isSubscribed) {
+						// Get all attached audio elements for this track
+						const audioElements = publication.track.attachedElements as HTMLAudioElement[];
+						audioElements.forEach(element => {
+							if (element instanceof HTMLAudioElement) {
+								// Store original volume if not already stored
+							const trackId = publication.track!.sid;
+							if (trackId && !originalVolumes.has(trackId)) {
+								originalVolumes.set(trackId, element.volume);
+							}
+							// Set volume to 0 when deafened, restore original when not deafened
+							element.volume = deafened ? 0 : (trackId ? originalVolumes.get(trackId) || 1.0 : 1.0);
+							}
+						});
+					}
+				});
+			});
+		}
+	}
+
+	// Store original volumes to restore them properly
+	const originalVolumes = new Map<string, number>();
+
+	const restoreAudioVolumes = () => {
+		if (lvRoom && !isDeafened()) {
+			lvRoom.remoteParticipants.forEach(participant => {
+				participant.audioTrackPublications.forEach(publication => {
+					if (publication.track && publication.isSubscribed) {
+						const trackId = publication.track.sid;
+						if (!trackId) return;
+						const originalVolume = originalVolumes.get(trackId) || 1.0;
+						// Get all attached audio elements for this track
+						const audioElements = publication.track.attachedElements as HTMLAudioElement[];
+						audioElements.forEach(element => {
+							if (element instanceof HTMLAudioElement) {
+								element.volume = originalVolume;
+							}
+						});
+					}
+				});
+			});
+		}
+	}
+
+	const enabledMedia = () => {
 		return {
-			video: p.isCameraEnabled,
-			audio: p.isMicrophoneEnabled,
+			video: isCameraEnabled(),
+			audio: isMicrophoneEnabled(),
+			screenShare: isScreenShareEnabled(),
+			deafened: isDeafened(),
 		}
 	}
 
 	const disconnectedListener = (reason?: DisconnectReason) => {
-		console.log("Disconnected: ", reason);
+		console.log("[VoiceProvider] Voice call disconnected:", reason);
+		console.trace("[VoiceProvider] Disconnect stack trace:");
+		// Reset state when disconnected
+		setState(VoiceState.DISCONNECTED);
+		setRoom("");
+		setLocalTrack(null);
+		setLivekitRoom(null);
+		// Reset media states
+		setIsCameraEnabled(false);
+		setIsMicrophoneEnabled(false);
+		setIsScreenShareEnabled(false);
+		setIsDeafened(false);
+		// Clear original volumes map
+		originalVolumes.clear();
 	}
 
 	const setupListeners = () => {
-		lvRoom.on(RoomEvent.Disconnected, disconnectedListener)
-		/*p.on(ParticipantEvent.TrackMuted, (pub) => {
-			var allMuted = true;
-			for (const [_k, v] of p.trackPublications) {
-				if (!v.isMuted) allMuted = false;
-			}
-			const current = enabledMedia();
-			const tKind = pub.track?.kind;
-			if (!tKind) return;
-			const kind = (tKind === Track.Kind.Audio) ? "audio" : "video";
-			const currentVal = current[kind];
-			
-			if (allMuted && currentVal) {
-				const newVal = { ...current }
-				newVal[kind] = false;
-				setEnabledMedia(newVal);
+		lvRoom.on(RoomEvent.Disconnected, disconnectedListener);
+		
+		// Handle track subscription to store original volumes
+		lvRoom.on(RoomEvent.TrackSubscribed, (track, _publication, _participant) => {
+			if (track.kind === 'audio') {
+				// Wait for the track to be attached to DOM elements
+				setTimeout(() => {
+					const audioElements = track.attachedElements as HTMLAudioElement[];
+					audioElements.forEach(element => {
+						if (element instanceof HTMLAudioElement) {
+							// Store original volume when track is subscribed
+						const trackId = track.sid;
+						if (trackId && !originalVolumes.has(trackId)) {
+							originalVolumes.set(trackId, element.volume || 1.0);
+						}
+							// Apply deafen state if currently deafened
+							if (isDeafened()) {
+								element.volume = 0;
+							}
+						}
+					});
+				}, 100); // Small delay to ensure elements are attached
 			}
 		});
-		p.on(ParticipantEvent.TrackUnmuted, (pub) => {
-			var allUnmuted = true;
-			for (const [_k, v] of p.trackPublications) {
-				if (v.isMuted) allUnmuted = false;
-			}
-			const current = enabledMedia();
-			const tKind = pub.track?.kind;
-			if (!tKind) return;
-			const kind = (tKind === Track.Kind.Audio) ? "audio" : "video";
-			const currentVal = current[kind];
+	}
 
-			if (allUnmuted && currentVal) {
-				const newVal = { ...current }
-				newVal[kind] = true;
-				setEnabledMedia(newVal);
-			}
-		});*/
+	const disconnect = async () => {
+		console.log("[VoiceProvider] Disconnect called");
+		console.trace("[VoiceProvider] Disconnect stack trace:");
+		// Restore audio volumes before disconnecting
+		restoreAudioVolumes();
+		if (lvRoom && lvRoom.state === 'connected') {
+			console.log("[VoiceProvider] Disconnecting from LiveKit room");
+			await lvRoom.disconnect();
+		}
+		// Manually trigger state reset in case the event doesn't fire
+		setState(VoiceState.DISCONNECTED);
+		setRoom("");
+		setLocalTrack(null);
+		setLivekitRoom(null);
+		// Reset media states
+		setIsCameraEnabled(false);
+		setIsMicrophoneEnabled(false);
+		setIsScreenShareEnabled(false);
+		setIsDeafened(false);
+		// Clear original volumes map
+		originalVolumes.clear();
+		console.log("[VoiceProvider] Voice call disconnected successfully");
 	}
 
 	const setDevice = (device: MediaDeviceInfo) => {
@@ -143,10 +245,6 @@ export const VoiceProvider: ParentComponent = (props) => {
 		}
 	}
 
-	const disconnect = async () => { // TODO:
-		lvRoom.disconnect();
-	}
-
 	return (
 		<VoiceContext.Provider
 			value={{
@@ -156,6 +254,8 @@ export const VoiceProvider: ParentComponent = (props) => {
 				disconnect,
 				enableCamera,
 				enableMicrophone,
+				enableScreenShare,
+				setDeafened,
 				enabledMedia,
 				setDevice,
 				currentDevices: {
