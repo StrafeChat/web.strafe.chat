@@ -7,6 +7,7 @@ import {
 } from "solid-js";
 import { Portal } from "solid-js/web";
 import { useTransContext } from "@mbarzda/solid-i18next";
+import { useNavigate } from "@solidjs/router";
 
 import { FS_URL } from "../../../constants";
 import { useAuth } from "../../../lib/providers/auth/AuthProvider";
@@ -39,6 +40,7 @@ export function Message(props: MessageProps) {
   const { appearance } = useUserSettings();
   const { user, rooms, deleteMessage, editMessage, isMobile } = useAuth();
   const [t] = useTransContext();
+  const navigate = useNavigate();
 
   const [isEditing, setIsEditing] = createSignal(false);
   const [editContent, setEditContent] = createSignal(props.content);
@@ -247,6 +249,63 @@ export function Message(props: MessageProps) {
     setShowEmojiDetails(true);
   };
 
+  // Handle message click events including mention clicks
+  const handleMessageClick = (_e: MouseEvent) => {
+    // Default message click behavior can be added here
+  };
+
+  // Setup event listeners for mention click events
+  createEffect(() => {
+    // Event listener for opening user popup from mention clicks
+    const handleOpenUserPopup = (e: CustomEvent) => {
+      const { userId, triggerElement } = e.detail;
+      if (userId) {
+        // Set the user popup trigger element
+        setUserPopupTrigger(triggerElement);
+        // Set the user ID for the popup (if different from the message author)
+        if (userId !== props.author_id) {
+          // For mentions of users other than the message author
+          setSystemSelectedUserId(userId);
+          setSystemUserPopupTrigger(triggerElement);
+          setSystemUserPopupOpen(true);
+        } else {
+          // For mentions of the message author
+          setUserPopupOpen(true);
+        }
+      }
+    };
+
+    // Event listener for navigating to rooms from mention clicks
+    const handleNavigateToRoom = (e: CustomEvent) => {
+      const { roomId } = e.detail;
+      if (roomId) {
+        // Navigate to the room
+        const room = rooms().find(r => r.id === roomId);
+        if (room) {
+          // Check room type to determine the correct URL format
+          // Space rooms (TEXT_ROOM, VOICE_ROOM, SPACE_SECTION) use /spaces/id/rooms/id
+          // PM rooms (PM, GROUP_PM) use /rooms/id
+          if (room.type === 0 || room.type === 1) { // PM or GROUP_PM
+            // Use the router to navigate without page reload
+            navigate(`/rooms/${roomId}`);
+          } else { // Space rooms
+            // Use the router to navigate without page reload
+            navigate(`/spaces/${room.space_id}/rooms/${roomId}`);
+          }
+        }
+      }
+    };
+
+    // Add event listeners
+    document.addEventListener('openUserPopup', handleOpenUserPopup as EventListener);
+    document.addEventListener('navigateToRoom', handleNavigateToRoom as EventListener);
+
+    // Clean up event listeners
+    onCleanup(() => {
+      document.removeEventListener('openUserPopup', handleOpenUserPopup as EventListener);
+      document.removeEventListener('navigateToRoom', handleNavigateToRoom as EventListener);
+    });
+  });
 
 
   createEffect(() => {
@@ -284,11 +343,26 @@ export function Message(props: MessageProps) {
     );
   }
 
+  // Check if the current user is mentioned in the message content
+  const isCurrentUserMentioned = createMemo(() => {
+    const currentUser = user();
+    if (!currentUser || !props.content) return false;
+    
+    // Check for user mention format: <@user_id>
+    const userMentionRegex = new RegExp(`<@${currentUser.id}>`, 'g');
+    if (userMentionRegex.test(props.content)) return true;
+    
+    // Check for @everyone mention
+    if (/@everyone/.test(props.content)) return true;
+    
+    return false;
+  });
+
   return (
     <>
       <>
         <div
-          class={`flex flex-col ${shouldShowCompact ? "mt-1" : "mt-5"} group hover:bg-surface hover:bg-opacity-10 transition-colors px-4 w-full relative overflow-visible min-w-0`}
+          class={`flex flex-col ${shouldShowCompact ? "mt-1" : "mt-5"} group hover:bg-surface hover:bg-opacity-10 transition-colors px-4 w-full relative overflow-visible min-w-0 ${isCurrentUserMentioned() ? "bg-yellow-900/30 border-l-4 border-yellow-700" : ""}`}
         >
           <MessageReplies
             refMessages={refMessages()}
@@ -312,11 +386,33 @@ export function Message(props: MessageProps) {
 
           <UserPopupMenu
             isOpen={userPopupOpen()}
-            onClose={() => setUserPopupOpen(false)}
+            onClose={() => {
+              setUserPopupOpen(false);
+              // Remove the marker class from any elements
+              document.querySelectorAll('.user-popup-open').forEach(el => {
+                el.classList.remove('user-popup-open');
+              });
+            }}
             triggerRef={userPopupTrigger()}
             userId={props.author_id}
             spaceId={currentSpaceId()}
             spaceMember={currentSpaceMember()}
+          />
+          
+          {/* Popup for mentioned users (not the message author) */}
+          <UserPopupMenu
+            isOpen={systemUserPopupOpen()}
+            onClose={() => {
+              setSystemUserPopupOpen(false);
+              // Remove the marker class from any elements
+              document.querySelectorAll('.user-popup-open').forEach(el => {
+                el.classList.remove('user-popup-open');
+              });
+            }}
+            triggerRef={systemUserPopupTrigger()}
+            userId={systemSelectedUserId() || ''}
+            spaceId={currentSpaceId()}
+            spaceMember={systemSelectedUserId() ? cache.getSpaceMember(currentSpaceId() || '', systemSelectedUserId() || '') : undefined}
           />
 
           <div
@@ -365,7 +461,7 @@ export function Message(props: MessageProps) {
                   isCompact={shouldShowCompact}
                   pending={props.pending ?? false}
                   error={props.error}
-                  onMessageClick={() => {}}
+                  onMessageClick={handleMessageClick}
                   onEmojiClick={handleEmojiClick}
                   roomId={props.room_id}
                   messageId={props.id}

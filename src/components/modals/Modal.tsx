@@ -8,6 +8,7 @@ interface ModalProps {
   type?: "default" | "full";
   children: JSX.Element;
   hideCloseButton?: boolean;
+  class?: string;
 }
 
 const Modal: Component<ModalProps> = (props) => {
@@ -36,7 +37,7 @@ const Modal: Component<ModalProps> = (props) => {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.3 }}
-            class="fixed inset-0 z-50"
+            class={`fixed inset-0 z-[100] ${props.class || ''}`}
           >
             <Motion
               initial={{ opacity: 0 }}

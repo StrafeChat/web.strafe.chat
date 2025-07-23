@@ -25,7 +25,7 @@ const LinkConfirmModal: Component<LinkConfirmModalProps> = (props) => {
   };
   
   return (
-    <Modal isOpen={props.isOpen} onClose={props.onClose} hideCloseButton={true}>
+    <Modal isOpen={props.isOpen} onClose={props.onClose} hideCloseButton={true} class="z-[200]">
       <h2 class="text-xl font-semibold mb-4">External Link</h2>
       <p class="text-gray-300 mb-6">
         You're about to visit an external website: <br />

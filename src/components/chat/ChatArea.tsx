@@ -26,12 +26,14 @@ import {
 import { RoomType } from "../../types/roomTypes";
 import { EmojiPicker } from "../shared/EmojiPicker";
 import { EmojiAutocomplete } from "../shared/EmojiAutocomplete";
+import { MentionAutocomplete } from "../shared/MentionAutocomplete";
 import DateDivider from "./DateDivider";
 import UnreadDivider from "./UnreadDivider";
 import MessageSkeleton from "./MessageSkeleton";
 import { Avatar } from "../common/Avatar";
 import { MessageAttachment } from "../../types/messageTypes";
 import { Message } from "./Message/index";
+import { detectMentionAtCursor, formatUserMention, formatRoleMention, formatRoomMention } from "../../lib/utils/mentions";
 
 const ChatArea: Component = () => {
   const params = useParams();
@@ -78,6 +80,13 @@ const ChatArea: Component = () => {
   const [emojiAutocompletePosition, setEmojiAutocompletePosition] =
     createSignal({ top: 0, left: 0, width: 0 });
   const [emojiAutocompleteRange, setEmojiAutocompleteRange] =
+    createSignal<Range | null>(null);
+  const [showMentionAutocomplete, setShowMentionAutocomplete] = createSignal(false);
+  const [mentionAutocompleteQuery, setMentionAutocompleteQuery] = createSignal("");
+  const [mentionAutocompleteType, setMentionAutocompleteType] = createSignal<'user' | 'role' | 'room'>('user');
+  const [mentionAutocompletePosition, setMentionAutocompletePosition] =
+    createSignal({ top: 0, left: 0, width: 0 });
+  const [mentionAutocompleteRange, setMentionAutocompleteRange] =
     createSignal<Range | null>(null);
   const [fileInputRef, setFileInputRef] = createSignal<HTMLInputElement>();
   const [attachments, setAttachments] = createSignal<
@@ -2490,7 +2499,7 @@ const ChatArea: Component = () => {
                 const hasUnclosed = hasUnclosedCodeBlock(text);
                 updateCodeBlockIndicator(e.currentTarget, hasUnclosed);
 
-                // Emoji autocomplete detection
+                // Emoji and mention autocomplete detection
                 const selection = window.getSelection();
                 if (selection && selection.rangeCount > 0) {
                   const range = selection.getRangeAt(0);
@@ -2507,24 +2516,21 @@ const ChatArea: Component = () => {
                     );
                     const emojiMatch = beforeCursor.match(/:([a-zA-Z_]*)$/);
 
+                    // Calculate position for autocomplete menu - position like reply popup
+                    const inputContainer = e.currentTarget
+                      .parentElement as HTMLElement;
+                    const rect = inputContainer ? inputContainer.getBoundingClientRect() : null;
+                    const autocompleteHeight = 250; // Approximate height including padding and content
+                    const autocompletePosition = rect ? {
+                      top: rect.top + window.scrollY - autocompleteHeight - 15, // Position so bottom is above input with 8px gap
+                      left: rect.left + window.scrollX,
+                      width: rect.width, // Match the width of the input container
+                    } : { top: 0, left: 0, width: 0 };
+
                     if (emojiMatch) {
                       const query = emojiMatch[1];
                       setEmojiAutocompleteQuery(query);
-
-                      // Calculate position for autocomplete menu - position like reply popup
-                      const inputContainer = e.currentTarget
-                        .parentElement as HTMLElement;
-                      if (inputContainer) {
-                        const rect = inputContainer.getBoundingClientRect();
-                        // Position above the input container so bottom edge is above input
-                        const autocompleteHeight = 250; // Approximate height including padding and content
-                        setEmojiAutocompletePosition({
-                          top:
-                            rect.top + window.scrollY - autocompleteHeight - 15, // Position so bottom is above input with 8px gap
-                          left: rect.left + window.scrollX,
-                          width: rect.width, // Match the width of the input container
-                        });
-                      }
+                      setEmojiAutocompletePosition(autocompletePosition);
 
                       // Store the range for later replacement
                       const emojiRange = document.createRange();
@@ -2533,13 +2539,36 @@ const ChatArea: Component = () => {
                       setEmojiAutocompleteRange(emojiRange);
 
                       setShowEmojiAutocomplete(true);
+                      setShowMentionAutocomplete(false); // Close mention autocomplete if open
                     } else {
                       setShowEmojiAutocomplete(false);
                       setEmojiAutocompleteRange(null);
+                      
+                      // Check for mention patterns (@user, @&role, #room)
+                      const mentionInfo = detectMentionAtCursor(textContent, cursorPosition);
+                      
+                      if (mentionInfo) {
+                        setMentionAutocompleteQuery(mentionInfo.query);
+                        setMentionAutocompleteType(mentionInfo.type || 'user');
+                        setMentionAutocompletePosition(autocompletePosition);
+                        
+                        // Store the range for later replacement
+                        const mentionRange = document.createRange();
+                        mentionRange.setStart(textNode, mentionInfo.startPos);
+                        mentionRange.setEnd(textNode, mentionInfo.endPos);
+                        setMentionAutocompleteRange(mentionRange);
+                        
+                        setShowMentionAutocomplete(true);
+                      } else {
+                        setShowMentionAutocomplete(false);
+                        setMentionAutocompleteRange(null);
+                      }
                     }
                   } else {
                     setShowEmojiAutocomplete(false);
                     setEmojiAutocompleteRange(null);
+                    setShowMentionAutocomplete(false);
+                    setMentionAutocompleteRange(null);
                   }
                 }
 
@@ -2585,6 +2614,19 @@ const ChatArea: Component = () => {
                     e.key === "Escape"
                   ) {
                     // Let the EmojiAutocomplete component handle these keys
+                    return;
+                  }
+                }
+
+                // Handle mention autocomplete navigation
+                if (showMentionAutocomplete()) {
+                  if (
+                    e.key === "ArrowDown" ||
+                    e.key === "ArrowUp" ||
+                    e.key === "Enter" ||
+                    e.key === "Escape"
+                  ) {
+                    // Let the MentionAutocomplete component handle these keys
                     return;
                   }
                 }
@@ -2861,6 +2903,61 @@ const ChatArea: Component = () => {
               onClose={() => {
                 setShowEmojiAutocomplete(false);
                 setEmojiAutocompleteRange(null);
+              }}
+            />
+          </Show>
+
+          {/* Mention Autocomplete */}
+          <Show when={showMentionAutocomplete()}>
+            <MentionAutocomplete
+              type={mentionAutocompleteType()}
+              query={mentionAutocompleteQuery()}
+              position={mentionAutocompletePosition()}
+              currentRoomId={params.roomId} // Pass current room ID for context
+              onSelect={(id, type) => {
+                const range = mentionAutocompleteRange();
+                if (range) {
+                  // Replace the @query, @&query, or #query with the formatted mention
+                  range.deleteContents();
+                  
+                  let formattedMention = "";
+                  if (type === 'user') {
+                    formattedMention = formatUserMention(id);
+                  } else if (type === 'role') {
+                    formattedMention = formatRoleMention(id);
+                  } else if (type === 'room') {
+                    formattedMention = formatRoomMention(id);
+                  }
+                  
+                  range.insertNode(document.createTextNode(formattedMention));
+                  range.collapse(false);
+
+                  const selection = window.getSelection();
+                  if (selection) {
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                  }
+
+                  // Update the message text state
+                  const chatInput = document.querySelector(
+                    "[data-placeholder]",
+                  ) as HTMLDivElement;
+                  if (chatInput) {
+                    setMessageText(chatInput.textContent || "");
+                    chatInput.focus();
+
+                    // Trigger input event to update state
+                    const inputEvent = new Event("input", { bubbles: true });
+                    chatInput.dispatchEvent(inputEvent);
+                  }
+                }
+
+                setShowMentionAutocomplete(false);
+                setMentionAutocompleteRange(null);
+              }}
+              onClose={() => {
+                setShowMentionAutocomplete(false);
+                setMentionAutocompleteRange(null);
               }}
             />
           </Show>

@@ -1,5 +1,8 @@
-import { Component, Show } from "solid-js";
+import { Component, Show, onMount } from "solid-js";
 import { parseMarkdown } from "../../../../lib/utils/markdownUtils";
+import { setMentionGlobals, initializeMentionClickHandlers } from "../../../../lib/utils/mentionRenderer";
+import { useCache } from "../../../../lib/providers/cache/CacheProvider";
+import { useAuth } from "../../../../lib/providers/auth/AuthProvider";
 
 
 interface MessageContentProps {
@@ -16,7 +19,16 @@ interface MessageContentProps {
 }
 
 export const MessageContent: Component<MessageContentProps> = (props) => {
-
+  const cache = useCache();
+  const { rooms } = useAuth();
+  
+  // Set global references for mention rendering on every render
+  setMentionGlobals(cache, rooms);
+  
+  // Initialize mention click handlers on mount
+  onMount(() => {
+    initializeMentionClickHandlers();
+  });
 
   return (
     <div class="flex items-center gap-2 overflow-hidden">

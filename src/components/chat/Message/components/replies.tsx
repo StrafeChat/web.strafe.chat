@@ -1,4 +1,4 @@
-import { Component, Show, For, createSignal, createEffect } from "solid-js";
+import { Component, Show, For } from "solid-js";
 import { Avatar } from "../../../common/Avatar";
 import { scrollToMessage } from "../utils/message";
 
@@ -12,7 +12,21 @@ interface MessageRepliesProps {
 const ReplyMessage: Component<{ refMessage: any; replyMaxWidth: string }> = (props) => {
   const displayContent = () => {
     const content = props.refMessage.content || "Click to see attachment";
-    return content.length > 100 ? content.substring(0, 100) + '...' : content;
+    
+    // Check if content is empty or just whitespace
+    if (!content.trim()) {
+      return "Click to see attachment";
+    }
+    
+    // Handle different content types better
+    if (content.length > 100) {
+      // Find a good breaking point (preferably at a space)
+      const breakPoint = content.lastIndexOf(' ', 100);
+      const truncateAt = breakPoint > 80 ? breakPoint : 100;
+      return content.substring(0, truncateAt) + '...';
+    }
+    
+    return content;
   };
 
   return (

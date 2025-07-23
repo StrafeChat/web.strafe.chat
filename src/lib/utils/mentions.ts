@@ -6,10 +6,10 @@ export interface MentionData {
 }
 
 // Regex patterns for mentions
-const USER_MENTION_REGEX = /<@([a-zA-Z0-9-]+)>/g;
-const ROLE_MENTION_REGEX = /<@&([a-zA-Z0-9-]+)>/g;
-const ROOM_MENTION_REGEX = /<#([a-zA-Z0-9-]+)>/g;
-const EVERYONE_MENTION_REGEX = /@everyone/g;
+export const USER_MENTION_REGEX = /<@([a-zA-Z0-9-]+)>/g;
+export const ROLE_MENTION_REGEX = /<@&([a-zA-Z0-9-]+)>/g;
+export const ROOM_MENTION_REGEX = /<#([a-zA-Z0-9-]+)>/g;
+export const EVERYONE_MENTION_REGEX = /@everyone/g;
 
 /**
  * Parse mentions from message content
@@ -92,17 +92,17 @@ export function formatEveryoneMention(): string {
  */
 export function formatMentionsInContent(content: string): string {
   return content
-    .replace(/@([a-zA-Z0-9_]+)/g, (match, username) => {
+    .replace(/@([a-zA-Z0-9_]+)/g, (match, _username) => {
       // This would need to be enhanced to look up actual user IDs
       // For now, just return the original mention
       return match;
     })
-    .replace(/@&([a-zA-Z0-9_]+)/g, (match, roleName) => {
+    .replace(/@&([a-zA-Z0-9_]+)/g, (match, _roleName) => {
       // This would need to be enhanced to look up actual role IDs
       // For now, just return the original mention
       return match;
     })
-    .replace(/#([a-zA-Z0-9_-]+)/g, (match, roomName) => {
+    .replace(/#([a-zA-Z0-9_-]+)/g, (match, _roomName) => {
       // This would need to be enhanced to look up actual room IDs
       // For now, just return the original mention
       return match;

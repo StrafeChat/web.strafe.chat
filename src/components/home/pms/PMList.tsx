@@ -189,6 +189,67 @@ export const PMList: Component = () => {
     return "Unknown Chat";
   };
 
+  // Helper function to get last message preview
+  const getLastMessagePreview = (room: any) => {
+    if (!room.last_message_id) return "";
+    
+    const message = cache.getMessage(room.id, room.last_message_id);
+    if (!message) return "";
+    
+    // Get the sender's name
+    const currentUserId = user()?.id;
+    let senderName = "";
+    
+    if (message.author_id === currentUserId) {
+      senderName = "You";
+    } else {
+      const sender = cache.getUser(message.author_id);
+      if (sender) {
+        senderName = sender.display_name || sender.username;
+      } else {
+        senderName = "Unknown";
+      }
+    }
+    
+    // Get message content preview
+    let content = message.content || "";
+    
+    // Handle different message types
+    if (message.attachments && message.attachments.length > 0) {
+      if (content) {
+        content = "📎 " + content;
+      } else {
+        content = "📎 Attachment";
+      }
+    }
+    
+    // if (message.embeds && message.embeds.length > 0 && !content) {
+    //   content = "🔗 Embed";
+    // }
+    
+    if (!content) {
+      content = "Message";
+    }
+    
+    // Truncate content if too long
+    if (content.length > 50) {
+      content = content.substring(0, 47) + "...";
+    }
+    
+    // For group PMs, show sender name
+    if (room.type === RoomType.GROUP_PM) {
+      return `${senderName}: ${content}`;
+    }
+    
+    // For direct PMs, only show content if it's from the other user
+    // If it's from current user, show "You: content"
+    if (message.author_id === currentUserId) {
+      return `You: ${content}`;
+    }
+    
+    return content;
+  };
+
   // Helper function to get room status (for PMs)
   const getRoomStatus = (room: any) => {
     // Only show status indicators for direct PMs (type 0), not group PMs (type 1)
@@ -417,7 +478,12 @@ export const PMList: Component = () => {
                     <div class="text-sm font-medium text-text-primary truncate select-none">
                       {getRoomName(room)}
                     </div>
-                    {room.type === RoomType.PM && getRoomStatus(room) !== "offline" ? (
+                    {/* Get last message preview if available */}
+                    {room.last_message_id ? (
+                      <div class="text-xs text-text-secondary truncate select-none">
+                        {getLastMessagePreview(room)}
+                      </div>
+                    ) : room.type === RoomType.PM && getRoomStatus(room) !== "offline" ? (
                       <div class="text-xs text-text-secondary truncate select-none">
                         {getRoomCustomStatus(room)}
                       </div>

@@ -171,7 +171,7 @@ const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
         <Portal>
           <div
             ref={popupRef}
-            class="fixed z-50 bg-background2 rounded-lg shadow-lg w-[300px] overflow-y-auto animate-fade-in"
+            class="fixed z-50 bg-background2 rounded-lg shadow-sm w-[300px] overflow-y-auto animate-fade-in"
             style={getPopupStyle()}
             onClick={(e) => e.stopPropagation()}
           >
