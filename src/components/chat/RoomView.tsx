@@ -469,7 +469,7 @@ const RoomView: Component = () => {
         </Show>
       </div>
 
-			<Show when={isInVoiceCall() && currentRoom()?.type === RoomType.PM}>
+			<Show when={isInVoiceCall() && (currentRoom()?.type === RoomType.PM || currentRoom()?.type === RoomType.GROUP_PM)}>
 				<PMCall room={currentRoom()!}>
 				</PMCall>
 			</Show>
