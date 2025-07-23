@@ -3,10 +3,10 @@ import { useVoice } from "../../lib/providers/voice/VoiceProvider";
 import { Tooltip } from "../common/Tooltip";
 
 export const VoiceControls: Component = () => {
-	const { enableCamera, enableMicrophone, enabledMedia } = useVoice();
+	const { enableCamera, enableMicrophone, enabledMedia, currentDevices } = useVoice();
 
 	const handleToggleMicrophone = async () => {
-		await enableMicrophone(!enabledMedia().audio);
+		await enableMicrophone(!enabledMedia().audio, { deviceId: currentDevices.audio()?.deviceId || undefined });
 	};
 
 	const handleToggleCamera = async () => {

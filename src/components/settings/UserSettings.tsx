@@ -27,6 +27,8 @@ import Keyboard from "../shared/icons/Keyboard";
 import Bell from "../shared/icons/Bell";
 import Robot from "../shared/icons/Robot";
 import Key from "../shared/icons/Key";
+import { PhoneRinging } from "../shared/icons/PhoneRinging";
+import { VoiceSettings } from "./user/VoiceSettings";
 
 interface UserSettingsProps {
   isOpen: boolean;
@@ -73,7 +75,7 @@ const UserSettings: Component<UserSettingsProps> = (props) => {
       case "sessions":
         return <SessionsSettings />;
       case "privacy":
-        return <PrivacySettings />;
+        return <PrivacySettings />; 	
       case "appearance":
         return <AppearanceSettings />;
       case "language":
@@ -82,6 +84,8 @@ const UserSettings: Component<UserSettingsProps> = (props) => {
         return <BotsSettings />;
       case "oauth2":
         return <OAuth2Settings />;
+			case "voice":
+				return <VoiceSettings />;
       default:
         return <DefaultSettings title={state.activeSection} />;
     }
@@ -229,6 +233,19 @@ const UserSettings: Component<UserSettingsProps> = (props) => {
                           <Palette />
                           {t("settings.sections.appearance")}
                         </button>
+												<button
+													onClick={() => {
+														setActiveSection("voice");
+														isMobile() && setIsSidebarOpen(false);
+													}}
+													class={`w-full px-[10px] py-[6px] rounded-[4px] text-left text-base hover:bg-surface ${state.activeSection === "voice"
+															? "bg-surface"
+															: ""
+														} text-text-primary flex items-center gap-3`}
+												>
+													<PhoneRinging />
+													Voice and Video
+												</button>
                         <button
                           onClick={() => {
                             setActiveSection("language");

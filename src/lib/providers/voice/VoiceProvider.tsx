@@ -27,6 +27,12 @@ type VoiceContextType = {
 	setDeafened: (deafened: boolean) => void;
 	enabledMedia: () => { video: boolean, audio: boolean, screenShare: boolean, deafened: boolean };
 
+	setDevice: (device: MediaDeviceInfo) => void;
+	currentDevices: {
+		audio: Accessor<MediaDeviceInfo | null>;
+		video: Accessor<MediaDeviceInfo | null>;
+	};
+
 	state: Accessor<VoiceState>;
 	room: Accessor<String>;
 
@@ -43,6 +49,8 @@ export const VoiceProvider: ParentComponent = (props) => {
 	const [room, setRoom] = createSignal("");
 	const [localTrack, setLocalTrack] = createSignal<LocalTrackPublication | null>(null);
 	const [livekitRoom, setLivekitRoom] = createSignal<Room | null>(null);
+	const [audio, setAudio] = createSignal<MediaDeviceInfo | null>(null);
+	const [video, setVideo] = createSignal<MediaDeviceInfo | null>(null);
 	
 	// Reactive signals for media states
 	const [isCameraEnabled, setIsCameraEnabled] = createSignal(false);
@@ -196,8 +204,24 @@ export const VoiceProvider: ParentComponent = (props) => {
 		// Handle track subscription to store original volumes
 		lvRoom.on(RoomEvent.TrackSubscribed, (track, _publication, _participant) => {
 			if (track.kind === 'audio') {
+				track.on("elementAttached", () => {
+					const audioElements = track.attachedElements as HTMLAudioElement[];
+					audioElements.forEach(element => {
+						if (element instanceof HTMLAudioElement) {
+							// Store original volume when track is subscribed
+							const trackId = track.sid;
+							if (trackId && !originalVolumes.has(trackId)) {
+								originalVolumes.set(trackId, element.volume || 1.0);
+							}
+							// Apply deafen state if currently deafened
+							if (isDeafened()) {
+								element.volume = 0;
+							}
+						}
+					});
+				});
 				// Wait for the track to be attached to DOM elements
-				setTimeout(() => {
+				/*setTimeout(() => {
 					const audioElements = track.attachedElements as HTMLAudioElement[];
 					audioElements.forEach(element => {
 						if (element instanceof HTMLAudioElement) {
@@ -212,7 +236,7 @@ export const VoiceProvider: ParentComponent = (props) => {
 							}
 						}
 					});
-				}, 100); // Small delay to ensure elements are attached
+				}, 100); // Small delay to ensure elements are attached*/
 			}
 		});
 	}
@@ -241,6 +265,22 @@ export const VoiceProvider: ParentComponent = (props) => {
 		console.log("[VoiceProvider] Voice call disconnected successfully");
 	}
 
+	const setDevice = async (device: MediaDeviceInfo) => {
+		if (device.kind === "audioinput") {
+			setAudio(device);
+			if (lvRoom) {
+				await lvRoom.switchActiveDevice('audioinput', device.deviceId);
+			}
+		} else if (device.kind === "videoinput") {
+			setVideo(device);
+			if (lvRoom) {
+				await lvRoom.switchActiveDevice('videoinput', device.deviceId);
+			}
+		} else if (device.kind === "audiooutput") {
+			// TODO:
+		}
+	}
+
 	return (
 		<VoiceContext.Provider
 			value={{
@@ -253,6 +293,11 @@ export const VoiceProvider: ParentComponent = (props) => {
 				enableScreenShare,
 				setDeafened,
 				enabledMedia,
+				setDevice,
+				currentDevices: {
+					audio,
+					video
+				},
 				localTrack,
 				livekitRoom
 			}}
