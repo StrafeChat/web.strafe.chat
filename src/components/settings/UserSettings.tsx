@@ -27,8 +27,8 @@ import Keyboard from "../shared/icons/Keyboard";
 import Bell from "../shared/icons/Bell";
 import Robot from "../shared/icons/Robot";
 import Key from "../shared/icons/Key";
-import { VoiceSettings } from "./pages/VoiceSettings";
 import { PhoneRinging } from "../shared/icons/PhoneRinging";
+import { VoiceSettings } from "./user/VoiceSettings";
 
 interface UserSettingsProps {
   isOpen: boolean;

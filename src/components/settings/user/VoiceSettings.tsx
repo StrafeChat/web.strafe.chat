@@ -33,6 +33,17 @@ export const VoiceSettings: Component = () => {
 				<h4>Input Devices</h4>
 				<InputSelector onChange={(d: MediaDeviceInfo) => { setDevice(d); console.log(d, d.label); }} types={{ audioOut: false, videoIn: false }} />
 			</div>
+
+			<div class="bg-background1 rounded-lg p-6 mb-6">
+				<div class="flex items-center gap-4 mb-4">
+					<div class="p-2 bg-primary/10 rounded-lg">
+						<PhoneRinging></PhoneRinging>
+					</div>
+					<h3 class="text-lg font-semibold text-text-primary">Video</h3>
+				</div>
+				<h4>Input Devices</h4>
+				<InputSelector onChange={(d: MediaDeviceInfo) => { setDevice(d); console.log(d, d.label); }} types={{ audioOut: false, audioIn: false }} />
+			</div>
 		</div>
 	)
 }
