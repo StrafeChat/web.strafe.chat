@@ -52,6 +52,7 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 				element.muted = true;
 			}
 			if (track.kind === Track.Kind.Audio) {
+				element.muted = true;
 				setupSpeakingIndicator(track as Track<Track.Kind.Audio>);
 			}
 			// Style video elements properly
@@ -109,8 +110,8 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 			// attach it to a new HTMLVideoElement or HTMLAudioElement
 			const element = track.attach();
 			if (track.kind === Track.Kind.Audio) {
-				// Ensure remote audio is not muted
-				element.muted = false;
+				// Ensure remote audio is muted to prevent double audio playback
+				element.muted = true;
 				setupSpeakingIndicator(track as Track<Track.Kind.Audio>);
 			}
 			// Style video elements properly
