@@ -12,8 +12,7 @@ import { FS_URL } from "../../../constants";
 import { useAuth } from "../../../lib/providers/auth/AuthProvider";
 import { useCache } from "../../../lib/providers/cache/CacheProvider";
 import { useUserSettings } from "../../../lib/providers/userSettings/UserSettingsProvider";
-import { useE2EE } from "../../../lib/providers/e2ee/E2EEProvider";
-import { isE2EEContent } from "../../../lib/utils/e2eeReplyUtils";
+
 import { RoomType } from "../../../types/roomTypes";
 import { MessageAttachment, MessageType } from "../../../types/messageTypes";
 
@@ -39,7 +38,6 @@ export function Message(props: MessageProps) {
   const cache = useCache();
   const { appearance } = useUserSettings();
   const { user, rooms, deleteMessage, editMessage, isMobile } = useAuth();
-  const e2ee = useE2EE();
   const [t] = useTransContext();
 
   const [isEditing, setIsEditing] = createSignal(false);
@@ -66,7 +64,7 @@ export function Message(props: MessageProps) {
   const [showEmojiDetails, setShowEmojiDetails] = createSignal(false);
   const [selectedEmoji, setSelectedEmoji] = createSignal<any>(null);
   const [popupPosition, setPopupPosition] = createSignal({ x: 0, y: 0 });
-  const [isDecrypting, setIsDecrypting] = createSignal(false);
+
 
   const refMessages = referencedMessages(() => props, cache);
   const inviteStates = useInviteStates(props, cache);
@@ -152,25 +150,7 @@ export function Message(props: MessageProps) {
         setIsEditLoading(false);
       }
     } else {
-      // Check if the message content is E2EE encrypted and decrypt it for editing
-      const content = props.content || "";
-      if (isE2EEContent(content)) {
-        try {
-          // Decrypt the content before setting it in the editor
-          const room = cache.getRoom(props.room_id);
-          if (room && e2ee.isE2EEInitialized()) {
-            const decryptedContent = await e2ee.decryptMessage(room.type, props.room_id, content, props.author_id);
-            setEditContent(decryptedContent);
-          } else {
-            setEditContent(content); // Fallback to encrypted content
-          }
-        } catch (error) {
-          console.error('Error decrypting message for editing:', error);
-          setEditContent(content); // Fallback to encrypted content
-        }
-      } else {
-        setEditContent(content);
-      }
+      setEditContent(props.content || "");
 
       if (isMobile()) {
         const chatInput = document.querySelector(
@@ -267,9 +247,7 @@ export function Message(props: MessageProps) {
     setShowEmojiDetails(true);
   };
 
-  const handleDecryptionStateChange = (decrypting: boolean) => {
-    setIsDecrypting(decrypting);
-  };
+
 
   createEffect(() => {
     const updateReplyWidth = () => {
@@ -308,7 +286,7 @@ export function Message(props: MessageProps) {
 
   return (
     <>
-      <Show when={!isDecrypting()}>
+      <>
         <div
           class={`flex flex-col ${shouldShowCompact ? "mt-1" : "mt-5"} group hover:bg-surface hover:bg-opacity-10 transition-colors px-4 w-full relative overflow-visible min-w-0`}
         >
@@ -417,7 +395,7 @@ export function Message(props: MessageProps) {
             </div>
           </div>
         </div>
-      </Show>
+      </>
 
       <Portal>
         <ConfirmModal

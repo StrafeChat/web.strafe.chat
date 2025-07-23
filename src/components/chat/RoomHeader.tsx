@@ -1,6 +1,5 @@
 import { Component, Show } from "solid-js";
-import { E2EEIndicator } from "../ui/E2EEIndicator";
-import { useE2EE } from "../../lib/providers/e2ee/E2EEProvider";
+
 import { RoomType } from "../../types/roomTypes";
 import { Avatar } from "../common/Avatar";
 import { StatusIndicator, UserStatus } from "../common/StatusIndicator";
@@ -19,7 +18,6 @@ interface RoomHeaderProps {
 const RoomHeader: Component<RoomHeaderProps> = (props) => {
   const { user, rooms } = useAuth();
   const cache = useCache();
-  const { getE2EEStatusForRoom } = useE2EE();
 
   const currentRoom = () => {
     const allRooms = rooms();
@@ -55,15 +53,7 @@ const RoomHeader: Component<RoomHeaderProps> = (props) => {
     return room.recipients.length;
   };
 
-  const e2eeStatus = () => {
-    if (!props.roomType) return 'disabled';
-    const room = currentRoom();
-    return getE2EEStatusForRoom(props.roomType, room?.recipients);
-  };
 
-  const showE2EEIndicator = () => {
-    return props.roomType === RoomType.PM || props.roomType === RoomType.GROUP_PM || props.roomType === RoomType.TEXT_ROOM;
-  };
 
   return (
     <div class="flex items-center gap-2">
@@ -105,8 +95,7 @@ const RoomHeader: Component<RoomHeaderProps> = (props) => {
                     size="sm"
                   />
                 );
-              })()
-            }
+              })()}
             </Show>
           ) : (
             <Avatar
@@ -127,9 +116,7 @@ const RoomHeader: Component<RoomHeaderProps> = (props) => {
       <div class="flex flex-col justify-center flex-1 min-w-0">
         <div class="flex items-center gap-2">
           <h2 class="text-sm font-semibold text-text-primary truncate">{props.roomName}</h2>
-          <Show when={showE2EEIndicator()}>
-            <E2EEIndicator status={e2eeStatus()} />
-          </Show>
+
         </div>
         <Show when={props.roomType === RoomType.GROUP_PM}>
           <Show 

@@ -14,8 +14,7 @@ import { useParams } from "@solidjs/router";
 import { useTransContext } from "@mbarzda/solid-i18next";
 import { useCache } from "../../lib/providers/cache/CacheProvider";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
-import { useE2EE } from "../../lib/providers/e2ee/E2EEProvider";
-import { isE2EEContent } from "../../lib/utils/e2eeReplyUtils";
+
 import { usePermissions } from "../../lib/hooks/usePermissions";
 import { BASE_URL, FS_URL } from "../../constants";
 import { CachedMessage } from "../../lib/cache/MessageCache";
@@ -47,7 +46,6 @@ const ChatArea: Component = () => {
     markMessagesAsRead,
   } = useAuth();
   const cache = useCache();
-  const e2ee = useE2EE();
   const [t] = useTransContext();
   const { userSettings } = useUserSettings();
   const { checkPermission } = usePermissions();
@@ -1483,25 +1481,8 @@ const ChatArea: Component = () => {
       setEditingMessageId(message.id);
       setEditingRoomId(params.roomId);
       
-      // Check if the message content is E2EE encrypted
       const content = message.content || "";
-      if (isE2EEContent(content)) {
-        try {
-          // Decrypt the content before setting it in the editor
-          const room = cache.getRoom(params.roomId);
-          if (room && e2ee.isE2EEInitialized()) {
-            const decryptedContent = await e2ee.decryptMessage(room.type, params.roomId, content, message.author_id);
-            setMessageText(decryptedContent);
-          } else {
-            setMessageText(content); // Fallback to encrypted content
-          }
-        } catch (error) {
-          console.error('Error decrypting message for editing:', error);
-          setMessageText(content); // Fallback to encrypted content
-        }
-      } else {
-        setMessageText(content);
-      }
+      setMessageText(content);
     }
   };
 
@@ -1976,29 +1957,7 @@ const ChatArea: Component = () => {
     try {
       setSending(true);
 
-      // Get room information for E2EE encryption
-      const room = cache.getRoom(roomId);
-      let processedContent = content;
-
-      // Apply E2EE encryption if applicable
-      if (room && content.trim() && e2ee.isE2EEInitialized()) {
-        try {
-          // Check if E2EE should be applied (GROUP_PM = 1, TEXT_ROOM = 2)
-          // Direct PMs (type 0) are NOT encrypted
-          if (room.type === 1 || room.type === 2) {
-            // Group PM and TEXT_ROOM - encrypt for the group/room
-            processedContent = await e2ee.encryptMessage(room.type, roomId, content);
-            console.log('[ChatArea] Message edit encrypted for E2EE');
-          } else if (room.type === 0) {
-            console.log('[ChatArea] Direct PM detected - editing as plaintext (not encrypted)');
-          }
-        } catch (e2eeError) {
-          console.warn('[ChatArea] E2EE encryption failed for edit, sending plaintext:', e2eeError);
-          // Continue with original content if encryption fails
-        }
-      }
-
-      const result = await editMessage(roomId, messageId, processedContent);
+      const result = await editMessage(roomId, messageId, content);
 
       if (!result.success) {
         setError(result.error || t("chat.errors.editFailed"));

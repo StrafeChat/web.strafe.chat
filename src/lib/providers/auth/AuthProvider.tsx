@@ -39,17 +39,7 @@ export const API_ENDPOINTS = {
   SPACE_INVITES: (spaceId: string) => `${BASE_URL}/spaces/${spaceId}/invites`,
   GET_INVITE_INFO: (code: string) => `${BASE_URL}/invite/${code}`,
   USE_INVITE: (code: string) => `${BASE_URL}/invite/${code}/use`,
-  // E2EE Endpoints
-  E2EE_INITIALIZE: `${BASE_URL}/e2ee/initialize`,
-  E2EE_STATUS: `${BASE_URL}/e2ee/status`,
-  E2EE_USER_STATUS: (userId: string) => `${BASE_URL}/e2ee/users/${userId}/status`,
-  E2EE_PRE_KEY_BUNDLE: (userId: string) => `${BASE_URL}/e2ee/users/${userId}/pre-key-bundle`,
-  E2EE_REFRESH_PRE_KEYS: `${BASE_URL}/e2ee/refresh-pre-keys`,
-  E2EE_ENCRYPT_DIRECT: `${BASE_URL}/e2ee/encrypt/direct`,
-  E2EE_DECRYPT_DIRECT: `${BASE_URL}/e2ee/decrypt/direct`,
-  E2EE_ENCRYPT_GROUP: `${BASE_URL}/e2ee/encrypt/group`,
-  E2EE_DECRYPT_GROUP: `${BASE_URL}/e2ee/decrypt/group`,
-  E2EE_CREATE_GROUP_SESSION: `${BASE_URL}/e2ee/group-session`,
+
 };
 
 export const API_HEADERS = {
@@ -1103,37 +1093,7 @@ export const AuthProvider: ParentComponent = (props) => {
         return { success: false, error: "Room ID and message content or attachments are required" };
       }
 
-      // Get room information for E2EE encryption
-      const currentRooms = rooms();
-      const room = currentRooms.find(r => r.id === roomId);
       let processedMessageData = { ...messageData };
-
-      // Apply E2EE encryption if applicable
-      if (room && messageData.content.trim()) {
-        try {
-          // Import E2EE service dynamically to avoid circular dependencies
-          const { e2eeService } = await import('../../e2ee/E2EEService');
-          
-          // Check if E2EE should be applied (GROUP_PM = 1, TEXT_ROOM = 2)
-          // Direct PMs (type 0) are NOT encrypted
-          if (room.type === 1 || room.type === 2) {
-            let encryptedContent = messageData.content;
-            
-            if (room.type === 1 || room.type === 2) {
-              // Group PM and TEXT_ROOM - encrypt for the group/room
-              encryptedContent = await e2eeService.encryptGroupMessage(roomId, messageData.content);
-            }
-            
-            processedMessageData.content = encryptedContent;
-            console.log('[AuthProvider] Message encrypted for E2EE');
-          } else if (room.type === 0) {
-            console.log('[AuthProvider] Direct PM detected - sending as plaintext (not encrypted)');
-          }
-        } catch (e2eeError) {
-          console.warn('[AuthProvider] E2EE encryption failed, sending plaintext:', e2eeError);
-          // Continue with original content if encryption fails
-        }
-      }
 
       const response = await fetch(API_ENDPOINTS.ROOM_MESSAGES(roomId), {
         method: "POST",
@@ -1248,31 +1208,7 @@ export const AuthProvider: ParentComponent = (props) => {
         return { success: false, error: "Room ID and message content are required" };
       }
 
-      // Get room information for E2EE encryption
-      const currentRooms = rooms();
-      const room = currentRooms.find(r => r.id === roomId);
       let processedContent = content;
-
-      // Apply E2EE encryption if applicable
-      if (room && content.trim()) {
-        try {
-          // Import E2EE service dynamically to avoid circular dependencies
-          const { e2eeService } = await import('../../e2ee/E2EEService');
-          
-          // Check if E2EE should be applied (GROUP_PM = 1, TEXT_ROOM = 2)
-          // Direct PMs (type 0) are NOT encrypted
-          if (room.type === 1 || room.type === 2) {
-            // Group PM and TEXT_ROOM - encrypt for the group/room
-            processedContent = await e2eeService.encryptGroupMessage(roomId, content);
-            console.log('[AuthProvider] Edit message encrypted for E2EE');
-          } else if (room.type === 0) {
-            console.log('[AuthProvider] Direct PM edit detected - sending as plaintext (not encrypted)');
-          }
-        } catch (e2eeError) {
-          console.warn('[AuthProvider] E2EE encryption failed for edit, sending plaintext:', e2eeError);
-          // Continue with original content if encryption fails
-        }
-      }
 
       const response = await fetch(`${API_ENDPOINTS.ROOM_MESSAGES(roomId)}/${messageId}`, {
         method: "PATCH",

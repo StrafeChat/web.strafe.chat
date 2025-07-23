@@ -26,15 +26,7 @@ const createHeaders = (additionalHeaders: Record<string, string> = {}) => {
 export const apiRequest = async <T>(endpoint: string, options: RequestOptions = {}): Promise<T> => {
   const { method = "GET", body, headers = {} } = options;
 
-  // Log E2EE initialization requests specifically
-  if (endpoint.includes('/e2ee/initialize')) {
-    console.log('[API] E2EE Initialize Request:', {
-      endpoint,
-      method,
-      body: body,
-      bodyStringified: body ? JSON.stringify(body) : undefined
-    });
-  }
+
 
   const response = await fetch(endpoint, {
     method,

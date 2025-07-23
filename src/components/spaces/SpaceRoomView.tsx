@@ -5,13 +5,11 @@ import { useAuth } from "../../lib/providers/auth/AuthProvider";
 import ChatArea from "../chat/ChatArea";
 import { RoomType } from "../../types/roomTypes";
 import SpaceMembersList from "./SpaceMembersList";
-import { E2EEIndicator } from "../ui/E2EEIndicator";
-import { useE2EE } from "../../lib/providers/e2ee/E2EEProvider";
+
 
 export const SpaceRoomView: Component = () => {
   const params = useParams();
   const { spaces, rooms, isMobile } = useAuth();
-  const { getE2EEStatusForRoom } = useE2EE();
   // const cache = useCache();
 
   // Get the current space based on the spaceId parameter
@@ -52,12 +50,7 @@ export const SpaceRoomView: Component = () => {
     return room.name || "Unknown Room";
   };
 
-  // Get E2EE status for the current room
-  const e2eeStatus = () => {
-    const room = currentRoom();
-    if (!room || room.type !== RoomType.TEXT_ROOM) return 'disabled';
-    return getE2EEStatusForRoom(room.type, room.recipients);
-  };
+
 
   // State to control the visibility of the members sidebar
   const [showMembers, setShowMembers] = createSignal(!isMobile());
@@ -98,9 +91,7 @@ export const SpaceRoomView: Component = () => {
               <h2 class="text-lg font-bold text-text-primary truncate min-w-0">
                 {getRoomName()}
               </h2>
-              <Show when={currentRoom()?.type === RoomType.TEXT_ROOM}>
-                <E2EEIndicator status={e2eeStatus()} />
-              </Show>
+
             </div>
 
             {/* Members toggle button */}

@@ -1,7 +1,6 @@
 import { Component, Show } from "solid-js";
 import { parseMarkdown } from "../../../../lib/utils/markdownUtils";
-import { E2EEMessageContent } from "./E2EEMessageContent";
-import { isE2EEContent } from "../../../../lib/utils/e2eeReplyUtils";
+
 
 interface MessageContentProps {
   content: string;
@@ -17,60 +16,42 @@ interface MessageContentProps {
 }
 
 export const MessageContent: Component<MessageContentProps> = (props) => {
-  // Check if content might be E2EE encrypted
-  const isEncryptedContent = () => {
-    return isE2EEContent(props.content) && props.roomId && props.messageId;
-  };
+
 
   return (
     <div class="flex items-center gap-2 overflow-hidden">
-      <Show when={isEncryptedContent()} fallback={
-        <div
-          class="text-text-primary max-w-full message-content whitespace-pre-wrap overflow-hidden overflow-wrap-anywhere min-w-0 flex-1"
-          data-edited={props.editedAt ? "true" : undefined}
-          style="word-break: break-word; overflow-wrap: break-word; max-width: 100%;"
-          onClick={(e) => {
-            // Check if clicked element is an emoji
-            const target = e.target as HTMLElement;
-            if (target.tagName === 'IMG' && target.classList.contains('inline-emoji')) {
-              const shortcode = target.getAttribute('data-emoji-shortcode');
-              const name = target.getAttribute('data-emoji-name');
-              const code = target.getAttribute('data-emoji-code');
-              
-              if (shortcode && name && code && props.onEmojiClick) {
-                const rect = target.getBoundingClientRect();
-                props.onEmojiClick(
-                  {
-                    shortcode,
-                    emoji: { name, code }
-                  },
-                  { x: rect.left + rect.width / 2, y: rect.top }
-                );
-                return;
-              }
+      <div
+        class="text-text-primary max-w-full message-content whitespace-pre-wrap overflow-hidden overflow-wrap-anywhere min-w-0 flex-1"
+        data-edited={props.editedAt ? "true" : undefined}
+        style="word-break: break-word; overflow-wrap: break-word; max-width: 100%;"
+        onClick={(e) => {
+          // Check if clicked element is an emoji
+          const target = e.target as HTMLElement;
+          if (target.tagName === 'IMG' && target.classList.contains('inline-emoji')) {
+            const shortcode = target.getAttribute('data-emoji-shortcode');
+            const name = target.getAttribute('data-emoji-name');
+            const code = target.getAttribute('data-emoji-code');
+            
+            if (shortcode && name && code && props.onEmojiClick) {
+              const rect = target.getBoundingClientRect();
+              props.onEmojiClick(
+                {
+                  shortcode,
+                  emoji: { name, code }
+                },
+                { x: rect.left + rect.width / 2, y: rect.top }
+              );
+              return;
             }
-            props.onMessageClick(e);
-          }}
-        >
-          <span
-            class="markdown-content"
-            innerHTML={parseMarkdown(props.content)}
-          />
-        </div>
-      }>
-        <E2EEMessageContent
-          content={props.content}
-          roomId={props.roomId!}
-          messageId={props.messageId!}
-          senderId={props.senderId}
-          editedAt={props.editedAt}
-          onMessageClick={props.onMessageClick}
-          onEmojiClick={props.onEmojiClick}
-          isCompact={props.isCompact}
-          pending={props.pending}
-          error={props.error}
+          }
+          props.onMessageClick(e);
+        }}
+      >
+        <span
+          class="markdown-content"
+          innerHTML={parseMarkdown(props.content)}
         />
-      </Show>
+      </div>
       <Show when={props.isCompact && props.pending}>
         <span class="text-xs text-text-secondary italic flex-shrink-0">
           (sending...)
