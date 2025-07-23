@@ -7,4 +7,4 @@ export const WS_URL =
 export const LIVEKIT_URL =
 	import.meta.env.VITE_LIVEKIT_HOST || "ws://localhost:7880";
 
-export const APP_VERSION = "0.1.5-INDEV";
+export const APP_VERSION = "0.1.9-INDEV";

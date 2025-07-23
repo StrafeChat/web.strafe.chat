@@ -87,12 +87,26 @@ export const VoiceProvider: ParentComponent = (props) => {
 		// Update reactive signal
 		setIsCameraEnabled(p.isCameraEnabled);
 	}
-	const enableMicrophone = async (enable: boolean, options?: AudioCaptureOptions) => {
-		const p = lvRoom.localParticipant;
-		await p.setMicrophoneEnabled(enable, options);
-		// Update reactive signal
-		setIsMicrophoneEnabled(p.isMicrophoneEnabled);
-	}
+	const enableMicrophone = async (
+	enable: boolean,
+	options?: AudioCaptureOptions
+) => {
+	const p = lvRoom.localParticipant;
+
+	// Merge your provided options with default noise suppression
+	const micOptions: AudioCaptureOptions = {
+		noiseSuppression: true,
+		echoCancellation: true,
+		autoGainControl: true,   
+		...options               
+	};
+
+	await p.setMicrophoneEnabled(enable, micOptions);
+
+	// Update reactive signal
+	setIsMicrophoneEnabled(p.isMicrophoneEnabled);
+   };
+  
 	const enableScreenShare = async (enable: boolean) => {
 		const p = lvRoom.localParticipant;
 		await p.setScreenShareEnabled(enable);
