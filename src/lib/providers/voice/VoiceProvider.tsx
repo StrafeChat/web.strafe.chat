@@ -7,14 +7,15 @@ import {
 } from "solid-js"
 
 import { useAuth } from "../auth/AuthProvider"
-import { AudioCaptureOptions, DisconnectReason, LocalTrackPublication, Room, RoomEvent, VideoCaptureOptions } from "livekit-client";
+import { AudioCaptureOptions, DisconnectReason, LocalTrackPublication, ParticipantEvent, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent, Track, VideoCaptureOptions } from "livekit-client";
 import { LIVEKIT_URL } from "../../../constants";
 
 export enum VoiceState {
-	DISCONNECTED,
+	DISCONNECTED, // order is important
+	ERROR,
+
 	CONNECTING,
 	CONNECTED,
-	ERROR
 }
 
 type VoiceContextType = {
@@ -87,6 +88,9 @@ export const VoiceProvider: ParentComponent = (props) => {
 			setRoom("")
 		}
 	}
+
+	const pubElements = new Map<string, HTMLElement>();
+	var audioCon!: HTMLDivElement;
 
 	const enableCamera = async (enable: boolean, options?: VideoCaptureOptions) => {
 		const p = lvRoom.localParticipant;
@@ -198,8 +202,27 @@ export const VoiceProvider: ParentComponent = (props) => {
 		originalVolumes.clear();
 	}
 
+	const joinListener = (p: RemoteParticipant) => {
+		p.on(ParticipantEvent.TrackSubscribed, (track: RemoteTrack) => {
+			if (track.kind !== Track.Kind.Audio) return;
+
+			const element = track.attach();
+
+			audioCon.appendChild(element);
+			pubElements.set(track.sid!, element);
+		});
+
+		p.on(ParticipantEvent.TrackUnsubscribed, (track: RemoteTrack) => {
+			track.detach();
+			if (!pubElements.has(track.sid!)) return;
+			const e = pubElements.get(track.sid!);
+			e?.remove();
+		})
+	}
+
 	const setupListeners = () => {
 		lvRoom.on(RoomEvent.Disconnected, disconnectedListener);
+		lvRoom.on(RoomEvent.ParticipantConnected, joinListener);
 		
 		// Handle track subscription to store original volumes
 		lvRoom.on(RoomEvent.TrackSubscribed, (track, _publication, _participant) => {
@@ -302,6 +325,9 @@ export const VoiceProvider: ParentComponent = (props) => {
 				livekitRoom
 			}}
 		>
+			<div ref={audioCon}>
+
+			</div>
 			{props.children}
 		</VoiceContext.Provider>
 	)

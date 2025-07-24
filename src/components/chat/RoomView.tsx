@@ -398,7 +398,7 @@ const RoomView: Component = () => {
         </div>
 
 				{/* Voice Call Controls */}
-				<Show when={roomType() === RoomType.PM}>
+				<Show when={roomType() === RoomType.PM || roomType() === RoomType.GROUP_PM}>
 					<div>
 						<button 
 							style="width: 1.5rem"
@@ -469,7 +469,7 @@ const RoomView: Component = () => {
         </Show>
       </div>
 
-			<Show when={isInVoiceCall() && currentRoom()?.type === RoomType.PM}>
+			<Show when={isInVoiceCall() && (currentRoom()?.type === RoomType.PM || currentRoom()?.type === RoomType.GROUP_PM)}>
 				<PMCall room={currentRoom()!}>
 				</PMCall>
 			</Show>

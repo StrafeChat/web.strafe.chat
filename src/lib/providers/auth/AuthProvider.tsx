@@ -9,7 +9,7 @@ import {
   onMount,
 } from "solid-js";
 import { WebSocketClient } from "../../ws/WebSocketClient";
-import { useCache } from "../cache/CacheProvider";
+import { useCache, User } from "../cache/CacheProvider";
 import { handleWebSocketMessage } from "../../events";
 import { BASE_URL, WS_URL } from "../../../constants";
 import { api } from "../../api";
@@ -104,6 +104,7 @@ type AuthContextType = {
   fetchUnreadMessages: (roomId: string) => Promise<void>;
   markMessagesAsRead: (roomId: string) => Promise<void>;
 	getJoinToken: (roomId: string) => Promise<string>;
+	getRoomParticipants: (roomId: string) => Promise<(User | null)[]>;
 };
 
 type LoginCredentials = {
@@ -225,7 +226,7 @@ export const AuthProvider: ParentComponent = (props) => {
     console.log("[AuthProvider] Registering MESSAGE_EDIT handler");
     client.onMessage("MESSAGE_EDIT", handleMessageEditEvent);
   };
-
+	
   const handleReadyEvent = (data: any) => {
     console.log("[AuthProvider] READY event received:", data);
     
@@ -1533,6 +1534,29 @@ export const AuthProvider: ParentComponent = (props) => {
 		}
 	}
 
+	const getRoomParticipants = async (roomId: string): Promise<(User | null)[]> => {
+		try {
+			const response = await fetch(`${BASE_URL}/rooms/${roomId}/participants`, {
+				headers: {
+					...API_HEADERS.JSON,
+					...API_HEADERS.SESSION(),
+				},
+				method: "POST"
+			})
+
+			if (!response.ok) {
+				throw new Error(`Failed to fetch participants for room ${roomId}: ${response.status}`);
+			}
+
+			const data = await response.json();
+
+			return data.participants.map((p: string) => cache.getUser(p));
+		} catch (error) {
+			console.error(`[AuthProvider] Failed to fetch participants: `, error);
+			return [];
+		}
+	}
+
   const fetchRoomMessages = async (roomId: string): Promise<void> => {
     try {
       console.log(`[AuthProvider] Fetching messages for room: ${roomId}`);
@@ -1628,6 +1652,7 @@ export const AuthProvider: ParentComponent = (props) => {
         markMessagesAsRead,
         sendTypingIndicator,
 				getJoinToken,
+				getRoomParticipants,
       }}
       data-auth-provider
     >
