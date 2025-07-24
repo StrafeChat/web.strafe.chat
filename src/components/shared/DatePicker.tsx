@@ -202,6 +202,13 @@ const DatePicker: Component<DatePickerProps> = (props) => {
       days.push({ type: "day", value: day });
     }
 
+    // Pad with empty days to always have 6 rows (42 days)
+    const totalSlots = 42;
+    const remaining = totalSlots - days.length;
+    for (let i = 0; i < remaining; i++) {
+      days.push({ type: "empty" });
+    }
+
     return days;
   });
 
@@ -218,11 +225,11 @@ const DatePicker: Component<DatePickerProps> = (props) => {
 
       <Show when={isOpen()}>
         <div
-          class="absolute bottom-full left-0 right-0 z-50 p-4 mb-2 border rounded-lg shadow-lg
+          class="absolute bottom-full right-0 md:left-[-4rem] w-80 p-3 mb-1 border rounded-lg shadow-lg
             bg-background border-border dark:bg-background dark:border-border
             animate-in fade-in slide-in-from-top-2"
         >
-          <div class="flex items-center justify-between mb-4">
+          <div class="flex items-center justify-between mb-1">
             <button
               type="button"
               onClick={handlePrevMonth}
@@ -291,7 +298,7 @@ const DatePicker: Component<DatePickerProps> = (props) => {
             <div class="grid grid-cols-7 gap-1 mb-2">
               <For each={weekDays()}>
                 {(day) => (
-                  <div class="w-10 h-10 flex items-center justify-center text-sm font-semibold text-text-secondary">
+                  <div class="w-11 h-9 flex items-center justify-center text-sm font-semibold text-text-secondary">
                     {day}
                   </div>
                 )}
@@ -302,7 +309,7 @@ const DatePicker: Component<DatePickerProps> = (props) => {
               <For each={getCalendarDays()}>
                 {(day) => {
                   if (day.type === "empty") {
-                    return <div class="w-10 h-10" />;
+                    return <div class="w-11 h-9" />;
                   }
 
                   const date = new Date(
@@ -325,7 +332,7 @@ const DatePicker: Component<DatePickerProps> = (props) => {
                       onClick={() =>
                         !isDisabled && handleDateSelect(day.value!)
                       }
-                      class={`w-10 h-10 rounded-full flex items-center justify-center text-sm transition-transform
+                      class={`w-11 h-8 rounded-full flex items-center justify-center text-sm transition-transform
                         ${isSelected ? "bg-accent text-white" : "hover:bg-surface dark:hover:bg-surface-dark text-text-primary"}
                         ${isDisabled ? "text-text-disabled cursor-not-allowed" : "cursor-pointer hover:scale-110 active:scale-95"}
                       `}
@@ -350,7 +357,7 @@ const DatePicker: Component<DatePickerProps> = (props) => {
                       e.stopPropagation();
                       handleMonthSelect(index());
                     }}
-                    class={`p-2 rounded-md text-sm transition-colors
+                    class={`p-1 rounded-md text-sm transition-colors
                       ${currentMonth() === index() ? "bg-accent text-white" : "hover:bg-surface dark:hover:bg-surface-dark text-text-primary"}
                     `}
                   >
@@ -362,7 +369,7 @@ const DatePicker: Component<DatePickerProps> = (props) => {
           </Show>
 
           <Show when={showYearPicker()}>
-            <div class="grid grid-cols-4 gap-2 max-h-[200px] overflow-y-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-surface">
+            <div class="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-surface">
               <For each={years()}>
                 {(year) => (
                   <button
@@ -372,7 +379,7 @@ const DatePicker: Component<DatePickerProps> = (props) => {
                       e.stopPropagation();
                       handleYearSelect(year);
                     }}
-                    class={`p-2 rounded-md text-sm transition-colors
+                    class={`p-1 rounded-md text-sm transition-colors
                       ${currentYear() === year ? "bg-accent text-white" : "hover:bg-surface dark:hover:bg-surface-dark text-text-primary"}
                     `}
                   >
