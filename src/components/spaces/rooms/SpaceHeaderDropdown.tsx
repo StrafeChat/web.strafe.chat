@@ -2,7 +2,11 @@ import { Component, createSignal, onMount, onCleanup, Show } from "solid-js";
 import SpaceSettings from "../../settings/SpaceSettings";
 import CreateRoomModal from "../../modals/CreateRoomModal";
 import CreateSectionModal from "../../modals/CreateSectionModal";
+import ConfirmModal from "../../modals/ConfirmModal";
 import { FS_URL } from "../../../constants";
+import { api } from "../../../lib/api";
+import { useAuth } from "../../../lib/providers/auth/AuthProvider";
+import { useNavigate } from "@solidjs/router";
 
 interface SpaceHeaderDropdownProps {
   spaceId?: string;
@@ -15,7 +19,12 @@ export const SpaceHeaderDropdown: Component<SpaceHeaderDropdownProps> = (props) 
   const [isSpaceSettingsOpen, setIsSpaceSettingsOpen] = createSignal(false);
   const [isCreateRoomModalOpen, setIsCreateRoomModalOpen] = createSignal(false);
   const [isCreateSectionModalOpen, setIsCreateSectionModalOpen] = createSignal(false);
+  const [isLeaveConfirmOpen, setIsLeaveConfirmOpen] = createSignal(false);
+  const [isLeaving, setIsLeaving] = createSignal(false);
   let dropdownRef: HTMLDivElement | undefined;
+  
+  const { user } = useAuth();
+  const navigate = useNavigate();
 
   // Handle clicking outside dropdown to close it
   const handleClickOutside = (event: MouseEvent) => {
@@ -55,6 +64,33 @@ export const SpaceHeaderDropdown: Component<SpaceHeaderDropdownProps> = (props) 
     console.log('Create Section clicked for space:', props.spaceId);
     setIsOpen(false);
     setIsCreateSectionModalOpen(true);
+  };
+
+  const handleLeaveSpace = () => {
+    console.log('Leave Space clicked for space:', props.spaceId);
+    setIsOpen(false);
+    setIsLeaveConfirmOpen(true);
+  };
+
+  const confirmLeaveSpace = async () => {
+    if (!props.spaceId) return;
+    
+    setIsLeaving(true);
+    try {
+      await api.spaces.leave(props.spaceId);
+      setIsLeaveConfirmOpen(false);
+      navigate('/'); // Navigate to home or spaces list
+    } catch (error) {
+      console.error('Failed to leave space:', error);
+      // TODO: Show error toast
+    } finally {
+      setIsLeaving(false);
+    }
+  };
+
+  // Check if current user is the space owner
+  const isSpaceOwner = () => {
+    return props.currentSpace?.owner_id === user()?.id;
   };
 
   return (
@@ -163,6 +199,23 @@ export const SpaceHeaderDropdown: Component<SpaceHeaderDropdownProps> = (props) 
             </svg>
             <span>Create Section</span>
           </button>
+          
+          <Show when={!isSpaceOwner()}>
+            <div class="mx-2 my-1 h-px bg-surface bg-opacity-20"></div>
+            
+            <button
+              type="button"
+              onClick={handleLeaveSpace}
+              class="w-full flex items-center gap-3 px-3 py-2 hover:bg-red-500 hover:bg-opacity-10 text-red-400 text-left transition-colors"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
+                <polyline points="16,17 21,12 16,7" />
+                <line x1="21" y1="12" x2="9" y2="12" />
+              </svg>
+              <span>Leave Space</span>
+            </button>
+          </Show>
         </div>
       </Show>
       
@@ -190,6 +243,21 @@ export const SpaceHeaderDropdown: Component<SpaceHeaderDropdownProps> = (props) 
           isOpen={isCreateSectionModalOpen()}
           onClose={() => setIsCreateSectionModalOpen(false)}
           spaceId={props.spaceId || ""}
+        />
+      </Show>
+      
+      {/* Leave Space Confirmation Modal */}
+      <Show when={isLeaveConfirmOpen()}>
+        <ConfirmModal
+          isOpen={isLeaveConfirmOpen()}
+          onClose={() => setIsLeaveConfirmOpen(false)}
+          onConfirm={confirmLeaveSpace}
+          title="Leave Space"
+          description={`Are you sure you want to leave "${props.spaceName || 'this space'}"? You will no longer have access to any of its channels and messages.`}
+          confirmText="Leave Space"
+          cancelText="Cancel"
+          variant="danger"
+          isLoading={isLeaving()}
         />
       </Show>
     </div>

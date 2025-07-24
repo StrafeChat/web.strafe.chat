@@ -197,6 +197,10 @@ export const api = {
           method: "DELETE",
         }),
     },
+    leave: (spaceId: string) =>
+      apiRequest(`${API_ENDPOINTS.SPACES}/${spaceId}/leave`, {
+        method: "DELETE",
+      }),
     roles: {
       list: (spaceId: string) => apiRequest(API_ENDPOINTS.SPACE_ROLES(spaceId)),
     },

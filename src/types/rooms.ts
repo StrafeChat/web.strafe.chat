@@ -29,6 +29,7 @@ export type RoomWithRecipients = {
   updated_at: string | null;
   recipients_data: any[];
   unread_count?: number;
+  mention_count?: number;
   space_id?: string;
   parent_id?: string;
   position?: number;

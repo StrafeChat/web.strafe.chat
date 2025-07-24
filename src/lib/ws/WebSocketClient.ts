@@ -176,6 +176,8 @@ export class WebSocketClient {
     this.onMessage("ROOM_MEMBER_ADD", this.handleRoomMemberAdd.bind(this));
     this.onMessage("ROOM_MEMBER_REMOVE", this.handleRoomMemberRemove.bind(this));
     this.onMessage("SPACE_CREATE", this.handleSpaceCreate.bind(this));
+    this.onMessage("SPACE_MEMBER_REMOVE", this.handleSpaceMemberRemove.bind(this));
+    this.onMessage("SPACE_MEMBER_ADD", this.handleSpaceMemberAdd.bind(this));
     this.onMessage("TYPING_INDICATOR", this.handleTypingIndicator.bind(this));    console.log("[WebSocket] Message handlers set up:", [...this.messageHandlers.entries()]);
   }
 
@@ -995,6 +997,37 @@ export class WebSocketClient {
       
       // Dispatch spaceUpdate event for the cache provider
       this.dispatchEvent("spaceUpdate", updatedSpace);
+    }
+  }
+
+  private handleSpaceMemberRemove(data: any): void {
+    console.log("[WebSocket] Handling space member remove:", data);
+    const memberData = data.data || data;
+    if (memberData.space_id && memberData.user_id) {
+      console.log("[WebSocket] Dispatching space member remove event:", memberData);
+      
+      // Dispatch event for cache updates
+      this.dispatchEvent("spaceMemberRemove", {
+        spaceId: memberData.space_id,
+        userId: memberData.user_id,
+        removedAt: memberData.removed_at || new Date().toISOString()
+      });
+    }
+  }
+
+  private handleSpaceMemberAdd(data: any): void {
+    console.log("[WebSocket] Handling space member add:", data);
+    const memberData = data.data || data;
+    if (memberData.space_id && memberData.user_id) {
+      console.log("[WebSocket] Dispatching space member add event:", memberData);
+      
+      // Dispatch event for cache updates
+      this.dispatchEvent("spaceMemberAdd", {
+        spaceId: memberData.space_id,
+        userId: memberData.user_id,
+        joinedAt: memberData.joined_at || new Date().toISOString(),
+        roles: memberData.roles || []
+      });
     }
   }
 

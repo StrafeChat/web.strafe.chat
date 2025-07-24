@@ -99,6 +99,8 @@ type AuthContextType = {
   editMessage: (roomId: string, messageId: string, content: string) => Promise<{ success: boolean; message?: any; error?: string; }>;
   unreadMessages: () => { [roomId: string]: string[] };
   setUnreadMessages: (unreads: { [roomId: string]: string[] } | ((prev: { [roomId: string]: string[] }) => { [roomId: string]: string[] })) => void;
+  mentionUnreadMessages: () => { [roomId: string]: string[] };
+  setMentionUnreadMessages: (unreads: { [roomId: string]: string[] } | ((prev: { [roomId: string]: string[] }) => { [roomId: string]: string[] })) => void;
   fetchUnreadMessages: (roomId: string) => Promise<void>;
   markMessagesAsRead: (roomId: string) => Promise<void>;
 	getJoinToken: (roomId: string) => Promise<string>;
@@ -153,6 +155,7 @@ export const AuthProvider: ParentComponent = (props) => {
   const [isMobile, setIsMobile] = createSignal(window.innerWidth <= 768);
   const [wsClient, setWsClient] = createSignal<WebSocketClient | null>(null);
   const [unreadMessages, setUnreadMessages] = createSignal<{ [roomId: string]: string[] }>({});
+  const [mentionUnreadMessages, setMentionUnreadMessages] = createSignal<{ [roomId: string]: string[] }>({});
 
   const mobileCheck = createMemo(() => isMobile());
 
@@ -217,6 +220,8 @@ export const AuthProvider: ParentComponent = (props) => {
     client.onMessage("SPACE_INVITE_DELETE", handleSpaceInviteDeleteEvent);
     client.onMessage("SPACE_INVITE_UPDATE", handleSpaceInviteUpdateEvent);
     client.onMessage("SPACE_MEMBER_ROLE_UPDATE", handleSpaceMemberRoleUpdateEvent);
+    client.onMessage("SPACE_MEMBER_REMOVE", handleSpaceMemberRemoveEvent);
+    client.onMessage("SPACE_MEMBER_ADD", handleSpaceMemberAddEvent);
     client.onMessage("presence", handlePresenceEvent);
     console.log("[AuthProvider] Registering MESSAGE_CREATE handler");
     client.onMessage("MESSAGE_CREATE", handleMessageCreateEvent);
@@ -347,19 +352,26 @@ export const AuthProvider: ParentComponent = (props) => {
     // Handle unread messages from READY event
     if (data.unread_messages) {
       setUnreadMessages(data.unread_messages);
-      
-      // Update room unread counts based on unread messages
-      if (data.rooms) {
-        setRooms(rooms => {
-          return rooms.map(room => {
-            const roomUnreads = data.unread_messages?.[room.id] || [];
-            return {
-              ...room,
-              unread_count: roomUnreads.length
-            };
-          });
+    }
+    
+    // Handle mention unread messages from READY event
+    if (data.mention_unread_messages) {
+      setMentionUnreadMessages(data.mention_unread_messages);
+    }
+    
+    // Update room unread counts based on unread messages
+    if (data.rooms && (data.unread_messages || data.mention_unread_messages)) {
+      setRooms(rooms => {
+        return rooms.map(room => {
+          const roomUnreads = data.unread_messages?.[room.id] || [];
+          const roomMentionUnreads = data.mention_unread_messages?.[room.id] || [];
+          return {
+            ...room,
+            unread_count: roomUnreads.length,
+            mention_count: roomMentionUnreads.length
+          };
         });
-      }
+      });
     }
 
     if (!data.client_user || !data.users) {
@@ -842,6 +854,78 @@ export const AuthProvider: ParentComponent = (props) => {
           }
         }));
       }
+    }
+  };
+
+  const handleSpaceMemberRemoveEvent = (eventData: any) => {
+    console.log("[AuthProvider] Space member remove event:", eventData);
+    
+    const spaceId = String(eventData.space_id || eventData.data?.space_id);
+    const userId = String(eventData.user_id || eventData.data?.user_id);
+    const currentUserId = user()?.id;
+    
+    if (spaceId && userId) {
+      // If the current user is being removed from the space, remove it from their spaces array
+      if (userId === currentUserId) {
+        console.log("[AuthProvider] Current user removed from space:", spaceId);
+        setSpaces(currentSpaces => {
+          const updatedSpaces = currentSpaces.filter(space => space.id !== spaceId);
+          console.log("[AuthProvider] Updated spaces after removal:", updatedSpaces.map(s => s.id));
+          return updatedSpaces;
+        });
+        
+        // Remove space from cache
+        cache.removeSpaceMember(spaceId, userId);
+        
+        // Dispatch event for real-time UI updates
+        window.dispatchEvent(new CustomEvent('spaceRemove', { 
+          detail: {
+            spaceId,
+            userId
+          }
+        }));
+      } else {
+        // Another user is being removed, just remove them from the space member cache
+        cache.removeSpaceMember(spaceId, userId);
+        
+        // Dispatch event for components to handle member removal
+        window.dispatchEvent(new CustomEvent('spaceMemberRemove', { 
+          detail: {
+            spaceId,
+            userId
+          }
+        }));
+      }
+    }
+  };
+
+  const handleSpaceMemberAddEvent = (eventData: any) => {
+    console.log("[AuthProvider] Space member add event:", eventData);
+    
+    const spaceId = String(eventData.space_id || eventData.data?.space_id);
+    const userId = String(eventData.user_id || eventData.data?.user_id);
+    const roles = eventData.roles || eventData.data?.roles || [];
+    
+    if (spaceId && userId) {
+      // Add the user to the space member cache
+      cache.addSpaceMember(spaceId, {
+        user_id: userId,
+        roles: roles,
+        joined_at: new Date().toISOString(),
+        deaf: false,
+        mute: false,
+        flags: 0,
+        pending: false
+      });
+      
+      // Dispatch event for components to handle member addition
+      window.dispatchEvent(new CustomEvent('spaceMemberAdd', { 
+        detail: {
+          spaceId,
+          userId,
+          roles
+        }
+      }));
     }
   };
 
@@ -1474,14 +1558,22 @@ export const AuthProvider: ParentComponent = (props) => {
         delete updated[roomId];
         return updated;
       });
+      
+      // Clear mention unread messages for this room
+      setMentionUnreadMessages((prev: { [roomId: string]: string[] }) => {
+        const updated = { ...prev };
+        delete updated[roomId];
+        return updated;
+      });
 
-      // Also update the room's unread_count to 0
+      // Also update the room's unread_count and mention_count to 0
       setRooms((rooms: RoomWithRecipients[]) => {
         return rooms.map((room: RoomWithRecipients) => {
           if (room.id === roomId) {
             return {
               ...room,
-              unread_count: 0
+              unread_count: 0,
+              mention_count: 0
             };
           }
           return room;
@@ -1628,6 +1720,8 @@ export const AuthProvider: ParentComponent = (props) => {
         editMessage,
         unreadMessages: () => unreadMessages(),
         setUnreadMessages,
+        mentionUnreadMessages: () => mentionUnreadMessages(),
+        setMentionUnreadMessages,
         fetchUnreadMessages,
         markMessagesAsRead,
         sendTypingIndicator,
