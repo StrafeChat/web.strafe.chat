@@ -116,7 +116,7 @@ export const Interface = (props: { children: JSX.Element }) => {
         <div class={`flex md:flex-1 w-screen overflow-x-auto snap-x snap-mandatory scroll-smooth hide-scrollbar ${showBottomNav() ? 'pb-14' : ''} md:pb-0 h-full`}>
           {/* First snap point - Lists */}
           <div class={`flex ${showSidebar() ? 'w-[calc(92px+15rem)]' : 'w-[72px]'} md:w-auto flex-none snap-start overflow-hidden`}>
-            <div class="w-[72px] h-full flex-none overflow-hidden">
+            <div class="w-[72px] h-full flex-none overflow-visible">
               <SpacesList />
             </div>
             {showSidebar() && (

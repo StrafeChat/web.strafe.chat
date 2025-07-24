@@ -99,6 +99,8 @@ type AuthContextType = {
   editMessage: (roomId: string, messageId: string, content: string) => Promise<{ success: boolean; message?: any; error?: string; }>;
   unreadMessages: () => { [roomId: string]: string[] };
   setUnreadMessages: (unreads: { [roomId: string]: string[] } | ((prev: { [roomId: string]: string[] }) => { [roomId: string]: string[] })) => void;
+  mentionUnreadMessages: () => { [roomId: string]: string[] };
+  setMentionUnreadMessages: (unreads: { [roomId: string]: string[] } | ((prev: { [roomId: string]: string[] }) => { [roomId: string]: string[] })) => void;
   fetchUnreadMessages: (roomId: string) => Promise<void>;
   markMessagesAsRead: (roomId: string) => Promise<void>;
 	getJoinToken: (roomId: string) => Promise<string>;
@@ -152,6 +154,7 @@ export const AuthProvider: ParentComponent = (props) => {
   const [isMobile, setIsMobile] = createSignal(window.innerWidth <= 768);
   const [wsClient, setWsClient] = createSignal<WebSocketClient | null>(null);
   const [unreadMessages, setUnreadMessages] = createSignal<{ [roomId: string]: string[] }>({});
+  const [mentionUnreadMessages, setMentionUnreadMessages] = createSignal<{ [roomId: string]: string[] }>({});
 
   const mobileCheck = createMemo(() => isMobile());
 
@@ -346,19 +349,26 @@ export const AuthProvider: ParentComponent = (props) => {
     // Handle unread messages from READY event
     if (data.unread_messages) {
       setUnreadMessages(data.unread_messages);
-      
-      // Update room unread counts based on unread messages
-      if (data.rooms) {
-        setRooms(rooms => {
-          return rooms.map(room => {
-            const roomUnreads = data.unread_messages?.[room.id] || [];
-            return {
-              ...room,
-              unread_count: roomUnreads.length
-            };
-          });
+    }
+    
+    // Handle mention unread messages from READY event
+    if (data.mention_unread_messages) {
+      setMentionUnreadMessages(data.mention_unread_messages);
+    }
+    
+    // Update room unread counts based on unread messages
+    if (data.rooms && (data.unread_messages || data.mention_unread_messages)) {
+      setRooms(rooms => {
+        return rooms.map(room => {
+          const roomUnreads = data.unread_messages?.[room.id] || [];
+          const roomMentionUnreads = data.mention_unread_messages?.[room.id] || [];
+          return {
+            ...room,
+            unread_count: roomUnreads.length,
+            mention_count: roomMentionUnreads.length
+          };
         });
-      }
+      });
     }
 
     if (!data.client_user || !data.users) {
@@ -1473,14 +1483,22 @@ export const AuthProvider: ParentComponent = (props) => {
         delete updated[roomId];
         return updated;
       });
+      
+      // Clear mention unread messages for this room
+      setMentionUnreadMessages((prev: { [roomId: string]: string[] }) => {
+        const updated = { ...prev };
+        delete updated[roomId];
+        return updated;
+      });
 
-      // Also update the room's unread_count to 0
+      // Also update the room's unread_count and mention_count to 0
       setRooms((rooms: RoomWithRecipients[]) => {
         return rooms.map((room: RoomWithRecipients) => {
           if (room.id === roomId) {
             return {
               ...room,
-              unread_count: 0
+              unread_count: 0,
+              mention_count: 0
             };
           }
           return room;
@@ -1604,6 +1622,8 @@ export const AuthProvider: ParentComponent = (props) => {
         editMessage,
         unreadMessages: () => unreadMessages(),
         setUnreadMessages,
+        mentionUnreadMessages: () => mentionUnreadMessages(),
+        setMentionUnreadMessages,
         fetchUnreadMessages,
         markMessagesAsRead,
         sendTypingIndicator,

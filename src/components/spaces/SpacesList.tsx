@@ -70,7 +70,7 @@ const SpacesList: Component = () => {
     ).length;
   });
 
-  // Get rooms with unread messages
+  // Get PM rooms with unread messages (exclude text rooms from spaces)
   const unreadRooms = createMemo(() => {
     const allRooms = rooms();
     const currentUser = user();
@@ -78,8 +78,43 @@ const SpacesList: Component = () => {
     // Don't show unread rooms if user is in DND mode
     if (currentUser?.presence?.status === "dnd") return [];
     
-    return allRooms.filter(room => (room.unread_count ?? 0) > 0);
+    // Only show unread indicators for PMs and Group PMs, not text rooms from spaces
+    return allRooms.filter(room => 
+      (room.unread_count ?? 0) > 0 && 
+      (room.type === RoomType.PM || room.type === RoomType.GROUP_PM)
+    );
   });
+
+  // Calculate unread count for a specific space (excluding mentions)
+  const getSpaceUnreadCount = (spaceId: string) => {
+    const allRooms = rooms();
+    const currentUser = user();
+    
+    // Don't show unread count if user is in DND mode
+    if (currentUser?.presence?.status === "dnd") return 0;
+    
+    return allRooms
+      .filter(room => String(room.space_id) === String(spaceId))
+      .reduce((total, room) => {
+        const unreads = (room.unread_count || 0);
+        const mentions = (room.mention_count || 0);
+        // Only count unreads that are not mentions
+        return total + Math.max(0, unreads - mentions);
+      }, 0);
+  };
+
+  // Calculate mention count for a specific space
+  const getSpaceMentionCount = (spaceId: string) => {
+    const allRooms = rooms();
+    const currentUser = user();
+    
+    // Don't show mention count if user is in DND mode
+    if (currentUser?.presence?.status === "dnd") return 0;
+    
+    return allRooms
+      .filter(room => String(room.space_id) === String(spaceId))
+      .reduce((total, room) => total + (room.mention_count || 0), 0);
+  };
 
   // Helper function to get room avatar
   const getRoomAvatar = (room: any) => {
@@ -110,8 +145,9 @@ const SpacesList: Component = () => {
   };
 
   return (
-    <div class="flex flex-col items-center h-full py-3 pb-14 md:pb-3 gap-2 bg-[var(--background)] relative">
-      {/* Home button */}
+    <div class="flex flex-col items-center h-full py-3 pb-14 md:pb-3 gap-3 bg-[var(--background)] relative overflow-y-auto hide-scrollbar">
+      {/* Home button container */}
+      <div class="flex flex-col gap-2 w-full items-center">
       <Tooltip content={"Home"} position="right">
         <button
             class="w-12 h-12 rounded-full bg-surface hover:bg-accent transition-all group relative"
@@ -122,13 +158,13 @@ const SpacesList: Component = () => {
             onMouseEnter={() => setHoveredHome(true)}
             onMouseLeave={() => setHoveredHome(false)}
           >
-          {/* Active indicator */}
+          {/* Active indicator - long thick line like Discord */}
           <Show when={isHomePage()}>
-            <div class="absolute -left-3 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-accent rounded-r-full"></div>
+            <div class="absolute -left-3 top-1/2 transform -translate-y-1/2 w-1 h-10 bg-primary rounded-r-md"></div>
           </Show>
-          {/* Hover indicator */}
+          {/* Hover indicator - short line like Discord */}
           <Show when={hoveredHome() && !isHomePage()}>
-            <div class="absolute -left-3 top-1/2 transform -translate-y-1/2 w-1 h-5 bg-accent bg-opacity-60 rounded-r-full"></div>
+            <div class="absolute -left-3 top-1/2 transform -translate-y-1/2 w-1 h-5 bg-primary rounded-r-md"></div>
           </Show>
           <svg
             xmlns="http://www.w3.org/2000/svg"
@@ -140,22 +176,19 @@ const SpacesList: Component = () => {
           >
             <path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
           </svg>
-          <Show when={unreadCount() > 0 || pendingCount() > 0}>
-            <div class="absolute -top-1 -right-1 bg-red-500 text-white text-xs w-[20px] h-[20px] rounded-full grid place-items-center border-[2.5px] border-[var(--background)]">
-              {unreadCount() + pendingCount()}
-            </div>
-          </Show>
+          {/* Removed unread indicator from home button for spaces - only show for PMs */}
         </button>
       </Tooltip>
+      </div>
 
       {/* Unread messages avatars */}
       <Show when={unreadRooms().length > 0}>
-        <div class="flex flex-col gap-2 mt-2">
+        <div class="flex flex-col gap-2 mt-1 w-full items-center">
           <For each={unreadRooms().slice(0, 3)}>
             {(room) => (
               <Tooltip content={`Unread messages in ${room.name || 'chat'}`} position="right">
                 <button 
-                  class="w-10 h-10 rounded-full relative overflow-hidden border-2 border-surface hover:border-accent transition-all"
+                  class="w-10 h-10 rounded-full relative border-2 border-surface transition-all"
                   onClick={() => {
                     navigate(`/rooms/${room.id}`);
                     if (isMobile()) {
@@ -164,14 +197,14 @@ const SpacesList: Component = () => {
                   }}
                 >
                   {room.type === RoomType.GROUP_PM && !room.icon ? (
-                    <div class="w-full h-full bg-surface bg-opacity-20 text-text-primary flex items-center justify-center">
+                    <div class="w-full h-full rounded-full bg-surface bg-opacity-20 text-text-primary flex items-center justify-center">
                       <DefaultGroupPM />
                     </div>
                   ) : (
                     <img
                       src={getRoomAvatar(room) || undefined}
                       alt="Room avatar"
-                      class="w-full h-full object-cover"
+                      class="w-full h-full rounded-full"
                       draggable="false"
                       onError={(e) => {
                         // Replace failed room icon with default group icon for group PMs
@@ -183,7 +216,7 @@ const SpacesList: Component = () => {
                       }}
                     />
                   )}
-                  <div class="absolute bottom-0 right-0 bg-red-500 w-[12px] h-[12px] rounded-full border-2 border-[var(--background)]"></div>
+                  <div class="absolute bottom-0.5 right-0.5 bg-red-500 w-[16px] h-[16px] rounded-full border-2 border-[var(--background)] z-10 transform translate-x-1 translate-y-1"></div>
                 </button>
               </Tooltip>
             )}
@@ -200,37 +233,46 @@ const SpacesList: Component = () => {
       </Show>
 
       {/* Separator */}
-      <div class="w-8 h-0.5 rounded-full bg-border" />
+      {/* <hr class="w-8 border-0 h-[1px] bg-border opacity-50" /> */}
 
       {/* Spaces List */}
-      <div class="flex flex-col gap-2 flex-1 overflow-y-auto min-h-0 hide-scrollbar">
+      <div class="flex flex-col gap-2 w-full items-center">
         <For each={userSpaces()}>
           {(space) => (
-            <Tooltip content={space.name} position="right">
-              <button
-                class={`w-12 h-12 flex-shrink-0 ${isSpaceActive() === String(space.id) ? "rounded-2xl" : "rounded-full hover:rounded-2xl"} bg-surface hover:bg-accent relative overflow-hidden group transition-all duration-200`}
-                onClick={() => {
-                  const lastSpaceRoute = getLastSpaceRoute(String(space.id));
-                  navigate(lastSpaceRoute);
-                  if (isMobile()) {
-                    setCurrentView("content");
-                  }
-                }}
-                onMouseEnter={() => setHoveredSpace(String(space.id))}
-                onMouseLeave={() => setHoveredSpace(null)}
-              >
-                {/* Active indicator */}
-                <Show when={isSpaceActive() === String(space.id)}>
-                  <div class="absolute -left-3 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-accent rounded-r-full"></div>
-                </Show>
-                {/* Hover indicator */}
-                <Show when={hoveredSpace() === String(space.id) && isSpaceActive() !== String(space.id)}>
-                  <div class="absolute -left-3 top-1/2 transform -translate-y-1/2 w-1 h-5 bg-accent bg-opacity-60 rounded-r-full"></div>
-                </Show>
+            <div class="relative flex-shrink-0 w-12 h-12">
+              {/* Active indicator - long thick line like Discord */}
+              <Show when={isSpaceActive() === String(space.id)}>
+                <div class="absolute -left-3 top-1/2 transform -translate-y-1/2 w-1 h-10 bg-primary rounded-r-md z-30"></div>
+              </Show>
+              {/* Hover indicator - short line like Discord */}
+              <Show when={hoveredSpace() === String(space.id) && isSpaceActive() !== String(space.id)}>
+                <div class="absolute -left-3 top-1/2 transform -translate-y-1/2 w-1 h-5 bg-primary rounded-r-md z-30"></div>
+              </Show>
+              {/* Unread indicator - small white dot like Discord */}
+              <Show when={getSpaceUnreadCount(space.id) > 0 && getSpaceMentionCount(space.id) === 0 && isSpaceActive() !== String(space.id) && hoveredSpace() !== String(space.id)}>
+                <div class="absolute -left-3 top-1/2 transform -translate-y-1/2 w-1 h-2 bg-primary rounded-r-md z-30"></div>
+              </Show>
+              {/* Mention indicator - red dot like Discord */}
+              <Show when={getSpaceMentionCount(space.id) > 0 && isSpaceActive() !== String(space.id) && hoveredSpace() !== String(space.id)}>
+                <div class="absolute -left-3 top-1/2 transform -translate-y-1/2 w-1 h-2 bg-red-500 rounded-r-md z-30"></div>
+              </Show>
+              <Tooltip content={space.name} position="right">
+                <button
+                  class={`w-12 h-12 flex-shrink-0 ${isSpaceActive() === String(space.id) ? "rounded-2xl" : "rounded-full hover:rounded-2xl"} bg-surface relative group transition-all duration-200`}
+                  onClick={() => {
+                    const lastSpaceRoute = getLastSpaceRoute(String(space.id));
+                    navigate(lastSpaceRoute);
+                    if (isMobile()) {
+                      setCurrentView("content");
+                    }
+                  }}
+                  onMouseEnter={() => setHoveredSpace(String(space.id))}
+                  onMouseLeave={() => setHoveredSpace(null)}
+                >
                 <Show
                   when={space.icon}
                   fallback={
-                    <div class="w-full h-full bg-surface bg-opacity-20 text-text-primary flex items-center justify-center text-lg font-semibold">
+                    <div class={`w-full h-full bg-surface bg-opacity-20 text-text-primary flex items-center justify-center text-lg font-semibold transition-all duration-200 ${isSpaceActive() === String(space.id) ? "rounded-2xl" : hoveredSpace() === String(space.id) ? "rounded-2xl" : "rounded-full"}`}>
                       {space.name_acronym}
                     </div>
                   }
@@ -238,32 +280,36 @@ const SpacesList: Component = () => {
                   <img
                     src={`${FS_URL}/space_icons/${space.id}/${space.icon}`}
                     alt={space.name}
-                    class="w-full h-full object-cover"
+                    class={`w-full h-full object-cover transition-all duration-200 ${isSpaceActive() === String(space.id) ? "rounded-2xl" : hoveredSpace() === String(space.id) ? "rounded-2xl" : "rounded-full"}`}
                     draggable="false"
                     onError={(e) => {
                       // Replace failed space icon with acronym
                       const target = e.target as HTMLImageElement;
                       const container = target.parentElement;
                       if (container) {
-                        container.innerHTML = `<div class="w-full h-full bg-surface bg-opacity-20 text-text-primary flex items-center justify-center text-lg font-semibold">${space.name_acronym}</div>`;
+                        const isActive = isSpaceActive() === String(space.id);
+                        const isHovered = hoveredSpace() === String(space.id);
+                        const roundingClass = isActive || isHovered ? "rounded-2xl" : "rounded-full";
+                        container.innerHTML = `<div class="w-full h-full bg-surface bg-opacity-20 text-text-primary flex items-center justify-center text-lg font-semibold transition-all duration-200 ${roundingClass}">${space.name_acronym}</div>`;
                       }
                     }}
                   />
                 </Show>
               </button>
             </Tooltip>
+          </div>
           )}
         </For>
       </div>
 
       {/* Separator */}
-      <div class="w-8 h-0.5 rounded-full bg-border" />
+      {/* <hr class="w-8 border-0 h-[1px] bg-border opacity-50" /> */}
 
       {/* Bottom buttons container */}
-      <div class="flex flex-col gap-2">
+      <div class="flex flex-col gap-2 w-full items-center">
         <Tooltip content={"Add a Space"} position="right">
           <button 
-            class="w-12 h-12 rounded-full bg-surface hover:bg-accent transition-all"
+            class="w-12 h-12 rounded-full bg-surface hover:bg-accent transition-all duration-200"
             onClick={() => setShowCreateModal(true)}
           >
             <Plus />
@@ -271,7 +317,7 @@ const SpacesList: Component = () => {
         </Tooltip>
 
         <Tooltip content={"Discover"} position="right">
-          <button class="w-12 h-12 rounded-full bg-surface hover:bg-accent transition-all">
+          <button class="w-12 h-12 rounded-full bg-surface hover:bg-accent transition-all duration-200">
             <svg
               xmlns="http://www.w3.org/2000/svg"
               class="w-6 h-6 mx-auto"
