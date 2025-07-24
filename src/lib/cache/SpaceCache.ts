@@ -226,6 +226,46 @@ export class SpaceCache {
     this.recentUpdates.set(updateKey, Date.now());
   }
 
+  public addSpaceMember(spaceId: string, memberData: Partial<SpaceMember> & { user_id: string }): void {
+    const spaceMember: SpaceMember = {
+      space_id: spaceId,
+      user_id: memberData.user_id,
+      roles: memberData.roles || [],
+      joined_at: memberData.joined_at || new Date().toISOString(),
+      deaf: memberData.deaf || false,
+      mute: memberData.mute || false,
+      flags: memberData.flags || 0,
+      pending: memberData.pending || false,
+      user: memberData.user || {
+        id: memberData.user_id,
+        username: 'Unknown',
+        display_name: 'Unknown User',
+        discriminator: 0,
+        bot: false,
+        system: false,
+        flags: 0,
+        presence: {
+          status: 'offline'
+        }
+      }
+    };
+    
+    // Add to individual member cache
+    this.setSpaceMember(spaceMember);
+    
+    // Update cached members list if it exists
+    const cached = this.spaceMembersCache.get(spaceId);
+    if (cached) {
+      // Check if member already exists
+      const existingIndex = cached.data.findIndex(m => m.user_id === memberData.user_id);
+      if (existingIndex === -1) {
+        cached.data.push(spaceMember);
+      } else {
+        cached.data[existingIndex] = spaceMember;
+      }
+    }
+  }
+
   public removeSpaceMember(spaceId: string, userId: string): void {
     this.spaceMembers.get(spaceId)?.delete(userId);
     this.removeUserFromSpace(userId, spaceId);

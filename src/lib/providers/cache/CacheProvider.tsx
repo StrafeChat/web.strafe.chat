@@ -65,6 +65,7 @@ type CacheContextType = {
   getSpaceMembers: (spaceId: string) => SpaceMember[];
   getSpaceMember: (spaceId: string, userId: string) => SpaceMember | undefined;
   setSpaceMember: (spaceMember: SpaceMember) => void;
+  addSpaceMember: (spaceId: string, memberData: Partial<SpaceMember> & { user_id: string }) => void;
   removeSpaceMember: (spaceId: string, userId: string) => void;
   deleteSpace: (spaceId: string) => void;
   // Space members cache
@@ -215,6 +216,50 @@ export const CacheProvider: ParentComponent = (props) => {
       }
     };
 
+    const handleSpaceMemberRemove = (event: CustomEvent) => {
+      console.log("[CacheProvider] Space member remove event:", event.detail);
+      const { spaceId, userId } = event.detail;
+      
+      if (spaceId && userId) {
+        // Remove member from space cache
+        spaceCache.removeSpaceMember(spaceId, userId);
+        
+        // Update spaces state to trigger reactivity
+        setSpaces(prev => [...prev]);
+        
+        // Dispatch spaceMemberUpdate event for UI reactivity
+        window.dispatchEvent(new CustomEvent('spaceMemberUpdate', {
+          detail: { spaceId, userId, action: 'remove' }
+        }));
+      }
+    };
+
+    const handleSpaceMemberAdd = (event: CustomEvent) => {
+      console.log("[CacheProvider] Space member add event:", event.detail);
+      const { spaceId, userId, roles } = event.detail;
+      
+      if (spaceId && userId) {
+        // Add member to space cache
+        spaceCache.addSpaceMember(spaceId, {
+          user_id: userId,
+          roles: roles || [],
+          joined_at: new Date().toISOString(),
+          deaf: false,
+          mute: false,
+          flags: 0,
+          pending: false
+        });
+        
+        // Update spaces state to trigger reactivity
+        setSpaces(prev => [...prev]);
+        
+        // Dispatch spaceMemberUpdate event for UI reactivity
+        window.dispatchEvent(new CustomEvent('spaceMemberUpdate', {
+          detail: { spaceId, userId, action: 'add' }
+        }));
+      }
+    };
+
     window.addEventListener("userUpdate", handleUserUpdate as EventListener);
     window.addEventListener("messageCreate", handleMessageCreate as EventListener);
     window.addEventListener("messageDelete", handleMessageDelete as EventListener);
@@ -226,6 +271,8 @@ export const CacheProvider: ParentComponent = (props) => {
     window.addEventListener("spaceMembersCache", handleSpaceMembersCache as EventListener);
     window.addEventListener("spaceRolesCache", handleSpaceRolesCache as EventListener);
     window.addEventListener("spaceMemberRoleUpdate", handleSpaceMemberRoleUpdate as EventListener);
+    window.addEventListener("spaceMemberRemove", handleSpaceMemberRemove as EventListener);
+    window.addEventListener("spaceMemberAdd", handleSpaceMemberAdd as EventListener);
 
     return () => {
       window.removeEventListener("userUpdate", handleUserUpdate as EventListener);
@@ -239,6 +286,8 @@ export const CacheProvider: ParentComponent = (props) => {
       window.removeEventListener("spaceMembersCache", handleSpaceMembersCache as EventListener);
       window.removeEventListener("spaceRolesCache", handleSpaceRolesCache as EventListener);
       window.removeEventListener("spaceMemberRoleUpdate", handleSpaceMemberRoleUpdate as EventListener);
+      window.removeEventListener("spaceMemberRemove", handleSpaceMemberRemove as EventListener);
+      window.removeEventListener("spaceMemberAdd", handleSpaceMemberAdd as EventListener);
     };
   });
 
@@ -338,6 +387,10 @@ export const CacheProvider: ParentComponent = (props) => {
     getSpaceMember: (spaceId: string, userId: string) => spaceCache.getSpaceMember(spaceId, userId),
     setSpaceMember: (spaceMember: SpaceMember) => {
       spaceCache.setSpaceMember(spaceMember);
+      setSpaces(spaceCache.getAllSpaces());
+    },
+    addSpaceMember: (spaceId: string, memberData: Partial<SpaceMember> & { user_id: string }) => {
+      spaceCache.addSpaceMember(spaceId, memberData);
       setSpaces(spaceCache.getAllSpaces());
     },
     removeSpaceMember: (spaceId: string, userId: string) => {

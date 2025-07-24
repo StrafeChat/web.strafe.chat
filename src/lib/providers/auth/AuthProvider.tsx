@@ -220,6 +220,8 @@ export const AuthProvider: ParentComponent = (props) => {
     client.onMessage("SPACE_INVITE_DELETE", handleSpaceInviteDeleteEvent);
     client.onMessage("SPACE_INVITE_UPDATE", handleSpaceInviteUpdateEvent);
     client.onMessage("SPACE_MEMBER_ROLE_UPDATE", handleSpaceMemberRoleUpdateEvent);
+    client.onMessage("SPACE_MEMBER_REMOVE", handleSpaceMemberRemoveEvent);
+    client.onMessage("SPACE_MEMBER_ADD", handleSpaceMemberAddEvent);
     client.onMessage("presence", handlePresenceEvent);
     console.log("[AuthProvider] Registering MESSAGE_CREATE handler");
     client.onMessage("MESSAGE_CREATE", handleMessageCreateEvent);
@@ -852,6 +854,78 @@ export const AuthProvider: ParentComponent = (props) => {
           }
         }));
       }
+    }
+  };
+
+  const handleSpaceMemberRemoveEvent = (eventData: any) => {
+    console.log("[AuthProvider] Space member remove event:", eventData);
+    
+    const spaceId = String(eventData.space_id || eventData.data?.space_id);
+    const userId = String(eventData.user_id || eventData.data?.user_id);
+    const currentUserId = user()?.id;
+    
+    if (spaceId && userId) {
+      // If the current user is being removed from the space, remove it from their spaces array
+      if (userId === currentUserId) {
+        console.log("[AuthProvider] Current user removed from space:", spaceId);
+        setSpaces(currentSpaces => {
+          const updatedSpaces = currentSpaces.filter(space => space.id !== spaceId);
+          console.log("[AuthProvider] Updated spaces after removal:", updatedSpaces.map(s => s.id));
+          return updatedSpaces;
+        });
+        
+        // Remove space from cache
+        cache.removeSpaceMember(spaceId, userId);
+        
+        // Dispatch event for real-time UI updates
+        window.dispatchEvent(new CustomEvent('spaceRemove', { 
+          detail: {
+            spaceId,
+            userId
+          }
+        }));
+      } else {
+        // Another user is being removed, just remove them from the space member cache
+        cache.removeSpaceMember(spaceId, userId);
+        
+        // Dispatch event for components to handle member removal
+        window.dispatchEvent(new CustomEvent('spaceMemberRemove', { 
+          detail: {
+            spaceId,
+            userId
+          }
+        }));
+      }
+    }
+  };
+
+  const handleSpaceMemberAddEvent = (eventData: any) => {
+    console.log("[AuthProvider] Space member add event:", eventData);
+    
+    const spaceId = String(eventData.space_id || eventData.data?.space_id);
+    const userId = String(eventData.user_id || eventData.data?.user_id);
+    const roles = eventData.roles || eventData.data?.roles || [];
+    
+    if (spaceId && userId) {
+      // Add the user to the space member cache
+      cache.addSpaceMember(spaceId, {
+        user_id: userId,
+        roles: roles,
+        joined_at: new Date().toISOString(),
+        deaf: false,
+        mute: false,
+        flags: 0,
+        pending: false
+      });
+      
+      // Dispatch event for components to handle member addition
+      window.dispatchEvent(new CustomEvent('spaceMemberAdd', { 
+        detail: {
+          spaceId,
+          userId,
+          roles
+        }
+      }));
     }
   };
 
