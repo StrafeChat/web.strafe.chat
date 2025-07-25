@@ -203,6 +203,8 @@ export const VoiceProvider: ParentComponent = (props) => {
 	}
 
 	const joinListener = (p: RemoteParticipant) => {
+		console.log(p);
+		if (p.isLocal) return; // don't listen to local audio
 		p.on(ParticipantEvent.TrackSubscribed, (track: RemoteTrack) => {
 			if (track.kind !== Track.Kind.Audio) return;
 
@@ -211,8 +213,26 @@ export const VoiceProvider: ParentComponent = (props) => {
 			audioCon.appendChild(element);
 			pubElements.set(track.sid!, element);
 		});
+		p.on(ParticipantEvent.TrackPublished, (pub: RemoteTrackPublication) => {
+			const track = pub.track;
+			if (!track) return;
+			if (track.kind !== Track.Kind.Audio) return;
+
+			const element = track.attach();
+
+			audioCon.appendChild(element);
+			pubElements.set(track.sid!, element);
+		})
 
 		p.on(ParticipantEvent.TrackUnsubscribed, (track: RemoteTrack) => {
+			track.detach();
+			if (!pubElements.has(track.sid!)) return;
+			const e = pubElements.get(track.sid!);
+			e?.remove();
+		});
+		p.on(ParticipantEvent.TrackUnpublished, (pub: RemoteTrackPublication) => {
+			const track = pub.track;
+			if (!track) return;
 			track.detach();
 			if (!pubElements.has(track.sid!)) return;
 			const e = pubElements.get(track.sid!);
@@ -221,8 +241,13 @@ export const VoiceProvider: ParentComponent = (props) => {
 	}
 
 	const setupListeners = () => {
+		console.log("setting up listeners");
 		lvRoom.on(RoomEvent.Disconnected, disconnectedListener);
 		lvRoom.on(RoomEvent.ParticipantConnected, joinListener);
+
+		for (const [_k, v] of lvRoom.remoteParticipants) { // setup listeners for participants already in the room
+			joinListener(v);
+		}
 		
 		// Handle track subscription to store original volumes
 		lvRoom.on(RoomEvent.TrackSubscribed, (track, _publication, _participant) => {

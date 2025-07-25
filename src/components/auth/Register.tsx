@@ -114,7 +114,7 @@ const Register = () => {
       <div
         class={
           isMobile()
-            ? "w-full max-w-md mx-auto bg-[#24283b]/95 backdrop-blur-sm rounded-lg shadow-lg shadow-black/20 p-6 border border-[#414868] relative z-10"
+            ? "w-full max-w-md mx-auto bg-[#24283b]/95 backdrop-blur-sm rounded-lg shadow-lg shadow-black/20 p-6 pb-16 border border-[#414868] relative z-10 max-h-[calc(90vh-10px)] overflow-y-auto"
             : "w-full max-w-md bg-[#24283b]/95 backdrop-blur-sm rounded-lg shadow-lg shadow-black/20 p-8 border border-[#414868] relative z-10"
         }
       >
@@ -127,114 +127,129 @@ const Register = () => {
           </p>
 
           <form onSubmit={handleSubmit} class="space-y-4">
-            <div>
-              <label
-                for="username"
-                class="block text-sm font-medium mb-2 text-gray-300"
-              >
-                {t("auth.register.username")}*
-              </label>
-              <input
-                type="text"
-                id="username"
-                value={username()}
-                required
-                onInput={(e) => setUsername(e.currentTarget.value)}
-                class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
+            <div class="md:grid md:grid-cols-2 md:gap-4 space-y-4 md:space-y-0">
+              <div class="space-y-4">
+                <div>
+                  <label
+                    for="username"
+                    class="block text-sm font-medium mb-2 text-gray-300"
+                  >
+                    {t("auth.register.username")}*
+                  </label>
+                  <input
+                    type="text"
+                    id="username"
+                    value={username()}
+                    required
+                    onInput={(e) => setUsername(e.currentTarget.value)}
+                    class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
 
-            <div>
-              <label
-                for="discriminator"
-                class="block text-sm font-medium mb-2 text-gray-300"
-              >
-                {t("auth.register.discriminator")}*
-              </label>
-              <input
-                type="text"
-                id="discriminator"
-                value={discriminator()}
-                required
-                onInput={(e) => setDiscriminator(e.currentTarget.value)}
-                class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
+                <div>
+                  <label
+                    for="discriminator"
+                    class="block text-sm font-medium mb-2 text-gray-300"
+                  >
+                    {t("auth.register.discriminator")}*
+                  </label>
+                  <input
+                    type="text"
+                    id="discriminator"
+                    value={discriminator()}
+                    required
+                    onInput={(e) => setDiscriminator(e.currentTarget.value)}
+                    class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
 
-            <div>
-              <label
-                for="displayName"
-                class="block text-sm font-medium mb-2 text-gray-300"
-              >
-                {t("auth.register.displayName")}
-              </label>
-              <input
-                type="text"
-                id="displayName"
-                value={displayName()}
-                onInput={(e) => setDisplayName(e.currentTarget.value)}
-                class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
+                <div>
+                  <label
+                    for="displayName"
+                    class="block text-sm font-medium mb-2 text-gray-300"
+                  >
+                    {t("auth.register.displayName")}
+                  </label>
+                  <input
+                    type="text"
+                    id="displayName"
+                    value={displayName()}
+                    onInput={(e) => setDisplayName(e.currentTarget.value)}
+                    class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
+              </div>
 
-            <div>
-              <label
-                for="email"
-                class="block text-sm font-medium mb-2 text-gray-300"
-              >
-                {t("auth.register.email")}*
-              </label>
-              <input
-                type="email"
-                id="email"
-                value={email()}
-                required
-                onInput={(e) => setEmail(e.currentTarget.value)}
-                class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
+              <div class="space-y-4">
+                <div>
+                  <label
+                    for="email"
+                    class="block text-sm font-medium mb-2 text-gray-300"
+                  >
+                    {t("auth.register.email")}*
+                  </label>
+                  <input
+                    type="email"
+                    id="email"
+                    value={email()}
+                    required
+                    onInput={(e) => setEmail(e.currentTarget.value)}
+                    class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
 
-            <div>
-              <label
-                for="password"
-                class="block text-sm font-medium mb-2 text-gray-300"
-              >
-                {t("auth.register.password")}*
-              </label>
-              <input
-                type="password"
-                id="password"
-                value={password()}
-                required
-                onInput={(e) => setPassword(e.currentTarget.value)}
-                class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-            </div>
+                <div>
+                  <label
+                    for="password"
+                    class="block text-sm font-medium mb-2 text-gray-300"
+                  >
+                    {t("auth.register.password")}*
+                  </label>
+                  <input
+                    type="password"
+                    id="password"
+                    value={password()}
+                    required
+                    onInput={(e) => setPassword(e.currentTarget.value)}
+                    class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none focus:ring-2 focus:ring-primary"
+                  />
+                </div>
 
-            <div>
-              <label
-                for="dateOfBirth"
-                class="block text-sm font-medium mb-2 text-gray-300"
-              >
-                {t("auth.register.dateOfBirth")}*
-              </label>
-              <DatePicker
-                value={dateOfBirth()}
-                onChange={(date) => setDateOfBirth(date)}
-                minDate={new Date(1900, 0, 1)}
-                maxDate={new Date()}
-                class="w-full"
-              />
+                <div>
+                  <label
+                    for="dateOfBirth"
+                    class="block text-sm font-medium mb-2 text-gray-300"
+                  >
+                    {t("auth.register.dateOfBirth")}*
+                  </label>
+                  <DatePicker
+                    value={dateOfBirth()}
+                    onChange={(date) => setDateOfBirth(date)}
+                    minDate={new Date(1900, 0, 1)}
+                    maxDate={new Date()}
+                    class="w-full"
+                  />
+                </div>
+              </div>
             </div>
 
             <div class="flex items-center">
-              <input
-                type="checkbox"
-                id="tos"
-                required
-                class="w-4 h-4 mr-2 rounded accent-[var(--primary)] cursor-pointer"
-              />
-              <label for="tos" class="text-sm text-gray-300 select-none">
+              <div class="relative inline-block w-5 h-5 mr-2">
+                <input
+                  type="checkbox"
+                  id="tos"
+                  required
+                  class="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer peer z-10"
+                />
+                <span class="absolute top-0 left-0 h-5 w-5 bg-[#24283b] border border-[#414868] rounded-md peer-checked:bg-primary peer-checked:border-primary transition-all duration-200 ease-in-out"></span>
+                <span class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 ease-in-out">
+                  ✓
+                </span>
+              </div>
+              <label
+                for="tos"
+                class="text-sm text-gray-300 select-none cursor-pointer"
+              >
                 {t("auth.register.tos")}{" "}
                 <a
                   href="https://strafe.chat/terms"
