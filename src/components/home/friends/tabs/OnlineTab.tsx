@@ -36,6 +36,7 @@ export const OnlineTab: Component = () => {
         banner: friend.banner,
         status: friend.presence?.status || "offline",
         custom_status: friend.presence?.custom_status || "",
+        bot: friend.bot || false,
       }))
       .filter((friend) => friend.status !== "offline");
   });
@@ -204,7 +205,14 @@ export const OnlineTab: Component = () => {
                       <StatusIndicator status={friend.status as UserStatus} />
                     </div>
                     <div class="flex flex-col flex-grow">
-                      <span>{friend.display_name}</span>
+                      <div class="flex items-center gap-2">
+                        <span>{friend.display_name}</span>
+                        <Show when={friend.bot}>
+                          <span class="text-xs bg-primary text-white px-1.5 py-0.5 rounded font-medium flex-shrink-0">
+                            BOT
+                          </span>
+                        </Show>
+                      </div>
                       <span class="text-text-secondary text-sm">
                         {friend.custom_status
                           ? `${friend.custom_status}`

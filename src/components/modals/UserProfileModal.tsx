@@ -275,6 +275,7 @@ const UserProfileModal: Component<UserProfileModalProps> = (props) => {
                     <Avatar
                       userId={user()?.id || ''}
                       avatar={user()?.avatar}
+                      bot={user()?.bot}
                       alt="User avatar"
                       class="!w-full !h-full !rounded-full object-cover"
                     />
@@ -315,6 +316,11 @@ const UserProfileModal: Component<UserProfileModalProps> = (props) => {
                   >
                     {user()?.display_name || user()?.username}
                   </h1>
+                  <Show when={user()?.bot}>
+                    <span class="text-xs bg-primary text-white px-1.5 py-0.5 rounded font-medium flex-shrink-0">
+                      BOT
+                    </span>
+                  </Show>
                 </div>
                 <div class="text-text-secondary">
                   {user()?.username}#{String(user()?.discriminator).padStart(4, "0")}

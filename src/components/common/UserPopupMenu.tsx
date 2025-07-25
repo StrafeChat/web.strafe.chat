@@ -209,6 +209,7 @@ const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
                     <Avatar
                       userId={user()?.id || ''}
                       avatar={user()?.avatar}
+                      bot={user()?.bot}
                       alt="User avatar"
                       class="!w-[72px] !h-[72px] !rounded-full object-cover"
                     />
@@ -234,7 +235,14 @@ const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
             </div>
             {/* User Info */}
             <div class="mt-4 p-4">
-              <div class="font-semibold text-lg">{user()?.display_name}</div>
+              <div class="flex items-center gap-2">
+                <div class="font-semibold text-lg">{user()?.display_name}</div>
+                <Show when={user()?.bot}>
+                  <span class="text-xs bg-primary text-white px-1.5 py-0.5 rounded font-medium flex-shrink-0">
+                    BOT
+                  </span>
+                </Show>
+              </div>
               <div class="text-sm text-text-secondary">
                 {user()?.username}#
                 {String(user()?.discriminator).padStart(4, "0")}

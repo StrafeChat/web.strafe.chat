@@ -37,6 +37,8 @@ import Notes from "./components/home/notes/Notes";
 import { SpaceRoomView } from "./components/spaces/SpaceRoomView";
 import SpaceView from "./components/spaces/SpaceView";
 import InviteHandler from "./components/invite/InviteHandler";
+import BotsPage from "./components/bots/BotsPage";
+import BotInvitePage from "./components/bots/BotInvitePage";
 import { VoiceProvider } from "./lib/providers/voice/VoiceProvider";
 import { NavigationHistoryProvider } from "./lib/providers/navigation/NavigationHistoryProvider";
 
@@ -128,10 +130,12 @@ const App = () => {
 				<Route path="/password-reset/verify" component={PasswordResetVerify} />
 				<Route path="/password-reset/complete" component={PasswordResetComplete} />
 				<Route path="/invite/:code" component={InviteHandler} />
+				<Route path="/bot/:botId" component={BotInvitePage} />
 				<Route path="/" component={Interface as never}>
 					<Route path="/" component={Home} />
 					<Route path="/friends" component={Friends} />
 					<Route path="/notes" component={Notes} />
+					<Route path="/bots" component={BotsPage} />
 					<Route path="/rooms/:roomId" component={RoomView} />
 					<Route path="/spaces/:spaceId" component={SpaceView} />
 					<Route path="/spaces/:spaceId/rooms/:roomId" component={SpaceRoomView} />

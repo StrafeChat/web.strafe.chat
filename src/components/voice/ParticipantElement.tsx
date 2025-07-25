@@ -184,6 +184,7 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 						avatar={pUser?.avatar} 
 						size="lg" 
 						class="w-20 h-20" 
+
 					/>
 				</div>
 			</Show>

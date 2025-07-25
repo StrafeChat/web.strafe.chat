@@ -390,7 +390,8 @@ const DraggableRoomItem: Component<DraggableRoomItemProps> = (props) => {
 												userId={user.id}
 												avatar={user.avatar}
 												alt={`${user.display_name || user.username}'s avatar`}
-												size="xs">
+												size="xs"
+												bot={user.bot}>
 
 											</Avatar>
 											<p>{ user.display_name || user.username }</p>

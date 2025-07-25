@@ -94,6 +94,7 @@ export const SpaceMembersList: Component<SpaceMembersListProps> = (props) => {
           avatar: userData.avatar,
           banner: userData.banner,
           presence: userData.presence,
+          bot: userData.bot,
           spaceMember: member
         };
         
@@ -121,6 +122,7 @@ export const SpaceMembersList: Component<SpaceMembersListProps> = (props) => {
               avatar: userData.avatar,
               banner: userData.banner,
               presence: userData.presence,
+              bot: userData.bot,
               spaceMember: member
             };
             roleMembers.push(memberData);
@@ -149,6 +151,7 @@ export const SpaceMembersList: Component<SpaceMembersListProps> = (props) => {
             display_name: userData.display_name,
             avatar: userData.avatar,
             banner: userData.banner,
+            bot: userData.bot,
             presence: userData.presence,
             spaceMember: member
           };
@@ -199,6 +202,7 @@ export const SpaceMembersList: Component<SpaceMembersListProps> = (props) => {
             userId={member.id}
             avatar={member.avatar}
             alt={`${member.display_name || member.username}'s avatar`}
+            bot={member.bot}
             size="sm"
           />
         </div>
@@ -212,6 +216,11 @@ export const SpaceMembersList: Component<SpaceMembersListProps> = (props) => {
           <div class="text-sm font-medium text-text-primary truncate">
             {member.spaceMember?.nick || member.display_name || member.username}
           </div>
+          <Show when={member.bot}>
+            <span class="text-xs bg-primary text-white px-1.5 py-0.5 rounded font-medium flex-shrink-0">
+              BOT
+            </span>
+          </Show>
           {/* Crown icon for space owner */}
           <Show when={props.currentSpace?.owner_id === member.id}>
             <Tooltip content="Space Owner" position="top">

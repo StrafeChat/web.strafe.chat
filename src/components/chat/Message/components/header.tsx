@@ -28,6 +28,7 @@ export const MessageHeader: Component<MessageHeaderProps> = (props) => {
           }`}
           size="md"
           onClick={props.onAuthorClick}
+          bot={props.author?.bot}
         />
       </div>
     </Show>
