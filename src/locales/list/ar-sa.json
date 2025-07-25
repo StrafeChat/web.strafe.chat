@@ -68,11 +68,14 @@
       "dateOfBirth": "تاريخ الميلاد",
       "tos": "أوافق على",
       "tosLink": "شروط الخدمة",
+      "aupLink": "سياسة الاستخدام",
       "and": "و",
       "privacyLink": "سياسة الخصوصية",
       "submit": "التسجيل",
+      "next": "التالي",
       "haveAccount": "لديك حساب بالفعل؟ تسجيل الدخول",
       "error": {
+        "passwordMismatch": "كلمات المرور غير متطابقة",
         "requiredFields": "يرجى ملء جميع الحقول المطلوبة",
         "registrationFailed": "فشل التسجيل. يرجى المحاولة مرة أخرى."
       }

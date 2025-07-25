@@ -217,7 +217,7 @@ const DatePicker: Component<DatePickerProps> = (props) => {
       <div
         onClick={() => setIsOpen(!isOpen())}
         class="w-full px-4 py-2 border border-border rounded-md cursor-pointer 
-          bg-background text-text-primary hover:border-accent focus:outline-none 
+          bg-[#323857] text-text-primary hover:border-accent focus:outline-none 
           focus:border-accent dark:border-border"
       >
         {formatDate()(selectedDate())}
@@ -225,8 +225,8 @@ const DatePicker: Component<DatePickerProps> = (props) => {
 
       <Show when={isOpen()}>
         <div
-          class="absolute bottom-full right-0 md:left-[-4rem] w-80 p-3 mb-1 border rounded-lg shadow-lg
-            bg-background border-border dark:bg-background dark:border-border
+          class="absolute z-50 bottom-full left-1/2 -translate-x-1/2 w-full sm:w-96 max-w-[calc(100vw-2rem)] p-3 mb-1 border rounded-lg shadow-lg
+            bg-[#23273A] border-border dark:border-border
             animate-in fade-in slide-in-from-top-2"
         >
           <div class="flex items-center justify-between mb-1">
@@ -298,7 +298,7 @@ const DatePicker: Component<DatePickerProps> = (props) => {
             <div class="grid grid-cols-7 gap-1 mb-2">
               <For each={weekDays()}>
                 {(day) => (
-                  <div class="w-11 h-9 flex items-center justify-center text-sm font-semibold text-text-secondary">
+                  <div class="w-12 h-8 flex items-center justify-center text-sm font-semibold text-text-secondary">
                     {day}
                   </div>
                 )}
@@ -332,8 +332,8 @@ const DatePicker: Component<DatePickerProps> = (props) => {
                       onClick={() =>
                         !isDisabled && handleDateSelect(day.value!)
                       }
-                      class={`w-11 h-8 rounded-full flex items-center justify-center text-sm transition-transform
-                        ${isSelected ? "bg-accent text-white" : "hover:bg-surface dark:hover:bg-surface-dark text-text-primary"}
+                      class={`w-12 h-7 rounded-full flex items-center justify-center text-sm transition-transform
+                        ${isSelected ? "bg-[#323857] text-white" : "hover:bg-surface dark:hover:bg-surface-dark text-text-primary"}
                         ${isDisabled ? "text-text-disabled cursor-not-allowed" : "cursor-pointer hover:scale-110 active:scale-95"}
                       `}
                       disabled={isDisabled}
