@@ -114,7 +114,7 @@ export function ContextMenuProvider(props: { children: JSX.Element }) {
             style={{
               left: `${x()}px`,
               top: `${y()}px`,
-              width: "250px",
+              width: "215px",
               "max-height": "400px",
               "overflow-y": "auto",
               "background-color": theme().colors.background2,

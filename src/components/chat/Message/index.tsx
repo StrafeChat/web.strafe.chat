@@ -19,6 +19,7 @@ import { MessageAttachment, MessageType } from "../../../types/messageTypes";
 
 import ConfirmModal from "../../modals/ConfirmModal";
 import UserPopupMenu from "../../common/UserPopupMenu";
+import { useContextMenu } from "../../../lib/providers/context/ContextMenuProvider";
 import { MessageProps } from "./types";
 
 import { referencedMessages } from "./utils/message";
@@ -41,6 +42,7 @@ export function Message(props: MessageProps) {
   const { user, rooms, deleteMessage, editMessage, isMobile } = useAuth();
   const [t] = useTransContext();
   const navigate = useNavigate();
+  const { openContextMenu } = useContextMenu();
 
   const [isEditing, setIsEditing] = createSignal(false);
   const [editContent, setEditContent] = createSignal(props.content);
@@ -254,6 +256,106 @@ export function Message(props: MessageProps) {
     // Default message click behavior can be added here
   };
 
+  // Handle message context menu (right-click)
+  const handleMessageContextMenu = (e: MouseEvent) => {
+    e.preventDefault();
+    
+    const messageContextMenu = () => (
+      <div class="py-1 w-48">
+        <button
+          class="w-full px-3 py-1.5 text-left text-sm text-text-primary hover:bg-surface hover:bg-opacity-10 transition-colors flex items-center gap-2"
+          onClick={() => {
+            navigator.clipboard.writeText(props.content || '');
+          }}
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+          Copy Text
+        </button>
+        
+        <Show when={props.onReply && props.id}>
+          <button
+            class="w-full px-3 py-1.5 text-left text-sm text-text-primary hover:bg-surface hover:bg-opacity-10 transition-colors flex items-center gap-2"
+            onClick={() => {
+              props.onReply?.(props.id!);
+            }}
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+            </svg>
+            Reply
+          </button>
+        </Show>
+        
+        <Show when={canEdit()}>
+          <button
+            class="w-full px-3 py-1.5 text-left text-sm text-text-primary hover:bg-surface hover:bg-opacity-10 transition-colors flex items-center gap-2"
+            onClick={() => {
+              handleEdit();
+            }}
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            </svg>
+            Edit
+          </button>
+        </Show>
+        
+        <Show when={canDelete()}>
+          <button
+            class="w-full px-3 py-1.5 text-left text-sm text-red-400 hover:bg-red-500 hover:bg-opacity-10 transition-colors flex items-center gap-2"
+            onClick={() => {
+              setShowDeleteConfirm(true);
+            }}
+          >
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Delete
+          </button>
+        </Show>
+        
+        <div class="border-t border-border-primary my-1"></div>
+        
+        <button
+          class="w-full px-3 py-1.5 text-left text-sm text-text-secondary hover:text-text-primary hover:bg-surface hover:bg-opacity-10 transition-colors flex items-center gap-2"
+          onClick={() => {
+            navigator.clipboard.writeText(props.id || '');
+          }}
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+          Copy Message ID
+        </button>
+        
+        <button
+          class="w-full px-3 py-1.5 text-left text-sm text-text-secondary hover:text-text-primary hover:bg-surface hover:bg-opacity-10 transition-colors flex items-center gap-2"
+          onClick={() => {
+            const currentRoom = rooms().find(r => r.id === props.room_id);
+            if (currentRoom) {
+              let link = '';
+              if (currentRoom.type === 0 || currentRoom.type === 1) { // PM or GROUP_PM
+                link = `${window.location.origin}/rooms/${props.room_id}/${props.id}`;
+              } else { // Space rooms
+                link = `${window.location.origin}/spaces/${currentRoom.space_id}/rooms/${props.room_id}/${props.id}`;
+              }
+              navigator.clipboard.writeText(link);
+            }
+          }}
+        >
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+          </svg>
+          Copy Message Link
+        </button>
+      </div>
+    );
+    
+    openContextMenu(e, messageContextMenu);
+  };
+
   // Setup event listeners for mention click events
   createEffect(() => {
     // Event listener for opening user popup from mention clicks
@@ -363,6 +465,7 @@ export function Message(props: MessageProps) {
       <>
         <div
           class={`flex flex-col ${shouldShowCompact ? "mt-1" : "mt-5"} group hover:bg-surface hover:bg-opacity-10 transition-colors px-4 w-full relative overflow-visible min-w-0 ${isCurrentUserMentioned() ? "bg-yellow-900/30 border-l-4 border-yellow-700 pl-3" : ""}`}
+          onContextMenu={handleMessageContextMenu}
         >
           <MessageReplies
             refMessages={refMessages()}
