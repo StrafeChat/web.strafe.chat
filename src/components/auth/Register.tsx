@@ -5,6 +5,7 @@ import { useTransContext } from "@mbarzda/solid-i18next";
 import { LanguageSelector } from "../shared/LanguageSelector";
 import DatePicker from "../shared/DatePicker";
 
+
 const Register = () => {
   const [username, setUsername] = createSignal("");
   const [discriminator, setDiscriminator] = createSignal("");
@@ -15,10 +16,13 @@ const Register = () => {
   const [tosAgreed, setTosAgreed] = createSignal(false);
   const [error, setError] = createSignal("");
   const [step, setStep] = createSignal(1);
+  
   const [confirmPassword, setConfirmPassword] = createSignal("");
   const { register, isMobile } = useAuth();
   const [t] = useTransContext();
   const navigate = useNavigate();
+
+  
 
   const handleNext = (e: Event) => {
     e.preventDefault();
@@ -43,10 +47,7 @@ const Register = () => {
       if (!username() || !discriminator()) {
         setError(t("auth.register.error.requiredFields"));
         valid = false;
-      } else if (
-        discriminator().length !== 4 ||
-        isNaN(parseInt(discriminator()))
-      ) {
+      } else if (discriminator().length !== 4 || isNaN(parseInt(discriminator()))) {
         setError("Discriminator must be exactly 4 numbers");
         valid = false;
       }
@@ -58,11 +59,13 @@ const Register = () => {
     }
 
     if (valid) {
+      
       setStep((prev) => prev + 1);
     }
   };
 
   const handleBack = () => {
+    
     setStep((prev) => prev - 1);
   };
 
@@ -116,8 +119,10 @@ const Register = () => {
 
     if (result.success) {
       if (result.message) {
+
         navigate("/verify-email", { replace: true });
       } else {
+        
         navigate("/", { replace: true });
       }
     } else {
@@ -172,7 +177,7 @@ const Register = () => {
         class={
           isMobile()
             ? "w-full max-w-md mx-auto bg-[#24283b]/95 backdrop-blur-sm rounded-lg shadow-lg shadow-black/20 p-6 pb-16 border border-[#414868] relative z-10 overflow-visible"
-            : "w-full max-w-md bg-[#24283b]/95 backdrop-blur-sm rounded-lg shadow-lg shadow-black/20 p-8 border border-[#414868] relative z-10"
+            : "w-full h-full max-w-md bg-[#24283b]/95 backdrop-blur-sm rounded-lg shadow-lg shadow-black/20 p-8 border border-[#414868] relative z-10"
         }
       >
         <div class="space-y-1.5">
@@ -190,10 +195,7 @@ const Register = () => {
               if (step() === 4) handleSubmit(e);
             }}
           >
-            <div
-              class="relative overflow-hidden w-full"
-              style="min-height: 300px;"
-            >
+            <div class="relative overflow-hidden w-full">
               <div
                 class="flex transition-transform duration-300 ease-in-out"
                 style={`width: 400%; transform: translateX(-${(step() - 1) * 25}%);`}
@@ -212,7 +214,7 @@ const Register = () => {
                       value={email()}
                       required
                       onInput={(e) => setEmail(e.currentTarget.value)}
-                      class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none"
+                      class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none "
                     />
                   </div>
                   <div>
@@ -252,7 +254,7 @@ const Register = () => {
                       value={password()}
                       required
                       onInput={(e) => setPassword(e.currentTarget.value)}
-                      class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none"
+                      class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none "
                     />
                   </div>
                   <div>
@@ -268,7 +270,7 @@ const Register = () => {
                       value={confirmPassword()}
                       required
                       onInput={(e) => setConfirmPassword(e.currentTarget.value)}
-                      class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none"
+                      class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none "
                     />
                   </div>
                   <div class="flex space-x-4">
@@ -302,7 +304,7 @@ const Register = () => {
                       value={username()}
                       required
                       onInput={(e) => setUsername(e.currentTarget.value)}
-                      class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none"
+                      class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none "
                     />
                   </div>
                   <div>
@@ -322,7 +324,7 @@ const Register = () => {
                         const value = e.currentTarget.value.replace(/\D/g, "");
                         setDiscriminator(value.slice(0, 4));
                       }}
-                      class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none"
+                      class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none "
                     />
                   </div>
                   <div class="flex space-x-4">
@@ -355,7 +357,7 @@ const Register = () => {
                       id="displayName"
                       value={displayName()}
                       onInput={(e) => setDisplayName(e.currentTarget.value)}
-                      class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none"
+                      class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none "
                     />
                   </div>
                   <div class="flex items-center">
