@@ -71,7 +71,9 @@ export const VoiceProvider: ParentComponent = (props) => {
 
 			lvRoom = new Room();
 			setLivekitRoom(lvRoom);
-			await lvRoom.connect(LIVEKIT_URL, token);
+			await lvRoom.connect(LIVEKIT_URL, token, {
+				autoSubscribe: false,
+			});
 			setupListeners();
 
 			// Initialize media states
@@ -203,7 +205,6 @@ export const VoiceProvider: ParentComponent = (props) => {
 	}
 
 	const joinListener = (p: RemoteParticipant) => {
-		console.log(p);
 		if (p.isLocal) return; // don't listen to local audio
 		p.on(ParticipantEvent.TrackSubscribed, (track: RemoteTrack) => {
 			if (track.kind !== Track.Kind.Audio) return;
