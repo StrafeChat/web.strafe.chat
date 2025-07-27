@@ -248,6 +248,8 @@ const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
                 {String(user()?.discriminator).padStart(4, "0")}
               </div>
 
+
+
               {/* About Me Section */}
               <Show when={(user()?.about_me || user()?.AboutMe) && (user()?.about_me || user()?.AboutMe)?.trim().length > 0}>
                 <div class="w-full pt-4">
@@ -294,6 +296,8 @@ const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
                   );
                 })()}
               </Show>
+
+
             </div>
           </div>
         </Portal>
