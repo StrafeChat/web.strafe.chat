@@ -123,7 +123,11 @@ export const VoiceProvider: ParentComponent = (props) => {
   
 	const enableScreenShare = async (enable: boolean) => {
 		const p = lvRoom.localParticipant;
-		await p.setScreenShareEnabled(enable);
+		await p.setScreenShareEnabled(enable, {
+			audio: true,
+			surfaceSwitching: "include",
+			selfBrowserSurface: "include",
+		});
 		// Update reactive signal
 		setIsScreenShareEnabled(p.isScreenShareEnabled);
 	}

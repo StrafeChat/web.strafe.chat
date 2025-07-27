@@ -18,10 +18,13 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 	const userId = p.identity;
 
 	const pubElements = new Map<string, HTMLElement>();
+	const screenShares: RemoteTrackPublication[] = [];
 
 	const MIN_DECIBELS = -45;
 
 	const [soundDetected, setSoundDetected] = createSignal(false);
+	const [screenShareEnabled, setScreenShareEnabled] = createSignal(false);
+	const [screenShareInbound, setScreenShareInbound] = createSignal(false);
 
 	const getStrafeUser = () => {
 		if (user()?.id === userId) {
@@ -42,7 +45,13 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 	var mediaCon!: HTMLDivElement;
 
 	const onPublish = (pub: RemoteTrackPublication) => { // TODO: handle custom subscription logic
-		pub.setSubscribed(true);
+		if (pub.source !== Track.Source.ScreenShare && pub.source !== Track.Source.ScreenShareAudio) {
+			return pub.setSubscribed(true);
+		}
+
+		// handle screenshares
+		screenShares.push(pub);
+		setScreenShareInbound(true);
 	}
 
 	const setupSpeakingIndicator = (track: Track<Track.Kind.Audio>) => {
@@ -79,6 +88,31 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 		window.requestAnimationFrame(detectSound);
 	}
 
+	const enableScreenshare = () => {
+		if (screenShares.length === 0) return;
+
+		screenShares.forEach(pub => {
+			if (pub.isSubscribed) {
+				if (!pub.isEnabled) pub.setEnabled(true);
+				return;
+			}
+			pub.setSubscribed(true);
+		});
+
+		setScreenShareEnabled(true);
+	}
+	const disableScreenshare = () => {
+		if (screenShares.length === 0) return;
+
+		screenShares.forEach(pub => {
+			if (pub.isSubscribed) {
+				if (pub.isEnabled) pub.setEnabled(false);
+				return;
+			}
+		});
+
+		setScreenShareEnabled(false);
+	}
 
 	const handleTrack = (track: Track, sid: string) => {
 		if (track.kind === Track.Kind.Video || track.kind === Track.Kind.Audio) {
@@ -175,6 +209,8 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 					/>
 				</div>
 			</Show>
+
+			
 			
 			{/* User Info Overlay */}
 			<div class="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white text-sm px-2 py-1 rounded flex items-center gap-2">
@@ -183,6 +219,12 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 					<div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
 				</Show>
 				<span>{pUser?.username}#{pUser?.discriminator}</span>
+				<Show when={!screenShareEnabled() && screenShareInbound()}>
+					<button onclick={enableScreenshare}>View Screenshare</button>
+				</Show>
+				<Show when={screenShareEnabled() && screenShareInbound()}>
+					<button onclick={disableScreenshare}>Disable Screenshare</button>
+				</Show>
 			</div>
 			
 			{/* Speaking Border */}
