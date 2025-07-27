@@ -217,7 +217,9 @@ const ClientUserPopup: Component<Props> = (props) => {
 
             {/* User Info */}
             <div class="mt-4 p-4">
-              <div class="font-semibold text-lg">{user()?.display_name}</div>
+              <div class="flex items-center gap-2">
+                <div class="font-semibold text-lg">{user()?.display_name}</div>
+              </div>
               <div class="text-sm text-text-secondary">
                 {user()?.username}#
                 {String(user()?.discriminator).padStart(4, "0")}

@@ -9,6 +9,7 @@ interface AvatarProps {
   class?: string;
   size?: "xs" | "sm" | "md" | "lg" | "xl";
   onClick?: JSX.EventHandlerUnion<HTMLImageElement, MouseEvent>;
+  bot?: boolean;
 }
 
 type FallbackState = "original" | "user-default" | "global-default";
@@ -41,24 +42,25 @@ export const Avatar: Component<AvatarProps> = (props) => {
   // Get the avatar URL with progressive fallback handling
   const getAvatarUrl = () => {
     const state = fallbackState();
+    const avatarPath = props.bot ? "bot_avatars" : "avatars";
     
     switch (state) {
       case "original":
         if (props.avatar) {
-          return `${FS_URL}/avatars/${props.userId}/${props.avatar}`;
+          return `${FS_URL}/${avatarPath}/${props.userId}/${props.avatar}`;
         }
         // If no avatar provided, go directly to user default
-        return `${FS_URL}/avatars/${props.userId}/default.webp`;
+        return `${FS_URL}/${avatarPath}/${props.userId}/default.webp`;
       
       case "user-default":
-        return `${FS_URL}/avatars/${props.userId}/default.webp`;
+        return `${FS_URL}/${avatarPath}/${props.userId}/default.webp`;
       
       case "global-default":
         // Return null to indicate we should show the SVG icon
         return null;
       
       default:
-        return `${FS_URL}/avatars/${props.userId}/default.webp`;
+        return `${FS_URL}/${avatarPath}/${props.userId}/default.webp`;
     }
   };
   

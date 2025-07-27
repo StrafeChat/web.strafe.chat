@@ -26,6 +26,11 @@ export const MessageAuthorInfo: Component<MessageAuthorInfoProps> = (props) => {
               props.author?.username ||
               "Unknown User"}
           </span>
+          <Show when={props.author?.bot}>
+            <span class="text-xs bg-primary text-white px-1.5 py-0.5 rounded font-medium flex-shrink-0">
+              BOT
+            </span>
+          </Show>
           <span class="text-xs text-text-secondary whitespace-nowrap flex-shrink-0">
             {formatTimestamp(props.createdAt, props.t, props.appearance)}
           </span>

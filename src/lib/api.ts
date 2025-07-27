@@ -227,4 +227,46 @@ export const api = {
         }),
     },
   },
+  bots: {
+    list: () => apiRequest(`${API_ENDPOINTS.BOTS}`),
+    create: (data: { username: string; description?: string }) =>
+      apiRequest(`${API_ENDPOINTS.BOTS}`, {
+        method: "POST",
+        body: data,
+      }),
+    get: (botId: string) => apiRequest(`${API_ENDPOINTS.BOTS}/${botId}`),
+    update: (botId: string, data: {
+      username?: string;
+      description?: string;
+      public?: boolean;
+      discoverable?: boolean;
+      terms_of_service_url?: string;
+      privacy_policy_url?: string;
+    }) =>
+      apiRequest(`${API_ENDPOINTS.BOTS}/${botId}`, {
+        method: "PATCH",
+        body: data,
+      }),
+    delete: (botId: string) =>
+      apiRequest(`${API_ENDPOINTS.BOTS}/${botId}`, {
+        method: "DELETE",
+      }),
+    regenerateToken: (botId: string) =>
+      apiRequest(`${API_ENDPOINTS.BOTS}/${botId}/token`, {
+        method: "POST",
+      }),
+    spaces: {
+      add: (spaceId: string, botId: string) =>
+        apiRequest(`${API_ENDPOINTS.SPACES}/${spaceId}/bots`, {
+          method: "POST",
+          body: { bot_id: botId },
+        }),
+      remove: (spaceId: string, botId: string) =>
+        apiRequest(`${API_ENDPOINTS.SPACES}/${spaceId}/bots/${botId}`, {
+          method: "DELETE",
+        }),
+      list: (spaceId: string) =>
+        apiRequest(`${API_ENDPOINTS.SPACES}/${spaceId}/bots`),
+    },
+  },
 };

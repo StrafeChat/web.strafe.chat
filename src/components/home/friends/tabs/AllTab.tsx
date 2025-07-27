@@ -24,6 +24,7 @@ type FriendData = {
   banner?: string;
   status: UserStatus;
   custom_status: string;
+  bot?: boolean;
 };
 
 export const AllTab: Component = () => {
@@ -89,6 +90,7 @@ export const AllTab: Component = () => {
             ? friend.presence.status
             : "offline",
           custom_status: friend.presence?.custom_status || "",
+          bot: friend.bot || false,
         };
         console.log("[AllTab:friends] Created friend data:", friendData);
         return friendData;
@@ -247,7 +249,14 @@ export const AllTab: Component = () => {
                     <StatusIndicator status={friend.status as UserStatus} />
                   </div>
                   <div class="flex flex-col flex-grow">
-                    <span>{friend.display_name}</span>
+                    <div class="flex items-center gap-2">
+                      <span>{friend.display_name}</span>
+                      <Show when={friend.bot}>
+                        <span class="text-xs bg-primary text-white px-1.5 py-0.5 rounded font-medium flex-shrink-0">
+                          BOT
+                        </span>
+                      </Show>
+                    </div>
                     <span class="text-text-secondary text-sm">
                       {friend.status === "offline"
                         ? "Offline"

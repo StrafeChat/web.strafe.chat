@@ -39,6 +39,7 @@ export const API_ENDPOINTS = {
   SPACE_INVITES: (spaceId: string) => `${BASE_URL}/spaces/${spaceId}/invites`,
   GET_INVITE_INFO: (code: string) => `${BASE_URL}/invite/${code}`,
   USE_INVITE: (code: string) => `${BASE_URL}/invite/${code}/use`,
+  BOTS: `${BASE_URL}/bots`,
 
 };
 
