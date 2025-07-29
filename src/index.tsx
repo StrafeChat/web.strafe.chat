@@ -5,7 +5,7 @@ import App from "./App";
 import { registerServiceWorker } from "./lib/sw/registerServiceWorker";
 import { initConsoleDetector } from "./lib/utils/consoleDetector";
 
-initConsoleDetector();
+if (import.meta.env.MODE === "production") initConsoleDetector();
 
 const app = () => <App />;
 registerServiceWorker().catch(console.error);
