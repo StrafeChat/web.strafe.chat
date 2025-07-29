@@ -1,11 +1,11 @@
-import { Participant, ParticipantEvent, RemoteTrack, RemoteTrackPublication, Track, TrackPublication } from "livekit-client";
+import { Participant, ParticipantEvent, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Track, TrackEvent, TrackPublication } from "livekit-client";
 import { Component, createEffect, createSignal, Show } from "solid-js";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
 import { useCache } from "../../lib/providers/cache/CacheProvider";
 import { Avatar } from "../common/Avatar";
 
 type ParticipantProps = {
-	p: Participant,
+	p: Participant | RemoteParticipant,
 	isLocal: boolean,
 	onFocus?: () => void
 }
@@ -14,14 +14,17 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 	const { user } = useAuth();
 	const { getUser } = useCache();
 
-	const p = props.p;
+	const p = (props.isLocal) ? props.p as Participant : props.p as RemoteParticipant;
 	const userId = p.identity;
 
 	const pubElements = new Map<string, HTMLElement>();
+	const screenShares: RemoteTrackPublication[] = [];
 
 	const MIN_DECIBELS = -45;
 
 	const [soundDetected, setSoundDetected] = createSignal(false);
+	const [screenShareEnabled, setScreenShareEnabled] = createSignal(false);
+	const [screenShareInbound, setScreenShareInbound] = createSignal(false);
 
 	const getStrafeUser = () => {
 		if (user()?.id === userId) {
@@ -41,34 +44,14 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 
 	var mediaCon!: HTMLDivElement;
 
-	const onPublish = (pub: TrackPublication) => {
-		const track = pub.track;
-		if (!track) return;
-		if (track.kind === Track.Kind.Video || track.kind === Track.Kind.Audio) {
-			// attach it to a new HTMLVideoElement or HTMLAudioElement
-			const element = track.attach();
-			if (!!props.isLocal && track.kind === Track.Kind.Audio) {
-				// Mute local audio to prevent feedback
-				element.muted = true;
-			}
-			if (track.kind === Track.Kind.Audio) {
-				element.muted = true;
-				setupSpeakingIndicator(track as Track<Track.Kind.Audio>);
-			}
-			// Style video elements properly
-			if (track.kind === Track.Kind.Video) {
-				element.style.width = '100%';
-				element.style.height = '100%';
-				element.style.objectFit = 'cover';
-				// Check if this is a screen share track
-				if (track.source === Track.Source.ScreenShare) {
-					element.style.objectFit = 'contain';
-					element.classList.add('screen-share-track');
-				}
-			}
-			mediaCon.appendChild(element);
-			pubElements.set(pub.trackSid, element);
+	const onPublish = (pub: RemoteTrackPublication) => { // TODO: handle custom subscription logic
+		if (pub.source !== Track.Source.ScreenShare && pub.source !== Track.Source.ScreenShareAudio) {
+			return pub.setSubscribed(true);
 		}
+
+		// handle screenshares
+		screenShares.push(pub);
+		setScreenShareInbound(true);
 	}
 
 	const setupSpeakingIndicator = (track: Track<Track.Kind.Audio>) => {
@@ -105,13 +88,39 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 		window.requestAnimationFrame(detectSound);
 	}
 
-	const onSubscribe = (track: RemoteTrack, pub: RemoteTrackPublication) => {
+	const enableScreenshare = () => {
+		if (screenShares.length === 0) return;
+
+		screenShares.forEach(pub => {
+			if (pub.isSubscribed) {
+				if (!pub.isEnabled) pub.setEnabled(true);
+				return;
+			}
+			pub.setSubscribed(true);
+		});
+
+		setScreenShareEnabled(true);
+	}
+	const disableScreenshare = () => {
+		if (screenShares.length === 0) return;
+
+		screenShares.forEach(pub => {
+			if (pub.isSubscribed) {
+				if (pub.isEnabled) pub.setEnabled(false);
+				return;
+			}
+		});
+
+		setScreenShareEnabled(false);
+	}
+
+	const handleTrack = (track: Track, sid: string) => {
 		if (track.kind === Track.Kind.Video || track.kind === Track.Kind.Audio) {
 			// attach it to a new HTMLVideoElement or HTMLAudioElement
 			const element = track.attach();
+			// Ensure audio is muted to prevent double audio playback
+			element.muted = true;
 			if (track.kind === Track.Kind.Audio) {
-				// Ensure remote audio is muted to prevent double audio playback
-				element.muted = true;
 				setupSpeakingIndicator(track as Track<Track.Kind.Audio>);
 			}
 			// Style video elements properly
@@ -126,8 +135,17 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 				}
 			}
 			mediaCon.appendChild(element);
-			pubElements.set(pub.trackSid, element);
+			pubElements.set(sid, element);
+
+			track.on(TrackEvent.Restarted, (t: Track) => {
+				t.attachedElements.forEach(element => {
+					element.muted = true;
+				});
+			})
 		}
+	}
+	const onSubscribe = (track: RemoteTrack, pub: RemoteTrackPublication) => {
+		handleTrack(track, pub.trackSid);
 	}
 	const onUnsubscribe = (track: RemoteTrack, pub: RemoteTrackPublication) => {
 		track.detach();
@@ -157,12 +175,15 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 		// consume existing publications
 		for (const [_k, v] of p.trackPublications) {
 			if (!v) continue;
-			onPublish(v);
+			if (!props.isLocal) onPublish(v as RemoteTrackPublication);
+			handleTrack(v.track!, v.trackSid);
 		}
 	});
 
 	p.on(ParticipantEvent.TrackPublished, onPublish)
-		.on(ParticipantEvent.LocalTrackPublished, onPublish)
+		.on(ParticipantEvent.LocalTrackPublished, (p: TrackPublication) => {
+			handleTrack(p.track!, p.trackSid);
+		})
 		.on(ParticipantEvent.TrackSubscribed, onSubscribe)
 		.on(ParticipantEvent.TrackUnsubscribed, onUnsubscribe)
 		.on(ParticipantEvent.LocalTrackUnpublished, onLocalUnpublish)
@@ -188,6 +209,8 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 					/>
 				</div>
 			</Show>
+
+			
 			
 			{/* User Info Overlay */}
 			<div class="absolute bottom-2 left-2 bg-black bg-opacity-70 text-white text-sm px-2 py-1 rounded flex items-center gap-2">
@@ -196,6 +219,12 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 					<div class="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
 				</Show>
 				<span>{pUser?.username}#{pUser?.discriminator}</span>
+				<Show when={!screenShareEnabled() && screenShareInbound()}>
+					<button onclick={enableScreenshare}>View Screenshare</button>
+				</Show>
+				<Show when={screenShareEnabled() && screenShareInbound()}>
+					<button onclick={disableScreenshare}>Disable Screenshare</button>
+				</Show>
 			</div>
 			
 			{/* Speaking Border */}
