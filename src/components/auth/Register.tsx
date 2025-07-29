@@ -5,6 +5,7 @@ import { useTransContext } from "@mbarzda/solid-i18next";
 import { LanguageSelector } from "../shared/LanguageSelector";
 import DatePicker from "../shared/DatePicker";
 
+
 const Register = () => {
   const [username, setUsername] = createSignal("");
   const [discriminator, setDiscriminator] = createSignal("");
@@ -12,25 +13,86 @@ const Register = () => {
   const [email, setEmail] = createSignal("");
   const [password, setPassword] = createSignal("");
   const [dateOfBirth, setDateOfBirth] = createSignal(new Date());
+  const [tosAgreed, setTosAgreed] = createSignal(false);
   const [error, setError] = createSignal("");
+  const [step, setStep] = createSignal(1);
+  
+  const [confirmPassword, setConfirmPassword] = createSignal("");
   const { register, isMobile } = useAuth();
   const [t] = useTransContext();
   const navigate = useNavigate();
 
-  // In Register.tsx, modify the handleSubmit function:
+  
+
+  const handleNext = (e: Event) => {
+    e.preventDefault();
+    setError("");
+
+    let valid = true;
+
+    if (step() === 1) {
+      if (!email() || !dateOfBirth()) {
+        setError(t("auth.register.error.requiredFields"));
+        valid = false;
+      }
+    } else if (step() === 2) {
+      if (!password() || !confirmPassword()) {
+        setError(t("auth.register.error.requiredFields"));
+        valid = false;
+      } else if (password() !== confirmPassword()) {
+        setError(t("auth.register.error.passwordMismatch"));
+        valid = false;
+      }
+    } else if (step() === 3) {
+      if (!username() || !discriminator()) {
+        setError(t("auth.register.error.requiredFields"));
+        valid = false;
+      } else if (discriminator().length !== 4 || isNaN(parseInt(discriminator()))) {
+        setError("Discriminator must be exactly 4 numbers");
+        valid = false;
+      }
+    } else if (step() === 4) {
+      if (!tosAgreed()) {
+        setError(t("auth.register.error.requiredFields"));
+        valid = false;
+      }
+    }
+
+    if (valid) {
+      
+      setStep((prev) => prev + 1);
+    }
+  };
+
+  const handleBack = () => {
+    
+    setStep((prev) => prev - 1);
+  };
 
   const handleSubmit = async (e: Event) => {
     e.preventDefault();
     setError("");
 
     if (
-      !username() ||
-      !discriminator() ||
       !email() ||
       !password() ||
-      !dateOfBirth()
+      !confirmPassword() ||
+      !dateOfBirth() ||
+      !username() ||
+      !discriminator() ||
+      !tosAgreed()
     ) {
       setError(t("auth.register.error.requiredFields"));
+      return;
+    }
+
+    if (password() !== confirmPassword()) {
+      setError(t("auth.register.error.passwordMismatch"));
+      return;
+    }
+
+    if (discriminator().length !== 4) {
+      setError("Discriminator must be exactly 4 digits");
       return;
     }
 
@@ -57,10 +119,10 @@ const Register = () => {
 
     if (result.success) {
       if (result.message) {
-        // Email verification required - redirect to verify email page
+
         navigate("/verify-email", { replace: true });
       } else {
-        // Immediate login - redirect to home
+        
         navigate("/", { replace: true });
       }
     } else {
@@ -114,8 +176,8 @@ const Register = () => {
       <div
         class={
           isMobile()
-            ? "w-full max-w-md mx-auto bg-[#24283b]/95 backdrop-blur-sm rounded-lg shadow-lg shadow-black/20 p-6 pb-16 border border-[#414868] relative z-10 max-h-[calc(90vh-10px)] overflow-y-auto"
-            : "w-full max-w-md bg-[#24283b]/95 backdrop-blur-sm rounded-lg shadow-lg shadow-black/20 p-8 border border-[#414868] relative z-10"
+            ? "w-full max-w-md mx-auto bg-[#24283b]/95 backdrop-blur-sm rounded-lg shadow-lg shadow-black/20 p-6 pb-16 border border-[#414868] relative z-10 overflow-visible"
+            : "w-full h-full max-w-md bg-[#24283b]/95 backdrop-blur-sm rounded-lg shadow-lg shadow-black/20 p-8 border border-[#414868] relative z-10"
         }
       >
         <div class="space-y-1.5">
@@ -126,157 +188,245 @@ const Register = () => {
             {t("auth.register.subtitle")}
           </p>
 
-          <form onSubmit={handleSubmit} class="space-y-4">
-            <div class="md:grid md:grid-cols-2 md:gap-4 space-y-4 md:space-y-0">
-              <div class="space-y-4">
-                <div>
-                  <label
-                    for="username"
-                    class="block text-sm font-medium mb-2 text-gray-300"
-                  >
-                    {t("auth.register.username")}*
-                  </label>
-                  <input
-                    type="text"
-                    id="username"
-                    value={username()}
-                    required
-                    onInput={(e) => setUsername(e.currentTarget.value)}
-                    class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    for="discriminator"
-                    class="block text-sm font-medium mb-2 text-gray-300"
-                  >
-                    {t("auth.register.discriminator")}*
-                  </label>
-                  <input
-                    type="text"
-                    id="discriminator"
-                    value={discriminator()}
-                    required
-                    onInput={(e) => setDiscriminator(e.currentTarget.value)}
-                    class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    for="displayName"
-                    class="block text-sm font-medium mb-2 text-gray-300"
-                  >
-                    {t("auth.register.displayName")}
-                  </label>
-                  <input
-                    type="text"
-                    id="displayName"
-                    value={displayName()}
-                    onInput={(e) => setDisplayName(e.currentTarget.value)}
-                    class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-              </div>
-
-              <div class="space-y-4">
-                <div>
-                  <label
-                    for="email"
-                    class="block text-sm font-medium mb-2 text-gray-300"
-                  >
-                    {t("auth.register.email")}*
-                  </label>
-                  <input
-                    type="email"
-                    id="email"
-                    value={email()}
-                    required
-                    onInput={(e) => setEmail(e.currentTarget.value)}
-                    class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    for="password"
-                    class="block text-sm font-medium mb-2 text-gray-300"
-                  >
-                    {t("auth.register.password")}*
-                  </label>
-                  <input
-                    type="password"
-                    id="password"
-                    value={password()}
-                    required
-                    onInput={(e) => setPassword(e.currentTarget.value)}
-                    class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none focus:ring-2 focus:ring-primary"
-                  />
-                </div>
-
-                <div>
-                  <label
-                    for="dateOfBirth"
-                    class="block text-sm font-medium mb-2 text-gray-300"
-                  >
-                    {t("auth.register.dateOfBirth")}*
-                  </label>
-                  <DatePicker
-                    value={dateOfBirth()}
-                    onChange={(date) => setDateOfBirth(date)}
-                    minDate={new Date(1900, 0, 1)}
-                    maxDate={new Date()}
-                    class="w-full"
-                  />
-                </div>
-              </div>
-            </div>
-
-            <div class="flex items-center">
-              <div class="relative inline-block w-5 h-5 mr-2">
-                <input
-                  type="checkbox"
-                  id="tos"
-                  required
-                  class="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer peer z-10"
-                />
-                <span class="absolute top-0 left-0 h-5 w-5 bg-[#24283b] border border-[#414868] rounded-md peer-checked:bg-primary peer-checked:border-primary transition-all duration-200 ease-in-out"></span>
-                <span class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 ease-in-out">
-                  ✓
-                </span>
-              </div>
-              <label
-                for="tos"
-                class="text-sm text-gray-300 select-none cursor-pointer"
+          <form
+            class="space-y-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (step() === 4) handleSubmit(e);
+            }}
+          >
+            <div class="relative overflow-hidden w-full">
+              <div
+                class="flex transition-transform duration-300 ease-in-out"
+                style={`width: 400%; transform: translateX(-${(step() - 1) * 25}%);`}
               >
-                {t("auth.register.tos")}{" "}
-                <a
-                  href="https://strafe.chat/terms"
-                  class="text-[var(--primary)] hover:underline"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {t("auth.register.tosLink")}
-                </a>{" "}
-                {t("auth.register.and")}{" "}
-                <a
-                  href="https://strafe.chat/privacy"
-                  class="text-[var(--primary)] hover:underline"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  {t("auth.register.privacyLink")}
-                </a>
-              </label>
+                <div class="w-[25%] flex-shrink-0 space-y-4">
+                  <div>
+                    <label
+                      for="email"
+                      class="block text-sm font-medium mb-2 text-gray-300"
+                    >
+                      {t("auth.register.email")}*
+                    </label>
+                    <input
+                      type="email"
+                      id="email"
+                      value={email()}
+                      required
+                      onInput={(e) => setEmail(e.currentTarget.value)}
+                      class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none "
+                    />
+                  </div>
+                  <div>
+                    <label
+                      for="dateOfBirth"
+                      class="block text-sm font-medium mb-2 text-gray-300"
+                    >
+                      {t("auth.register.dateOfBirth")}*
+                    </label>
+                    <DatePicker
+                      value={dateOfBirth()}
+                      onChange={(date) => setDateOfBirth(date)}
+                      minDate={new Date(1900, 0, 1)}
+                      maxDate={new Date()}
+                      class="w-full"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleNext}
+                    class="w-full py-2 px-4 bg-primary rounded-md hover:opacity-90 transition-opacity text-white"
+                  >
+                    {t("auth.register.next")}
+                  </button>
+                </div>
+                <div class="w-[25%] flex-shrink-0 space-y-4">
+                  <div>
+                    <label
+                      for="password"
+                      class="block text-sm font-medium mb-2 text-gray-300"
+                    >
+                      {t("auth.register.password")}*
+                    </label>
+                    <input
+                      type="password"
+                      id="password"
+                      value={password()}
+                      required
+                      onInput={(e) => setPassword(e.currentTarget.value)}
+                      class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none "
+                    />
+                  </div>
+                  <div>
+                    <label
+                      for="confirmPassword"
+                      class="block text-sm font-medium mb-2 text-gray-300"
+                    >
+                      Confirm Password*
+                    </label>
+                    <input
+                      type="password"
+                      id="confirmPassword"
+                      value={confirmPassword()}
+                      required
+                      onInput={(e) => setConfirmPassword(e.currentTarget.value)}
+                      class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none "
+                    />
+                  </div>
+                  <div class="flex space-x-4">
+                    <button
+                      type="button"
+                      onClick={handleBack}
+                      class="flex-1 py-2 px-4 bg-gray-600 rounded-md hover:opacity-90 transition-opacity text-white"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleNext}
+                      class="flex-1 py-2 px-4 bg-primary rounded-md hover:opacity-90 transition-opacity text-white"
+                    >
+                      {t("auth.register.next")}
+                    </button>
+                  </div>
+                </div>
+                <div class="w-[25%] flex-shrink-0 space-y-4">
+                  <div>
+                    <label
+                      for="username"
+                      class="block text-sm font-medium mb-2 text-gray-300"
+                    >
+                      {t("auth.register.username")}*
+                    </label>
+                    <input
+                      type="text"
+                      id="username"
+                      value={username()}
+                      required
+                      onInput={(e) => setUsername(e.currentTarget.value)}
+                      class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none "
+                    />
+                  </div>
+                  <div>
+                    <label
+                      for="discriminator"
+                      class="block text-sm font-medium mb-2 text-gray-300"
+                    >
+                      {t("auth.register.discriminator")}*
+                    </label>
+                    <input
+                      type="text"
+                      id="discriminator"
+                      value={discriminator()}
+                      required
+                      maxLength={4}
+                      onInput={(e) => {
+                        const value = e.currentTarget.value.replace(/\D/g, "");
+                        setDiscriminator(value.slice(0, 4));
+                      }}
+                      class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none "
+                    />
+                  </div>
+                  <div class="flex space-x-4">
+                    <button
+                      type="button"
+                      onClick={handleBack}
+                      class="flex-1 py-2 px-4 bg-gray-600 rounded-md hover:opacity-90 transition-opacity text-white"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="button"
+                      onClick={handleNext}
+                      class="flex-1 py-2 px-4 bg-primary rounded-md hover:opacity-90 transition-opacity text-white"
+                    >
+                      {t("auth.register.next")}
+                    </button>
+                  </div>
+                </div>
+                <div class="w-[25%] flex-shrink-0 space-y-4">
+                  <div>
+                    <label
+                      for="displayName"
+                      class="block text-sm font-medium mb-2 text-gray-300"
+                    >
+                      {t("auth.register.displayName")}
+                    </label>
+                    <input
+                      type="text"
+                      id="displayName"
+                      value={displayName()}
+                      onInput={(e) => setDisplayName(e.currentTarget.value)}
+                      class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none "
+                    />
+                  </div>
+                  <div class="flex items-center">
+                    <div class="relative inline-block w-5 h-5 mr-2">
+                      <input
+                        type="checkbox"
+                        id="tos"
+                        checked={tosAgreed()}
+                        onChange={(e) => setTosAgreed(e.currentTarget.checked)}
+                        required
+                        class="absolute top-0 left-0 w-full h-full opacity-0 cursor-pointer peer z-10"
+                      />
+                      <span class="absolute top-0 left-0 h-5 w-5 bg-[#24283b] border border-[#414868] rounded-md peer-checked:bg-primary peer-checked:border-primary transition-all duration-200 ease-in-out"></span>
+                      <span class="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-white opacity-0 peer-checked:opacity-100 transition-opacity duration-200 ease-in-out">
+                        ✓
+                      </span>
+                    </div>
+                    <label
+                      for="tos"
+                      class="text-sm text-gray-300 select-none cursor-pointer"
+                    >
+                      {t("auth.register.tos")}{" "}
+                      <a
+                        href="https://strafe.chat/terms"
+                        class="text-[var(--primary)] hover:underline"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {t("auth.register.tosLink")}
+                      </a>
+                      {", "}
+                      <a
+                        href="https://strafe.chat/aup"
+                        class="text-[var(--primary)] hover:underline"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {t("auth.register.aupLink")}
+                      </a>
+                      {", "}
+                      {t("auth.register.and")}{" "}
+                      <a
+                        href="https://strafe.chat/privacy"
+                        class="text-[var(--primary)] hover:underline"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {t("auth.register.privacyLink")}
+                      </a>
+                    </label>
+                  </div>
+                  <div class="flex space-x-4">
+                    <button
+                      type="button"
+                      onClick={handleBack}
+                      class="flex-1 py-2 px-4 bg-gray-600 rounded-md hover:opacity-90 transition-opacity text-white"
+                    >
+                      Back
+                    </button>
+                    <button
+                      type="submit"
+                      class="flex-1 py-2 px-4 bg-primary rounded-md hover:opacity-90 transition-opacity text-white"
+                    >
+                      {t("auth.register.submit")}
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
-
-            <button
-              type="submit"
-              class="w-full py-2 px-4 bg-primary rounded-md hover:opacity-90 transition-opacity text-white"
-            >
-              {t("auth.register.submit")}
-            </button>
 
             <div class="text-left">
               <button
