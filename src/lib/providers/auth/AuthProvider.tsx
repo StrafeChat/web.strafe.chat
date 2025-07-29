@@ -15,6 +15,10 @@ import { BASE_URL, WS_URL } from "../../../constants";
 import { api } from "../../api";
 import { RoomWithRecipients } from "../../../types/rooms";
 import { Space } from "../cache/CacheProvider";
+import { NotificationService } from "../../services/NotificationService";
+import { hasUserMention } from "../../utils/mentions";
+import { useUserSettings } from "../userSettings/UserSettingsProvider";
+import { FS_URL } from "../../../constants";
 
 export const API_ENDPOINTS = {
   REGISTER: `${BASE_URL}/auth/register`,
@@ -157,6 +161,10 @@ export const AuthProvider: ParentComponent = (props) => {
   const [wsClient, setWsClient] = createSignal<WebSocketClient | null>(null);
   const [unreadMessages, setUnreadMessages] = createSignal<{ [roomId: string]: string[] }>({});
   const [mentionUnreadMessages, setMentionUnreadMessages] = createSignal<{ [roomId: string]: string[] }>({});
+  
+  // Get notification service and user settings
+  const notificationService = NotificationService.getInstance();
+  const userSettings = useUserSettings();
 
   const mobileCheck = createMemo(() => isMobile());
 
@@ -1325,7 +1333,7 @@ export const AuthProvider: ParentComponent = (props) => {
   };
 
   // Handle new message events to update unread messages
-  const handleMessageCreateEvent = (data: any) => {
+  const handleMessageCreateEvent = async (data: any) => {
     console.log("[AuthProvider] handleMessageCreateEvent called with data:", data);
     const messageData = data.data || data;
     console.log("[AuthProvider] Extracted messageData:", messageData);
@@ -1457,19 +1465,110 @@ export const AuthProvider: ParentComponent = (props) => {
       return updated;
     });
     
-    // Update room unread count
+    // Update room last_message_id for all messages
     setRooms((rooms: RoomWithRecipients[]) => {
       return rooms.map(room => {
         if (room.id === messageData.room_id) {
           return {
             ...room,
-            unread_count: (room.unread_count || 0) + 1,
             last_message_id: messageData.id
           };
         }
         return room;
       });
     });
+    
+    // Handle notifications for messages from other users
+    if (!isFromCurrentUser) {
+      try {
+        const currentRoom = rooms().find(room => room.id === messageData.room_id);
+        const messageAuthor = cache.getUser(normalizedMessage.author_id);
+        
+        // Check if this is a mention
+        const isMention = hasUserMention(normalizedMessage.content, currentUser.id);
+        
+        // Update unread messages state
+        setUnreadMessages(prev => ({
+          ...prev,
+          [messageData.room_id]: [...(prev[messageData.room_id] || []), messageData.id]
+        }));
+        
+        // If this is a mention, also update mention unread messages state
+        if (isMention) {
+          setMentionUnreadMessages(prev => ({
+            ...prev,
+            [messageData.room_id]: [...(prev[messageData.room_id] || []), messageData.id]
+          }));
+        }
+        
+        // Update room unread count and mention count for messages from other users
+        setRooms((rooms: RoomWithRecipients[]) => {
+          return rooms.map(room => {
+            if (room.id === messageData.room_id) {
+              const updatedRoom = {
+                ...room,
+                unread_count: (room.unread_count || 0) + 1
+              };
+              
+              // If this is a mention, also increment mention_count
+              if (isMention) {
+                updatedRoom.mention_count = (room.mention_count || 0) + 1;
+              }
+              
+              return updatedRoom;
+            }
+            return room;
+          });
+        });
+        
+        // Check if this is a PM (room type 1 or has recipients)
+        const isDM = currentRoom?.type === 1 || (currentRoom?.recipients && currentRoom.recipients.length > 0);
+        
+        // Create notification data with user avatar
+        const getAvatarUrl = (user: any) => {
+          if (!user) {
+            console.log('[AuthProvider] No user provided for avatar, using favicon');
+            return '/favicon.ico';
+          }
+          const avatarPath = user.bot ? 'bot_avatars' : 'avatars';
+          let avatarUrl;
+          if (user.avatar) {
+            avatarUrl = `${FS_URL}/${avatarPath}/${user.id}/${user.avatar}`;
+          } else {
+            avatarUrl = `${FS_URL}/${avatarPath}/${user.id}/default.webp`;
+          }
+          console.log('[AuthProvider] Generated avatar URL for notification:', avatarUrl, 'for user:', user);
+          return avatarUrl;
+        };
+        
+        const notificationData = {
+          type: isMention ? 'mention' as const : (isDM ? 'pm' as const : 'message' as const),
+          title: isDM 
+            ? `${messageAuthor?.display_name || messageAuthor?.username || 'Unknown User'}`
+            : `${messageAuthor?.display_name || messageAuthor?.username || 'Unknown User'} in ${currentRoom?.name || 'Unknown Room'}`,
+          body: normalizedMessage.content || 'New message',
+          icon: getAvatarUrl(messageAuthor),
+          roomId: messageData.room_id,
+          spaceId: currentRoom?.space_id,
+          userId: normalizedMessage.author_id,
+          url: `/rooms/${messageData.room_id}`,
+          isMention,
+          isDM
+        };
+        
+        // Get user settings and presence
+        const notifications = userSettings.notifications();
+        const userPresence = currentUser.presence;
+        
+        // Send notification
+        await notificationService.notify(notificationData, notifications, {
+          status: (userPresence?.status || "offline") as "offline" | "online" | "dnd" | "idle",
+        });
+        
+      } catch (error) {
+        console.error('[AuthProvider] Failed to send notification:', error);
+      }
+    }
   };
 
   const handleMessageEditEvent = (data: any) => {

@@ -217,6 +217,10 @@
       "title": "Privacy & Safety",
       "description": "Control your privacy and safety settings"
     },
+    "notifications": {
+      "title": "Notifications",
+      "description": "Customize your notification preferences"
+    },
     "default": {
       "underDevelopment": "This section is under development."
     },

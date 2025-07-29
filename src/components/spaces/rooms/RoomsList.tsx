@@ -109,9 +109,9 @@ const OrphanedRoomItem: Component<OrphanedRoomItemProps> = (props) => {
         isDragging() ? "opacity-50 scale-95 bg-blue-500 bg-opacity-20" : ""
       }`}
     >
-      {/* Unread indicator - white dot on very left */}
+      {/* Unread indicator - white dot on very left edge */}
       <Show when={(props.room.unread_count ?? 0) > 0 && !(props.room.mention_count ?? 0)}>
-        <div class="absolute -left-2 top-1/2 transform -translate-y-1/2 w-2 h-2 bg-white bg-opacity-80 rounded-full"></div>
+        <div class="absolute -left-4 top-1/2 transform -translate-y-1/2 w-2 h-2 bg-white bg-opacity-80 rounded-full"></div>
       </Show>
       <div
         class={`flex items-center gap-2 px-2 py-0.5 rounded-md transition-colors ${
@@ -120,7 +120,7 @@ const OrphanedRoomItem: Component<OrphanedRoomItemProps> = (props) => {
             : "text-text-secondary hover:bg-surface hover:bg-opacity-10 hover:text-text-primary"
         }`}
       >
-        {/* Mention indicator - red circle on right */}
+        {/* Mention indicator - red circle positioned closer */}
         <Show when={(props.room.mention_count ?? 0) > 0}>
           <div class="absolute -right-1 top-1/2 transform -translate-y-1/2 bg-red-500 text-white text-xs w-4 h-4 rounded-full grid place-items-center">
             {props.room.mention_count}
@@ -274,9 +274,9 @@ const DraggableRoomItem: Component<DraggableRoomItemProps> = (props) => {
         isDragging() ? "opacity-50 scale-95 bg-blue-500 bg-opacity-20" : ""
       }`}
     >
-      {/* Unread indicator - white dot on very left */}
+      {/* Unread indicator - white dot on very left edge */}
       <Show when={(props.room.unread_count ?? 0) > 0 && !(props.room.mention_count ?? 0)}>
-        <div class="absolute -left-2 top-1/2 transform -translate-y-1/2 w-2 h-2 bg-white bg-opacity-80 rounded-full"></div>
+        <div class="absolute -left-4 top-1/2 transform -translate-y-1/2 w-2 h-2 bg-white bg-opacity-80 rounded-full"></div>
       </Show>
       <div
         class={`flex items-center gap-1 px-2 py-0.5 rounded-md transition-colors ${
@@ -285,7 +285,7 @@ const DraggableRoomItem: Component<DraggableRoomItemProps> = (props) => {
             : "text-text-secondary hover:bg-surface hover:bg-opacity-10 hover:text-text-primary"
         }`}
       >
-        {/* Mention indicator - red circle on right */}
+        {/* Mention indicator - red circle positioned closer */}
         <Show when={(props.room.mention_count ?? 0) > 0}>
           <div class="absolute -right-1 top-1/2 transform -translate-y-1/2 bg-red-500 text-white text-xs w-4 h-4 rounded-full grid place-items-center">
             {props.room.mention_count}
