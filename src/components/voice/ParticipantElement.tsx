@@ -20,6 +20,8 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 	const pubElements = new Map<string, HTMLElement>();
 	const screenShares: RemoteTrackPublication[] = [];
 
+	const BLUR_STRENGTH = 5;
+
 	const [soundDetected, setSoundDetected] = createSignal(false);
 	const [screenShareEnabled, setScreenShareEnabled] = createSignal(false);
 	const [screenShareInbound, setScreenShareInbound] = createSignal(false);
@@ -49,6 +51,29 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 
 		// handle screenshares
 		screenShares.push(pub);
+		pub.setSubscribed(true);
+		if (pub.kind === Track.Kind.Video) {
+			pub.on("subscribed", (track) => { // load at least one frame
+				track.attachedElements.forEach(e => { // should only be a single element
+					e.style.filter = `blur(${BLUR_STRENGTH}px)`;
+				});
+				const stream = new MediaStream([track.mediaStreamTrack]);
+				if (stream) {
+					const recorder = new MediaRecorder(stream, {});
+
+					recorder.ondataavailable = (e) => {
+						if (e.data.size <= 0) return;
+
+						pub.setEnabled(false);
+						recorder.stop();
+					}
+					recorder.start(0);
+				}
+			});
+		} else {
+			pub.setEnabled(false);
+		}
+
 		setScreenShareInbound(true);
 	}
 
@@ -60,8 +85,8 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 
 		const source = audioCtx.createMediaStreamSource(stream);
 		source.connect(analyser);
-		analyser.minDecibels = MIN_DECIBELS;
 		analyser.fftSize = 32;
+
 		const bufferLength = analyser.frequencyBinCount;
 		const domainData = new Uint8Array(bufferLength);
 
@@ -91,6 +116,11 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 		screenShares.forEach(pub => {
 			if (pub.isSubscribed) {
 				if (!pub.isEnabled) pub.setEnabled(true);
+				if (pub.kind === Track.Kind.Video) {
+					pub.track?.attachedElements.forEach(e => {
+						e.style.filter = "none";
+					});
+				}
 				return;
 			}
 			pub.setSubscribed(true);
@@ -104,6 +134,11 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 		screenShares.forEach(pub => {
 			if (pub.isSubscribed) {
 				if (pub.isEnabled) pub.setEnabled(false);
+				if (pub.kind === Track.Kind.Video) {
+					pub.track?.attachedElements.forEach(e => {
+						e.style.filter = `blur(${BLUR_STRENGTH}px)`;
+					});
+				}
 				return;
 			}
 		});
