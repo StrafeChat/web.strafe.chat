@@ -220,10 +220,10 @@ const SessionsSettings: Component = () => {
   });
 
   return (
-    <div class={`mb-8 overflow-hidden ${isMobile() ? "" : "mr-5"}`}>
+    <div class={`mb-8 ${isMobile() ? "" : "mr-5"}`}>
       {/* Header with Icon */}
-      <div class="flex items-center gap-3 mb-6 overflow-hidden">
-        <div class="p-2 bg-primary/10 rounded-lg flex-shrink-0">
+      <div class="flex items-center gap-3 mb-6">
+        <div class="p-3 bg-primary/10 rounded-lg">
           <Monitor />
         </div>
         <div class="min-w-0 flex-1">
@@ -246,9 +246,11 @@ const SessionsSettings: Component = () => {
           <div class="bg-background1 rounded-lg p-4 sm:p-6 overflow-hidden">
             <div class="flex items-center gap-2 mb-4 overflow-hidden">
               <div class="w-2 h-2 bg-green-500 rounded-full animate-pulse flex-shrink-0"></div>
-              <h3 class="text-lg font-semibold text-text-primary truncate">Current Session</h3>
+              <h3 class="text-lg font-semibold text-text-primary truncate">
+                Current Session
+              </h3>
             </div>
-            <For each={sessions().filter(session => session.current)}>
+            <For each={sessions().filter((session) => session.current)}>
               {(session) => (
                 <div class="p-3 sm:p-4 rounded-lg border bg-green-500/10 border-green-500/30 dark:bg-green-400/10 dark:border-green-400/30 overflow-hidden">
                   <div class="flex flex-col sm:flex-row sm:items-start gap-3 overflow-hidden">
@@ -273,20 +275,31 @@ const SessionsSettings: Component = () => {
                         <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs text-text-secondary overflow-hidden">
                           <span class="truncate break-all">
                             {t("settings.sessions.lastActive", {
-                              time: formatDistanceToNow(new Date(session.created_at), {
-                                addSuffix: true,
-                              }),
+                              time: formatDistanceToNow(
+                                new Date(session.created_at),
+                                {
+                                  addSuffix: true,
+                                },
+                              ),
                             })}
                           </span>
                           <div class="flex items-center gap-1 min-w-0 overflow-hidden">
-                            <span class="flex-shrink-0 text-xs">{t("settings.sessions.ipAddress")}:</span>
+                            <span class="flex-shrink-0 text-xs">
+                              {t("settings.sessions.ipAddress")}:
+                            </span>
                             <span class="font-mono text-xs truncate break-all max-w-20">
-                              {hiddenIPs()[session.token] ? session.ip : session.ip.replace(/[^.]/g, '*')}
+                              {hiddenIPs()[session.token]
+                                ? session.ip
+                                : session.ip.replace(/[^.]/g, "*")}
                             </span>
                             <button
                               onClick={() => toggleIPVisibility(session.token)}
                               class="text-primary hover:text-primary-dark flex-shrink-0 p-1"
-                              title={hiddenIPs()[session.token] ? "Hide IP" : "Show IP"}
+                              title={
+                                hiddenIPs()[session.token]
+                                  ? "Hide IP"
+                                  : "Show IP"
+                              }
                             >
                               <svg
                                 xmlns="http://www.w3.org/2000/svg"
@@ -314,13 +327,14 @@ const SessionsSettings: Component = () => {
           </div>
 
           {/* Other Sessions */}
-          {sessions().filter(session => !session.current).length > 0 && (
+          {sessions().filter((session) => !session.current).length > 0 && (
             <div class="bg-background1 rounded-lg p-4 sm:p-6 overflow-hidden">
               <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4 overflow-hidden">
                 <div class="flex items-center gap-2 min-w-0 overflow-hidden">
                   <div class="w-2 h-2 bg-gray-400 rounded-full flex-shrink-0"></div>
                   <h3 class="text-lg font-semibold text-text-primary truncate break-all">
-                    Other Sessions ({sessions().filter(session => !session.current).length})
+                    Other Sessions (
+                    {sessions().filter((session) => !session.current).length})
                   </h3>
                 </div>
                 <button
@@ -331,7 +345,7 @@ const SessionsSettings: Component = () => {
                 </button>
               </div>
               <div class="space-y-4 overflow-hidden">
-                <For each={sessions().filter(session => !session.current)}>
+                <For each={sessions().filter((session) => !session.current)}>
                   {(session) => (
                     <div class="p-3 sm:p-4 rounded-lg border bg-background2 border-border overflow-hidden">
                       <div class="flex flex-col gap-3 overflow-hidden">
@@ -356,20 +370,33 @@ const SessionsSettings: Component = () => {
                             <div class="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 text-xs text-text-secondary overflow-hidden">
                               <span class="truncate break-all">
                                 {t("settings.sessions.lastActive", {
-                                  time: formatDistanceToNow(new Date(session.created_at), {
-                                    addSuffix: true,
-                                  }),
+                                  time: formatDistanceToNow(
+                                    new Date(session.created_at),
+                                    {
+                                      addSuffix: true,
+                                    },
+                                  ),
                                 })}
                               </span>
                               <div class="flex items-center gap-1 min-w-0 overflow-hidden">
-                                <span class="flex-shrink-0 text-xs">{t("settings.sessions.ipAddress")}:</span>
+                                <span class="flex-shrink-0 text-xs">
+                                  {t("settings.sessions.ipAddress")}:
+                                </span>
                                 <span class="font-mono text-xs truncate break-all max-w-20">
-                                  {hiddenIPs()[session.token] ? session.ip : session.ip.replace(/[^.]/g, '*')}
+                                  {hiddenIPs()[session.token]
+                                    ? session.ip
+                                    : session.ip.replace(/[^.]/g, "*")}
                                 </span>
                                 <button
-                                  onClick={() => toggleIPVisibility(session.token)}
+                                  onClick={() =>
+                                    toggleIPVisibility(session.token)
+                                  }
                                   class="text-primary hover:text-primary-dark flex-shrink-0 p-1"
-                                  title={hiddenIPs()[session.token] ? "Hide IP" : "Show IP"}
+                                  title={
+                                    hiddenIPs()[session.token]
+                                      ? "Hide IP"
+                                      : "Show IP"
+                                  }
                                 >
                                   <svg
                                     xmlns="http://www.w3.org/2000/svg"

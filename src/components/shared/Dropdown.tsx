@@ -3,9 +3,9 @@ import {
   For,
   Show,
   createSignal,
-  onCleanup,
-  onMount,
   createMemo,
+  onMount,
+  onCleanup,
 } from "solid-js";
 import { ChevronDown } from "./icons/ChevronDown";
 
@@ -24,72 +24,79 @@ type DropdownProps<T> = {
 
 export function Dropdown<T>(props: DropdownProps<T>) {
   const [isOpen, setIsOpen] = createSignal(false);
-  let dropdownRef: HTMLDivElement | undefined;
+  let ref: HTMLDivElement | undefined;
 
-  const handleClickOutside = (event: MouseEvent) => {
-    if (dropdownRef && !dropdownRef.contains(event.target as Node)) {
-      setIsOpen(false);
-    }
+  const handleClickOutside = (e: MouseEvent) => {
+    if (ref && !ref.contains(e.target as Node)) setIsOpen(false);
+  };
+
+  const handleKey = (e: KeyboardEvent) => {
+    if (e.key === "Escape") setIsOpen(false);
   };
 
   onMount(() => {
     document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("keydown", handleKey);
   });
 
   onCleanup(() => {
     document.removeEventListener("mousedown", handleClickOutside);
+    document.removeEventListener("keydown", handleKey);
   });
 
-  const currentOption = createMemo(() =>
+  const selected = createMemo(() =>
     props.options.find((opt) => opt.value === props.value),
   );
 
-  const handleSelect = (value: T) => {
-    props.onChange(value);
+  const handleSelect = (val: T) => {
+    props.onChange(val);
     setIsOpen(false);
   };
 
   return (
-    <div class={props.class} ref={dropdownRef}>
-      <div class="relative">
-        <button
-          type="button"
-          onClick={() => setIsOpen(!isOpen())}
-          class="flex items-center gap-2 px-3 py-1 border border-border rounded-md bg-background text-text-primary hover:bg-surface focus:outline-none focus:ring-2 focus:ring-accent cursor-pointer"
-        >
-          <Show when={currentOption()} keyed>
-            {(option) => (
+    <div ref={ref} class={`relative ${props.class ?? ""}`}>
+      <div
+        role="button"
+        aria-haspopup="listbox"
+        aria-expanded={isOpen()}
+        tabindex={0}
+        onClick={() => setIsOpen(!isOpen())}
+        class="w-full min-h-[44px] px-3 py-2 grid grid-cols-[1fr_auto] items-center gap-2 bg-background text-text-primary border border-border rounded-md cursor-pointer hover:bg-surface focus:outline-none transition-colors"
+      >
+        <div class="truncate text-[16px] font-medium leading-tight flex items-center gap-2">
+          <Show when={selected()} keyed>
+            {(option: DropdownOption<T>) => (
               <>
                 {option.icon && <option.icon />}
-                <span>{option.label}</span>
+                <span class="truncate">{option.label}</span>
               </>
             )}
           </Show>
-          <div
-            class="transition-transform duration-200"
-            classList={{ "rotate-180": isOpen() }}
-          >
-            <ChevronDown />
-          </div>
-        </button>
-
-        <Show when={isOpen()}>
-          <div class="absolute top-full mt-1 right-0 w-32 py-1 bg-background border border-border rounded-md shadow-lg z-50">
-            <For each={props.options}>
-              {(option) => (
-                <button
-                  type="button"
-                  onClick={() => handleSelect(option.value)}
-                  class="w-full flex items-center gap-2 px-3 py-1.5 hover:bg-surface text-text-primary text-left"
-                >
-                  {option.icon && <option.icon />}
-                  <span>{option.label}</span>
-                </button>
-              )}
-            </For>
-          </div>
-        </Show>
+        </div>
+        <div
+          class="transition-transform duration-200"
+          classList={{ "rotate-180": isOpen() }}
+        >
+          <ChevronDown />
+        </div>
       </div>
+
+      <Show when={isOpen()}>
+        <div class="absolute left-0 mt-1 w-full bg-background border border-border rounded-md shadow-lg z-50 overflow-hidden">
+          <For each={props.options}>
+            {(option) => (
+              <button
+                type="button"
+                onClick={() => handleSelect(option.value)}
+                class="w-full text-left px-3 py-2 hover:bg-surface flex items-center gap-2 text-text-primary text-sm truncate"
+              >
+                {option.icon && <option.icon />}
+                <span class="truncate">{option.label}</span>
+              </button>
+            )}
+          </For>
+        </div>
+      </Show>
     </div>
   );
 }
