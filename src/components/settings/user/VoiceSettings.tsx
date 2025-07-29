@@ -147,6 +147,7 @@ export const VoiceSettings: Component = () => {
                 Input Volume
               </label>
               <input
+								disabled
                 id="input-volume"
                 type="range"
                 min="0"
@@ -203,7 +204,8 @@ export const VoiceSettings: Component = () => {
                 Output Volume
               </label>
               <input
-                id="output-volume"
+								disabled
+								id="output-volume"
                 type="range"
                 min="0"
                 max="100"

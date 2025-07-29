@@ -20,8 +20,6 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 	const pubElements = new Map<string, HTMLElement>();
 	const screenShares: RemoteTrackPublication[] = [];
 
-	const MIN_DECIBELS = -45;
-
 	const [soundDetected, setSoundDetected] = createSignal(false);
 	const [screenShareEnabled, setScreenShareEnabled] = createSignal(false);
 	const [screenShareInbound, setScreenShareInbound] = createSignal(false);
@@ -54,9 +52,8 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 		setScreenShareInbound(true);
 	}
 
-	const setupSpeakingIndicator = (track: Track<Track.Kind.Audio>) => {
-		const stream = new MediaStream();
-		stream.addTrack(track.mediaStreamTrack)
+	const setupSpeakingIndicator = (track: Track<Track.Kind.Audio>) => { // just leaving this here: https://github.com/StrafeChat/web.strafe.chat/blob/412a6dea09703617b5a6c033726d11b7b8912c05/src/components/chat/voice/WaveformVisualisation.tsx
+		const stream = new MediaStream([track.mediaStreamTrack]);
 
 		const audioCtx = new AudioContext();
 		const analyser = audioCtx.createAnalyser();
@@ -64,7 +61,7 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 		const source = audioCtx.createMediaStreamSource(stream);
 		source.connect(analyser);
 		analyser.minDecibels = MIN_DECIBELS;
-
+		analyser.fftSize = 32;
 		const bufferLength = analyser.frequencyBinCount;
 		const domainData = new Uint8Array(bufferLength);
 
