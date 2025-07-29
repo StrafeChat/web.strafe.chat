@@ -6,6 +6,7 @@
       "email": "Correo electrónico",
       "password": "Contraseña",
       "submit": "Iniciar sesión",
+      "next": "Next",
       "needAccount": "¿Necesitas una cuenta? Regístrate",
       "forgotPassword": "¿Olvidaste tu contraseña?",
       "error": {
@@ -68,11 +69,14 @@
       "dateOfBirth": "Fecha de nacimiento",
       "tos": "Acepto los",
       "tosLink": "Términos de servicio",
+      "aupLink": "Política de uso aceptable",
       "and": "y la",
       "privacyLink": "Política de privacidad",
       "submit": "Registrarse",
+      "next": "Siguiente",
       "haveAccount": "¿Ya tienes una cuenta? Inicia sesión",
       "error": {
+        "passwordMismatch": "Las contraseñas no coinciden",
         "requiredFields": "Por favor, rellena todos los campos requeridos",
         "registrationFailed": "El registro falló. Por favor, inténtalo de nuevo."
       }

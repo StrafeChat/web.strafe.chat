@@ -823,8 +823,14 @@ const SpacesList: Component = () => {
                                     </Show>
                                   </button>
                                 </Tooltip>
+                                {/* Mention badge for spaces in folders */}
+                                <Show when={getSpaceMentionCount(space.id) > 0}>
+                                  <div class="absolute -bottom-1 -right-1 bg-red-500 text-white text-xs w-4 h-4 rounded-full flex items-center justify-center border border-background z-40">
+                                    {getSpaceMentionCount(space.id)}
+                                  </div>
+                                </Show>
                                 {/* Unread indicator for spaces in folders */}
-                                <Show when={spaceUnreadRooms().length > 0}>
+                                <Show when={spaceUnreadRooms().length > 0 && getSpaceMentionCount(space.id) === 0}>
                                   <div class="absolute -top-1 -right-1 flex flex-wrap gap-0.5 max-w-6">
                                     <For each={spaceUnreadRooms().slice(0, 3)}>
                                       {() => (
@@ -943,6 +949,12 @@ const SpacesList: Component = () => {
                           </Show>
                         </button>
                       </Tooltip>
+                      {/* Mention badge for standalone spaces */}
+                      <Show when={getSpaceMentionCount(item.data.id) > 0}>
+                        <div class="absolute -bottom-1 -right-1 bg-red-500 text-white text-xs w-5 h-5 rounded-full flex items-center justify-center border-2 border-background z-40">
+                          {getSpaceMentionCount(item.data.id)}
+                        </div>
+                      </Show>
                     </div>
                     {/* Drop indicator line below (for last item) */}
                     <Show

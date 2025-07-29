@@ -72,11 +72,14 @@
       "dateOfBirth": "Date de naissance",
       "tos": "J'accepte les",
       "tosLink": "Conditions d'utilisation",
+      "aupLink": "Politique d'acceptation d'utilisation",
       "and": "et la",
       "privacyLink": "Politique de confidentialité",
       "submit": "S'inscrire",
+      "next": "Suivant",
       "haveAccount": "Vous avez déjà un compte ? Se connecter",
       "error": {
+        "passwordMismatch": "Les mots de passe ne correspondent pas",
         "requiredFields": "Veuillez remplir tous les champs requis",
         "registrationFailed": "L'inscription a échoué. Veuillez réessayer."
       }
