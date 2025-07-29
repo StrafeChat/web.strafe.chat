@@ -115,6 +115,7 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 	}
 
 	const handleTrack = (track: Track, sid: string) => {
+		if (!track) return; // TODO: find out when this happens
 		if (track.kind === Track.Kind.Video || track.kind === Track.Kind.Audio) {
 			// attach it to a new HTMLVideoElement or HTMLAudioElement
 			const element = track.attach();
