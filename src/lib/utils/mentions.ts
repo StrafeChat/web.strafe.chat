@@ -120,6 +120,20 @@ export function hasMentions(content: string): boolean {
 }
 
 /**
+ * Check if a specific user is mentioned in the content
+ */
+export function hasUserMention(content: string, userId: string): boolean {
+  // Check for user mention format: <@user_id>
+  const userMentionRegex = new RegExp(`<@${userId}>`, 'g');
+  if (userMentionRegex.test(content)) return true;
+  
+  // Check for @everyone mention
+  if (/@everyone/.test(content)) return true;
+  
+  return false;
+}
+
+/**
  * Get mention type from a mention string
  */
 export function getMentionType(mention: string): 'user' | 'role' | 'room' | 'everyone' | null {

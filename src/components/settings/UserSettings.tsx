@@ -14,6 +14,7 @@ import SessionsSettings from "./user/SessionsSettings";
 import PrivacySettings from "./user/PrivacySettings";
 import BotsSettings from "./user/BotsSettings";
 import OAuth2Settings from "./user/OAuth2Settings";
+import NotificationSettings from "./user/NotificationSettings";
 import { ToastProvider } from "../common/Toast";
 
 // Import icons
@@ -76,6 +77,8 @@ const UserSettings: Component<UserSettingsProps> = (props) => {
         return <SessionsSettings />;
       case "privacy":
         return <PrivacySettings />; 	
+      case "notifications":
+        return <NotificationSettings />;
       case "appearance":
         return <AppearanceSettings />;
       case "language":

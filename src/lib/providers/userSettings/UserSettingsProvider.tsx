@@ -17,6 +17,17 @@ interface UserSettings {
   privacy: {
     sendTypingIndicators: boolean;
   };
+  notifications: {
+    enableSounds: boolean;
+    enablePushNotifications: boolean;
+    enableDesktopNotifications: boolean;
+    soundVolume: number;
+    mentionSound: string;
+    messageSound: string;
+    muteAllSounds: boolean;
+    onlyMentionsAndPMs: boolean;
+    respectDndStatus: boolean;
+  };
 }
 
 interface UserSettingsContextType {
@@ -26,6 +37,7 @@ interface UserSettingsContextType {
   toggleAlwaysShowSendButton: () => void;
   toggleTimeFormat: () => void;
   toggleSendTypingIndicators: () => void;
+  updateNotificationSettings: (settings: Partial<UserSettings['notifications']>) => void;
   appearance: () => {
     alwaysShowSendButton: boolean;
     timeFormat: string;
@@ -33,6 +45,17 @@ interface UserSettingsContextType {
   };
   privacy: () => {
     sendTypingIndicators: boolean;
+  };
+  notifications: () => {
+    enableSounds: boolean;
+    enablePushNotifications: boolean;
+    enableDesktopNotifications: boolean;
+    soundVolume: number;
+    mentionSound: string;
+    messageSound: string;
+    muteAllSounds: boolean;
+    onlyMentionsAndPMs: boolean;
+    respectDndStatus: boolean;
   };
 }
 
@@ -44,6 +67,17 @@ const defaultUserSettings: UserSettings = {
   },
   privacy: {
     sendTypingIndicators: true,
+  },
+  notifications: {
+    enableSounds: true,
+    enablePushNotifications: true,
+    enableDesktopNotifications: true,
+    soundVolume: 0.7,
+    mentionSound: "mention",
+    messageSound: "message",
+    muteAllSounds: false,
+    onlyMentionsAndPMs: false,
+    respectDndStatus: true,
   },
 };
 
@@ -114,6 +148,16 @@ export const UserSettingsProvider: ParentComponent = (props) => {
     }));
   };
 
+  const updateNotificationSettings = (settings: Partial<UserSettings['notifications']>) => {
+    setUserSettings((prev) => ({
+      ...prev,
+      notifications: {
+        ...prev.notifications,
+        ...settings,
+      },
+    }));
+  };
+
   return (
     <UserSettingsContext.Provider
       value={{
@@ -123,8 +167,10 @@ export const UserSettingsProvider: ParentComponent = (props) => {
         toggleAlwaysShowSendButton,
         toggleTimeFormat,
         toggleSendTypingIndicators,
+        updateNotificationSettings,
         appearance: () => userSettings().appearance,
         privacy: () => userSettings().privacy,
+        notifications: () => userSettings().notifications,
       }}
     >
       {props.children}

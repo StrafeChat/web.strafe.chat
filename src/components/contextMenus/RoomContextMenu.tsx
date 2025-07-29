@@ -8,7 +8,6 @@ import { useToast } from "../common/Toast";
 import Copy from "../shared/icons/Copy";
 import Edit from "../shared/icons/Edit";
 import Link from "../shared/icons/Link";
-import ConfirmModal from "../modals/ConfirmModal";
 import { RoomType } from "../../types/roomTypes";
 
 interface RoomContextMenuProps {
