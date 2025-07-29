@@ -29,8 +29,8 @@ export const VoiceSettings: Component = () => {
     const stream = await navigator.mediaDevices.getUserMedia({
       audio: {
         sampleRate: 48000,
-        echoCancellation: true,
-        noiseSuppression: true,
+        echoCancellation: false,
+        noiseSuppression: false,
         autoGainControl: true,
       },
     });

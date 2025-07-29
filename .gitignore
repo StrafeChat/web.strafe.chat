@@ -11,6 +11,8 @@ package-lock.json
 # env
 .env
 
+./src/index.tsx
+
 node_modules
 dist
 dist-ssr
