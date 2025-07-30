@@ -9,6 +9,7 @@ import {
 import { useAuth } from "../auth/AuthProvider"
 import { AudioCaptureOptions, DisconnectReason, LocalTrackPublication, ParticipantEvent, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent, Track, VideoCaptureOptions } from "livekit-client";
 import { LIVEKIT_URL } from "../../../constants";
+import { useRNNoise } from "./RNNoise";
 
 export enum VoiceState {
 	DISCONNECTED, // order is important
@@ -46,6 +47,7 @@ const VoiceContext = createContext<VoiceContextType>()
 
 export const VoiceProvider: ParentComponent = (props) => {
 	const { getJoinToken } = useAuth();
+  const { startSuppression } = useRNNoise();
 	const [state, setState] = createSignal<VoiceState>(VoiceState.DISCONNECTED)
 	const [room, setRoom] = createSignal("");
 	const [localTrack, setLocalTrack] = createSignal<LocalTrackPublication | null>(null);
@@ -109,11 +111,17 @@ export const VoiceProvider: ParentComponent = (props) => {
 
 	// Merge your provided options with default noise suppression
 	const micOptions: AudioCaptureOptions = {
-		noiseSuppression: true,
-		echoCancellation: true,
 		autoGainControl: true,   
 		...options               
 	};
+
+	/*const stream = await navigator.mediaDevices.getUserMedia({
+		video: false,
+		audio: true
+	});
+
+	await startSuppression(stream);*/
+
 
 	await p.setMicrophoneEnabled(enable, micOptions);
 
