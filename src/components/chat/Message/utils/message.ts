@@ -12,15 +12,15 @@ export const scrollToMessage = (messageId: string) => {
   }
 };
 
-export function referencedMessages(props: () => MessageProps, cache: any) {
+export function referencedMessages(props: () => MessageProps, getMessage: any, getUser: any) {
   return createMemo(() => {
     const currentProps = props();
 
     if (!currentProps.message_references?.length) return [];
 
     return currentProps.message_references.map((refId) => {
-      const message = cache.getMessage(currentProps.room_id!, refId);
-      const user = cache.getUser(message?.author_id || refId);
+      const message = getMessage(currentProps.room_id!, refId);
+      const user = getUser(message?.author_id || refId);
       return {
         id: refId,
         content: message?.content,

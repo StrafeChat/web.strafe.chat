@@ -16,8 +16,8 @@ interface RoomHeaderProps {
 }
 
 const RoomHeader: Component<RoomHeaderProps> = (props) => {
-  const { user, rooms } = useAuth();
-  const cache = useCache();
+  const { user } = useAuth();
+  const { getUser, rooms } = useCache();
 
   const currentRoom = () => {
     const allRooms = rooms();
@@ -34,7 +34,7 @@ const RoomHeader: Component<RoomHeaderProps> = (props) => {
       const recipientId = room.recipients.find((id) => id !== currentUserId);
       if (!recipientId) return "offline" as UserStatus;
       
-      const cachedUser = cache.getUser(recipientId);
+      const cachedUser = getUser(recipientId);
       if (cachedUser?.presence?.status) {
         return cachedUser.presence.status as UserStatus;
       } else if (room.recipients_data && room.recipients_data.length > 0) {

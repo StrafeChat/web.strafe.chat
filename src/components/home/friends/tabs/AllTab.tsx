@@ -28,8 +28,8 @@ type FriendData = {
 };
 
 export const AllTab: Component = () => {
-  const { user, relationships, rooms, setRooms } = useAuth();
-  const cache = useCache();
+  const { user } = useAuth();
+  const { relationships, rooms, setRooms, users, getUser } = useCache();
   const [searchQuery, setSearchQuery] = createSignal("");
   const navigate = useNavigate();
   const [isCreatingPM, setIsCreatingPM] = createSignal(false);
@@ -55,13 +55,13 @@ export const AllTab: Component = () => {
       return [] as const;
     }
 
-    const users = cache.users();
-    console.log("[AllTab:friends] All cached users:", users);
+    const allUsers = users();
+    console.log("[AllTab:friends] All cached users:", allUsers);
 
     const mappedFriends = friendIds
       .map((friendId) => {
         console.log("[AllTab:friends] Processing friend ID:", friendId);
-        const friend = cache.getUser(friendId);
+        const friend = getUser(friendId);
         console.log("[AllTab:friends] Found friend in cache:", friend);
 
         if (!friend?.username) {

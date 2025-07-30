@@ -23,7 +23,7 @@ interface SpaceMembersSettingsProps {
 
 const SpaceMembersSettings: Component<SpaceMembersSettingsProps> = (props) => {
   const { isMobile, user } = useAuth();
-  const cache = useCache();
+  const { getUser, getCachedSpaceMembers, getSpaceMembers, getCachedSpaceRoles, setCachedSpaceMembers, setCachedSpaceRoles, removeSpaceMember } = useCache();
   const [searchQuery, setSearchQuery] = createSignal("");
   const [activeTab, setActiveTab] = createSignal<"members" | "invites">("members");
 
@@ -40,7 +40,7 @@ const SpaceMembersSettings: Component<SpaceMembersSettingsProps> = (props) => {
     const spaceId = props.space.id.toString();
     
     // Check if we have valid cached data
-    const cachedMembers = cache.getCachedSpaceMembers(spaceId);
+    const cachedMembers = getCachedSpaceMembers(spaceId);
     if (cachedMembers && cachedMembers.length > 0) {
       return;
     }
@@ -50,7 +50,7 @@ const SpaceMembersSettings: Component<SpaceMembersSettingsProps> = (props) => {
     
     try {
       const response = await api.spaces.members.list(spaceId) as { members: any[] };
-      cache.setCachedSpaceMembers(spaceId, response.members || []);
+      setCachedSpaceMembers(spaceId, response.members || []);
     } catch (error) {
       console.error("Failed to fetch space members:", error);
       setMembersError("Failed to load members");
@@ -63,7 +63,7 @@ const SpaceMembersSettings: Component<SpaceMembersSettingsProps> = (props) => {
     const spaceId = props.space.id.toString();
     
     // Check if we have valid cached data
-    const cachedRoles = cache.getCachedSpaceRoles(spaceId);
+    const cachedRoles = getCachedSpaceRoles(spaceId);
     if (cachedRoles) {
       return;
     }
@@ -73,7 +73,7 @@ const SpaceMembersSettings: Component<SpaceMembersSettingsProps> = (props) => {
     
     try {
       const response = await api.spaces.roles.list(spaceId) as { roles: any[] };
-      cache.setCachedSpaceRoles(spaceId, response.roles || []);
+      setCachedSpaceRoles(spaceId, response.roles || []);
     } catch (error) {
       console.error("Failed to fetch space roles:", error);
       setRolesError("Failed to load roles");
@@ -124,8 +124,8 @@ const SpaceMembersSettings: Component<SpaceMembersSettingsProps> = (props) => {
 
   const members = createMemo(() => {
     const spaceId = props.space.id.toString();
-    const cachedMembers = cache.getCachedSpaceMembers(spaceId);
-    const fallbackMembers = cache.getSpaceMembers(spaceId);
+    const cachedMembers = getCachedSpaceMembers(spaceId);
+    const fallbackMembers = getSpaceMembers(spaceId);
     
     const rawMembers = cachedMembers || fallbackMembers || [];
     
@@ -137,7 +137,7 @@ const SpaceMembersSettings: Component<SpaceMembersSettingsProps> = (props) => {
       }
       
       // Otherwise, try to get user data from user cache
-      const userData = cache.getUser(member.user_id);
+      const userData = getUser(member.user_id);
       if (userData) {
         return {
           ...member,
@@ -212,7 +212,7 @@ const SpaceMembersSettings: Component<SpaceMembersSettingsProps> = (props) => {
      try {
        await api.spaces.members.kick(props.space.id.toString(), memberId);
        // Remove member from cache
-       cache.removeSpaceMember(props.space.id.toString(), memberId);
+       removeSpaceMember(props.space.id.toString(), memberId);
      } catch (error) {
        console.error("Failed to kick member:", error);
      }

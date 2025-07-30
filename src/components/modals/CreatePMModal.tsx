@@ -30,8 +30,8 @@ interface CreatePMModalProps {
 
 export const CreatePMModal: Component<CreatePMModalProps> = (props) => {
   const [t] = useTransContext();
-  const { relationships } = useAuth();
-  const { getUser } = useCache();
+  const { } = useAuth();
+  const { relationships, getUser } = useCache();
   const [searchQuery, setSearchQuery] = createSignal("");
   const [selectedFriends, setSelectedFriends] = createSignal<string[]>([]);
   const [error, setError] = createSignal("");

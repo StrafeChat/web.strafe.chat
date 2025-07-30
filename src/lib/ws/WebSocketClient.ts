@@ -612,6 +612,21 @@ export class WebSocketClient {
     }
   }
 
+  private parseJSONWithBigInt(jsonString: string): any {
+    // Custom JSON parser that preserves large integers as strings
+    return JSON.parse(jsonString, (key, value) => {
+      // Convert large integers to strings to preserve precision
+      if (typeof value === 'number' && Number.isInteger(value) && Math.abs(value) > Number.MAX_SAFE_INTEGER) {
+        return value.toString();
+      }
+      // Also handle specific ID fields that should always be strings
+      if ((key === 'space_id' || key === 'id' || key === 'user_id' || key === 'room_id' || key === 'parent_id') && typeof value === 'number') {
+        return value.toString();
+      }
+      return value;
+    });
+  }
+
   private async decodeMessage(data: any): Promise<any> {
     // For binary MessagePack data
     if (data instanceof ArrayBuffer || data instanceof Uint8Array) {
@@ -637,7 +652,7 @@ export class WebSocketClient {
         try {
           const textDecoder = new TextDecoder("utf-8");
           const jsonString = textDecoder.decode(uint8Array);
-          const parsed = JSON.parse(jsonString);
+          const parsed = this.parseJSONWithBigInt(jsonString);
           console.log("[WebSocket] Decoded JSON from Blob:", parsed);
           return parsed;
         } catch (jsonError) {
@@ -652,7 +667,7 @@ export class WebSocketClient {
     // For string data (JSON)
     else if (typeof data === "string") {
       try {
-        const parsed = JSON.parse(data);
+        const parsed = this.parseJSONWithBigInt(data);
         console.log("[WebSocket] Parsed JSON string:", parsed);
         return parsed;
       } catch (error) {

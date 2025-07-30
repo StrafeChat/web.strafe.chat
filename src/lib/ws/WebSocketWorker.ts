@@ -21,6 +21,18 @@ class WebSocketWorkerHandler {
   private url: string;
   private loading = true;
 
+  private parseJSONWithBigInt(jsonString: string): any {
+    return JSON.parse(jsonString, (key, value) => {
+      // Convert large integers and specific ID fields to strings to preserve precision
+      if (typeof value === 'number' && 
+          (Number.isInteger(value) && (value > Number.MAX_SAFE_INTEGER || value < Number.MIN_SAFE_INTEGER)) ||
+          (typeof key === 'string' && (key.endsWith('_id') || key === 'id' || key === 'space_id' || key === 'user_id' || key === 'room_id' || key === 'parent_id'))) {
+        return value.toString();
+      }
+      return value;
+    });
+  }
+
   constructor(url: string = WS_URL) {
     this.url = url;
   }
@@ -258,7 +270,7 @@ class WebSocketWorkerHandler {
           try {
             const textDecoder = new TextDecoder("utf-8");
             const jsonString = textDecoder.decode(uint8Array);
-            data = JSON.parse(jsonString);
+            data = this.parseJSONWithBigInt(jsonString);
             console.log(
               "[WebSocketWorker] Successfully decoded with JSON:",
               data
@@ -283,7 +295,7 @@ class WebSocketWorkerHandler {
         try {
           const textDecoder = new TextDecoder("utf-8");
           const jsonString = textDecoder.decode(event.data);
-          data = JSON.parse(jsonString);
+          data = this.parseJSONWithBigInt(jsonString);
           console.log(
             "[WebSocketWorker] Successfully decoded Uint8Array with JSON:",
             data
@@ -302,7 +314,7 @@ class WebSocketWorkerHandler {
         }
       } else if (typeof event.data === "string") {
         // Handle string data (JSON)
-        data = JSON.parse(event.data);
+        data = this.parseJSONWithBigInt(event.data);
       } else {
         // Handle other types of data
         data = event.data;

@@ -49,7 +49,7 @@ interface MutualSpace {
 }
 
 const UserProfileModal: Component<UserProfileModalProps> = (props) => {
-  const cache = useCache();
+  const { getUser, getSpace, getSpaceMembers, getSpaceRoles } = useCache();
   const { user: currentUser } = useAuth();
   const navigate = useNavigate();
   const [user, setUser] = createSignal<any>(null);
@@ -62,7 +62,7 @@ const UserProfileModal: Component<UserProfileModalProps> = (props) => {
 
   // Fetch user info from cache whenever props.userId changes
   createEffect(() => {
-    setUser(cache.getUser(props.userId));
+    setUser(getUser(props.userId));
   });
 
   // Fetch mutual friends
@@ -119,23 +119,23 @@ const UserProfileModal: Component<UserProfileModalProps> = (props) => {
   // Get current space data if in space context
   const currentSpace = createMemo(() => {
     if (!props.spaceId) return null;
-    return cache.getSpace(props.spaceId);
+    return getSpace(props.spaceId);
   });
 
   // Get user's space member data if in space context
   const spaceMember = createMemo(() => {
     if (!props.spaceId) return null;
-    const members = cache.getSpaceMembers(props.spaceId);
-    return members.find(member => member.user_id === props.userId);
+    const members = getSpaceMembers(props.spaceId);
+    return members?.find(member => member.user_id === props.userId);
   });
 
   // Get user's roles in the space
   const userRoles = createMemo(() => {
     if (!props.spaceId || !spaceMember()) return [];
-    const roles = cache.getSpaceRoles(props.spaceId);
+    const roles = getSpaceRoles(props.spaceId);
     const memberRoles = spaceMember()?.roles || [];
-    return roles.filter(role => memberRoles.includes(role.role_id))
-      .sort((a, b) => (b.position || 0) - (a.position || 0));
+    return roles?.filter(role => memberRoles.includes(role.role_id))
+      .sort((a, b) => (b.position || 0) - (a.position || 0)) || [];
   });
 
   // Get the highest role color

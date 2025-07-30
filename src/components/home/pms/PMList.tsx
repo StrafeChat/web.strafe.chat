@@ -20,11 +20,11 @@ import { Avatar } from "../../common/Avatar";
 import { ClientUserArea } from "../../shared/ClientUserArea";
 
 export const PMList: Component = () => {              
-  const { user, rooms, setRooms, relationshipRequests, isMobile } = useAuth();
+  const { user, isMobile } = useAuth();
+  const { rooms, setRooms, relationshipRequests, getUser, getMessage } = useCache();
   const { setCurrentView } = useMobileNav();
   const navigate = useNavigate();
   const location = useLocation();
-  const cache = useCache();
   const [t] = useTransContext();
   const [showCreatePM, setShowCreatePM] = createSignal(false);
 
@@ -143,7 +143,7 @@ export const PMList: Component = () => {
       if (room.type === RoomType.GROUP_PM) {
         // Check for missing users in cache and fetch them if needed
         const missingUserIds = room.recipients
-          ?.filter((id: string) => id !== currentUserId && !cache.getUser(id)) || [];
+          ?.filter((id: string) => id !== currentUserId && !getUser(id)) || [];
         
         if (missingUserIds.length > 0) {
           fetchMissingUsers(missingUserIds);
@@ -154,7 +154,7 @@ export const PMList: Component = () => {
           .filter((r: { id: string | undefined; }) => r.id !== currentUserId)
           .map((r: { id: string; display_name: string; username: string; }) => {
             // Use cached data if available for most up-to-date info
-            const cachedUser = cache.getUser(r.id);
+            const cachedUser = getUser(r.id);
             if (cachedUser) {
               return cachedUser.display_name || cachedUser.username;
             }
@@ -175,7 +175,7 @@ export const PMList: Component = () => {
       
       if (otherRecipient) {
         // Use cached data if available for most up-to-date info
-        const cachedUser = cache.getUser(otherRecipient.id);
+        const cachedUser = getUser(otherRecipient.id);
         if (cachedUser) {
           return cachedUser.display_name || cachedUser.username;
         }
@@ -193,7 +193,7 @@ export const PMList: Component = () => {
   const getLastMessagePreview = (room: any) => {
     if (!room.last_message_id) return "";
     
-    const message = cache.getMessage(room.id, room.last_message_id);
+    const message = getMessage(room.id, room.last_message_id);
     if (!message) return "";
     
     // Get the sender's name
@@ -203,7 +203,7 @@ export const PMList: Component = () => {
     if (message.author_id === currentUserId) {
       senderName = "You";
     } else {
-      const sender = cache.getUser(message.author_id);
+      const sender = getUser(message.author_id);
       if (sender) {
         senderName = sender.display_name || sender.username;
       } else {
@@ -260,7 +260,7 @@ export const PMList: Component = () => {
       const recipientId = room.recipients.find((id: string | undefined) => id !== currentUserId);
       if (!recipientId) return "offline" as UserStatus;
       
-      const cachedUser = cache.getUser(recipientId);
+      const cachedUser = getUser(recipientId);
       
       // Prioritize cached user data for more accurate status
       if (cachedUser?.presence?.status) {
@@ -286,7 +286,7 @@ export const PMList: Component = () => {
       const recipientId = room.recipients.find((id: string | undefined) => id !== currentUserId);
       if (!recipientId) return "";
       
-      const cachedUser = cache.getUser(recipientId);
+      const cachedUser = getUser(recipientId);
       const status = getRoomStatus(room);
       
       // Don't show custom status if user is offline

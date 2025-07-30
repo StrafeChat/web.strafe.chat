@@ -1,5 +1,5 @@
 import { Component, createMemo } from "solid-js";
-import { useAuth } from "../../../../lib/providers/auth/AuthProvider";
+import { useCache } from "../../../../lib/providers/cache/CacheProvider";
 
 interface RoomMentionProps {
   roomId: string;
@@ -7,7 +7,7 @@ interface RoomMentionProps {
 }
 
 export const RoomMention: Component<RoomMentionProps> = (props) => {
-  const { rooms } = useAuth();
+  const { rooms } = useCache();
   
   const room = createMemo(() => {
     const allRooms = rooms();

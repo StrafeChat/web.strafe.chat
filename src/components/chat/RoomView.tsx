@@ -18,8 +18,8 @@ import { useVoice, VoiceState } from "../../lib/providers/voice/VoiceProvider";
 
 const RoomView: Component = () => {
   const params = useParams();
-  const { user, rooms, isMobile } = useAuth();
-  const cache = useCache();
+  const { user, isMobile } = useAuth();
+  const { rooms, getUser } = useCache();
   const { state: voiceState, room: voiceRoom, connect: connectVoice } = useVoice();
   // const [t] = useTransContext();
 
@@ -83,7 +83,7 @@ const RoomView: Component = () => {
       if (room.type === RoomType.GROUP_PM) {
         // Check for missing users in cache and fetch them if needed
         const missingUserIds = room.recipients
-          ?.filter((id) => id !== currentUserId && !cache.getUser(id)) || [];
+          ?.filter((id) => id !== currentUserId && !getUser(id)) || [];
         
         if (missingUserIds.length > 0) {
           // Split into batches of 100 users to respect the API limit
@@ -98,7 +98,7 @@ const RoomView: Component = () => {
           .filter((r) => r.id !== currentUserId)
           .map((r) => {
             // Use cached data if available for most up-to-date info
-            const cachedUser = cache.getUser(r.id);
+            const cachedUser = getUser(r.id);
             if (cachedUser) {
               return cachedUser.display_name || cachedUser.username;
             }
@@ -122,7 +122,7 @@ const RoomView: Component = () => {
         
         if (otherRecipientId) {
           // Try to get user from cache first
-          const cachedUser = cache.getUser(otherRecipientId);
+          const cachedUser = getUser(otherRecipientId);
           if (cachedUser) {
             return cachedUser.display_name || cachedUser.username;
           }
@@ -144,7 +144,7 @@ const RoomView: Component = () => {
       
       if (otherRecipient) {
         // Use cached data if available for most up-to-date info
-        const cachedUser = cache.getUser(otherRecipient.id);
+        const cachedUser = getUser(otherRecipient.id);
         if (cachedUser) {
           return cachedUser.display_name || cachedUser.username;
         }
@@ -187,7 +187,7 @@ const RoomView: Component = () => {
       // Include all members INCLUDING the current user
       for (const member of room.recipients_data) {
         // Use cached data if available for real-time updates
-        const cachedUser = cache.getUser(member.id);
+        const cachedUser = getUser(member.id);
         if (cachedUser) {
           allMembers.push({
             id: cachedUser.id,
@@ -213,7 +213,7 @@ const RoomView: Component = () => {
     } else if (room.recipients) {
       // Check for missing users in cache and fetch them if needed
       const missingUserIds = room.recipients
-        .filter(id => id !== currentUserId && !cache.getUser(id));
+        .filter(id => id !== currentUserId && !getUser(id));
       
       if (missingUserIds.length > 0) {
         // Split into batches of 100 users to respect the API limit
@@ -225,7 +225,7 @@ const RoomView: Component = () => {
       
       // If we only have recipient IDs but no data, try to get from cache
       for (const recipientId of room.recipients) {
-        const cachedUser = cache.getUser(recipientId);
+        const cachedUser = getUser(recipientId);
         if (cachedUser) {
           allMembers.push({
             id: cachedUser.id,
