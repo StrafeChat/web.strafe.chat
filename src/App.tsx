@@ -41,6 +41,7 @@ import BotsPage from "./components/bots/BotsPage";
 import BotInvitePage from "./components/bots/BotInvitePage";
 import { VoiceProvider } from "./lib/providers/voice/VoiceProvider";
 import { NavigationHistoryProvider } from "./lib/providers/navigation/NavigationHistoryProvider";
+import { RNNoiseProvider } from "./lib/providers/voice/RNNoise";
 
 
 
@@ -93,22 +94,24 @@ const MountApp = (props: ParentProps) => {
 					<CacheProvider>
 						<UserSettingsProvider>
 							<AuthProvider>
-								<VoiceProvider>
-									<ContextMenuProvider>
-										<NavigationHistoryProvider>
-											<MobileNavProvider>
-												<SettingsProvider>
-													<ModalProvider>
-														<LinkConfirmationHandler />
-														<UpdateNotificationWrapper />
-														<GlobalKeyboardHandler />
-														<div class="h-[100dvh] w-full overflow-hidden">{props.children}</div>
-													</ModalProvider>
-												</SettingsProvider>
-											</MobileNavProvider>
-										</NavigationHistoryProvider>
-									</ContextMenuProvider>
-								</VoiceProvider>
+								<RNNoiseProvider>
+									<VoiceProvider>
+										<ContextMenuProvider>
+											<NavigationHistoryProvider>
+												<MobileNavProvider>
+													<SettingsProvider>
+														<ModalProvider>
+															<LinkConfirmationHandler />
+															<UpdateNotificationWrapper />
+															<GlobalKeyboardHandler />
+															<div class="h-[100dvh] w-full overflow-hidden">{props.children}</div>
+														</ModalProvider>
+													</SettingsProvider>
+												</MobileNavProvider>
+											</NavigationHistoryProvider>
+										</ContextMenuProvider>
+									</VoiceProvider>
+								</RNNoiseProvider>
 							</AuthProvider>
 						</UserSettingsProvider>
 					</CacheProvider>

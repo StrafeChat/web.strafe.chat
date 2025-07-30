@@ -20,7 +20,7 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 	const pubElements = new Map<string, HTMLElement>();
 	const screenShares: RemoteTrackPublication[] = [];
 
-	const MIN_DECIBELS = -45;
+	const BLUR_STRENGTH = 5;
 
 	const [soundDetected, setSoundDetected] = createSignal(false);
 	const [screenShareEnabled, setScreenShareEnabled] = createSignal(false);
@@ -51,19 +51,41 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 
 		// handle screenshares
 		screenShares.push(pub);
+		pub.setSubscribed(true);
+		if (pub.kind === Track.Kind.Video) {
+			pub.on("subscribed", (track) => { // load at least one frame
+				track.attachedElements.forEach(e => { // should only be a single element
+					e.style.filter = `blur(${BLUR_STRENGTH}px)`;
+				});
+				const stream = new MediaStream([track.mediaStreamTrack]);
+				if (stream) {
+					const recorder = new MediaRecorder(stream, {});
+
+					recorder.ondataavailable = (e) => {
+						if (e.data.size <= 0) return;
+
+						pub.setEnabled(false);
+						recorder.stop();
+					}
+					recorder.start(0);
+				}
+			});
+		} else {
+			pub.setEnabled(false);
+		}
+
 		setScreenShareInbound(true);
 	}
 
-	const setupSpeakingIndicator = (track: Track<Track.Kind.Audio>) => {
-		const stream = new MediaStream();
-		stream.addTrack(track.mediaStreamTrack)
+	const setupSpeakingIndicator = (track: Track<Track.Kind.Audio>) => { // just leaving this here: https://github.com/StrafeChat/web.strafe.chat/blob/412a6dea09703617b5a6c033726d11b7b8912c05/src/components/chat/voice/WaveformVisualisation.tsx
+		const stream = new MediaStream([track.mediaStreamTrack]);
 
 		const audioCtx = new AudioContext();
 		const analyser = audioCtx.createAnalyser();
 
 		const source = audioCtx.createMediaStreamSource(stream);
 		source.connect(analyser);
-		analyser.minDecibels = MIN_DECIBELS;
+		analyser.fftSize = 32;
 
 		const bufferLength = analyser.frequencyBinCount;
 		const domainData = new Uint8Array(bufferLength);
@@ -94,6 +116,11 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 		screenShares.forEach(pub => {
 			if (pub.isSubscribed) {
 				if (!pub.isEnabled) pub.setEnabled(true);
+				if (pub.kind === Track.Kind.Video) {
+					pub.track?.attachedElements.forEach(e => {
+						e.style.filter = "none";
+					});
+				}
 				return;
 			}
 			pub.setSubscribed(true);
@@ -107,6 +134,11 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 		screenShares.forEach(pub => {
 			if (pub.isSubscribed) {
 				if (pub.isEnabled) pub.setEnabled(false);
+				if (pub.kind === Track.Kind.Video) {
+					pub.track?.attachedElements.forEach(e => {
+						e.style.filter = `blur(${BLUR_STRENGTH}px)`;
+					});
+				}
 				return;
 			}
 		});
@@ -115,6 +147,7 @@ export const ParticipantElement: Component<ParticipantProps> = (props) => {
 	}
 
 	const handleTrack = (track: Track, sid: string) => {
+		if (!track) return; // TODO: find out when this happens
 		if (track.kind === Track.Kind.Video || track.kind === Track.Kind.Audio) {
 			// attach it to a new HTMLVideoElement or HTMLAudioElement
 			const element = track.attach();

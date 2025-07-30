@@ -14,15 +14,21 @@ interface SpaceHeaderDropdownProps {
   currentSpace?: any;
 }
 
-export const SpaceHeaderDropdown: Component<SpaceHeaderDropdownProps> = (props) => {
+export const SpaceHeaderDropdown: Component<SpaceHeaderDropdownProps> = (
+  props,
+) => {
   const [isOpen, setIsOpen] = createSignal(false);
   const [isSpaceSettingsOpen, setIsSpaceSettingsOpen] = createSignal(false);
   const [isCreateRoomModalOpen, setIsCreateRoomModalOpen] = createSignal(false);
-  const [isCreateSectionModalOpen, setIsCreateSectionModalOpen] = createSignal(false);
+  const [isCreateSectionModalOpen, setIsCreateSectionModalOpen] =
+    createSignal(false);
   const [isLeaveConfirmOpen, setIsLeaveConfirmOpen] = createSignal(false);
   const [isLeaving, setIsLeaving] = createSignal(false);
+  const [isInviteModalOpen, setIsInviteModalOpen] = createSignal(false);
+  const [createdInvite, setCreatedInvite] = createSignal<string | null>(null);
+  const [creating, setCreating] = createSignal(false);
   let dropdownRef: HTMLDivElement | undefined;
-  
+
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -34,54 +40,95 @@ export const SpaceHeaderDropdown: Component<SpaceHeaderDropdownProps> = (props) 
   };
 
   onMount(() => {
-    document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener("mousedown", handleClickOutside);
   });
 
   onCleanup(() => {
-    document.removeEventListener('mousedown', handleClickOutside);
+    document.removeEventListener("mousedown", handleClickOutside);
   });
 
   // Dropdown action handlers
-  const handleInvitePeople = () => {
-    console.log('Invite People clicked for space:', props.spaceId);
+  const handleInvitePeople = async () => {
     setIsOpen(false);
-    // TODO: Implement invite people functionality
+    setIsInviteModalOpen(true);
+    setCreatedInvite(null);
+  };
+
+  // Invite Modal state for copy feedback
+  const [copied, setCopied] = createSignal(false);
+
+  // Handle modal background click to close
+  function handleModalBgClick(e: MouseEvent) {
+    if ((e.target as HTMLElement).classList.contains("modal-bg")) {
+      setIsInviteModalOpen(false);
+      setCopied(false);
+    }
+  }
+
+  // Invite Modal state for advanced options
+  const [inviteMaxUses, setInviteMaxUses] = createSignal<number | undefined>(
+    undefined,
+  );
+  const [inviteExpiresIn, setInviteExpiresIn] = createSignal<string>("");
+
+  // Create invite logic with options
+  const handleCreateInvite = async () => {
+    if (!props.spaceId) return;
+    setCreating(true);
+    try {
+      const inviteData: any = {};
+      if (inviteMaxUses() !== undefined && inviteMaxUses()! > 0) {
+        inviteData.max_uses = inviteMaxUses();
+      }
+      if (inviteExpiresIn()) {
+        inviteData.expires_in = parseInt(inviteExpiresIn()) * 60 * 60; // hours to seconds
+      }
+      const newInvite = await api.spaces.invites.create(
+        props.spaceId,
+        inviteData,
+      );
+      setCreatedInvite(newInvite.code);
+    } catch (err) {
+      setCreatedInvite(null);
+    } finally {
+      setCreating(false);
+    }
   };
 
   const handleSpaceSettings = () => {
-    console.log('Space Settings clicked for space:', props.spaceId);
+    console.log("Space Settings clicked for space:", props.spaceId);
     setIsOpen(false);
     setIsSpaceSettingsOpen(true);
   };
 
   const handleCreateRoom = () => {
-    console.log('Create Room clicked for space:', props.spaceId);
+    console.log("Create Room clicked for space:", props.spaceId);
     setIsOpen(false);
     setIsCreateRoomModalOpen(true);
   };
 
   const handleCreateSection = () => {
-    console.log('Create Section clicked for space:', props.spaceId);
+    console.log("Create Section clicked for space:", props.spaceId);
     setIsOpen(false);
     setIsCreateSectionModalOpen(true);
   };
 
   const handleLeaveSpace = () => {
-    console.log('Leave Space clicked for space:', props.spaceId);
+    console.log("Leave Space clicked for space:", props.spaceId);
     setIsOpen(false);
     setIsLeaveConfirmOpen(true);
   };
 
   const confirmLeaveSpace = async () => {
     if (!props.spaceId) return;
-    
+
     setIsLeaving(true);
     try {
       await api.spaces.leave(props.spaceId);
       setIsLeaveConfirmOpen(false);
-      navigate('/'); // Navigate to home or spaces list
+      navigate("/"); // Navigate to home or spaces list
     } catch (error) {
-      console.error('Failed to leave space:', error);
+      console.error("Failed to leave space:", error);
       // TODO: Show error toast
     } finally {
       setIsLeaving(false);
@@ -94,28 +141,43 @@ export const SpaceHeaderDropdown: Component<SpaceHeaderDropdownProps> = (props) 
   };
 
   return (
-    <div class="relative flex flex-col border-b border-surface border-opacity-20 flex-shrink-0" ref={dropdownRef}>
+    <div
+      class="relative flex flex-col border-b border-surface border-opacity-20 flex-shrink-0"
+      ref={dropdownRef}
+    >
       {/* Space banner with header overlay */}
-      <Show when={props.currentSpace?.banner} fallback={
-        <div class="p-2">
-          <div 
-            class="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-surface hover:bg-opacity-10 rounded-md transition-colors"
-            onClick={() => setIsOpen(!isOpen())}
-          >
-            <h3 class="text-xl font-bold text-text-primary truncate">
-              {props.spaceName || "Unknown Space"}
-            </h3>
+      <Show
+        when={props.currentSpace?.banner}
+        fallback={
+          <div class="p-2">
             <div
-              class="transition-transform duration-200"
-              classList={{ "rotate-180": isOpen() }}
+              class="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-surface hover:bg-opacity-10 rounded-md transition-colors"
+              onClick={() => setIsOpen(!isOpen())}
             >
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-text-secondary" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <polyline points="6,9 12,15 18,9" />
-              </svg>
+              <h3 class="text-xl font-bold text-text-primary truncate">
+                {props.spaceName || "Unknown Space"}
+              </h3>
+              <div
+                class="transition-transform duration-200"
+                classList={{ "rotate-180": isOpen() }}
+              >
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="w-4 h-4 text-text-secondary"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
+                  <polyline points="6,9 12,15 18,9" />
+                </svg>
+              </div>
             </div>
           </div>
-        </div>
-      }>
+        }
+      >
         <div class="relative h-[120px] overflow-hidden">
           <img
             src={`${FS_URL}/space_banners/${props.currentSpace?.id}/${props.currentSpace?.banner}`}
@@ -123,10 +185,10 @@ export const SpaceHeaderDropdown: Component<SpaceHeaderDropdownProps> = (props) 
             class="w-full h-full object-cover"
           />
           <div class="absolute inset-0 bg-gradient-to-b from-black/60 via-black/20 to-transparent" />
-          
+
           {/* Space header with dropdown overlaid on banner */}
           <div class="absolute top-0 left-0 right-0 p-2">
-            <div 
+            <div
               class="flex items-center justify-between px-3 py-2 cursor-pointer hover:bg-black hover:bg-opacity-20 rounded-md transition-colors"
               onClick={() => setIsOpen(!isOpen())}
             >
@@ -137,7 +199,16 @@ export const SpaceHeaderDropdown: Component<SpaceHeaderDropdownProps> = (props) 
                 class="transition-transform duration-200"
                 classList={{ "rotate-180": isOpen() }}
               >
-                <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4 text-white drop-shadow-lg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  class="w-4 h-4 text-white drop-shadow-lg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                >
                   <polyline points="6,9 12,15 18,9" />
                 </svg>
               </div>
@@ -145,7 +216,7 @@ export const SpaceHeaderDropdown: Component<SpaceHeaderDropdownProps> = (props) 
           </div>
         </div>
       </Show>
-      
+
       <Show when={isOpen()}>
         <div class="absolute top-full left-2 right-2 mt-1 py-1 bg-background1 border border-surface border-opacity-20 rounded-md shadow-lg z-50">
           <button
@@ -153,7 +224,16 @@ export const SpaceHeaderDropdown: Component<SpaceHeaderDropdownProps> = (props) 
             onClick={handleInvitePeople}
             class="w-full flex items-center gap-3 px-3 py-2 hover:bg-surface hover:bg-opacity-10 text-text-primary text-left transition-colors"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="w-4 h-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
               <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
               <circle cx="9" cy="7" r="4" />
               <line x1="19" y1="8" x2="19" y2="14" />
@@ -161,54 +241,90 @@ export const SpaceHeaderDropdown: Component<SpaceHeaderDropdownProps> = (props) 
             </svg>
             <span>Invite People</span>
           </button>
-          
+
           <button
             type="button"
             onClick={handleSpaceSettings}
             class="w-full flex items-center gap-3 px-3 py-2 hover:bg-surface hover:bg-opacity-10 text-text-primary text-left transition-colors"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="w-4 h-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
               <circle cx="12" cy="12" r="3" />
               <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z" />
             </svg>
             <span>Space Settings</span>
           </button>
-          
+
           <div class="mx-2 my-1 h-px bg-surface bg-opacity-20"></div>
-          
+
           <button
             type="button"
             onClick={handleCreateRoom}
             class="w-full flex items-center gap-3 px-3 py-2 hover:bg-surface hover:bg-opacity-10 text-text-primary text-left transition-colors"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="w-4 h-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
               <path d="M12 5v14m-7-7h14" />
             </svg>
             <span>Create Room</span>
           </button>
-          
+
           <button
             type="button"
             onClick={handleCreateSection}
             class="w-full flex items-center gap-3 px-3 py-2 hover:bg-surface hover:bg-opacity-10 text-text-primary text-left transition-colors"
           >
-            <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              class="w-4 h-4"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="2"
+              stroke-linecap="round"
+              stroke-linejoin="round"
+            >
               <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
               <line x1="12" y1="11" x2="12" y2="17" />
               <line x1="9" y1="14" x2="15" y2="14" />
             </svg>
             <span>Create Section</span>
           </button>
-          
+
           <Show when={!isSpaceOwner()}>
             <div class="mx-2 my-1 h-px bg-surface bg-opacity-20"></div>
-            
+
             <button
               type="button"
               onClick={handleLeaveSpace}
               class="w-full flex items-center gap-3 px-3 py-2 hover:bg-red-500 hover:bg-opacity-10 text-red-400 text-left transition-colors"
             >
-              <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="w-4 h-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
                 <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
                 <polyline points="16,17 21,12 16,7" />
                 <line x1="21" y1="12" x2="9" y2="12" />
@@ -218,7 +334,7 @@ export const SpaceHeaderDropdown: Component<SpaceHeaderDropdownProps> = (props) 
           </Show>
         </div>
       </Show>
-      
+
       {/* Space Settings Modal */}
       <Show when={isSpaceSettingsOpen()}>
         <SpaceSettings
@@ -227,7 +343,7 @@ export const SpaceHeaderDropdown: Component<SpaceHeaderDropdownProps> = (props) 
           spaceId={props.spaceId || ""}
         />
       </Show>
-      
+
       {/* Create Room Modal */}
       <Show when={isCreateRoomModalOpen()}>
         <CreateRoomModal
@@ -236,7 +352,7 @@ export const SpaceHeaderDropdown: Component<SpaceHeaderDropdownProps> = (props) 
           spaceId={props.spaceId || ""}
         />
       </Show>
-      
+
       {/* Create Section Modal */}
       <Show when={isCreateSectionModalOpen()}>
         <CreateSectionModal
@@ -245,7 +361,7 @@ export const SpaceHeaderDropdown: Component<SpaceHeaderDropdownProps> = (props) 
           spaceId={props.spaceId || ""}
         />
       </Show>
-      
+
       {/* Leave Space Confirmation Modal */}
       <Show when={isLeaveConfirmOpen()}>
         <ConfirmModal
@@ -253,12 +369,112 @@ export const SpaceHeaderDropdown: Component<SpaceHeaderDropdownProps> = (props) 
           onClose={() => setIsLeaveConfirmOpen(false)}
           onConfirm={confirmLeaveSpace}
           title="Leave Space"
-          description={`Are you sure you want to leave "${props.spaceName || 'this space'}"? You will no longer have access to any of its channels and messages.`}
+          description={`Are you sure you want to leave "${props.spaceName || "this space"}"? You will no longer have access to any of its channels and messages.`}
           confirmText="Leave Space"
           cancelText="Cancel"
           variant="danger"
           isLoading={isLeaving()}
         />
+      </Show>
+
+      {/* Invite Modal */}
+      <Show when={isInviteModalOpen()}>
+        <div
+          class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 modal-bg"
+          onClick={handleModalBgClick}
+        >
+          <div
+            class="bg-background1 rounded-lg p-6 w-full max-w-md shadow-lg relative"
+            onClick={(e) => e.stopPropagation()} // Prevent modal close when clicking inside
+          >
+            <button
+              class="absolute top-2 right-2 text-text-secondary hover:text-text-primary"
+              onClick={() => {
+                setIsInviteModalOpen(false);
+                setCopied(false);
+              }}
+            >
+              <svg width="24" height="24" fill="none" stroke="currentColor">
+                <path
+                  stroke-width="2"
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  d="M6 18L18 6M6 6l12 12"
+                />
+              </svg>
+            </button>
+            <h3 class="text-lg font-semibold mb-2">Create Space Invite</h3>
+            <p class="text-sm text-text-secondary mb-4">
+              Create an invite link to share your space with others.
+            </p>
+            <Show when={!createdInvite()}>
+              <div class="space-y-4">
+                <div>
+                  <label class="block text-sm font-medium text-text-primary mb-2">
+                    Max Uses (Optional)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    placeholder="Unlimited"
+                    value={inviteMaxUses() || ""}
+                    onInput={(e) => {
+                      const value = e.currentTarget.value;
+                      setInviteMaxUses(value ? parseInt(value) : undefined);
+                    }}
+                    class="w-full bg-surface border border-border rounded-lg px-3 py-2 text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label class="block text-sm font-medium text-text-primary mb-2">
+                    Expires In (Hours)
+                  </label>
+                  <select
+                    value={inviteExpiresIn()}
+                    onChange={(e) => setInviteExpiresIn(e.currentTarget.value)}
+                    class="w-full bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
+                  >
+                    <option value="">Never</option>
+                    <option value="1">1 Hour</option>
+                    <option value="6">6 Hours</option>
+                    <option value="12">12 Hours</option>
+                    <option value="24">1 Day</option>
+                    <option value="168">1 Week</option>
+                    <option value="720">1 Month</option>
+                  </select>
+                </div>
+                <button
+                  class="bg-primary text-white px-4 py-2 rounded-lg font-semibold w-full mt-2"
+                  disabled={creating()}
+                  onClick={handleCreateInvite}
+                >
+                  {creating() ? "Creating..." : "Create Invite"}
+                </button>
+              </div>
+            </Show>
+            <Show when={!!createdInvite()}>
+              <div class="mt-4 flex flex-col items-center">
+                <div class="bg-surface px-3 py-2 rounded text-primary font-mono text-center mb-2">
+                  {window.location.origin}/invite/{createdInvite()}
+                </div>
+                <button
+                  class={`bg-primary text-white px-4 py-2 rounded-lg font-semibold transition-all ${
+                    copied() ? "bg-green-500 scale-105" : ""
+                  }`}
+                  onClick={async () => {
+                    await navigator.clipboard.writeText(
+                      `${window.location.origin}/invite/${createdInvite()}`,
+                    );
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1200);
+                  }}
+                >
+                  {copied() ? "Copied!" : "Copy Invite Link"}
+                </button>
+              </div>
+            </Show>
+          </div>
+        </div>
       </Show>
     </div>
   );

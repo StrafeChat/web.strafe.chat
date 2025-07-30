@@ -10,11 +10,8 @@ import Shield from "../../shared/icons/Shield";
 import Kick from "../../shared/icons/Kick";
 import Ban from "../../shared/icons/Ban";
 import Settings from "../../shared/icons/Settings";
-import Link from "../../shared/icons/Link";
 import { api } from "../../../lib/api";
 import { useCache } from "../../../lib/providers/cache/CacheProvider";
-import SpaceInvitesSettings from "./SpaceInvitesSettings";
-
 import { SpaceMember } from "../../../lib/cache/SpaceCache";
 
 interface SpaceMembersSettingsProps {
@@ -276,12 +273,8 @@ const SpaceMembersSettings: Component<SpaceMembersSettingsProps> = (props) => {
           <Users />
         </div>
         <div>
-          <h2 class="text-xl font-semibold text-text-primary mb-1">
-            Members
-          </h2>
-          <p class="text-text-secondary text-xs">
-            Manage members and invitations for your space
-          </p>
+          <h2 class="text-xl font-semibold text-text-primary mb-1">Members</h2>
+          <p class="text-text-secondary text-xs">Manage members</p>
         </div>
       </div>
 
@@ -298,7 +291,7 @@ const SpaceMembersSettings: Component<SpaceMembersSettingsProps> = (props) => {
           <Users class="w-4 h-4" />
           Members ({members().length})
         </button>
-        <button
+        {/* <button
           onClick={() => setActiveTab("invites")}
           class={`flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors ${
             activeTab() === "invites"
@@ -308,7 +301,7 @@ const SpaceMembersSettings: Component<SpaceMembersSettingsProps> = (props) => {
         >
           <Link class="w-4 h-4" />
            <span>Invites</span>
-        </button>
+        </button> */}
       </div>
 
       {/* Members Tab */}
@@ -329,7 +322,9 @@ const SpaceMembersSettings: Component<SpaceMembersSettingsProps> = (props) => {
           {/* Members List */}
           <div class="bg-background1 rounded-lg">
             <div class="p-4 border-b border-border">
-              <h3 class="text-lg font-semibold text-text-primary">Space Members</h3>
+              <h3 class="text-lg font-semibold text-text-primary">
+                Space Members
+              </h3>
             </div>
             <div class="divide-y divide-border">
               <For each={filteredMembers()}>
@@ -337,28 +332,55 @@ const SpaceMembersSettings: Component<SpaceMembersSettingsProps> = (props) => {
                   <div class="p-4 flex items-center justify-between">
                     <div class="flex items-center gap-3">
                       <div class="relative">
-                        <Avatar 
+                        <Avatar
                           userId={member.user_id}
                           avatar={member.user?.avatar || (member as any).avatar}
                           size="md"
-                          alt={member.user?.display_name || member.user?.username || (member as any).display_name || (member as any).username || 'Unknown User'}
+                          alt={
+                            member.user?.display_name ||
+                            member.user?.username ||
+                            (member as any).display_name ||
+                            (member as any).username ||
+                            "Unknown User"
+                          }
                         />
-                        <div class={`absolute -bottom-1 -right-1 w-4 h-4 ${getStatusColor(member.user?.presence?.status || (member as any).status || 'offline')} rounded-full border-2 border-background1`} />
+                        <div
+                          class={`absolute -bottom-1 -right-1 w-4 h-4 ${getStatusColor(member.user?.presence?.status || (member as any).status || "offline")} rounded-full border-2 border-background1`}
+                        />
                       </div>
                       <div>
                         <div class="flex items-center gap-2">
                           <span class="text-text-primary font-medium">
-                            {member.user?.display_name || member.user?.username || (member as any).display_name || (member as any).username || 'Unknown User'}
+                            {member.user?.display_name ||
+                              member.user?.username ||
+                              (member as any).display_name ||
+                              (member as any).username ||
+                              "Unknown User"}
                           </span>
-                          {(props.space.owner_id === member.user_id) && (
+                          {props.space.owner_id === member.user_id && (
                             <Crown class="w-4 h-4 text-yellow-500" />
                           )}
                           {member.roles && member.roles.length > 0 && (
                             <Shield />
                           )}
                         </div>
-                        <div class="text-sm text-text-secondary">@{member.user?.username || (member as any).username || 'unknown'}#{(member.user?.discriminator || (member as any).discriminator || 0).toString().padStart(4, "0")}</div>
-                        <div class="text-xs text-text-secondary">Joined {formatDate(member.joined_at)}</div>
+                        <div class="text-sm text-text-secondary">
+                          @
+                          {member.user?.username ||
+                            (member as any).username ||
+                            "unknown"}
+                          #
+                          {(
+                            member.user?.discriminator ||
+                            (member as any).discriminator ||
+                            0
+                          )
+                            .toString()
+                            .padStart(4, "0")}
+                        </div>
+                        <div class="text-xs text-text-secondary">
+                          Joined {formatDate(member.joined_at)}
+                        </div>
                         {member.roles && member.roles.length > 0 && (
                           <div class="text-xs text-blue-400 mt-1">
                             Roles: {member.roles.join(", ")}
@@ -366,41 +388,50 @@ const SpaceMembersSettings: Component<SpaceMembersSettingsProps> = (props) => {
                         )}
                       </div>
                     </div>
-                    
-                    {canManageMembers() && props.space.owner_id !== member.user_id && member.user_id !== user()?.id && (
+
+                    {canManageMembers() && (
                       <div class="flex gap-2">
                         <button
-                          onClick={() => handleManageRoles(member as SpaceMember)}
+                          onClick={() =>
+                            handleManageRoles(member as SpaceMember)
+                          }
                           class="p-2 text-blue-500 hover:bg-blue-500/10 rounded-lg transition-colors"
                           title="Manage Roles"
                         >
                           <Settings />
                         </button>
-                        <button
-                          onClick={() => handleKickMember(member.user_id)}
-                          class="p-2 text-orange-500 hover:bg-orange-500/10 rounded-lg transition-colors"
-                          title="Kick Member"
-                        >
-                          <Kick />
-                        </button>
-                        <button
-                          onClick={() => handleBanMember(member.user_id)}
-                          class="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
-                          title="Ban Member"
-                        >
-                          <Ban />
-                        </button>
+                        {props.space.owner_id !== member.user_id &&
+                          member.user_id !== user()?.id && (
+                            <>
+                              <button
+                                onClick={() => handleKickMember(member.user_id)}
+                                class="p-2 text-orange-500 hover:bg-orange-500/10 rounded-lg transition-colors"
+                                title="Kick Member"
+                              >
+                                <Kick />
+                              </button>
+                              <button
+                                onClick={() => handleBanMember(member.user_id)}
+                                class="p-2 text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
+                                title="Ban Member"
+                              >
+                                <Ban />
+                              </button>
+                            </>
+                          )}
                       </div>
                     )}
                   </div>
                 )}
               </For>
-              
+
               {filteredMembers().length === 0 && (
                 <div class="p-8 text-center text-text-secondary">
                   <Users class="w-12 h-12 mx-auto mb-4 opacity-50" />
                   <p>No members found</p>
-                  <p class="text-sm mt-2">Total cached members: {members().length}</p>
+                  <p class="text-sm mt-2">
+                    Total cached members: {members().length}
+                  </p>
                   <p class="text-sm">Search query: "{searchQuery()}"</p>
                 </div>
               )}
@@ -410,9 +441,9 @@ const SpaceMembersSettings: Component<SpaceMembersSettingsProps> = (props) => {
       )}
 
       {/* Invites Tab */}
-      {activeTab() === "invites" && (
+      {/* {activeTab() === "invites" && (
         <SpaceInvitesSettings space={props.space} />
-      )}
+      )} */}
 
       {/* Role Management Modal */}
       <RoleManagementModal

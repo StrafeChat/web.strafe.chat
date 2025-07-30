@@ -4,6 +4,7 @@ interface ColorPickerProps {
   value: string;
   onChange: (color: string) => void;
   class?: string;
+  disabled?: boolean;
 }
 
 interface HSV {
@@ -145,11 +146,13 @@ const ColorPicker: Component<ColorPickerProps> = (props) => {
   }
 
   function handleSaturationMouseDown(e: MouseEvent) {
+    if (props.disabled) return; 
     isDraggingSaturation = true;
     handleSaturationMove(e);
   }
 
   function handleHueMouseDown(e: MouseEvent) {
+    if (props.disabled) return; 
     isDraggingHue = true;
     handleHueMove(e);
   }
@@ -160,7 +163,7 @@ const ColorPicker: Component<ColorPickerProps> = (props) => {
   }
 
   function handleSaturationMove(e: MouseEvent) {
-    if (!isDraggingSaturation || !saturationRef) return;
+    if (!isDraggingSaturation || !saturationRef || props.disabled) return;
 
     const rect = saturationRef.getBoundingClientRect();
     const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
@@ -176,7 +179,7 @@ const ColorPicker: Component<ColorPickerProps> = (props) => {
   }
 
   function handleHueMove(e: MouseEvent) {
-    if (!isDraggingHue || !hueRef) return;
+    if (!isDraggingHue || !hueRef || props.disabled) return;
 
     const rect = hueRef.getBoundingClientRect();
     const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
@@ -190,40 +193,50 @@ const ColorPicker: Component<ColorPickerProps> = (props) => {
   }
 
   function handleMouseMove(e: MouseEvent) {
+    if (props.disabled) return;
     handleSaturationMove(e);
     handleHueMove(e);
   }
 
   const handleClickOutside = (event: MouseEvent) => {
+    if (props.disabled) return; 
     if (pickerRef && !pickerRef.contains(event.target as Node)) {
       setIsOpen(false);
     }
   };
 
-  document.addEventListener("mousedown", handleClickOutside);
-  document.addEventListener("mousemove", handleMouseMove);
-  document.addEventListener("mouseup", handleMouseUp);
+  if (!props.disabled) {
+    document.addEventListener("mousedown", handleClickOutside);
+    document.addEventListener("mousemove", handleMouseMove);
+    document.addEventListener("mouseup", handleMouseUp);
+  }
 
   onCleanup(() => {
-    document.removeEventListener("mousedown", handleClickOutside);
-    document.removeEventListener("mousemove", handleMouseMove);
-    document.removeEventListener("mouseup", handleMouseUp);
+    if (!props.disabled) {
+      document.removeEventListener("mousedown", handleClickOutside);
+      document.removeEventListener("mousemove", handleMouseMove);
+      document.removeEventListener("mouseup", handleMouseUp);
+    }
   });
 
   return (
-    <div ref={pickerRef} class={`relative ${props.class || ""}`}>
+    <div
+      ref={pickerRef}
+      class={`relative ${props.class || ""} ${props.disabled ? "opacity-50 cursor-not-allowed" : ""}`}
+    >
       <button
         type="button"
-        onClick={() => setIsOpen(!isOpen())}
+        onClick={() => !props.disabled && setIsOpen(!isOpen())} 
         class="w-10 h-10 rounded border border-border"
         style={{ "background-color": props.value }}
+        disabled={props.disabled}
       />
 
       <Show when={isOpen()}>
         <div class="absolute top-full left-0 mt-2 p-4 bg-surface border border-border rounded-lg shadow-lg z-50">
           <div
             ref={saturationRef}
-            class="w-56 h-40 relative cursor-crosshair rounded overflow-hidden mb-2"
+            class={`w-56 h-40 relative rounded overflow-hidden mb-2 ${props.disabled ? "cursor-not-allowed" : "cursor-crosshair"}`}
             onMouseDown={handleSaturationMouseDown}
             style={{
               background: `linear-gradient(to right, #fff, transparent),
@@ -243,7 +256,7 @@ const ColorPicker: Component<ColorPickerProps> = (props) => {
 
           <div
             ref={hueRef}
-            class="w-56 h-3 relative cursor-pointer rounded overflow-hidden"
+            class={`w-56 h-3 relative rounded overflow-hidden ${props.disabled ? "cursor-not-allowed" : "cursor-pointer"}`}
             onMouseDown={handleHueMouseDown}
             style={{
               "background-image":
@@ -262,6 +275,7 @@ const ColorPicker: Component<ColorPickerProps> = (props) => {
             type="text"
             value={props.value}
             onInput={(e) => {
+              if (props.disabled) return; 
               const value = e.currentTarget.value;
               if (/^#[0-9A-Fa-f]{6}$/.test(value)) {
                 props.onChange(value);
@@ -269,6 +283,7 @@ const ColorPicker: Component<ColorPickerProps> = (props) => {
               }
             }}
             class="mt-2 w-full px-2 py-1 text-sm border border-border rounded bg-background text-text-primary"
+            disabled={props.disabled} 
           />
         </div>
       </Show>

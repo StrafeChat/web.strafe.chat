@@ -41,102 +41,91 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
   const [showCreateRole, setShowCreateRole] = createSignal(false);
   const [newRoleName, setNewRoleName] = createSignal("");
   const [newRoleColor, setNewRoleColor] = createSignal("#99aab5");
-
   const [roles, setRoles] = createSignal<Role[]>([]);
-  const [availablePermissions, setAvailablePermissions] = createSignal<Permission[]>([]);
-  const [loading, setLoading] = createSignal(true);
+  const [availablePermissions, setAvailablePermissions] = createSignal<
+    Permission[]
+  >([]);
   const [error, setError] = createSignal<string | null>(null);
   const [editedRole, setEditedRole] = createSignal<Role | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = createSignal(false);
   const [, setRenderTrigger] = createSignal(0);
-  const [activeTab, setActiveTab] = createSignal<'display' | 'permissions'>('display');
-  const [permissionSearch, setPermissionSearch] = createSignal('');
+  const [activeTab, setActiveTab] = createSignal<"display" | "permissions">(
+    "display",
+  );
+  const [permissionSearch, setPermissionSearch] = createSignal("");
+  const [draggedRoleId, setDraggedRoleId] = createSignal<string | null>(null);
 
   const isOwner = () => props.space.owner_id === user()?.id;
   const canManageRoles = () => isOwner(); // TODO: Add role-based permissions
 
   // Load roles and permissions on mount
   onMount(async () => {
-    console.log('SpaceRolesSettings mounted, starting to load data');
-    
-    // Set a timeout to ensure loading state clears even if API calls hang
-     const timeoutId = setTimeout(() => {
-       console.log('Timeout reached, clearing loading state');
-       setLoading(false);
-       setRenderTrigger(prev => prev + 1); // Force re-render
-       setError('Failed to load data: Request timeout');
-     }, 10000); // 10 second timeout
-    
+    console.log("SpaceRolesSettings mounted, starting to load data");
+
+    const timeoutId = setTimeout(() => {
+      console.log("Timeout reached, clearing loading state");
+      setRenderTrigger((prev) => prev + 1);
+      setError("Failed to load data: Request timeout");
+    }, 10000);
+
     try {
       await Promise.race([
-        Promise.all([
-          loadRoles(),
-          loadAvailablePermissions()
-        ]),
-        new Promise((_, reject) => 
-          setTimeout(() => reject(new Error('Request timeout')), 8000)
-        )
+        Promise.all([loadRoles(), loadAvailablePermissions()]),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("Request timeout")), 8000),
+        ),
       ]);
-      console.log('All data loaded successfully');
+      console.log("All data loaded successfully");
       clearTimeout(timeoutId);
     } catch (err) {
-      console.error('Error during data loading:', err);
+      console.error("Error during data loading:", err);
       clearTimeout(timeoutId);
-      setError(err instanceof Error ? err.message : 'Failed to load data');
+      setError(err instanceof Error ? err.message : "Failed to load data");
     } finally {
-       console.log('Setting loading to false');
-       setLoading(false);
-       setRenderTrigger(prev => prev + 1); // Force re-render
-       console.log('Loading state after setting:', loading());
-     }
+      console.log("Setting loading to false");
+      setRenderTrigger((prev) => prev + 1);
+    }
   });
 
   const loadRoles = async () => {
     try {
       const spaceId = props.space.id.toString();
-      console.log('Loading roles for space:', spaceId);
-      
-      // Check cache first
+      console.log("Loading roles for space:", spaceId);
+
       const cachedRoles = cache.getCachedSpaceRoles(spaceId);
       if (cachedRoles) {
-        console.log('Using cached roles:', cachedRoles);
-        // Convert SpaceRole format to Role format for the UI
+        console.log("Using cached roles:", cachedRoles);
         const convertedRoles = cachedRoles.map((role: any) => ({
           id: role.role_id,
           name: role.name,
-          color: role.color || '#99aab5',
+          color: role.color || "#99aab5",
           permissions: role.permissions || [],
           hoist: role.hoist || false,
           mentionable: role.mentionable || false,
-          position: role.position || 0
+          position: role.position || 0,
+          member_count: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         }));
-        setRoles(convertedRoles.map(role => ({
-          ...role,
-          member_count: 0, // Default value since it's not in cached data
-          created_at: new Date().toISOString(), // Default to current time
-          updated_at: new Date().toISOString() // Default to current time
-        })));
+        setRoles(convertedRoles);
         return;
       }
-      
-      // Fetch from API if not cached
-      console.log('Fetching roles from API');
-      const rolesData = await apiRequest(`${BASE_URL}/spaces/${props.space.id}/roles`, {
-        method: 'GET'
-      }) as { roles: any[] };
-      
-      console.log('Roles data received:', rolesData);
-      
-      // Convert backend role format to frontend format
+
+      console.log("Fetching roles from API");
+      const rolesData = (await apiRequest(
+        `${BASE_URL}/spaces/${props.space.id}/roles`,
+        {
+          method: "GET",
+        },
+      )) as { roles: any[] };
+
       const convertedRoles = rolesData.roles.map((role: any) => ({
         ...role,
-        permissions: Object.keys(role.permissions || {})
+        permissions: Object.keys(role.permissions || {}),
       }));
-      
-      console.log('Converted roles:', convertedRoles);
+
       setRoles(convertedRoles);
-      
-      // Cache the roles in SpaceRole format
+
       const spaceRoles = rolesData.roles.map((role: any) => ({
         role_id: role.id,
         name: role.name,
@@ -145,59 +134,59 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
         permissions: Object.keys(role.permissions || {}),
         hoist: role.hoist,
         mentionable: role.mentionable,
-        position: role.position
+        position: role.position,
       }));
       cache.setCachedSpaceRoles(spaceId, spaceRoles);
     } catch (err) {
-      console.error('Error loading roles:', err);
-      setError('Failed to load roles');
+      console.error("Error loading roles:", err);
+      setError("Failed to load roles");
     }
   };
 
   const loadAvailablePermissions = async () => {
     try {
-      console.log('Loading available permissions');
-      const permissionsData = await apiRequest(`${BASE_URL}/permissions`, {
-        method: 'GET'
-      }) as Permission[];
-      
-      console.log('Permissions data received:', permissionsData);
+      console.log("Loading available permissions");
+      const permissionsData = (await apiRequest(`${BASE_URL}/permissions`, {
+        method: "GET",
+      })) as Permission[];
+
       setAvailablePermissions(permissionsData);
     } catch (err) {
-      console.error('Error loading permissions:', err);
-      setError('Failed to load permissions');
+      console.error("Error loading permissions:", err);
+      setError("Failed to load permissions");
     }
   };
 
   const handleCreateRole = async () => {
     if (!newRoleName().trim()) return;
-    
+
     try {
-      const response = await apiRequest(`${BASE_URL}/spaces/${props.space.id}/roles`, {
-        method: 'POST',
-        body: {
-          name: newRoleName(),
-          color: newRoleColor(),
-          permissions: {
-            "VIEW_ROOMS": true,
-            "SEND_MESSAGES": true,
-            "READ_MESSAGE_HISTORY": true
+      const response = (await apiRequest(
+        `${BASE_URL}/spaces/${props.space.id}/roles`,
+        {
+          method: "POST",
+          body: {
+            name: newRoleName(),
+            color: newRoleColor(),
+            permissions: {
+              VIEW_ROOMS: true,
+              SEND_MESSAGES: true,
+              READ_MESSAGE_HISTORY: true,
+            },
+            mentionable: false,
+            hoist: false,
           },
-          mentionable: false,
-          hoist: false
-        }
-      }) as { role: any };
-      
-      // Convert backend role format to frontend format
+        },
+      )) as { role: any };
+
       const convertedRole = {
         ...response.role,
-        permissions: Object.keys(response.role.permissions || {})
+        permissions: Object.keys(response.role.permissions || {}),
       };
-      
+
       const updatedRoles = [...roles(), convertedRole];
       setRoles(updatedRoles);
-      
-      // Update cache
+
       const spaceId = props.space.id.toString();
       const spaceRoles = updatedRoles.map((role: any) => ({
         role_id: role.id,
@@ -207,32 +196,31 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
         permissions: role.permissions || [],
         hoist: role.hoist,
         mentionable: role.mentionable,
-        position: role.position
+        position: role.position,
       }));
       cache.setCachedSpaceRoles(spaceId, spaceRoles);
-      
+
       setNewRoleName("");
       setNewRoleColor("#99aab5");
       setShowCreateRole(false);
       setSelectedRole(convertedRole);
     } catch (err) {
-      console.error('Error creating role:', err);
-      setError('Failed to create role');
+      console.error("Error creating role:", err);
+      setError("Failed to create role");
     }
   };
 
   const handleDeleteRole = async (roleId: string) => {
-    if (roleId === "@everyone") return; // Can't delete @everyone
-    
+    if (roleId === "@everyone") return;
+
     try {
       await apiRequest(`${BASE_URL}/spaces/${props.space.id}/roles/${roleId}`, {
-        method: 'DELETE'
+        method: "DELETE",
       });
-      
-      const updatedRoles = roles().filter(r => r.id !== roleId);
+
+      const updatedRoles = roles().filter((r) => r.id !== roleId);
       setRoles(updatedRoles);
-      
-      // Update cache
+
       const spaceId = props.space.id.toString();
       const spaceRoles = updatedRoles.map((role: any) => ({
         role_id: role.id,
@@ -242,23 +230,23 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
         permissions: role.permissions || [],
         hoist: role.hoist,
         mentionable: role.mentionable,
-        position: role.position
+        position: role.position,
       }));
       cache.setCachedSpaceRoles(spaceId, spaceRoles);
-      
+
       if (selectedRole()?.id === roleId) {
         setSelectedRole(null);
       }
     } catch (err) {
-      console.error('Error deleting role:', err);
-      setError('Failed to delete role');
+      console.error("Error deleting role:", err);
+      setError("Failed to delete role");
     }
   };
 
   const updateRoleProperty = (property: keyof Role, value: any) => {
     const role = editedRole();
     if (!role) return;
-    
+
     const updatedRole = { ...role, [property]: value };
     setEditedRole(updatedRole);
     setHasUnsavedChanges(true);
@@ -267,42 +255,45 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
   const saveRoleChanges = async () => {
     const role = editedRole();
     if (!role || !hasUnsavedChanges()) return;
-    
+
     try {
-      // Convert permissions array to object format for backend
       const permissionsObject: Record<string, boolean> = {};
-      role.permissions.forEach(perm => {
+      role.permissions.forEach((perm) => {
         permissionsObject[perm] = true;
       });
 
-      // For @everyone role, only send permissions to avoid backend validation errors
-      const updateData = role.id === "@everyone" 
-        ? { permissions: permissionsObject }
-        : {
-            name: role.name,
-            color: role.color,
-            permissions: permissionsObject,
-            hoist: role.hoist,
-            mentionable: role.mentionable
-          };
+      const updateData =
+        role.id === "@everyone"
+          ? { permissions: permissionsObject }
+          : {
+              name: role.name,
+              color: role.color,
+              permissions: permissionsObject,
+              hoist: role.hoist,
+              mentionable: role.mentionable,
+              position: role.position,
+            };
 
-      const response = await apiRequest(`${BASE_URL}/spaces/${props.space.id}/roles/${role.id}`, {
-        method: 'PATCH',
-        body: updateData
-      }) as any;
-      
-      // Convert backend role format to frontend format
+      const response = (await apiRequest(
+        `${BASE_URL}/spaces/${props.space.id}/roles/${role.id}`,
+        {
+          method: "PATCH",
+          body: updateData,
+        },
+      )) as any;
+
       const convertedRole = {
         ...response,
-        permissions: Object.keys(response.permissions || {})
+        permissions: Object.keys(response.permissions || {}),
       };
-      
-      const updatedRoles = roles().map(r => r.id === role.id ? convertedRole : r);
+
+      const updatedRoles = roles().map((r) =>
+        r.id === role.id ? convertedRole : r,
+      );
       setSelectedRole(convertedRole);
       setEditedRole(convertedRole);
       setRoles(updatedRoles);
-      
-      // Update cache
+
       const spaceId = props.space.id.toString();
       const spaceRoles = updatedRoles.map((role: any) => ({
         role_id: role.id,
@@ -312,27 +303,120 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
         permissions: role.permissions || [],
         hoist: role.hoist,
         mentionable: role.mentionable,
-        position: role.position
+        position: role.position,
       }));
       cache.setCachedSpaceRoles(spaceId, spaceRoles);
-      
+
       setHasUnsavedChanges(false);
     } catch (err) {
-      console.error('Error updating role:', err);
-      setError('Failed to update role');
+      console.error("Error updating role:", err);
+      setError("Failed to update role");
     }
+  };
+
+  const handleDragStart = (e: DragEvent, roleId: string) => {
+    if (!canManageRoles() || roleId === "@everyone") return;
+    setDraggedRoleId(roleId);
+    e.dataTransfer?.setData("text/plain", roleId);
+    (e.currentTarget as HTMLDivElement).classList.add("opacity-50"); // Type cast to HTMLDivElement
+  };
+
+  const handleDragOver = (e: DragEvent, roleId: string) => {
+    if (
+      !canManageRoles() ||
+      roleId === "@everyone" ||
+      draggedRoleId() === roleId
+    )
+      return;
+    e.preventDefault(); // Allow dropping
+  };
+
+  const handleDrop = async (e: DragEvent, targetRoleId: string) => {
+    e.preventDefault();
+    if (!canManageRoles() || targetRoleId === "@everyone" || !draggedRoleId())
+      return;
+
+    const currentRoles = [...roles()].sort((a, b) => b.position - a.position);
+    const draggedIndex = currentRoles.findIndex(
+      (r) => r.id === draggedRoleId(),
+    );
+    const targetIndex = currentRoles.findIndex((r) => r.id === targetRoleId);
+
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    // Create new array with reordered roles
+    const updatedRoles = [...currentRoles];
+    const [draggedRole] = updatedRoles.splice(draggedIndex, 1);
+    updatedRoles.splice(targetIndex, 0, draggedRole);
+
+    // Reassign positions based on new order (highest position at top)
+    const maxPosition = Math.max(...currentRoles.map((r) => r.position));
+    const reorderedRoles = updatedRoles.map((role, index) => ({
+      ...role,
+      position: maxPosition - index,
+    }));
+
+    setRoles(reorderedRoles);
+    setDraggedRoleId(null);
+
+    // Update backend
+    try {
+      // Update positions for all affected roles
+      await Promise.all(
+        reorderedRoles.map((role) =>
+          apiRequest(`${BASE_URL}/spaces/${props.space.id}/roles/${role.id}`, {
+            method: "PATCH",
+            body: { position: role.position },
+          }),
+        ),
+      );
+
+      // Update cache
+      const spaceId = props.space.id.toString();
+      const spaceRoles = reorderedRoles.map((role: any) => ({
+        role_id: role.id,
+        name: role.name,
+        description: role.description,
+        color: role.color,
+        permissions: role.permissions || [],
+        hoist: role.hoist,
+        mentionable: role.mentionable,
+        position: role.position,
+      }));
+      cache.setCachedSpaceRoles(spaceId, spaceRoles);
+
+      // Update selected and edited role if affected
+      const updatedSelectedRole = reorderedRoles.find(
+        (r) => r.id === selectedRole()?.id,
+      );
+      if (updatedSelectedRole) {
+        setSelectedRole(updatedSelectedRole);
+        setEditedRole(updatedSelectedRole);
+      }
+    } catch (err) {
+      console.error("Error updating role positions:", err);
+      setError("Failed to update role positions");
+      // Revert on error
+      setRoles(currentRoles);
+      setDraggedRoleId(null);
+    }
+  };
+
+  const handleDragEnd = (e: DragEvent) => {
+    (e.currentTarget as HTMLDivElement).classList.remove("opacity-50"); // Type cast to HTMLDivElement
+    setDraggedRoleId(null);
   };
 
   const togglePermission = (permission: string) => {
     const role = editedRole();
     if (!role) return;
-    
+
     const hasPermission = role.permissions.includes(permission);
     const newPermissions = hasPermission
-      ? role.permissions.filter(p => p !== permission)
+      ? role.permissions.filter((p) => p !== permission)
       : [...role.permissions, permission];
-    
-    updateRoleProperty('permissions', newPermissions);
+
+    updateRoleProperty("permissions", newPermissions);
   };
 
   const selectRole = (role: Role) => {
@@ -357,16 +441,16 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
     }
   };
 
-  // Group permissions by category with search filtering
   const groupedPermissions = () => {
     const searchTerm = permissionSearch().toLowerCase();
-    const filteredPermissions = availablePermissions().filter(perm => 
-      perm.name.toLowerCase().includes(searchTerm) || 
-      perm.description.toLowerCase().includes(searchTerm)
+    const filteredPermissions = availablePermissions().filter(
+      (perm) =>
+        perm.name.toLowerCase().includes(searchTerm) ||
+        perm.description.toLowerCase().includes(searchTerm),
     );
-    
+
     const groups: Record<string, Permission[]> = {};
-    filteredPermissions.forEach(perm => {
+    filteredPermissions.forEach((perm) => {
       if (!groups[perm.category]) {
         groups[perm.category] = [];
       }
@@ -375,32 +459,20 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
     return groups;
   };
 
-  // // Force reactivity check with render trigger
-  // const isLoading = () => {
-  //   renderTrigger(); // Access render trigger to ensure reactivity
-  //   const loadingState = loading();
-  //   console.log('Current loading state in render:', loadingState, 'trigger:', renderTrigger());
-  //   return loadingState;
-  // };
-  
   return (
     <div class={`mb-8 ${isMobile() ? "" : "mr-5"}`}>
-      {/* Header with Icon */}
       <div class="flex items-center gap-3 mb-6">
         <div class="p-3 bg-purple-500/10 rounded-lg">
           <Crown />
         </div>
         <div>
-          <h2 class="text-xl font-semibold text-text-primary mb-1">
-            Roles
-          </h2>
+          <h2 class="text-xl font-semibold text-text-primary mb-1">Roles</h2>
           <p class="text-text-secondary text-xs">
             Manage roles and permissions for your space members
           </p>
         </div>
       </div>
 
-      {/* Error Message */}
       {error() && (
         <div class="mb-4 p-3 bg-red-500/10 border border-red-500/20 rounded-lg">
           <p class="text-red-500 text-sm">{error()}</p>
@@ -418,7 +490,6 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
       )}
 
       <div class="flex gap-6">
-        {/* Roles List */}
         <div class="w-1/3 bg-background1 rounded-lg p-4">
           <div class="flex items-center justify-between mb-4">
             <h3 class="text-lg font-semibold text-text-primary">Roles</h3>
@@ -432,8 +503,7 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
               </button>
             )}
           </div>
-          
-          {/* Create Role Form */}
+
           {showCreateRole() && (
             <div class="mb-4 p-3 bg-background2 rounded-lg border border-border">
               <div class="space-y-3">
@@ -450,6 +520,7 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
                     value={newRoleColor()}
                     onChange={(color) => setNewRoleColor(color)}
                     class="w-full"
+                    disabled={!canManageRoles()}
                   />
                 </div>
                 <div class="flex gap-2">
@@ -470,19 +541,21 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
               </div>
             </div>
           )}
-          
-          {/* Roles List */}
+
           <div class="space-y-2">
             <For each={roles().sort((a, b) => b.position - a.position)}>
               {(role) => (
                 <div
+                  draggable={canManageRoles() && role.id !== "@everyone"}
+                  onDragStart={(e) => handleDragStart(e, role.id)}
+                  onDragOver={(e) => handleDragOver(e, role.id)}
+                  onDrop={(e) => handleDrop(e, role.id)}
+                  onDragEnd={handleDragEnd}
                   class={`p-3 rounded-lg transition-colors ${
                     selectedRole()?.id === role.id
                       ? "bg-primary/20 border border-primary bg-background2 hover:bg-background2/80 cursor-pointer"
-                      : 
-                         "bg-background2 hover:bg-background2/80 cursor-pointer"
-                        
-                  }`}
+                      : "bg-background2 hover:bg-background2/80 cursor-pointer"
+                  } ${canManageRoles() && role.id !== "@everyone" ? "cursor-move" : ""}`}
                   onClick={() => selectRole(role)}
                 >
                   <div class="flex items-center justify-between">
@@ -492,8 +565,12 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
                         style={{ "background-color": role.color }}
                       />
                       <div>
-                        <div class="text-sm font-medium text-text-primary">{role.name}</div>
-                        <div class="text-xs text-text-secondary">{role.member_count} members</div>
+                        <div class="text-sm font-medium text-text-primary">
+                          {role.name}
+                        </div>
+                        <div class="text-xs text-text-secondary">
+                          {role.member_count} members
+                        </div>
                       </div>
                     </div>
                     {canManageRoles() && role.id !== "@everyone" && (
@@ -515,7 +592,6 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
           </div>
         </div>
 
-        {/* Role Settings */}
         <div class="flex-1 bg-background1 rounded-lg p-6">
           {selectedRole() ? (
             <div>
@@ -523,9 +599,14 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
                 <div class="flex items-center gap-3">
                   <div
                     class="w-6 h-6 rounded-full"
-                    style={{ "background-color": editedRole()?.color || selectedRole()!.color }}
+                    style={{
+                      "background-color":
+                        editedRole()?.color || selectedRole()!.color,
+                    }}
                   />
-                  <h3 class="text-lg font-semibold text-text-primary">{editedRole()?.name || selectedRole()!.name}</h3>
+                  <h3 class="text-lg font-semibold text-text-primary">
+                    {editedRole()?.name || selectedRole()!.name}
+                  </h3>
                   {selectedRole()!.id === "@everyone" && (
                     <span class="text-xs bg-blue-500/20 text-blue-400 px-2 py-1 rounded">
                       Editable
@@ -580,10 +661,14 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
               ) : (
                 <div class="flex border-b border-border mb-6">
                   <button
-                    onClick={() => setActiveTab('permissions')}
-                    class="px-4 py-2 text-sm font-medium text-primary border-b-2 border-primary"
+                    onClick={() => setActiveTab("display")}
+                    class={`px-4 py-2 text-sm font-medium ${
+                      activeTab() === "display"
+                        ? "text-primary border-b-2 border-primary"
+                        : "text-text-secondary hover:text-text-primary"
+                    }`}
                   >
-                    Permissions
+                    Display
                   </button>
                 </div>
               )}
@@ -663,7 +748,9 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
                         <input
                           type="text"
                           value={permissionSearch()}
-                          onInput={(e) => setPermissionSearch(e.currentTarget.value)}
+                          onInput={(e) =>
+                            setPermissionSearch(e.currentTarget.value)
+                          }
                           placeholder="Search permissions..."
                           class="w-full p-2 bg-background1 border border-border rounded-lg text-text-primary text-sm"
                         />
@@ -678,21 +765,29 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
                             </h5>
                             <div class="space-y-3">
                               <For each={permissions}>
-                                {(permission) => {                                 
-                                  return (
-                                    <div class="flex items-center justify-between p-3 bg-background1 rounded-lg">
-                                      <div class="flex-1">
-                                        <div class="text-sm font-medium text-text-primary">{permission.name}</div>
-                                        <div class="text-xs text-text-secondary">{permission.description}</div>
+                                {(permission) => (
+                                  <div class="flex items-center justify-between p-3 bg-background1 rounded-lg">
+                                    <div class="flex-1">
+                                      <div class="text-sm font-medium text-text-primary">
+                                        {permission.name}
                                       </div>
-                                      <ToggleSwitch
-                                        checked={editedRole()?.permissions?.includes(permission.id) || false}
-                                        onChange={() => togglePermission(permission.id)}
-                                        disabled={!canManageRoles()}
-                                      />
+                                      <div class="text-xs text-text-secondary">
+                                        {permission.description}
+                                      </div>
                                     </div>
-                                  );
-                                }}
+                                    <ToggleSwitch
+                                      checked={
+                                        editedRole()?.permissions?.includes(
+                                          permission.id,
+                                        ) || false
+                                      }
+                                      onChange={() =>
+                                        togglePermission(permission.id)
+                                      }
+                                      disabled={!canManageRoles()}
+                                    />
+                                  </div>
+                                )}
                               </For>
                             </div>
                           </div>
@@ -706,7 +801,9 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
           ) : (
             <div class="text-center py-12">
               <Crown class="w-12 h-12 text-text-secondary mx-auto mb-4" />
-              <p class="text-text-secondary">Select a role to edit its settings</p>
+              <p class="text-text-secondary">
+                Select a role to edit its settings
+              </p>
             </div>
           )}
         </div>

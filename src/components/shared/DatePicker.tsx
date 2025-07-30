@@ -8,6 +8,7 @@ import {
   createMemo,
 } from "solid-js";
 import { useTransContext } from "@mbarzda/solid-i18next";
+import { Portal } from "solid-js/web";
 
 interface DatePickerProps {
   value: Date;
@@ -217,180 +218,183 @@ const DatePicker: Component<DatePickerProps> = (props) => {
       <div
         onClick={() => setIsOpen(!isOpen())}
         class="w-full px-4 py-2 border border-border rounded-md cursor-pointer 
-          bg-background text-text-primary hover:border-accent focus:outline-none 
+          bg-[#323857] text-text-primary focus:outline-none 
           focus:border-accent dark:border-border"
       >
         {formatDate()(selectedDate())}
       </div>
 
-      <Show when={isOpen()}>
-        <div
-          class="absolute bottom-full right-0 md:left-[-4rem] w-80 p-3 mb-1 border rounded-lg shadow-lg
-            bg-background border-border dark:bg-background dark:border-border
-            animate-in fade-in slide-in-from-top-2"
-        >
-          <div class="flex items-center justify-between mb-1">
-            <button
-              type="button"
-              onClick={handlePrevMonth}
-              class="p-1 rounded-full hover:bg-surface dark:hover:bg-surface-dark
-                transition-transform hover:scale-110 active:scale-95"
-            >
-              <svg
-                class="w-6 h-6 text-text-primary"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width={2}
-                  d="M15 19l-7-7 7-7"
-                />
-              </svg>
-            </button>
-
-            <div class="flex items-center space-x-2">
+      <Portal>
+        <Show when={isOpen()}>
+          <div
+            ref={pickerRef}
+            class="fixed z-[1000] top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-full sm:w-96 max-w-[calc(100vw-2rem)] p-3 border rounded-lg shadow-lg
+              bg-[#1B1B26] border-border dark:border-border
+              animate-in fade-in slide-in-from-top-2"
+          >
+            <div class="flex items-center justify-between mb-1">
               <button
                 type="button"
-                onClick={toggleMonthPicker}
-                class="text-lg font-semibold hover:text-accent text-text-primary px-2 py-1 rounded
-                  hover:bg-surface dark:hover:bg-surface-dark transition-colors"
-                title={t("components.datePicker.selectMonth")}
+                onClick={handlePrevMonth}
+                class="p-1 rounded-full hover:bg-surface dark:hover:bg-surface-dark
+                  transition-transform hover:scale-110 active:scale-95"
               >
-                {months()[currentMonth()]}
+                <svg
+                  class="w-6 h-6 text-text-primary"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width={2}
+                    d="M15 19l-7-7 7-7"
+                  />
+                </svg>
               </button>
+
+              <div class="flex items-center space-x-2">
+                <button
+                  type="button"
+                  onClick={toggleMonthPicker}
+                  class="text-lg font-semibold hover:text-accent text-text-primary px-2 py-1 rounded
+                    hover:bg-surface dark:hover:bg-surface-dark transition-colors"
+                  title={t("components.datePicker.selectMonth")}
+                >
+                  {months()[currentMonth()]}
+                </button>
+                <button
+                  type="button"
+                  onClick={toggleYearPicker}
+                  class="text-lg font-semibold hover:text-accent text-text-primary px-2 py-1 rounded
+                    hover:bg-surface dark:hover:bg-surface-dark transition-colors"
+                  title={t("components.datePicker.selectYear")}
+                >
+                  {formatNumber()(currentYear())}
+                </button>
+              </div>
+
               <button
                 type="button"
-                onClick={toggleYearPicker}
-                class="text-lg font-semibold hover:text-accent text-text-primary px-2 py-1 rounded
-                  hover:bg-surface dark:hover:bg-surface-dark transition-colors"
-                title={t("components.datePicker.selectYear")}
+                onClick={handleNextMonth}
+                class="p-1 rounded-full hover:bg-surface dark:hover:bg-surface-dark
+                  transition-transform hover:scale-110 active:scale-95"
               >
-                {formatNumber()(currentYear())}
+                <svg
+                  class="w-6 h-6 text-text-primary"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width={2}
+                    d="M9 5l7 7-7 7"
+                  />
+                </svg>
               </button>
             </div>
 
-            <button
-              type="button"
-              onClick={handleNextMonth}
-              class="p-1 rounded-full hover:bg-surface dark:hover:bg-surface-dark
-                transition-transform hover:scale-110 active:scale-95"
-            >
-              <svg
-                class="w-6 h-6 text-text-primary"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  stroke-width={2}
-                  d="M9 5l7 7-7 7"
-                />
-              </svg>
-            </button>
-          </div>
+            <Show when={!showMonthPicker() && !showYearPicker()}>
+              <div class="grid grid-cols-7 gap-1 mb-2">
+                <For each={weekDays()}>
+                  {(day) => (
+                    <div class="w-12 h-8 flex items-center justify-center text-sm font-semibold text-text-secondary">
+                      {day}
+                    </div>
+                  )}
+                </For>
+              </div>
 
-          <Show when={!showMonthPicker() && !showYearPicker()}>
-            <div class="grid grid-cols-7 gap-1 mb-2">
-              <For each={weekDays()}>
-                {(day) => (
-                  <div class="w-11 h-9 flex items-center justify-center text-sm font-semibold text-text-secondary">
-                    {day}
-                  </div>
-                )}
-              </For>
-            </div>
+              <div class="grid grid-cols-7 gap-1">
+                <For each={getCalendarDays()}>
+                  {(day) => {
+                    if (day.type === "empty") {
+                      return <div class="w-11 h-9" />;
+                    }
 
-            <div class="grid grid-cols-7 gap-1">
-              <For each={getCalendarDays()}>
-                {(day) => {
-                  if (day.type === "empty") {
-                    return <div class="w-11 h-9" />;
-                  }
+                    const date = new Date(
+                      currentYear(),
+                      currentMonth(),
+                      day.value!,
+                    );
+                    const minDate = props.minDate || new Date(1900, 0, 1);
+                    const maxDate = props.maxDate || new Date();
+                    const isDisabled = date < minDate || date > maxDate;
+                    const isSelected =
+                      selectedDate() &&
+                      date.getDate() === selectedDate().getDate() &&
+                      date.getMonth() === selectedDate().getMonth() &&
+                      date.getFullYear() === selectedDate().getFullYear();
 
-                  const date = new Date(
-                    currentYear(),
-                    currentMonth(),
-                    day.value!,
-                  );
-                  const minDate = props.minDate || new Date(1900, 0, 1);
-                  const maxDate = props.maxDate || new Date();
-                  const isDisabled = date < minDate || date > maxDate;
-                  const isSelected =
-                    selectedDate() &&
-                    date.getDate() === selectedDate().getDate() &&
-                    date.getMonth() === selectedDate().getMonth() &&
-                    date.getFullYear() === selectedDate().getFullYear();
+                    return (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          !isDisabled && handleDateSelect(day.value!)
+                        }
+                        class={`w-12 h-7 rounded-full flex items-center justify-center text-sm transition-transform
+                          ${isSelected ? "bg-[#323857] text-white" : "hover:bg-surface dark:hover:bg-surface-dark text-text-primary"}
+                          ${isDisabled ? "text-text-disabled cursor-not-allowed" : "cursor-pointer hover:scale-110 active:scale-95"}
+                        `}
+                        disabled={isDisabled}
+                      >
+                        {formatNumber()(day.value!)}
+                      </button>
+                    );
+                  }}
+                </For>
+              </div>
+            </Show>
 
-                  return (
+            <Show when={showMonthPicker()}>
+              <div class="grid grid-cols-3 gap-2">
+                <For each={months()}>
+                  {(month, index) => (
                     <button
                       type="button"
-                      onClick={() =>
-                        !isDisabled && handleDateSelect(day.value!)
-                      }
-                      class={`w-11 h-8 rounded-full flex items-center justify-center text-sm transition-transform
-                        ${isSelected ? "bg-accent text-white" : "hover:bg-surface dark:hover:bg-surface-dark text-text-primary"}
-                        ${isDisabled ? "text-text-disabled cursor-not-allowed" : "cursor-pointer hover:scale-110 active:scale-95"}
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleMonthSelect(index());
+                      }}
+                      class={`p-1 rounded-md text-sm transition-colors
+                        ${currentMonth() === index() ? "bg-accent text-white" : "hover:bg-surface dark:hover:bg-surface-dark text-text-primary"}
                       `}
-                      disabled={isDisabled}
                     >
-                      {formatNumber()(day.value!)}
+                      {month}
                     </button>
-                  );
-                }}
-              </For>
-            </div>
-          </Show>
+                  )}
+                </For>
+              </div>
+            </Show>
 
-          <Show when={showMonthPicker()}>
-            <div class="grid grid-cols-3 gap-2">
-              <For each={months()}>
-                {(month, index) => (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleMonthSelect(index());
-                    }}
-                    class={`p-1 rounded-md text-sm transition-colors
-                      ${currentMonth() === index() ? "bg-accent text-white" : "hover:bg-surface dark:hover:bg-surface-dark text-text-primary"}
-                    `}
-                  >
-                    {month}
-                  </button>
-                )}
-              </For>
-            </div>
-          </Show>
-
-          <Show when={showYearPicker()}>
-            <div class="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-surface">
-              <For each={years()}>
-                {(year) => (
-                  <button
-                    type="button"
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      handleYearSelect(year);
-                    }}
-                    class={`p-1 rounded-md text-sm transition-colors
-                      ${currentYear() === year ? "bg-accent text-white" : "hover:bg-surface dark:hover:bg-surface-dark text-text-primary"}
-                    `}
-                  >
-                    {formatNumber()(year)}
-                  </button>
-                )}
-              </For>
-            </div>
-          </Show>
-        </div>
-      </Show>
+            <Show when={showYearPicker()}>
+              <div class="grid grid-cols-4 gap-2 max-h-40 overflow-y-auto scrollbar-thin scrollbar-thumb-border scrollbar-track-surface">
+                <For each={years()}>
+                  {(year) => (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        handleYearSelect(year);
+                      }}
+                      class={`p-1 rounded-md text-sm transition-colors
+                        ${currentYear() === year ? "bg-accent text-white" : "hover:bg-surface dark:hover:bg-surface-dark text-text-primary"}
+                      `}
+                    >
+                      {formatNumber()(year)}
+                    </button>
+                  )}
+                </For>
+              </div>
+            </Show>
+          </div>
+        </Show>
+      </Portal>
     </div>
   );
 };

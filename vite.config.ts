@@ -4,6 +4,9 @@ import solid from "vite-plugin-solid";
 
 export default defineConfig({
   plugins: [solid()],
+  optimizeDeps: {
+    include: ["@solid-primitives/utils"],
+  },
   server: {
     port: 3000,
     middlewareMode: false,
