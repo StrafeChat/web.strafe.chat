@@ -4,7 +4,12 @@ import { NoiseSuppressorWorklet_Name } from "@timephy/rnnoise-wasm"
 import NoiseSuppressorWorklet from "@timephy/rnnoise-wasm/NoiseSuppressorWorklet?worker&url"
 
 export type RNNoiseContextType = {
-	rnnoise: (stream: MediaStream) => Promise<MediaStream>;
+	rnnoise: (stream: MediaStream) => Promise<RNNoiseResult>;
+}
+export type RNNoiseResult = {
+	stream: MediaStream;
+	context: AudioContext;
+	destroy: () => Promise<void>; // free up system resources
 }
 
 const RNNoiseContext = createContext<RNNoiseContextType>();
@@ -21,7 +26,15 @@ export const RNNoiseProvider: ParentComponent = (props) => {
 		const dest = ctx.createMediaStreamDestination();
 		noiseSuppressionNode.connect(dest);
 
-		return dest.stream;
+		const ret = {
+			stream: dest.stream,
+			context: ctx,
+			destroy: async function() {
+				if (this.context.state !== "closed") await this.context.close();
+			},
+		}
+
+		return ret;
 	}
 
 	return (
