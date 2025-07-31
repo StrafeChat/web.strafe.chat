@@ -57,7 +57,7 @@ interface SpaceMembersListProps {
 }
 
 export const SpaceMembersList: Component<SpaceMembersListProps> = (props) => {
-  const cache = useCache();
+  const { getUser, getRoom, getSpaceMember, getSpaceRoles, getSpaceMembers } = useCache();
   const { user } = useAuth();
   const { openContextMenu } = useContextMenu();
   const params = useParams();
@@ -68,7 +68,7 @@ export const SpaceMembersList: Component<SpaceMembersListProps> = (props) => {
   const currentRoom = createMemo(() => {
     const roomId = params.roomId;
     if (!roomId) return null;
-    return cache.getRoom(roomId);
+    return getRoom(roomId);
   });
 
   // Fetch room permissions when room changes
@@ -157,7 +157,7 @@ export const SpaceMembersList: Component<SpaceMembersListProps> = (props) => {
    * Checks role-specific room permission overrides
    */
   const checkRoleOverrides = (memberId: string, spaceId: string, permissions: RoomPermissions): boolean | null => {
-    const member = cache.getSpaceMember(spaceId, memberId);
+    const member = getSpaceMember(spaceId, memberId);
     if (!member) return null;
     
     const memberRoles = member.roles || [];
@@ -184,10 +184,10 @@ export const SpaceMembersList: Component<SpaceMembersListProps> = (props) => {
    * Checks space-level permissions for VIEW_ROOMS
    */
   const checkSpaceLevelPermissions = (memberId: string, spaceId: string): boolean => {
-    const member = cache.getSpaceMember(spaceId, memberId);
+    const member = getSpaceMember(spaceId, memberId);
     if (!member) return false;
     
-    const roles = cache.getSpaceRoles(spaceId);
+    const roles = getSpaceRoles(spaceId);
     const memberRoles = member.roles || [];
     
     // Check if any of the member's roles have VIEW_ROOMS permission
@@ -261,8 +261,8 @@ export const SpaceMembersList: Component<SpaceMembersListProps> = (props) => {
     const space = props.currentSpace;
     if (!space) return { roleGroups: [], online: [], offline: [] };
     
-    const members = cache.getSpaceMembers(space.id);
-    const roles = cache.getSpaceRoles(space.id);
+    const members = getSpaceMembers(space.id);
+    const roles = getSpaceRoles(space.id);
     
     // Get hoisted roles sorted by position (highest first)
     const hoistedRoles = roles
@@ -276,7 +276,7 @@ export const SpaceMembersList: Component<SpaceMembersListProps> = (props) => {
     
     // First, separate all members into offline and online groups
     for (const member of members) {
-      const userData = cache.getUser(member.user_id);
+      const userData = getUser(member.user_id);
       if (userData && canMemberViewRoom(userData.id)) {
         const memberData = createMemberData(userData, member);
         
@@ -294,7 +294,7 @@ export const SpaceMembersList: Component<SpaceMembersListProps> = (props) => {
       
       for (const member of members) {
         if (member.roles.includes(role.role_id) && !processedMembers.has(member.user_id)) {
-          const userData = cache.getUser(member.user_id);
+          const userData = getUser(member.user_id);
           if (userData && canMemberViewRoom(userData.id)) {
             const memberData = createMemberData(userData, member);
             roleMembers.push(memberData);
@@ -311,7 +311,7 @@ export const SpaceMembersList: Component<SpaceMembersListProps> = (props) => {
     // Finally, add remaining online members without hoisted roles to the online section
     for (const member of members) {
       if (!processedMembers.has(member.user_id)) {
-        const userData = cache.getUser(member.user_id);
+        const userData = getUser(member.user_id);
         if (userData && canMemberViewRoom(userData.id)) {
           const memberData = createMemberData(userData, member);
           onlineMembers.push(memberData);

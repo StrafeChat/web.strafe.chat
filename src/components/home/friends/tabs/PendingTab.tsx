@@ -15,8 +15,8 @@ import { FriendSearch } from "../FriendSearch";
 import { BASE_URL } from "../../../../constants";
 
 export const PendingTab: Component = () => {
-  const { relationshipRequests, user, setRelationshipRequests } = useAuth();
-  const cache = useCache();
+  const { user } = useAuth();
+  const { relationshipRequests, setRelationshipRequests, users, getUser } = useCache();
   const [t] = useTransContext();
   const [searchQuery, setSearchQuery] = createSignal("");
 
@@ -93,7 +93,7 @@ export const PendingTab: Component = () => {
 
   const getUserDisplay = (userId: string) => {
     const userData = createMemo(() => {
-      const cachedUsers = cache.users();
+      const cachedUsers = users();
       console.log(
         "[PendingTab] Cached users:",
         cachedUsers,
@@ -136,7 +136,7 @@ export const PendingTab: Component = () => {
       const isIncoming = request.recipient_id === user()?.id;
       const targetId = isIncoming ? request.sender_id : request.recipient_id;
       const person = getUserDisplay(targetId);
-      const userData = cache.getUser(targetId);
+      const userData = getUser(targetId);
 
       return (
         person.name.toLowerCase().includes(query) ||

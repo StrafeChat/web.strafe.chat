@@ -909,11 +909,19 @@ const RoomsList: Component<RoomsListProps> = (props) => {
     if (!allRooms) return [];
 
     const filtered = allRooms.filter((room: RoomWithRecipients) => {
-      const spaceIdMatch = String(room.space_id) === String(props.spaceId);
+      const roomSpaceId = String(room.space_id);
+      const propsSpaceId = String(props.spaceId);
+      const spaceIdMatch = roomSpaceId === propsSpaceId;
       const typeMatch =
         room.type === RoomType.TEXT_ROOM ||
         room.type === RoomType.VOICE_ROOM ||
         room.type === RoomType.SPACE_SECTION;
+      
+      // Enhanced debugging for space ID comparison
+      if (!spaceIdMatch && room.name) {
+        console.log(`[RoomsList] Space ID mismatch for room "${room.name}": room.space_id="${roomSpaceId}" vs props.spaceId="${propsSpaceId}"`);
+      }
+      
       return spaceIdMatch && typeMatch;
     });
     console.log(

@@ -77,7 +77,7 @@ export const MessageAttachments: Component<MessageAttachmentsProps> = (
                     messageId={props.messageId}
                   />
                 </Show>
-                <Show when={!isAudio}>
+                <Show when={!isAudio && !isImage}>
                   <div class="p-3 bg-surface bg-opacity-20">
                     <div class="flex items-center justify-between">
                       <div class="flex items-center gap-2 min-w-0">

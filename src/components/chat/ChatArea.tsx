@@ -47,7 +47,7 @@ const ChatArea: Component = () => {
     unreadMessages,
     markMessagesAsRead,
   } = useAuth();
-  const cache = useCache();
+  const { getUser, getMessage, getRoom, getSpaceMember, getSpaceMembers, getSpaceRoles, getMessages, hasReachedBeginning: cacheHasReachedBeginning, hasReachedEnd: cacheHasReachedEnd, getOldestMessageId, setUser, setHasReachedBeginning: cacheSetHasReachedBeginning, setMessages: cacheSetMessages, getNewestMessageId, setHasReachedEnd: cacheSetHasReachedEnd, deleteMessage, getSpace } = useCache();
   const [t] = useTransContext();
   const { userSettings } = useUserSettings();
   const { checkPermission } = usePermissions();
@@ -55,7 +55,7 @@ const ChatArea: Component = () => {
   const [sending, setSending] = createSignal(false);
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal("");
-  const [messages, setMessages] = createSignal<CachedMessage[]>([]);
+  const [localMessages, setLocalMessages] = createSignal<CachedMessage[]>([]);
   const [pendingMessages, setPendingMessages] = createSignal<CachedMessage[]>(
     [],
   );
@@ -99,8 +99,8 @@ const ChatArea: Component = () => {
     >
   >([]);
   const [, setUploadingFiles] = createSignal(false);
-  const [hasReachedBeginning, setHasReachedBeginning] = createSignal(false);
-  const [hasReachedEnd, setHasReachedEnd] = createSignal(false);
+  const [localHasReachedBeginning, setLocalHasReachedBeginning] = createSignal(false);
+  const [localHasReachedEnd, setLocalHasReachedEnd] = createSignal(false);
   const [loadingOlderPhase, setLoadingOlderPhase] = createSignal<
     "idle" | "loading" | "positioning"
   >("idle");
@@ -470,7 +470,7 @@ const ChatArea: Component = () => {
     if (room.type >= 2 && room.type <= 4 && room.permission_overrides) {
       const SEND_MESSAGES = 1 << 11; // SEND_MESSAGES permission bit (2048)
 
-      const space = cache.getSpace(room.space_id!);
+      const space = getSpace(room.space_id!);
       if (user()!.id == space?.owner_id) return true;
       
       console.log('[canSendMessages] Checking permission overrides for room:', room.id, {
@@ -499,7 +499,7 @@ const ChatArea: Component = () => {
            console.log('[canSendMessages] Checking role overrides for user:', currentUserId);
            if (currentUserId && room.space_id) {
              // Get user's space membership to access their roles
-             const spaceMember = cache.getSpaceMember(room.space_id.toString(), currentUserId);
+             const spaceMember = getSpaceMember(room.space_id.toString(), currentUserId);
              const userRoles = spaceMember?.roles || [];
              console.log('[canSendMessages] User roles:', userRoles, 'Space member:', spaceMember);
              
@@ -543,7 +543,7 @@ const ChatArea: Component = () => {
 
   // Combined messages for display (cached + pending)
   const displayMessages = createMemo(() => {
-    const cached = messages();
+    const cached = localMessages();
     const pending = pendingMessages();
 
     // Create a set of nonces from cached messages for deduplication
@@ -634,7 +634,7 @@ const ChatArea: Component = () => {
           .filter((r) => r.id !== currentUserId)
           .map((r) => {
             // Use cached data if available for most up-to-date info
-            const cachedUser = cache.getUser(r.id);
+            const cachedUser = getUser(r.id);
             if (cachedUser) {
               return cachedUser.display_name || cachedUser.username;
             }
@@ -662,7 +662,7 @@ const ChatArea: Component = () => {
 
           if (otherRecipientId) {
             // Try to get user from cache first
-            const cachedUser = cache.getUser(otherRecipientId);
+            const cachedUser = getUser(otherRecipientId);
             if (cachedUser) {
               return cachedUser.display_name || cachedUser.username;
             }
@@ -687,7 +687,7 @@ const ChatArea: Component = () => {
         );
         if (recipient) {
           // Use cached data if available for most up-to-date info
-          const cachedUser = cache.getUser(recipient.id);
+          const cachedUser = getUser(recipient.id);
           if (cachedUser) {
             return cachedUser.display_name || cachedUser.username;
           }
@@ -742,8 +742,8 @@ const ChatArea: Component = () => {
     lastCacheSync = now;
 
     // Get messages from cache and sync with local state
-    const cachedMessages = cache.getMessages(roomId);
-    const currentMessages = messages();
+    const cachedMessages = getMessages(roomId);
+    const currentMessages = localMessages();
 
     // Only update if cache has different messages than local state
     if (
@@ -760,7 +760,7 @@ const ChatArea: Component = () => {
       const processed = processMessages(cachedMessages);
       // Only update if the processed messages are actually different
       if (processed !== currentMessages) {
-        setMessages(processed);
+        setLocalMessages(processed);
       }
     }
   });
@@ -789,9 +789,9 @@ const ChatArea: Component = () => {
       setTypingUsers((prev) => prev.filter((u) => u.id !== message.author_id));
 
       // Force immediate update for real-time messages to bypass throttling
-      const cachedMessages = cache.getMessages(roomId);
+      const cachedMessages = getMessages(roomId);
       const processed = processMessages(cachedMessages);
-      setMessages(processed);
+      setLocalMessages(processed);
 
       console.log(
         "[ChatArea] Updated messages immediately for real-time create, count:",
@@ -815,9 +815,9 @@ const ChatArea: Component = () => {
       );
 
       // Force immediate update for real-time deletions to bypass throttling
-      const cachedMessages = cache.getMessages(roomId);
+      const cachedMessages = getMessages(roomId);
       const processed = processMessages(cachedMessages);
-      setMessages(processed);
+      setLocalMessages(processed);
 
       console.log(
         "[ChatArea] Updated messages immediately for real-time delete, count:",
@@ -836,9 +836,9 @@ const ChatArea: Component = () => {
       );
 
       // Force immediate update for real-time edits to bypass throttling
-      const cachedMessages = cache.getMessages(roomId);
+      const cachedMessages = getMessages(roomId);
       const processed = processMessages(cachedMessages);
-      setMessages(processed);
+      setLocalMessages(processed);
 
       console.log(
         "[ChatArea] Updated messages immediately for real-time edit, count:",
@@ -872,34 +872,34 @@ const ChatArea: Component = () => {
       // Clean up previous room state
 
       // Reset state for the new room
-      setMessages([]);
+      setLocalMessages([]);
       setPendingMessages([]); // Clear pending messages when switching rooms
       setError("");
       setHasScrolledUp(false);
       setShouldScrollToBottom(true);
-      setHasReachedBeginning(false);
-      setHasReachedEnd(false);
+      setLocalHasReachedBeginning(false);
+      setLocalHasReachedEnd(false);
       setLoadingOlderPhase("idle");
       setIsLoadingNewer(false);
       setIsNearTop(false);
       setIsNearBottom(true);
 
       // Check if we already have messages in cache
-      const cachedMessages = cache.getMessages(roomId);
+      const cachedMessages = getMessages(roomId);
       if (cachedMessages.length > 0) {
         // If we have cached messages, use them immediately without loading skeleton
         setLoading(false);
-        setMessages(processMessages(cachedMessages));
+        setLocalMessages(processMessages(cachedMessages));
 
         // Set hasReachedBeginning based on cached message count and cache state
-        const cacheHasReachedBeginning = cache.hasReachedBeginning(roomId);
-        setHasReachedBeginning(
-          cacheHasReachedBeginning || cachedMessages.length < 50,
+        const hasReachedBeginningFromCache = cacheHasReachedBeginning(roomId);
+        setLocalHasReachedBeginning(
+          hasReachedBeginningFromCache || cachedMessages.length < 50,
         );
 
         // Set hasReachedEnd based on cache state
-        const cacheHasReachedEnd = cache.hasReachedEnd(roomId);
-        setHasReachedEnd(cacheHasReachedEnd);
+        const hasReachedEndFromCache = cacheHasReachedEnd(roomId);
+        setLocalHasReachedEnd(hasReachedEndFromCache);
 
         // Ensure scroll to bottom happens after DOM updates and invite embeds load
         requestAnimationFrame(() => {
@@ -913,8 +913,8 @@ const ChatArea: Component = () => {
           // We've already fetched this room and it was empty, so hide loading
           setLoading(false);
           // Set flags for empty room that was previously fetched
-          setHasReachedBeginning(true);
-          setHasReachedEnd(true);
+          setLocalHasReachedBeginning(true);
+          setLocalHasReachedEnd(true);
           // Don't call fetchInitialMessages for already fetched empty rooms
         } else {
           // Show loading skeleton only for rooms that need to fetch messages
@@ -950,7 +950,7 @@ const ChatArea: Component = () => {
     if (
       !params.roomId ||
       loadingOlderPhase() !== "idle" ||
-      hasReachedBeginning()
+      localHasReachedBeginning()
     ) {
       return;
     }
@@ -985,10 +985,10 @@ const ChatArea: Component = () => {
         : null;
 
       // Get the oldest message ID for the API request
-      const oldestMessageId = cache.getOldestMessageId(params.roomId);
+      const oldestMessageId = getOldestMessageId(params.roomId);
 
       if (!oldestMessageId) {
-        setHasReachedBeginning(true);
+        setLocalHasReachedBeginning(true);
         setLoadingOlderPhase("idle");
         return;
       }
@@ -1017,15 +1017,15 @@ const ChatArea: Component = () => {
             : [];
 
       // Extract author data from messages and add to user cache (optimized batch processing)
-      if (Array.isArray(messages)) {
+      if (Array.isArray(fetchedMessages)) {
         const newUsers = new Map();
 
         // First pass: collect unique authors that aren't already cached
-        messages.forEach((message: any) => {
+        fetchedMessages.forEach((message: any) => {
           if (
             message.author &&
             message.author.id &&
-            !cache.getUser(message.author.id) &&
+            !getUser(message.author.id) &&
             !newUsers.has(message.author.id)
           ) {
             newUsers.set(message.author.id, {
@@ -1045,25 +1045,25 @@ const ChatArea: Component = () => {
 
         // Batch add new users to cache
         newUsers.forEach((user) => {
-          cache.setUser(user);
+          setUser(user);
         });
       }
 
       if (fetchedMessages.length === 0) {
-        cache.setHasReachedBeginning(params.roomId, true);
-        setHasReachedBeginning(true);
+        cacheSetHasReachedBeginning(params.roomId, true);
+        setLocalHasReachedBeginning(true);
       } else {
         // Add messages to cache
-        cache.setMessages(params.roomId, fetchedMessages, "older");
+        cacheSetMessages(params.roomId, fetchedMessages, "older");
 
         // Update displayed messages with batched DOM updates
         const updatedMessages = processMessages(
-          cache.getMessages(params.roomId),
+          getMessages(params.roomId),
         );
 
         // Use flushSync to ensure DOM updates are applied immediately
         batch(() => {
-          setMessages(updatedMessages);
+          setLocalMessages(updatedMessages);
         });
 
         // Enhanced scroll restoration with multiple fallback strategies
@@ -1100,8 +1100,8 @@ const ChatArea: Component = () => {
 
         // Check if we got fewer messages than requested (reached beginning)
         if (fetchedMessages.length < 50) {
-          cache.setHasReachedBeginning(params.roomId, true);
-          setHasReachedBeginning(true);
+          cacheSetHasReachedBeginning(params.roomId, true);
+          setLocalHasReachedBeginning(true);
         }
       }
     } catch (err) {
@@ -1113,18 +1113,18 @@ const ChatArea: Component = () => {
 
   // Simple fetch newer messages
   const fetchNewerMessages = async () => {
-    if (!params.roomId || isLoadingNewer() || hasReachedEnd()) {
+    if (!params.roomId || isLoadingNewer() || localHasReachedEnd()) {
       return;
     }
 
     try {
       setIsLoadingNewer(true);
 
-      const newestMessageId = cache.getNewestMessageId(params.roomId);
+      const newestMessageId = getNewestMessageId(params.roomId);
 
       if (!newestMessageId) {
         // If we don't have a newest message ID, mark as reached end
-        setHasReachedEnd(true);
+        setLocalHasReachedEnd(true);
         return;
       }
 
@@ -1160,7 +1160,7 @@ const ChatArea: Component = () => {
           if (
             message.author &&
             message.author.id &&
-            !cache.getUser(message.author.id) &&
+            !getUser(message.author.id) &&
             !newUsers.has(message.author.id)
           ) {
             newUsers.set(message.author.id, {
@@ -1180,28 +1180,28 @@ const ChatArea: Component = () => {
 
         // Batch add new users to cache
         newUsers.forEach((user) => {
-          cache.setUser(user);
+          setUser(user);
         });
       }
 
       if (fetchedMessages.length === 0) {
         // No more newer messages
-        cache.setHasReachedEnd(params.roomId, true);
-        setHasReachedEnd(true);
+        cacheSetHasReachedEnd(params.roomId, true);
+        setLocalHasReachedEnd(true);
       } else {
         // Add messages to cache
-        cache.setMessages(params.roomId, fetchedMessages, "newer");
+        cacheSetMessages(params.roomId, fetchedMessages, "newer");
 
         // Update displayed messages
         const updatedMessages = processMessages(
-          cache.getMessages(params.roomId),
+          getMessages(params.roomId),
         );
-        setMessages(updatedMessages);
+        setLocalMessages(updatedMessages);
 
         // Check if we got fewer messages than requested (reached end)
         if (fetchedMessages.length < 50) {
-          cache.setHasReachedEnd(params.roomId, true);
-          setHasReachedEnd(true);
+          cacheSetHasReachedEnd(params.roomId, true);
+          setLocalHasReachedEnd(true);
         }
 
         // Maintain scroll position if user was at bottom
@@ -1224,7 +1224,7 @@ const ChatArea: Component = () => {
 
     try {
       // Only set loading to true if we don't already know this room is empty
-      const cachedMessages = cache.getMessages(roomId);
+      const cachedMessages = getMessages(roomId);
       if (!cachedMessages || cachedMessages.length > 0) {
         setLoading(true);
       }
@@ -1260,7 +1260,7 @@ const ChatArea: Component = () => {
           if (
             message.author &&
             message.author.id &&
-            !cache.getUser(message.author.id) &&
+            !getUser(message.author.id) &&
             !newUsers.has(message.author.id)
           ) {
             newUsers.set(message.author.id, {
@@ -1280,7 +1280,7 @@ const ChatArea: Component = () => {
 
         // Batch add new users to cache
         newUsers.forEach((user) => {
-          cache.setUser(user);
+          setUser(user);
         });
       }
 
@@ -1289,28 +1289,28 @@ const ChatArea: Component = () => {
 
       if (messages.length > 0) {
         // Add messages to cache
-        cache.setMessages(roomId, messages, "replace");
-        setMessages(processMessages(messages));
+        cacheSetMessages(roomId, messages, "replace");
+        setLocalMessages(processMessages(messages));
 
         // Only set hasReachedBeginning if we got fewer than the limit (50)
         // This indicates there are no older messages
         if (messages.length < 50) {
-          setHasReachedBeginning(true);
+          setLocalHasReachedBeginning(true);
         } else {
           // Reset the flag to allow fetching older messages
-          setHasReachedBeginning(false);
-        }
+        setLocalHasReachedBeginning(false);
+      }
 
-        // For initial load, assume we've reached the end (most recent messages)
-        // This prevents unnecessary "after" queries immediately after loading
-        setHasReachedEnd(true);
+      // For initial load, assume we've reached the end (most recent messages)
+      // This prevents unnecessary "after" queries immediately after loading
+      setLocalHasReachedEnd(true);
       } else {
         console.log("No messages found or empty response:", data);
         // Don't set an error for empty messages, just show an empty chat
-        setMessages([]);
+        setLocalMessages([]);
         // Set flags for empty room
-        setHasReachedBeginning(true);
-        setHasReachedEnd(true);
+        setLocalHasReachedBeginning(true);
+        setLocalHasReachedEnd(true);
       }
     } catch (err) {
       console.error("Error fetching messages:", err);
@@ -1398,7 +1398,7 @@ const ChatArea: Component = () => {
       // Predictive loading - start loading before user reaches threshold
       if (
         isNearTop &&
-        !hasReachedBeginning() &&
+        !localHasReachedBeginning() &&
         loadingOlderPhase() === "idle"
       ) {
         // Use requestIdleCallback for non-blocking loading
@@ -1412,7 +1412,7 @@ const ChatArea: Component = () => {
       // Load newer messages with similar optimization
       if (
         isAtBottom &&
-        !hasReachedEnd() &&
+        !localHasReachedEnd() &&
         !isLoadingNewer() &&
         hasScrolledUp() &&
         displayMessages().length > 0
@@ -1499,7 +1499,7 @@ const ChatArea: Component = () => {
   const handleDelete = (messageId: string) => {
     if (messageId) {
       // Call the API to delete the message
-      cache.deleteMessage(params.roomId, messageId);
+      deleteMessage(params.roomId, messageId);
     }
   };
 
@@ -2018,7 +2018,7 @@ const ChatArea: Component = () => {
             </Show>
             <div class="flex-1 flex flex-col justify-end">
               {/* Show beginning section immediately when we know we've reached it */}
-              <Show when={hasReachedBeginning()}>
+              <Show when={localHasReachedBeginning()}>
                 <div class="flex items-start gap-4 text-text-secondary select-none px-4 py-5">
                   <Show when={isDirectPM()}>
                     <div class="flex-shrink-0">
@@ -2219,7 +2219,7 @@ const ChatArea: Component = () => {
                       if (replyMessage) {
                         const authorId = replyMessage.author_id;
                         if (!uniqueAuthors.has(authorId)) {
-                          const replyAuthor = cache.getUser(authorId);
+                          const replyAuthor = getUser(authorId);
                           uniqueAuthors.set(authorId, replyAuthor);
                         }
                       }
@@ -2268,7 +2268,7 @@ const ChatArea: Component = () => {
               <div class="flex -space-x-2 mr-1">
                 <For each={typingUsers().slice(0, 3)}>
                   {(typingUser) => {
-                    const user = cache.getUser(typingUser.id);
+                    const user = getUser(typingUser.id);
                     return (
                       <div class="w-6 h-6 rounded-full bg-primary flex-shrink-0 overflow-hidden border border-background2">
                         <Avatar
@@ -2288,7 +2288,7 @@ const ChatArea: Component = () => {
                   const users = typingUsers()
                     .slice(0, 3)
                     .map((tu) => {
-                      const user = cache.getUser(tu.id);
+                      const user = getUser(tu.id);
                       return user?.display_name || user?.username || "Someone";
                     });
 
@@ -2974,7 +2974,7 @@ const ChatArea: Component = () => {
               <div class="flex -space-x-2 mr-1">
                 <For each={typingUsers().slice(0, 3)}>
                   {(typingUser) => {
-                    const user = cache.getUser(typingUser.id);
+                    const user = getUser(typingUser.id);
                     return (
                       <div class="w-6 h-6 rounded-full bg-primary flex-shrink-0 overflow-hidden border border-background2">
                         <Avatar
@@ -2994,7 +2994,7 @@ const ChatArea: Component = () => {
                   const users = typingUsers()
                     .slice(0, 3)
                     .map((tu) => {
-                      const user = cache.getUser(tu.id);
+                      const user = getUser(tu.id);
                       return user?.display_name || user?.username || "Someone";
                     });
 

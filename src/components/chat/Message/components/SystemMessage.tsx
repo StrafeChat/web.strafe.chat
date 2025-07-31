@@ -3,10 +3,11 @@ import { SystemMessageType } from "../../../../types/messageTypes";
 import UserPopupMenu from "../../../common/UserPopupMenu";
 import { MessageProps } from "../types";
 import { formatTimeOnly } from "../utils/date";
+import { useCache } from "../../../../lib/providers/cache/CacheProvider";
 
 export const renderSystemMessage = (
   props: MessageProps,
-  cache: { getUser: (arg0: string) => any },
+  getUser: (arg0: string) => any,
   appearance: any,
 ) => {
   if (!props.system_type || !props.system_data)
@@ -49,10 +50,10 @@ export const renderSystemMessage = (
   }
 
   const actorUser = systemData.actor_id
-    ? cache.getUser(systemData.actor_id)
+    ? getUser(systemData.actor_id)
     : null;
   const targetUser = systemData.user_id
-    ? cache.getUser(systemData.user_id)
+    ? getUser(systemData.user_id)
     : null;
   const actorName =
     actorUser?.display_name || actorUser?.username || "Unknown User";
@@ -228,7 +229,6 @@ export const getSystemMessageIcon = (props: MessageProps) => {
 
 interface SystemMessageProps {
   message: any;
-  cache: any;
   appearance: any;
   systemUserPopupOpen: boolean;
   systemUserPopupTrigger?: HTMLElement;
@@ -239,9 +239,10 @@ interface SystemMessageProps {
 }
 
 export const SystemMessage: Component<SystemMessageProps> = (props) => {
+  const { getUser, getSpaceMember } = useCache();
   const messageData = renderSystemMessage(
     props.message,
-    props.cache,
+    getUser,
     props.appearance,
   );
 
@@ -250,7 +251,7 @@ export const SystemMessage: Component<SystemMessageProps> = (props) => {
     const spaceId = props.spaceId;
     const userId = props.systemSelectedUserId;
     if (!spaceId || !userId) return undefined;
-    return props.cache.getSpaceMember(spaceId, userId);
+    return getSpaceMember(spaceId, userId);
   };
 
   return (

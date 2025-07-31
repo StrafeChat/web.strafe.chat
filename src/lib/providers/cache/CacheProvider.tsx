@@ -10,7 +10,9 @@ import { SpaceCache, Space, SpaceMember, SpaceRole } from "../../cache/SpaceCach
 import { RoomCache } from "../../cache/RoomCache";
 import { InviteCache } from "./InviteCache";
 import { InviteInfo } from "../../../types/api";
-import { Room } from "../../../types/rooms";
+import { RoomWithRecipients, Room } from "../../../types/rooms";
+import { Relationship } from "../../../types/relationships";
+import { UserType } from "../../../types/users";
 
 export type Presence = {
   status: string;
@@ -36,10 +38,20 @@ export type User = {
 };
 
 type CacheContextType = {
+  // User management
   users: () => Record<string, User>;
   getUser: (id: string) => User | undefined;
   setUser: (user: Partial<User> & { id: string }) => void;
   setUsers: (usersData: Record<string, any>) => void;
+  // Room management
+  rooms: () => RoomWithRecipients[];
+  setRooms: (rooms: RoomWithRecipients[] | ((prev: RoomWithRecipients[]) => RoomWithRecipients[])) => void;
+  // Relationship management
+  relationships: () => string[];
+  setRelationships: (relationships: string[]) => void;
+  relationshipRequests: () => Relationship[];
+  setRelationshipRequests: (requests: Relationship[]) => void;
+  // Message management
   getMessages: (roomId: string) => CachedMessage[];
   getMessage: (roomId: string, messageId: string) => CachedMessage | undefined;
   getMessageCount: (roomId: string) => number;
@@ -114,6 +126,9 @@ window.inviteCache = inviteCache;
 export const CacheProvider: ParentComponent = (props) => {
   const [users, setUsers] = createSignal<Record<string, User>>({});
   const [spaces, setSpaces] = createSignal<Space[]>([]);
+  const [rooms, setRooms] = createSignal<RoomWithRecipients[]>([]);
+  const [relationships, setRelationships] = createSignal<string[]>([]);
+  const [relationshipRequests, setRelationshipRequests] = createSignal<Relationship[]>([]);
 
   // Listen for user updates, message events, and space events
   createEffect(() => {
@@ -154,6 +169,43 @@ export const CacheProvider: ParentComponent = (props) => {
       if (room && room.id) {
         console.log("[CacheProvider] Adding room to cache:", room);
         roomCache.setRoom(room);
+        // Add to reactive rooms signal
+        setRooms(prev => [...prev, room]);
+      }
+    };
+
+    const handleRoomUpdate = (event: CustomEvent) => {
+      const roomData = event.detail;
+      if (roomData && roomData.room_id) {
+        console.log("[CacheProvider] Updating room:", roomData);
+        setRooms(prev => prev.map(room => {
+          if (room.id === roomData.room_id) {
+            return { ...room, ...roomData };
+          }
+          return room;
+        }));
+      }
+    };
+
+    const handleRelationshipUpdate = (event: CustomEvent) => {
+      const { relationships: newRelationships, relationshipRequests: newRequests } = event.detail;
+      if (newRelationships) {
+        console.log("[CacheProvider] Updating relationships:", newRelationships);
+        setRelationships(newRelationships);
+      }
+      if (newRequests) {
+        console.log("[CacheProvider] Updating relationship requests:", newRequests);
+        setRelationshipRequests(newRequests);
+      }
+    };
+
+    const handleRoomsCache = (event: CustomEvent) => {
+      const roomsData = event.detail;
+      if (roomsData && Array.isArray(roomsData)) {
+        console.log("[CacheProvider] Caching rooms:", roomsData);
+        setRooms(roomsData);
+        // Also cache in RoomCache
+        roomsData.forEach(room => roomCache.setRoom(room));
       }
     };
 
@@ -265,6 +317,9 @@ export const CacheProvider: ParentComponent = (props) => {
     window.addEventListener("messageDelete", handleMessageDelete as EventListener);
     window.addEventListener("spaceCreate", handleSpaceCreate as EventListener);
     window.addEventListener("roomCreate", handleRoomCreate as EventListener);
+    window.addEventListener("roomUpdate", handleRoomUpdate as EventListener);
+    window.addEventListener("roomsCache", handleRoomsCache as EventListener);
+    window.addEventListener("relationshipUpdate", handleRelationshipUpdate as EventListener);
     window.addEventListener("spaceUpdate", handleSpaceUpdate as EventListener);
     window.addEventListener("spaceDelete", handleSpaceDelete as EventListener);
     window.addEventListener("spaceMemberCreate", handleSpaceMemberCreate as EventListener);
@@ -280,6 +335,9 @@ export const CacheProvider: ParentComponent = (props) => {
       window.removeEventListener("messageDelete", handleMessageDelete as EventListener);
       window.removeEventListener("spaceCreate", handleSpaceCreate as EventListener);
       window.removeEventListener("roomCreate", handleRoomCreate as EventListener);
+      window.removeEventListener("roomUpdate", handleRoomUpdate as EventListener);
+      window.removeEventListener("roomsCache", handleRoomsCache as EventListener);
+      window.removeEventListener("relationshipUpdate", handleRelationshipUpdate as EventListener);
       window.removeEventListener("spaceUpdate", handleSpaceUpdate as EventListener);
       window.removeEventListener("spaceDelete", handleSpaceDelete as EventListener);
       window.removeEventListener("spaceMemberCreate", handleSpaceMemberCreate as EventListener);
@@ -358,6 +416,14 @@ export const CacheProvider: ParentComponent = (props) => {
     getUser,
     setUser,
     setUsers: setUsersData,
+    // Room management
+    rooms,
+    setRooms,
+    // Relationship management
+    relationships,
+    setRelationships,
+    relationshipRequests,
+    setRelationshipRequests,
     getMessages: (roomId: string) => messageCache.getMessages(roomId),
     getMessage: (roomId: string, messageId: string) => messageCache.getMessages(roomId).find(m => m.id === messageId || m.nonce === messageId),
     getMessageCount: (roomId: string) => messageCache.getMessageCount(roomId),

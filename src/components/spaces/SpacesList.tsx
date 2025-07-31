@@ -1,6 +1,7 @@
 import { Component, createMemo, Show, For, createSignal, createEffect, Accessor } from "solid-js";
 import { useNavigate, useLocation } from "@solidjs/router";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
+import { useCache } from "../../lib/providers/cache/CacheProvider";
 import { useMobileNav } from "../../lib/providers/mobile/MobileNavProvider";
 import { useNavigationHistory } from "../../lib/providers/navigation/NavigationHistoryProvider";
 import { Tooltip } from "../common/Tooltip";
@@ -31,7 +32,8 @@ type SpaceListItem =
 const SpacesList: Component = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, rooms, isMobile, spaces } = useAuth();
+  const { user, isMobile } = useAuth();
+  const { rooms, spaces } = useCache();
   const { setCurrentView } = useMobileNav();
   const { getLastHomeRoute, getLastSpaceRoute } = useNavigationHistory();
   const [showCreateModal, setShowCreateModal] = createSignal(false);
@@ -198,7 +200,7 @@ const SpacesList: Component = () => {
           addedIds.add(spaceId);
         }
       });
-      standaloneSpaces.forEach((space) => {
+      standaloneSpaces.forEach((space: Space) => {
         if (!addedIds.has(space.id)) {
           sortedStandaloneSpaces.push(space);
         }
@@ -208,10 +210,10 @@ const SpacesList: Component = () => {
     }
 
     const items: SpaceListItem[] = [];
-    currentFolders.forEach((folder) => {
+    currentFolders.forEach((folder: Folder) => {
       items.push({ type: "folder", data: folder });
     });
-    sortedStandaloneSpaces.forEach((space) => {
+    sortedStandaloneSpaces.forEach((space: Space) => {
       items.push({ type: "space", data: space });
     });
 
@@ -221,7 +223,7 @@ const SpacesList: Component = () => {
   // Get spaces within a folder
   const getFolderSpaces = (folder: Folder): Space[] => {
     const allSpaces = userSpaces();
-    const spaceMap = new Map(allSpaces.map((space) => [space.id, space]));
+    const spaceMap = new Map(allSpaces.map((space: Space) => [space.id, space]));
     return folder.spaceIds.map((id) => spaceMap.get(id)).filter((space): space is Space => !!space);
   };
 
@@ -231,7 +233,7 @@ const SpacesList: Component = () => {
     if (currentSpaces.length > 0) {
       const savedOrder = loadSpacesOrder();
       if (savedOrder.length === 0) {
-        const currentOrder = currentSpaces.map((space) => space.id);
+        const currentOrder = currentSpaces.map((space: Space) => space.id);
         setSpacesOrder(currentOrder);
         saveSpacesOrder(currentOrder);
       } else {
@@ -248,7 +250,7 @@ const SpacesList: Component = () => {
     const currentUser = user();
     if (currentUser?.presence?.status === "dnd") return [];
     return allRooms.filter(
-      (room) =>
+      (room: any) =>
         (room.unread_count ?? 0) > 0 &&
         (room.type === RoomType.PM || room.type === RoomType.GROUP_PM)
     );
@@ -260,8 +262,8 @@ const SpacesList: Component = () => {
     const currentUser = user();
     if (currentUser?.presence?.status === "dnd") return 0;
     return allRooms
-      .filter((room) => String(room.space_id) === String(spaceId))
-      .reduce((total, room) => {
+      .filter((room: any) => String(room.space_id) === String(spaceId))
+      .reduce((total: number, room: any) => {
         const unreads = room.unread_count || 0;
         const mentions = room.mention_count || 0;
         return total + Math.max(0, unreads - mentions);
@@ -274,8 +276,8 @@ const SpacesList: Component = () => {
     const currentUser = user();
     if (currentUser?.presence?.status === "dnd") return 0;
     return allRooms
-      .filter((room) => String(room.space_id) === String(spaceId))
-      .reduce((total, room) => total + (room.mention_count || 0), 0);
+      .filter((room: any) => String(room.space_id) === String(spaceId))
+      .reduce((total: number, room: any) => total + (room.mention_count || 0), 0);
   };
 
   // Helper function to get room avatar

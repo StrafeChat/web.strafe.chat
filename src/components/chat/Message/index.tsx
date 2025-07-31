@@ -37,7 +37,7 @@ import { InviteEmbeds } from "./components/InviteEmbeds";
 import { SystemMessage } from "./components/SystemMessage";
 
 export function Message(props: MessageProps) {
-  const cache = useCache();
+  const { getUser, getMessage, getSpaceMember } = useCache();
   const { appearance } = useUserSettings();
   const { user, rooms, deleteMessage, editMessage, isMobile } = useAuth();
   const [t] = useTransContext();
@@ -70,16 +70,16 @@ export function Message(props: MessageProps) {
   const [popupPosition, setPopupPosition] = createSignal({ x: 0, y: 0 });
 
 
-  const refMessages = referencedMessages(() => props, cache);
-  const inviteStates = useInviteStates(props, cache);
-  const author = createMemo(() => cache.getUser(props.author_id));
+  const refMessages = referencedMessages(() => props, getMessage, getUser);
+  const inviteStates = useInviteStates(props, { getMessage, getUser });
+  const author = createMemo(() => getUser(props.author_id));
   const currentRoom = createMemo(() => rooms().find((r) => r.id === props.room_id));
   const currentSpaceId = createMemo(() => currentRoom()?.space_id);
   const currentSpaceMember = createMemo(() => {
     const spaceId = currentSpaceId();
     const authorId = props.author_id;
     if (!spaceId || !authorId) return undefined;
-    return cache.getSpaceMember(spaceId, authorId);
+    return getSpaceMember(spaceId, authorId);
   });
   const shouldShowCompact =
     props.isCompact && !props.message_references?.length;
@@ -429,7 +429,6 @@ export function Message(props: MessageProps) {
     return (
       <SystemMessage
         message={props}
-        cache={cache}
         appearance={appearance}
         systemUserPopupOpen={systemUserPopupOpen()}
         systemUserPopupTrigger={systemUserPopupTrigger()}
@@ -515,7 +514,7 @@ export function Message(props: MessageProps) {
             triggerRef={systemUserPopupTrigger()}
             userId={systemSelectedUserId() || ''}
             spaceId={currentSpaceId()}
-            spaceMember={systemSelectedUserId() ? cache.getSpaceMember(currentSpaceId() || '', systemSelectedUserId() || '') : undefined}
+            spaceMember={systemSelectedUserId() ? getSpaceMember(currentSpaceId() || '', systemSelectedUserId() || '') : undefined}
           />
 
           <div

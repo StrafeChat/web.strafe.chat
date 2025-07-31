@@ -423,9 +423,13 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
     setSelectedRole(role);
     setEditedRole({ ...role });
     setHasUnsavedChanges(false);
-
-    if (role.id === "@everyone" && activeTab() === "display") {
-      setActiveTab("permissions");
+    
+    // If selecting @everyone role, switch to permissions tab since display tab is not available
+    if (role.id === "@everyone") {
+      setActiveTab('permissions');
+    } else {
+      // For regular roles, default to display tab
+      setActiveTab('display');
     }
   };
 
@@ -630,8 +634,32 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
                 )}
               </div>
 
-              <div class="flex border-b border-border mb-6">
-                {selectedRole()?.id !== "@everyone" && (
+              {/* Tab Navigation */}
+              {selectedRole()!.id !== "@everyone" ? (
+                <div class="flex border-b border-border mb-6">
+                  <button
+                    onClick={() => setActiveTab('display')}
+                    class={`px-4 py-2 text-sm font-medium transition-colors ${
+                      activeTab() === 'display'
+                        ? 'text-primary border-b-2 border-primary'
+                        : 'text-text-secondary hover:text-text-primary'
+                    }`}
+                  >
+                    Display
+                  </button>
+                  <button
+                    onClick={() => setActiveTab('permissions')}
+                    class={`px-4 py-2 text-sm font-medium transition-colors ${
+                      activeTab() === 'permissions'
+                        ? 'text-primary border-b-2 border-primary'
+                        : 'text-text-secondary hover:text-text-primary'
+                    }`}
+                  >
+                    Permissions
+                  </button>
+                </div>
+              ) : (
+                <div class="flex border-b border-border mb-6">
                   <button
                     onClick={() => setActiveTab("display")}
                     class={`px-4 py-2 text-sm font-medium ${
@@ -642,84 +670,80 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
                   >
                     Display
                   </button>
-                )}
-                <button
-                  onClick={() => setActiveTab("permissions")}
-                  class={`px-4 py-2 text-sm font-medium ${
-                    activeTab() === "permissions"
-                      ? "text-primary border-b-2 border-primary"
-                      : "text-text-secondary hover:text-text-primary"
-                  }`}
-                >
-                  Permissions
-                </button>
-              </div>
+                </div>
+              )}
 
-              <div class="space-y-6">
-                {activeTab() === "display" &&
-                  selectedRole()?.id !== "@everyone" && (
-                    <div class="bg-background2 rounded-lg p-4">
-                      <h4 class="text-md font-semibold text-text-primary mb-4">
-                        Display Settings
-                      </h4>
-                      <div class="space-y-4">
-                        <div>
-                          <label class="text-sm text-text-secondary mb-2 block">
-                            Role Name
-                          </label>
-                          <input
-                            type="text"
-                            value={editedRole()?.name || ""}
-                            onInput={(e) =>
-                              updateRoleProperty("name", e.currentTarget.value)
-                            }
-                            placeholder="Role name"
-                            class="w-full p-2 bg-background1 border border-border rounded text-text-primary"
-                            disabled={!canManageRoles()}
+              {/* Tab Content */}
+              {activeTab() === 'display' && selectedRole()!.id !== "@everyone" ? (
+                <div class="space-y-6">
+                  <div class="bg-background2 rounded-lg p-4">
+                    <h4 class="text-md font-semibold text-text-primary mb-4">Role Appearance</h4>
+                    <div class="space-y-4">
+                      {/* Role Name */}
+                      <div>
+                        <label class="block text-sm font-medium text-text-primary mb-2">
+                          Role Name
+                        </label>
+                        <input
+                          type="text"
+                          value={editedRole()?.name || ''}
+                          onInput={(e) => updateRoleProperty('name', e.currentTarget.value)}
+                          placeholder="Enter role name"
+                          class="w-full p-3 bg-background1 border border-border rounded-lg text-text-primary focus:border-primary focus:outline-none"
+                          disabled={!canManageRoles()}
+                        />
+                      </div>
+
+                      {/* Role Color */}
+                      <div>
+                        <label class="block text-sm font-medium text-text-primary mb-2">
+                          Role Color
+                        </label>
+                        <ColorPicker
+                          value={editedRole()?.color || '#99aab5'}
+                          onChange={(color) => updateRoleProperty('color', color)}
+                          class={`w-full ${!canManageRoles() ? 'opacity-50 pointer-events-none' : ''}`}
                           />
-                        </div>
-                        <div>
-                          <label class="text-sm text-text-secondary mb-2 block">
-                            Role Color
-                          </label>
-                          <ColorPicker
-                            value={editedRole()?.color || "#99aab5"}
-                            onChange={(color) =>
-                              updateRoleProperty("color", color)
-                            }
-                            class="w-full"
-                            disabled={!canManageRoles()}
-                          />
-                        </div>
-                        <div class="flex items-center justify-between">
+                      </div>
+
+                      {/* Display Settings */}
+                      <div class="space-y-3">
+                        <h5 class="text-sm font-medium text-text-primary">Display Settings</h5>
+                        
+                        {/* Hoist Setting */}
+                        <div class="flex items-center justify-between p-3 bg-background1 rounded-lg">
                           <div>
-                            <span class="text-sm font-medium text-text-primary">
-                              Hoist Role
-                            </span>
-                            <p class="text-xs text-text-secondary">
-                              Display role members separately in the member list
-                            </p>
+                            <div class="text-sm font-medium text-text-primary">Display role members separately from online members</div>
+                            <div class="text-xs text-text-secondary">Show members with this role in a separate section in the member list</div>
                           </div>
                           <ToggleSwitch
                             checked={editedRole()?.hoist || false}
-                            onChange={(checked) =>
-                              updateRoleProperty("hoist", checked)
-                            }
+                            onChange={(checked) => updateRoleProperty('hoist', checked)}
+                            disabled={!canManageRoles()}
+                          />
+                        </div>
+
+                        {/* Mentionable Setting */}
+                        <div class="flex items-center justify-between p-3 bg-background1 rounded-lg">
+                          <div>
+                            <div class="text-sm font-medium text-text-primary">Allow anyone to @mention this role</div>
+                            <div class="text-xs text-text-secondary">When enabled, anyone can mention this role to notify all members</div>
+                          </div>
+                          <ToggleSwitch
+                            checked={editedRole()?.mentionable || false}
+                            onChange={(checked) => updateRoleProperty('mentionable', checked)}
                             disabled={!canManageRoles()}
                           />
                         </div>
                       </div>
                     </div>
-                  )}
-
-                {activeTab() === "permissions" && (
+                  </div>
+                </div>
+              ) : (
+                <div class="space-y-6">
                   <div class="bg-background2 rounded-lg p-4">
                     <div class="flex items-center justify-between mb-4">
-                      <h4 class="text-md font-semibold text-text-primary">
-                        {selectedRole()?.id === "@everyone"
-                          ? "@everyone Role Permissions"
-                          : "Role Permissions"}
-                      </h4>
+                      <h4 class="text-md font-semibold text-text-primary">{selectedRole()!.name} Permissions</h4>
                       <div class="flex-1 max-w-xs ml-4">
                         <input
                           type="text"
@@ -771,8 +795,8 @@ const SpaceRolesSettings: Component<SpaceRolesSettingsProps> = (props) => {
                       </For>
                     </div>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           ) : (
             <div class="text-center py-12">

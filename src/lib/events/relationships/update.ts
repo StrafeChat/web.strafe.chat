@@ -118,7 +118,12 @@ export const handleRelationshipUpdate = async (
         setRelationships((prev) => {
           // Check if not already in relationships
           if (!prev.includes(friendId)) {
-            return [...prev, friendId];
+            const newRelationships = [...prev, friendId];
+            // Dispatch event to CacheProvider
+            window.dispatchEvent(new CustomEvent('relationshipUpdate', {
+              detail: { relationships: newRelationships }
+            }));
+            return newRelationships;
           }
           return prev;
         });
@@ -142,10 +147,22 @@ export const handleRelationshipUpdate = async (
           payload.sender_id === currentUserId
             ? payload.recipient_id
             : payload.sender_id;
-        setRelationships((prev) => prev.filter((id) => id !== removedFriendId));
+        setRelationships((prev) => {
+          const newRelationships = prev.filter((id) => id !== removedFriendId);
+          // Dispatch event to CacheProvider
+          window.dispatchEvent(new CustomEvent('relationshipUpdate', {
+            detail: { relationships: newRelationships }
+          }));
+          return newRelationships;
+        });
         break;
     }
 
+    // Dispatch event to CacheProvider for relationship requests
+    window.dispatchEvent(new CustomEvent('relationshipUpdate', {
+      detail: { relationshipRequests: newRelationships }
+    }));
+    
     return newRelationships;
   });
 };

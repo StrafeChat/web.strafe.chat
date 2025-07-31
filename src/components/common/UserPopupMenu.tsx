@@ -28,7 +28,7 @@ interface UserPopupMenuProps {
 }
 
 const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
-  const cache = useCache();
+  const { getUser, getSpaceRoles } = useCache();
   // const { user: currentUser } = useAuth();
   const [user, setUser] = createSignal<any>(null);
   const [showRoleModal, setShowRoleModal] = createSignal(false);
@@ -37,7 +37,7 @@ const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
 
   // Fetch user info from cache whenever props.userId changes
   createEffect(() => {
-    setUser(cache.getUser(props.userId));
+    setUser(getUser(props.userId));
   });
 
   // // Check if current user can manage roles in this space
@@ -265,7 +265,7 @@ const UserPopupMenu: Component<UserPopupMenuProps> = (props) => {
               {/* Roles Section (if in space context) */}
               <Show when={props.spaceId && props.spaceMember}>
                 {(() => {
-                  const spaceRoles = cache.getSpaceRoles(props.spaceId!);
+                  const spaceRoles = getSpaceRoles(props.spaceId!);
                   const userRoles = spaceRoles.filter((role: SpaceRole) => 
                     props.spaceMember?.roles?.includes(role.role_id)
                   ) || [];

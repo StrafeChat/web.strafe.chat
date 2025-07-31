@@ -11,8 +11,8 @@ import { useNavigate } from "@solidjs/router";
 import { RoomWithRecipients } from "../../../../types/rooms";
 
 export const OnlineTab: Component = () => {
-  const { user, relationships, rooms, setRooms } = useAuth();
-  const cache = useCache();
+  const { user } = useAuth();
+  const { relationships, rooms, setRooms, users } = useCache();
   const [t] = useTransContext();
   const [searchQuery, setSearchQuery] = createSignal("");
   const navigate = useNavigate();
@@ -24,9 +24,9 @@ export const OnlineTab: Component = () => {
 
     if (!currentUser?.id || !friendIds?.length) return [] as const;
 
-    const users = cache.users();
+    const allUsers = users();
     return friendIds
-      .map((id) => users[id])
+      .map((id) => allUsers[id])
       .filter(Boolean)
       .map((friend) => ({
         id: friend.id,

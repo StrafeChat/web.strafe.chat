@@ -149,7 +149,7 @@ type MessageResponse = {
 const AuthContext = createContext<AuthContextType>();
 
 export const AuthProvider: ParentComponent = (props) => {
-  const cache = useCache();
+  const { setUser: setCacheUser, setRoom, setCachedSpaceMembers, setCachedSpaceRoles, getUser, getSpaceMember, updateCachedSpaceMember, removeSpaceMember, addSpaceMember, setUsers, hasMessages, setMessages } = useCache();
   const [user, setUser] = createSignal<Clientuser | null>(null);
   const [relationships, setRelationships] = createSignal<string[]>([]);
   const [relationshipRequests, setRelationshipRequests] = createSignal<Relationship[]>([]);
@@ -181,7 +181,7 @@ export const AuthProvider: ParentComponent = (props) => {
     if (currentRooms && currentRooms.length > 0) {
       console.log("[AuthProvider] Caching", currentRooms.length, "rooms");
       currentRooms.forEach(room => {
-        cache.setRoom({
+        setRoom({
           ...room,
           updated_at: room.updated_at || undefined
         });
@@ -245,20 +245,28 @@ export const AuthProvider: ParentComponent = (props) => {
       const userData = normalizeUserData(data.client_user);
       setUser(userData);
       setIsAuthenticated(true);
-      cache.setUser(userData);
+      setCacheUser(userData);
     }
 
     if (data.users) {
-      cache.setUsers(data.users);
+      setUsers(data.users);
     }
 
     if (data.relationships) {
       setRelationships(data.relationships);
+      // Dispatch event to CacheProvider
+      window.dispatchEvent(new CustomEvent('relationshipUpdate', {
+        detail: { relationships: data.relationships }
+      }));
     }
 
     if (data.relationship_requests) {
       const requests = normalizeRelationshipRequests(data.relationship_requests);
       setRelationshipRequests(requests);
+      // Dispatch event to CacheProvider
+      window.dispatchEvent(new CustomEvent('relationshipUpdate', {
+        detail: { relationshipRequests: requests }
+      }));
     }
 
     if (data.rooms) {
@@ -266,6 +274,10 @@ export const AuthProvider: ParentComponent = (props) => {
       console.log("[AuthProvider] Number of rooms:", Array.isArray(data.rooms) ? data.rooms.length : Object.keys(data.rooms).length);
       const roomsData = normalizeRoomsData(data.rooms, data.users);
       setRooms(roomsData);
+      // Dispatch event to CacheProvider
+      window.dispatchEvent(new CustomEvent('roomsCache', {
+        detail: roomsData
+      }));
     } else {
       console.log("[AuthProvider] No rooms data in READY event");
     }
@@ -306,7 +318,7 @@ export const AuthProvider: ParentComponent = (props) => {
               }
             }
           }));
-          cache.setCachedSpaceMembers(spaceId, normalizedMembers);
+          setCachedSpaceMembers(spaceId, normalizedMembers);
         }
         
         // Cache space roles if they exist in the space object
@@ -324,7 +336,7 @@ export const AuthProvider: ParentComponent = (props) => {
             created_at: role.created_at || role.CreatedAt,
             updated_at: role.updated_at || role.UpdatedAt
           }));
-          cache.setCachedSpaceRoles(spaceId, normalizedRoles);
+          setCachedSpaceRoles(spaceId, normalizedRoles);
         }
         
         return {
@@ -465,9 +477,14 @@ export const AuthProvider: ParentComponent = (props) => {
   };
 
   const handleRelationshipEvent = (data: any) => {
+    const cacheObject = {
+      users: () => ({}), // Not used in relationship events
+      getUser,
+      setUser: setCacheUser
+    };
     handleWebSocketMessage(
       { type: data.type, ...data },
-      cache,
+      cacheObject,
       setRelationshipRequests,
       setRelationships,
       user()?.id || "",
@@ -490,6 +507,14 @@ export const AuthProvider: ParentComponent = (props) => {
     const roomData = data.room || data.data || data;
     console.log("[AuthProvider] Room create event received:", roomData);
     
+    // Debug space_id precision issue
+    const rawSpaceId = roomData.space_id || roomData.SpaceID;
+    console.log("[AuthProvider] Raw space_id from room create event:", {
+      raw_value: rawSpaceId,
+      type: typeof rawSpaceId,
+      string_converted: String(rawSpaceId)
+    });
+    
     const newRoom = {
       id: roomData.id || roomData.ID,
       name: roomData.name || roomData.Name || "",
@@ -501,11 +526,11 @@ export const AuthProvider: ParentComponent = (props) => {
       topic: roomData.topic || roomData.Topic || "",
       created_at: roomData.created_at || roomData.CreatedAt || new Date().toISOString(),
       updated_at: roomData.updated_at || roomData.UpdatedAt || null,
-      space_id: roomData.space_id || roomData.SpaceID ? String(roomData.space_id || roomData.SpaceID) : undefined,
+      space_id: rawSpaceId ? String(rawSpaceId) : undefined,
       parent_id: roomData.parent_id || roomData.ParentID ? String(roomData.parent_id || roomData.ParentID) : undefined,
       position: roomData.position || roomData.Position || undefined,
       recipients_data: (roomData.recipients || roomData.Recipients || [])?.map((recipientId: string) => {
-        const userData = cache.getUser(recipientId);
+        const userData = getUser(recipientId);
         return userData ? {
           id: recipientId,
           username: userData.username,
@@ -521,7 +546,12 @@ export const AuthProvider: ParentComponent = (props) => {
     setRooms(prev => [...prev, newRoom as RoomWithRecipients]);
     
     // Cache the new room immediately
-    cache.setRoom(newRoom);
+    setRoom(newRoom);
+    
+    // Dispatch event to CacheProvider
+    window.dispatchEvent(new CustomEvent('roomCreate', {
+      detail: newRoom
+    }));
   };
 
   const handleRoomDeleteEvent = (data: any) => {
@@ -531,6 +561,11 @@ export const AuthProvider: ParentComponent = (props) => {
     if (roomId) {
       console.log("[AuthProvider] Room deleted:", roomId);
       setRooms(prev => prev.filter(room => room.id !== roomId));
+      
+      // Dispatch event to CacheProvider
+      window.dispatchEvent(new CustomEvent('roomDelete', {
+        detail: { roomId }
+      }));
       
       // If user is currently viewing the deleted room, redirect to home
       const currentLocation = window.location.pathname;
@@ -570,10 +605,15 @@ export const AuthProvider: ParentComponent = (props) => {
           updatedRoom.updated_at = new Date().toISOString();
           
           // Cache the updated room
-          cache.setRoom({
+          setRoom({
             ...updatedRoom,
             updated_at: updatedRoom.updated_at || undefined
           });
+          
+          // Dispatch event to CacheProvider
+          window.dispatchEvent(new CustomEvent('roomUpdate', {
+            detail: updatedRoom
+          }));
           
           return updatedRoom;
         }
@@ -630,7 +670,7 @@ export const AuthProvider: ParentComponent = (props) => {
           // Update recipients list
           const updatedRecipients = [...recipients];
           const updatedRecipientsData = updatedRecipients.map((recipientId: string) => {
-            const userData = cache.getUser(recipientId);
+            const userData = getUser(recipientId);
             return userData ? {
               id: recipientId,
               username: userData.username,
@@ -678,7 +718,7 @@ export const AuthProvider: ParentComponent = (props) => {
           if (room.id === roomId) {
             const updatedRecipients = [...recipients];
             const updatedRecipientsData = updatedRecipients.map((recipientId: string) => {
-              const userData = cache.getUser(recipientId);
+              const userData = getUser(recipientId);
               return userData ? {
                 id: recipientId,
                 username: userData.username,
@@ -729,8 +769,16 @@ export const AuthProvider: ParentComponent = (props) => {
     console.log("[AuthProvider] Space created:", spaceData);
     
     // Add space to spaces signal
+    // Ensure space ID is handled as string from the start to avoid precision issues
+    const spaceId = String(spaceData.id || spaceData.ID);
+    console.log(`[AuthProvider] Creating space with ID:`, {
+      raw_id: spaceData.id || spaceData.ID,
+      string_id: spaceId,
+      type_of_raw: typeof (spaceData.id || spaceData.ID)
+    });
+    
     const newSpace: Space = {
-      id: String(spaceData.id || spaceData.ID),
+      id: spaceId,
       name: spaceData.name || spaceData.Name || "",
       name_acronym: spaceData.name_acronym || spaceData.NameAcronym || "",
       description: spaceData.description || spaceData.Description,
@@ -760,6 +808,101 @@ export const AuthProvider: ParentComponent = (props) => {
     
     // Also dispatch the event for the CacheProvider to handle
     window.dispatchEvent(new CustomEvent('spaceCreate', { detail: newSpace }));
+    
+    // Handle rooms if they exist in the space creation event
+    if (spaceData.rooms && Array.isArray(spaceData.rooms)) {
+      console.log(`[AuthProvider] Processing ${spaceData.rooms.length} rooms for space ${spaceId}`);
+      console.log(`[AuthProvider] Raw rooms data:`, spaceData.rooms);
+      
+      spaceData.rooms.forEach((room: any, index: number) => {
+        console.log(`[AuthProvider] Processing room ${index + 1}:`, {
+          raw_room: room,
+          id: room.id || room.ID,
+          name: room.name || room.Name,
+          type: room.type || room.Type,
+          space_id: room.space_id || room.SpaceID || spaceData.id,
+          parent_id: room.parent_id || room.ParentID,
+          position: room.position || room.Position
+        });
+        
+        const roomData = {
+          id: room.id || room.ID,
+          name: room.name || room.Name || "",
+          type: room.type || room.Type || 0,
+          recipients: room.recipients || room.Recipients || [],
+          owner_id: room.creator || room.Creator || room.owner_id || room.OwnerID || "",
+          last_message_id: room.last_message_id || room.LastMessageID || null,
+          icon: room.icon || room.Icon || null,
+          topic: room.topic || room.Topic || "",
+          created_at: room.created_at || room.CreatedAt || new Date().toISOString(),
+          updated_at: room.updated_at || room.UpdatedAt || null,
+          space_id: (() => {
+            const rawSpaceId = room.space_id || room.SpaceID || spaceId;
+            const stringSpaceId = String(rawSpaceId);
+            console.log(`[AuthProvider] Room space_id conversion:`, {
+              raw_space_id: rawSpaceId,
+              string_space_id: stringSpaceId,
+              consistent_space_id: spaceId,
+              type_of_raw: typeof rawSpaceId
+            });
+            return stringSpaceId;
+          })(),
+          parent_id: room.parent_id || room.ParentID ? String(room.parent_id || room.ParentID) : undefined,
+          position: room.position || room.Position || undefined,
+          recipients_data: (room.recipients || room.Recipients || [])?.map((recipientId: string) => {
+            const userData = getUser(recipientId);
+            return userData ? {
+              id: recipientId,
+              username: userData.username,
+              discriminator: userData.discriminator,
+              display_name: userData.display_name || userData.username,
+              avatar: userData.avatar,
+              presence: userData.presence
+            } : null;
+          }).filter(Boolean)
+        };
+        
+        console.log(`[AuthProvider] Final roomData for dispatch:`, {
+          id: roomData.id,
+          name: roomData.name,
+          type: roomData.type,
+          space_id: roomData.space_id,
+          parent_id: roomData.parent_id,
+          position: roomData.position,
+          type_matches_expected: [0, 1, 2, 3, 4].includes(roomData.type)
+        });
+        
+        // Add room to local state
+        setRooms(prev => [...prev, roomData as RoomWithRecipients]);
+        
+        // Cache the new room immediately
+        setRoom(roomData);
+        
+        // Dispatch event to CacheProvider
+        window.dispatchEvent(new CustomEvent('roomCreate', {
+          detail: roomData
+        }));
+      });
+    }
+    
+    // Handle members if they exist in the space creation event
+    if (spaceData.members && Array.isArray(spaceData.members)) {
+      console.log(`[AuthProvider] Processing ${spaceData.members.length} members for space ${spaceId}`);
+      window.dispatchEvent(new CustomEvent('spaceMembersCache', {
+        detail: {
+          spaceId: spaceId,
+          members: spaceData.members.map((member: any) => ({
+            space_id: member.space_id || spaceId,
+            user_id: member.user_id,
+            joined_at: member.joined_at,
+            deaf: member.deaf || false,
+            mute: member.mute || false,
+            flags: member.flags || 0,
+            pending: member.pending || false
+          }))
+        }
+      }));
+    }
   };
 
   const handleSpaceUpdateEvent = (data: any) => {
@@ -842,7 +985,7 @@ export const AuthProvider: ParentComponent = (props) => {
     
     if (spaceId && userId && roles.length > 0) {
       // Get current member from cache
-      const currentMember = cache.getSpaceMember(spaceId, userId);
+      const currentMember = getSpaceMember(spaceId, userId);
       if (currentMember) {
         // Update member with new roles
         const updatedMember = {
@@ -851,7 +994,7 @@ export const AuthProvider: ParentComponent = (props) => {
         };
         
         // Update cache
-        cache.updateCachedSpaceMember(spaceId, updatedMember);
+        updateCachedSpaceMember(spaceId, updatedMember);
         
         // Dispatch event for components to handle real-time updates
         window.dispatchEvent(new CustomEvent('spaceMemberRoleUpdate', { 
@@ -884,7 +1027,7 @@ export const AuthProvider: ParentComponent = (props) => {
         });
         
         // Remove space from cache
-        cache.removeSpaceMember(spaceId, userId);
+        removeSpaceMember(spaceId, userId);
         
         // Dispatch event for real-time UI updates
         window.dispatchEvent(new CustomEvent('spaceRemove', { 
@@ -895,7 +1038,7 @@ export const AuthProvider: ParentComponent = (props) => {
         }));
       } else {
         // Another user is being removed, just remove them from the space member cache
-        cache.removeSpaceMember(spaceId, userId);
+        removeSpaceMember(spaceId, userId);
         
         // Dispatch event for components to handle member removal
         window.dispatchEvent(new CustomEvent('spaceMemberRemove', { 
@@ -917,7 +1060,7 @@ export const AuthProvider: ParentComponent = (props) => {
     
     if (spaceId && userId) {
       // Add the user to the space member cache
-      cache.addSpaceMember(spaceId, {
+      addSpaceMember(spaceId, {
         user_id: userId,
         roles: roles,
         joined_at: new Date().toISOString(),
@@ -969,14 +1112,14 @@ export const AuthProvider: ParentComponent = (props) => {
         presence
       };
       setUser(updatedUser);
-      cache.setUser({
+      setCacheUser({
         ...currentUser,
         presence
       });
     } else {
-      const cachedUser = cache.getUser(data.user_id);
+      const cachedUser = getUser(data.user_id);
       if (cachedUser) {
-        cache.setUser({
+        setCacheUser({
           ...cachedUser,
           presence
         });
@@ -1106,7 +1249,7 @@ export const AuthProvider: ParentComponent = (props) => {
     };
 
     setUser(updatedUser);
-    cache.setUser(updatedUser);
+    setCacheUser(updatedUser);
   };
 
   const updateStatus = async (status?: string, customStatus?: string): Promise<boolean> => {
@@ -1127,7 +1270,7 @@ export const AuthProvider: ParentComponent = (props) => {
 
       const updatedUser = await res.json();
       setUser(updatedUser);
-      cache.setUser(updatedUser);
+      setCacheUser(updatedUser);
       return true;
     } catch (error) {
       console.error("Error updating status:", error);
@@ -1159,7 +1302,7 @@ export const AuthProvider: ParentComponent = (props) => {
         const userData = await response.json();
         if (userData?.users) {
           Object.entries(userData.users).forEach(([userId, userData]: [string, any]) => {
-            cache.setUser({
+            setCacheUser({
               id: userId,
               username: userData.username || userData.Username,
               discriminator: userData.discriminator || userData.Discriminator,
@@ -1350,7 +1493,7 @@ export const AuthProvider: ParentComponent = (props) => {
     const isViewingThisRoom = currentLocation.includes(`/rooms/${messageData.room_id}`);
     
     // Check if room has no cached messages before adding this one
-    const hadNoMessages = !cache.hasMessages(messageData.room_id);
+    const hadNoMessages = !hasMessages(messageData.room_id);
     
     // Create a normalized message object
     const normalizedMessage = {
@@ -1482,7 +1625,7 @@ export const AuthProvider: ParentComponent = (props) => {
     if (!isFromCurrentUser) {
       try {
         const currentRoom = rooms().find(room => room.id === messageData.room_id);
-        const messageAuthor = cache.getUser(normalizedMessage.author_id);
+        const messageAuthor = getUser(normalizedMessage.author_id);
         
         // Check if this is a mention
         const isMention = hasUserMention(normalizedMessage.content, currentUser.id);
@@ -1724,7 +1867,7 @@ export const AuthProvider: ParentComponent = (props) => {
 
 			const data = await response.json();
 
-			return data.participants.map((p: string) => cache.getUser(p));
+			return data.participants.map((p: string) => getUser(p));
 		} catch (error) {
 			console.error(`[AuthProvider] Failed to fetch participants: `, error);
 			return [];
@@ -1758,7 +1901,7 @@ export const AuthProvider: ParentComponent = (props) => {
         
         // First pass: collect unique authors that aren't already cached
         messages.forEach((message: any) => {
-          if (message.author && message.author.id && !cache.getUser(message.author.id) && !newUsers.has(message.author.id)) {
+          if (message.author && message.author.id && !getUser(message.author.id) && !newUsers.has(message.author.id)) {
             newUsers.set(message.author.id, {
               id: message.author.id,
               username: message.author.username,
@@ -1776,14 +1919,14 @@ export const AuthProvider: ParentComponent = (props) => {
         
         // Batch add new users to cache
         newUsers.forEach((user) => {
-          cache.setUser(user);
+          setCacheUser(user);
         });
       }
       
       if (Array.isArray(messages) && messages.length > 0) {
         console.log(`[AuthProvider] Fetched ${messages.length} historical messages for room: ${roomId}`);
         // Add messages to cache using 'older' position to place them before the real-time message
-        cache.setMessages(roomId, messages, 'older');
+        setMessages(roomId, messages, 'older');
       } else {
         console.log(`[AuthProvider] No historical messages found for room: ${roomId}`);
       }

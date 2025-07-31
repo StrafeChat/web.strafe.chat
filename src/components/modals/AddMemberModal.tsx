@@ -14,8 +14,7 @@ interface AddMemberModalProps {
 }
 
 export const AddMemberModal: Component<AddMemberModalProps> = (props) => {
-  const { relationships } = useAuth();
-  const cache = useCache();
+  const { relationships, getUser } = useCache();
   const [searchTerm, setSearchTerm] = createSignal("");
   const [selectedFriends, setSelectedFriends] = createSignal<string[]>([]);
   const [error, setError] = createSignal("");
@@ -28,7 +27,7 @@ export const AddMemberModal: Component<AddMemberModalProps> = (props) => {
     
     // Convert relationship IDs to User objects using cache
     const friends = relationshipIds
-      .map(id => cache.getUser(id))
+      .map(id => getUser(id))
       .filter(user => user !== undefined);
     
     return friends.filter(friend => 

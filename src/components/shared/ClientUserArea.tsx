@@ -15,8 +15,8 @@ import { useCache } from "../../lib/providers/cache/CacheProvider";
 import { RoomType } from "../../types/roomTypes";
 
 export const ClientUserArea: Component = () => {
-  const { user, rooms } = useAuth();
-  const { getUser } = useCache();
+  const { user } = useAuth();
+  const { getUser, rooms } = useCache();
   const { state, room: voiceRoomId, disconnect, enableCamera, enableMicrophone, enableScreenShare, setDeafened, enabledMedia } = useVoice();
   const [t] = useTransContext();
   const [showSettings, setShowSettings] = createSignal(false);
