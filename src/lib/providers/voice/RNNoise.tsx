@@ -4,31 +4,30 @@ import { NoiseSuppressorWorklet_Name } from "@timephy/rnnoise-wasm"
 import NoiseSuppressorWorklet from "@timephy/rnnoise-wasm/NoiseSuppressorWorklet?worker&url"
 
 export type RNNoiseContextType = {
-	startSuppression: (stream: MediaStream) => Promise<MediaStreamTrack>;
+	rnnoise: (stream: MediaStream) => Promise<MediaStream>;
 }
 
 const RNNoiseContext = createContext<RNNoiseContextType>();
 
 export const RNNoiseProvider: ParentComponent = (props) => {
-	const startSuppression = async (s: MediaStream) => {
+	const rnnoise = async (s: MediaStream) => {
 		const ctx = new AudioContext();
 		await ctx.audioWorklet.addModule(NoiseSuppressorWorklet);
 
 		const noiseSuppressionNode = new AudioWorkletNode(ctx, NoiseSuppressorWorklet_Name);
 		const source = ctx.createMediaStreamSource(s);
 		source.connect(noiseSuppressionNode)
-		source.connect(ctx.destination);
-
+		
 		const dest = ctx.createMediaStreamDestination();
-		source.connect(dest);
+		noiseSuppressionNode.connect(dest);
 
-		return dest.stream.getAudioTracks()[0];
+		return dest.stream;
 	}
 
 	return (
 		<RNNoiseContext.Provider
 			value={{
-				startSuppression
+				rnnoise
 			}}
 		>
 			{props.children}
