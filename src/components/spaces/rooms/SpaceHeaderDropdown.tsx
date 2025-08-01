@@ -3,6 +3,7 @@ import SpaceSettings from "../../settings/SpaceSettings";
 import CreateRoomModal from "../../modals/CreateRoomModal";
 import CreateSectionModal from "../../modals/CreateSectionModal";
 import ConfirmModal from "../../modals/ConfirmModal";
+import InviteModal from "../../modals/InviteModal";
 import { FS_URL } from "../../../constants";
 import { api } from "../../../lib/api";
 import { useAuth } from "../../../lib/providers/auth/AuthProvider";
@@ -25,8 +26,6 @@ export const SpaceHeaderDropdown: Component<SpaceHeaderDropdownProps> = (
   const [isLeaveConfirmOpen, setIsLeaveConfirmOpen] = createSignal(false);
   const [isLeaving, setIsLeaving] = createSignal(false);
   const [isInviteModalOpen, setIsInviteModalOpen] = createSignal(false);
-  const [createdInvite, setCreatedInvite] = createSignal<string | null>(null);
-  const [creating, setCreating] = createSignal(false);
   let dropdownRef: HTMLDivElement | undefined;
 
   const { user } = useAuth();
@@ -48,52 +47,12 @@ export const SpaceHeaderDropdown: Component<SpaceHeaderDropdownProps> = (
   });
 
   // Dropdown action handlers
-  const handleInvitePeople = async () => {
+  const handleInvitePeople = () => {
     setIsOpen(false);
     setIsInviteModalOpen(true);
-    setCreatedInvite(null);
   };
 
-  // Invite Modal state for copy feedback
-  const [copied, setCopied] = createSignal(false);
 
-  // Handle modal background click to close
-  function handleModalBgClick(e: MouseEvent) {
-    if ((e.target as HTMLElement).classList.contains("modal-bg")) {
-      setIsInviteModalOpen(false);
-      setCopied(false);
-    }
-  }
-
-  // Invite Modal state for advanced options
-  const [inviteMaxUses, setInviteMaxUses] = createSignal<number | undefined>(
-    undefined,
-  );
-  const [inviteExpiresIn, setInviteExpiresIn] = createSignal<string>("");
-
-  // Create invite logic with options
-  const handleCreateInvite = async () => {
-    if (!props.spaceId) return;
-    setCreating(true);
-    try {
-      const inviteData: any = {};
-      if (inviteMaxUses() !== undefined && inviteMaxUses()! > 0) {
-        inviteData.max_uses = inviteMaxUses();
-      }
-      if (inviteExpiresIn()) {
-        inviteData.expires_in = parseInt(inviteExpiresIn()) * 60 * 60; // hours to seconds
-      }
-      const newInvite = await api.spaces.invites.create(
-        props.spaceId,
-        inviteData,
-      );
-      setCreatedInvite(newInvite.code);
-    } catch (err) {
-      setCreatedInvite(null);
-    } finally {
-      setCreating(false);
-    }
-  };
 
   const handleSpaceSettings = () => {
     console.log("Space Settings clicked for space:", props.spaceId);
@@ -379,102 +338,11 @@ export const SpaceHeaderDropdown: Component<SpaceHeaderDropdownProps> = (
 
       {/* Invite Modal */}
       <Show when={isInviteModalOpen()}>
-        <div
-          class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 modal-bg"
-          onClick={handleModalBgClick}
-        >
-          <div
-            class="bg-background1 rounded-lg p-6 w-full max-w-md shadow-lg relative"
-            onClick={(e) => e.stopPropagation()} // Prevent modal close when clicking inside
-          >
-            <button
-              class="absolute top-2 right-2 text-text-secondary hover:text-text-primary"
-              onClick={() => {
-                setIsInviteModalOpen(false);
-                setCopied(false);
-              }}
-            >
-              <svg width="24" height="24" fill="none" stroke="currentColor">
-                <path
-                  stroke-width="2"
-                  stroke-linecap="round"
-                  stroke-linejoin="round"
-                  d="M6 18L18 6M6 6l12 12"
-                />
-              </svg>
-            </button>
-            <h3 class="text-lg font-semibold mb-2">Create Space Invite</h3>
-            <p class="text-sm text-text-secondary mb-4">
-              Create an invite link to share your space with others.
-            </p>
-            <Show when={!createdInvite()}>
-              <div class="space-y-4">
-                <div>
-                  <label class="block text-sm font-medium text-text-primary mb-2">
-                    Max Uses (Optional)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    placeholder="Unlimited"
-                    value={inviteMaxUses() || ""}
-                    onInput={(e) => {
-                      const value = e.currentTarget.value;
-                      setInviteMaxUses(value ? parseInt(value) : undefined);
-                    }}
-                    class="w-full bg-surface border border-border rounded-lg px-3 py-2 text-text-primary placeholder-text-secondary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label class="block text-sm font-medium text-text-primary mb-2">
-                    Expires In (Hours)
-                  </label>
-                  <select
-                    value={inviteExpiresIn()}
-                    onChange={(e) => setInviteExpiresIn(e.currentTarget.value)}
-                    class="w-full bg-surface border border-border rounded-lg px-3 py-2 text-text-primary focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
-                  >
-                    <option value="">Never</option>
-                    <option value="1">1 Hour</option>
-                    <option value="6">6 Hours</option>
-                    <option value="12">12 Hours</option>
-                    <option value="24">1 Day</option>
-                    <option value="168">1 Week</option>
-                    <option value="720">1 Month</option>
-                  </select>
-                </div>
-                <button
-                  class="bg-primary text-white px-4 py-2 rounded-lg font-semibold w-full mt-2"
-                  disabled={creating()}
-                  onClick={handleCreateInvite}
-                >
-                  {creating() ? "Creating..." : "Create Invite"}
-                </button>
-              </div>
-            </Show>
-            <Show when={!!createdInvite()}>
-              <div class="mt-4 flex flex-col items-center">
-                <div class="bg-surface px-3 py-2 rounded text-primary font-mono text-center mb-2">
-                  {window.location.origin}/invite/{createdInvite()}
-                </div>
-                <button
-                  class={`bg-primary text-white px-4 py-2 rounded-lg font-semibold transition-all ${
-                    copied() ? "bg-green-500 scale-105" : ""
-                  }`}
-                  onClick={async () => {
-                    await navigator.clipboard.writeText(
-                      `${window.location.origin}/invite/${createdInvite()}`,
-                    );
-                    setCopied(true);
-                    setTimeout(() => setCopied(false), 1200);
-                  }}
-                >
-                  {copied() ? "Copied!" : "Copy Invite Link"}
-                </button>
-              </div>
-            </Show>
-          </div>
-        </div>
+        <InviteModal
+          isOpen={isInviteModalOpen()}
+          onClose={() => setIsInviteModalOpen(false)}
+          spaceId={props.spaceId || ""}
+        />
       </Show>
     </div>
   );
