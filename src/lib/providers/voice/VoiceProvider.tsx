@@ -9,7 +9,7 @@ import {
 import { useAuth } from "../auth/AuthProvider"
 import { AudioCaptureOptions, DisconnectReason, LocalTrackPublication, ParticipantEvent, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent, Track, VideoCaptureOptions } from "livekit-client";
 import { LIVEKIT_URL } from "../../../constants";
-import { useRNNoise } from "./RNNoise";
+import { RNNoiseResult, useRNNoise } from "./RNNoise";
 
 export enum VoiceState {
 	DISCONNECTED, // order is important
@@ -47,7 +47,7 @@ const VoiceContext = createContext<VoiceContextType>()
 
 export const VoiceProvider: ParentComponent = (props) => {
 	const { getJoinToken } = useAuth();
-  const { startSuppression } = useRNNoise();
+  const { rnnoise } = useRNNoise();
 	const [state, setState] = createSignal<VoiceState>(VoiceState.DISCONNECTED)
 	const [room, setRoom] = createSignal("");
 	const [localTrack, setLocalTrack] = createSignal<LocalTrackPublication | null>(null);
@@ -62,6 +62,9 @@ export const VoiceProvider: ParentComponent = (props) => {
 	const [isDeafened, setIsDeafened] = createSignal(false);
 
 	var token: string, lvRoom: Room;
+	var audioPub: LocalTrackPublication;
+	var audioStream: MediaStream;
+	var rnn: RNNoiseResult;
 
 	const connect = async (roomId: string) => {
 		try {
@@ -103,31 +106,72 @@ export const VoiceProvider: ParentComponent = (props) => {
 		// Update reactive signal
 		setIsCameraEnabled(p.isCameraEnabled);
 	}
+
 	const enableMicrophone = async (
-	enable: boolean,
-	options?: AudioCaptureOptions
-) => {
-	const p = lvRoom.localParticipant;
+		enable: boolean,
+		options?: AudioCaptureOptions
+	) => {
+		const p = lvRoom.localParticipant;
 
-	// Merge your provided options with default noise suppression
-	const micOptions: AudioCaptureOptions = {
-		autoGainControl: true,   
-		...options               
-	};
+		// Merge your provided options with default noise suppression
+		/*const micOptions: AudioCaptureOptions = {
+			autoGainControl: true,   
+			...options               
+		};*/
+		setIsMicrophoneEnabled(enable);
 
-	/*const stream = await navigator.mediaDevices.getUserMedia({
-		video: false,
-		audio: true
-	});
+		if (!enable) {
+			if (!audioPub) return;
+			if (audioPub.isMuted) return;
 
-	await startSuppression(stream);*/
+			audioPub.mute();
+			return;
+		} else if (audioPub) {
+			audioPub.unmute();
+			return;
+		}
 
+		const track = await restartAudio(options?.deviceId);
 
-	await p.setMicrophoneEnabled(enable, micOptions);
+		//await p.setMicrophoneEnabled(enable, micOptions);
+		audioPub = await p.publishTrack(track, {
+			name: 'rnnoise',
+			simulcast: true,
+			// if this should be treated like a camera feed, tag it as such
+			// supported known sources are .Camera, .Microphone, .ScreenShare
+			source: Track.Source.Microphone,
+		});
+  };
 
-	// Update reactive signal
-	setIsMicrophoneEnabled(p.isMicrophoneEnabled);
-   };
+	const freeAudio = async () => {
+		if (audioPub) {
+			// stop current rnnoise process
+			audioStream.getTracks().forEach(track => {
+				track.stop();
+			});
+
+			if (rnn) {
+				await rnn.destroy();
+			}
+		}
+	}
+	const restartAudio = async (deviceId?: ConstrainDOMString) => {
+		await freeAudio();
+		
+		const stream = await navigator.mediaDevices.getUserMedia({
+			video: false,
+			audio: {
+				deviceId: deviceId,
+				autoGainControl: true,
+				echoCancellation: true,
+			},
+		});
+		audioStream = stream;
+
+		const filtered = await rnnoise(stream);
+		rnn = filtered;
+		return filtered.stream.getAudioTracks()[0];
+	}
   
 	const enableScreenShare = async (enable: boolean) => {
 		const p = lvRoom.localParticipant;
@@ -214,6 +258,9 @@ export const VoiceProvider: ParentComponent = (props) => {
 		setIsDeafened(false);
 		// Clear original volumes map
 		originalVolumes.clear();
+		audioStream.getTracks().forEach(track => {
+			track.stop();
+		});
 	}
 
 	const joinListener = (p: RemoteParticipant) => {
@@ -265,7 +312,7 @@ export const VoiceProvider: ParentComponent = (props) => {
 		// Handle track subscription to store original volumes
 		lvRoom.on(RoomEvent.TrackSubscribed, (track, _publication, _participant) => {
 			if (track.kind === 'audio') {
-				track.on("elementAttached", () => {
+				/*track.on("elementAttached", () => {
 					const audioElements = track.attachedElements as HTMLAudioElement[];
 					audioElements.forEach(element => {
 						if (element instanceof HTMLAudioElement) {
@@ -280,7 +327,7 @@ export const VoiceProvider: ParentComponent = (props) => {
 							}
 						}
 					});
-				});
+				});*/
 				// Wait for the track to be attached to DOM elements
 				/*setTimeout(() => {
 					const audioElements = track.attachedElements as HTMLAudioElement[];
@@ -323,6 +370,7 @@ export const VoiceProvider: ParentComponent = (props) => {
 		setIsDeafened(false);
 		// Clear original volumes map
 		originalVolumes.clear();
+		await freeAudio();
 		console.log("[VoiceProvider] Voice call disconnected successfully");
 	}
 
@@ -330,7 +378,9 @@ export const VoiceProvider: ParentComponent = (props) => {
 		if (device.kind === "audioinput") {
 			setAudio(device);
 			if (lvRoom) {
-				await lvRoom.switchActiveDevice('audioinput', device.deviceId);
+				if (!audioPub.track) throw new Error("[VoiceProvider] Local audio track nonexistent");
+				//await lvRoom.switchActiveDevice('audioinput', device.deviceId);
+				await audioPub.track!.replaceTrack(await restartAudio(device.deviceId), true);
 			}
 		} else if (device.kind === "videoinput") {
 			setVideo(device);
