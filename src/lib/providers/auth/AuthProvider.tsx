@@ -1157,7 +1157,7 @@ export const AuthProvider: ParentComponent = (props) => {
       return { success: true };
     } catch (error) {
       setLoading(false);
-			logout();
+			if ((error as Error).message === "Unauthorized") logout();
       return {
         success: false,
         error: error instanceof Error ? error.message : "Unknown error",
