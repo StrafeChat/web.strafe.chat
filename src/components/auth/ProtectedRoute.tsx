@@ -19,14 +19,8 @@ const ProtectedRoute: Component<ProtectedRouteProps> = (props) => {
   });
 
   return (
-    <Show
-      when={!loading()}
-      fallback={<LoadingScreen />}
-    >
-      <Show
-        when={isAuthenticated()}
-        fallback={null}
-      >
+    <Show when={!loading()} fallback={<LoadingScreen />}>
+      <Show when={isAuthenticated()} fallback={<LoadingScreen />}>
         {props.children}
       </Show>
     </Show>
