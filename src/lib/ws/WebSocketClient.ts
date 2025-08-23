@@ -582,6 +582,11 @@ export class WebSocketClient {
               handler(data.d);
             }
           }
+					else if (data.d && data.d.type.startsWith("VOICE_")) {
+						console.log("VOICE UPDATE: ", data.d);
+						this.handleVoiceUpdate(data.d);
+						this.dispatchEvent(data.d.type as VoicePayloadType, data.d);
+					}
           else {
             const handler = this.messageHandlers.get("DISPATCH");
             if (handler) {
