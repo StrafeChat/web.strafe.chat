@@ -32,6 +32,7 @@ export type RoomWithRecipients = {
   mention_count?: number;
   space_id?: string;
   parent_id?: string;
+	participants?: string[]; // voice participants
   position?: number;
   permission_overrides?: {
     member?: {

@@ -20,8 +20,9 @@ import CreateRoomModal from "../../modals/CreateRoomModal";
 import RoomContextMenu from "../../contextMenus/RoomContextMenu";
 import { Tooltip } from "../../common/Tooltip";
 import RoomEditModal from "../../modals/RoomEditModal";
-import { User } from "../../../lib/providers/cache/CacheProvider";
+import { useCache, User } from "../../../lib/providers/cache/CacheProvider";
 import { Avatar } from "../../common/Avatar";
+import { VoiceUpdateData } from "../../../lib/events/voice/update";
 
 interface RoomsListProps {
   spaceId?: string;
@@ -223,6 +224,7 @@ const DraggableRoomItem: Component<DraggableRoomItemProps> = (props) => {
 
 	const { getRoomParticipants } = useAuth();
 	const [participants, setParticipants] = createSignal<User[]>([]);
+	const { getUser } = useCache();
 
   const isDragging = () => globalDragState().draggedId === props.room.id;
   const isActive = () =>
@@ -257,8 +259,43 @@ const DraggableRoomItem: Component<DraggableRoomItemProps> = (props) => {
   // Remove drop functionality from room items - only drop zones should accept drops
 
 	createEffect(async () => {
-		setParticipants((await getRoomParticipants(props.room.id)).filter(e => e !== null));
+		const partsFetched = (await getRoomParticipants(props.room.id)).filter(e => e !== null);
+		const partsCached = props.room.participants?.map(p => {
+			return getUser(p);
+		}).filter(e => e !== undefined && e !== null);
+		if (partsCached) {
+			partsCached.forEach(p => {
+				const idx = partsFetched.findIndex(e => e.id === p.id);
+				if (idx === -1) return;
+				partsFetched.splice(idx, 1);
+			});
+			setParticipants(partsCached.concat(partsFetched)); // TODO: implement caching
+		} else {
+			setParticipants(partsFetched);
+		}
 	});
+	const handleUpdate = (d: CustomEvent) => {
+		const data = d.detail as VoiceUpdateData;
+		const ps = participants();
+		switch (data.event_type) {
+			case "VOICE_PARTICIPANT_JOIN":
+				var idx = ps.findIndex(e => e.id === data.participant_id);
+				if (idx !== -1) return;
+				var user = getUser(data.participant_id);
+				if (!user) return;
+				ps.push(user);
+				setParticipants([...ps]);
+			break;
+			case "VOICE_PARTICIPANT_LEAVE":
+				var idx = ps.findIndex(e => e.id === data.participant_id);
+				if (idx === -1) return;
+				ps.splice(idx, 1);
+				setParticipants([...ps]);
+			break;
+		}
+	}
+
+	window.addEventListener("roomVoiceUpdate", handleUpdate as EventListener)
 
 	const { wsClient } = useAuth();
 
@@ -614,6 +651,10 @@ const DraggableSection: Component<DraggableSectionProps> = (props) => {
       dragOverType: null,
     }));
   };
+
+	createEffect(() => {
+		console.log(props.rooms);
+	})
 
   return (
     <div
