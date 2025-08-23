@@ -13,6 +13,7 @@ import { InviteInfo } from "../../../types/api";
 import { RoomWithRecipients, Room } from "../../../types/rooms";
 import { Relationship } from "../../../types/relationships";
 import { UserType } from "../../../types/users";
+import { VoiceUpdateData } from "../../events/voice/update";
 
 export type Presence = {
   status: string;
@@ -186,6 +187,32 @@ export const CacheProvider: ParentComponent = (props) => {
         }));
       }
     };
+		const handleRoomVoiceUpdate = (event: CustomEvent) => {
+			const data = event.detail as VoiceUpdateData;
+			if (data && data.room_id) {
+				const r = rooms().find(room => room.id === data.room_id);
+				if (!r) return console.warn("[CacheProvider] Room to update voice state not found", data);
+				
+				const p = r.participants || [];
+				const id = data.participant_id;
+				if (data.event_type === "VOICE_PARTICIPANT_JOIN") {
+					if (p.findIndex(e => e === id) !== -1) return;
+					p.push(id);
+				} else if (data.event_type === "VOICE_PARTICIPANT_LEAVE") {
+					const idx = p.findIndex(e => e === id);
+					if (idx === -1) return;
+					p.splice(idx, 1);
+				}
+
+				console.log("[CacheProvider] Updating room:", data.room_id);
+				setRooms(prev => prev.map(room => {
+					if (room.id === data.room_id) {
+						return { ...room, participants: p };
+					}
+					return room;
+				}));
+			}
+		}
 
     const handleRelationshipUpdate = (event: CustomEvent) => {
       const { relationships: newRelationships, relationshipRequests: newRequests } = event.detail;
@@ -317,7 +344,8 @@ export const CacheProvider: ParentComponent = (props) => {
     window.addEventListener("messageDelete", handleMessageDelete as EventListener);
     window.addEventListener("spaceCreate", handleSpaceCreate as EventListener);
     window.addEventListener("roomCreate", handleRoomCreate as EventListener);
-    window.addEventListener("roomUpdate", handleRoomUpdate as EventListener);
+		window.addEventListener("roomUpdate", handleRoomUpdate as EventListener);
+		window.addEventListener("roomVoiceUpdate", handleRoomVoiceUpdate as EventListener);
     window.addEventListener("roomsCache", handleRoomsCache as EventListener);
     window.addEventListener("relationshipUpdate", handleRelationshipUpdate as EventListener);
     window.addEventListener("spaceUpdate", handleSpaceUpdate as EventListener);

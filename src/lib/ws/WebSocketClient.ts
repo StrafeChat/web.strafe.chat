@@ -1,3 +1,7 @@
+export type VoicePayloadType = 
+	| "VOICE_PARTICIPANT_JOIN"
+	| "VOICE_PARTICIPANT_LEAVE";
+
 export type PayloadType =
   | "IDENTIFY"
   | "HEARTBEAT"
@@ -15,7 +19,8 @@ export type PayloadType =
   | "MESSAGE_DELETE"
   | "MESSAGE_EDIT"
   | "TYPING_START"
-  | "TYPING_INDICATOR";
+	| "TYPING_INDICATOR"
+	| VoicePayloadType;
 
 export interface BasePayload {
   type: PayloadType;
@@ -97,6 +102,10 @@ export interface PresenceUpdatePayload extends BasePayload {
   status: string;
   custom_status: string;
 }
+export interface VoiceUpdatePayload extends BasePayload {
+	type: "VOICE_PARTICIPANT_JOIN" | "VOICE_PARTICIPANT_LEAVE";
+	data: VoiceUpdateData;
+}
 
 export type WSPayload =
   | IdentifyPayload
@@ -108,6 +117,7 @@ export type WSPayload =
 
 import { UserCache } from "../cache/UserCache";
 import { handlePresenceUpdate } from "../events/presence/update";
+import { handleVoiceUpdate, VoiceUpdateData } from "../events/voice/update";
 import { decode, encode } from "@msgpack/msgpack";
 import { BASE_URL } from "../../constants";
 
@@ -572,6 +582,11 @@ export class WebSocketClient {
               handler(data.d);
             }
           }
+					else if (data.d && data.d.type.startsWith("VOICE_")) {
+						console.log("VOICE UPDATE: ", data.d);
+						this.handleVoiceUpdate(data.d);
+						this.dispatchEvent(data.d.type as VoicePayloadType, data.d);
+					}
           else {
             const handler = this.messageHandlers.get("DISPATCH");
             if (handler) {
@@ -712,7 +727,11 @@ export class WebSocketClient {
           }
           // Also call the internal handler for custom events
           this.handleSpaceUpdate(payload);
-        } else {
+        } else if (payload.type.startsWith("VOICE_")) {
+					console.log("VOICE UPDATE: ", payload);
+					this.handleVoiceUpdate(payload);
+					this.dispatchEvent(payload.type as VoicePayloadType, payload.data);
+				 } else {
           const handler = this.messageHandlers.get(payload.type);
           if (handler) {
             handler(payload);
@@ -1382,6 +1401,11 @@ export class WebSocketClient {
     }
     await handlePresenceUpdate(payload, this.cache);
   }
+	private async handleVoiceUpdate(payload: VoiceUpdatePayload): Promise<void> {
+		console.log("[WebSocketClient] Handling voice update:", payload);
+		this.dispatchEvent("roomVoiceUpdate", payload.data);
+		//await handleVoiceUpdate(payload.type as VoicePayloadType, payload.data as VoiceUpdateData);
+	}
 
   private normalizePayload(data: any): any {
     // Normalize payload to use lowercase keys
