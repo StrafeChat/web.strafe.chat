@@ -13,26 +13,50 @@ import { BASE_URL, FS_URL } from "../../constants";
 // );
 
 const Check = (props: any) => (
-  <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <polyline points="20,6 9,17 4,12"/>
+  <svg
+    {...props}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <polyline points="20,6 9,17 4,12" />
   </svg>
 );
 
 const Bot = (props: any) => (
-  <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <rect x="3" y="11" width="18" height="10" rx="2" ry="2"/>
-    <circle cx="12" cy="5" r="2"/>
-    <path d="M12 7v4"/>
-    <line x1="8" y1="16" x2="8" y2="16"/>
-    <line x1="16" y1="16" x2="16" y2="16"/>
+  <svg
+    {...props}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <rect x="3" y="11" width="18" height="10" rx="2" ry="2" />
+    <circle cx="12" cy="5" r="2" />
+    <path d="M12 7v4" />
+    <line x1="8" y1="16" x2="8" y2="16" />
+    <line x1="16" y1="16" x2="16" y2="16" />
   </svg>
 );
 
 const AlertCircle = (props: any) => (
-  <svg {...props} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-    <circle cx="12" cy="12" r="10"/>
-    <line x1="12" y1="8" x2="12" y2="12"/>
-    <line x1="12" y1="16" x2="12.01" y2="16"/>
+  <svg
+    {...props}
+    viewBox="0 0 24 24"
+    fill="none"
+    stroke="currentColor"
+    stroke-width="2"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  >
+    <circle cx="12" cy="12" r="10" />
+    <line x1="12" y1="8" x2="12" y2="12" />
+    <line x1="12" y1="16" x2="12.01" y2="16" />
   </svg>
 );
 
@@ -72,9 +96,12 @@ const BotInvitePage: Component = () => {
   // Fetch bot details
   const fetchBot = async () => {
     try {
-      const response = await apiRequest<BotDetails>(`${BASE_URL}/bots/${botId()}`, {
-        method: "GET"
-      });
+      const response = await apiRequest<BotDetails>(
+        `${BASE_URL}/bots/${botId()}`,
+        {
+          method: "GET",
+        },
+      );
       setBot(response);
     } catch (error) {
       console.error("Failed to fetch bot:", error);
@@ -86,7 +113,7 @@ const BotInvitePage: Component = () => {
   const fetchSpaces = async () => {
     try {
       const response = await apiRequest<Space[]>(`${BASE_URL}/spaces`, {
-        method: "GET"
+        method: "GET",
       });
       setSpaces(response);
     } catch (error) {
@@ -103,13 +130,13 @@ const BotInvitePage: Component = () => {
 
     const spaceId = selectedSpace();
     const botId = bot()!.user_id;
-    
+
     console.log("[DEBUG] BotInvitePage - Adding bot to space:", {
       botId,
       spaceId,
-      availableSpaces: spaces().map(s => ({ id: s.id, name: s.name })),
-      selectedSpaceName: spaces().find(s => s.id === spaceId)?.name,
-      botUsername: bot()?.username
+      availableSpaces: spaces().map((s) => ({ id: s.id, name: s.name })),
+      selectedSpaceName: spaces().find((s) => s.id === spaceId)?.name,
+      botUsername: bot()?.username,
     });
 
     setInviting(true);
@@ -117,12 +144,12 @@ const BotInvitePage: Component = () => {
       await apiRequest(`${BASE_URL}/spaces/${spaceId}/bots`, {
         method: "POST",
         body: {
-          bot_id: botId
-        }
+          bot_id: botId,
+        },
       });
-      
+
       setSuccess(true);
-      
+
       // Redirect after a delay
       setTimeout(() => {
         navigate(`/spaces/${spaceId}`);
@@ -134,7 +161,7 @@ const BotInvitePage: Component = () => {
         botId,
         errorMessage: error.message,
         errorResponse: error.response,
-        availableSpaces: spaces().map(s => ({ id: s.id, name: s.name }))
+        availableSpaces: spaces().map((s) => ({ id: s.id, name: s.name })),
       });
       setError("Failed to invite bot to space");
     } finally {
@@ -163,17 +190,38 @@ const BotInvitePage: Component = () => {
     return (
       <div class="min-h-screen flex items-center justify-center relative overflow-hidden">
         <div class="absolute inset-0 opacity-40">
-          <img src="https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/512/emoji_u1f422.png" alt="Turtle" class="absolute w-24 h-24 animate-swim-1" style={{ top: "20%", left: "10%" }} />
-          <img src="https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/512/emoji_u1f422.png" alt="Turtle" class="absolute w-16 h-16 animate-swim-2" style={{ top: "60%", right: "15%" }} />
-          <img src="https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/512/emoji_u1f422.png" alt="Turtle" class="absolute w-20 h-20 animate-swim-3" style={{ bottom: "15%", left: "30%" }} />
+          <img
+            src="https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/512/emoji_u1f422.png"
+            alt="Turtle"
+            class="absolute w-24 h-24 animate-swim-1"
+            style={{ top: "20%", left: "10%" }}
+          />
+          <img
+            src="https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/512/emoji_u1f422.png"
+            alt="Turtle"
+            class="absolute w-16 h-16 animate-swim-2"
+            style={{ top: "60%", right: "15%" }}
+          />
+          <img
+            src="https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/512/emoji_u1f422.png"
+            alt="Turtle"
+            class="absolute w-20 h-20 animate-swim-3"
+            style={{ bottom: "15%", left: "30%" }}
+          />
         </div>
         <div class="absolute inset-0 bg-gradient-to-br from-[#1a1b26]/80 via-[#1a1b26]/60 to-[#1a1b26]/90"></div>
-        <button onClick={() => navigate("/")} class="absolute top-4 left-4 text-white bg-background1 px-4 py-2 rounded-md hover:bg-background2">Back to Home</button>
+        <button
+          onClick={() => navigate("/")}
+          class="absolute top-4 left-4 text-white bg-background1 px-4 py-2 rounded-md hover:bg-background2"
+        >
+          Back to Home
+        </button>
         <div class="bg-background1 rounded-lg p-8 max-w-md w-full mx-4 text-center relative z-10">
           <Check class="w-16 h-16 text-success mx-auto mb-4" />
           <h1 class="text-2xl font-bold text-text-primary mb-2">Bot Added!</h1>
           <p class="text-text-secondary mb-4">
-            {bot()?.username} has been successfully added to the space. Redirecting you now...
+            {bot()?.username} has been successfully added to the space.
+            Redirecting you now...
           </p>
         </div>
       </div>
@@ -181,15 +229,35 @@ const BotInvitePage: Component = () => {
   }
 
   return (
-    <div class="min-h-screen flex items-center justify-center p-4 relative overflow-hidden">
+    <div class="flex items-center justify-center p-4 relative overflow-auto">
       <div class="absolute inset-0 opacity-40">
-        <img src="https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/512/emoji_u1f422.png" alt="Turtle" class="absolute w-24 h-24 animate-swim-1" style={{ top: "20%", left: "10%" }} />
-        <img src="https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/512/emoji_u1f422.png" alt="Turtle" class="absolute w-16 h-16 animate-swim-2" style={{ top: "60%", right: "15%" }} />
-        <img src="https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/512/emoji_u1f422.png" alt="Turtle" class="absolute w-20 h-20 animate-swim-3" style={{ bottom: "15%", left: "30%" }} />
+        <img
+          src="https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/512/emoji_u1f422.png"
+          alt="Turtle"
+          class="absolute w-24 h-24 animate-swim-1"
+          style={{ top: "20%", left: "10%" }}
+        />
+        <img
+          src="https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/512/emoji_u1f422.png"
+          alt="Turtle"
+          class="absolute w-16 h-16 animate-swim-2"
+          style={{ top: "60%", right: "15%" }}
+        />
+        <img
+          src="https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/512/emoji_u1f422.png"
+          alt="Turtle"
+          class="absolute w-20 h-20 animate-swim-3"
+          style={{ bottom: "15%", left: "30%" }}
+        />
       </div>
       <div class="absolute inset-0 bg-gradient-to-br from-[#1a1b26]/80 via-[#1a1b26]/60 to-[#1a1b26]/90"></div>
-      <button onClick={() => navigate("/")} class="absolute top-4 left-4 text-white bg-background1 px-4 py-2 rounded-md hover:bg-background2">Back to Home</button>
-      
+      <button
+        onClick={() => navigate("/")}
+        class="absolute top-4 left-4 text-white bg-background1 px-4 py-2 rounded-md hover:bg-background2"
+      >
+        Back to Home
+      </button>
+
       <div class="bg-background1 rounded-lg p-6 max-w-md w-full relative z-10">
         <div class="text-center mb-6">
           <div class="w-16 h-16 bg-primary/10 rounded-lg flex items-center justify-center mx-auto mb-4">
@@ -215,8 +283,8 @@ const BotInvitePage: Component = () => {
             <div class="flex items-center space-x-4 mb-4">
               <div class="relative">
                 {bot()?.avatar ? (
-                  <img 
-                    src={`${FS_URL}/avatars/${bot()!.user_id}/${bot()!.avatar}`} 
+                  <img
+                    src={`${FS_URL}/avatars/${bot()!.user_id}/${bot()!.avatar}`}
                     alt={bot()!.username}
                     class="w-16 h-16 rounded-lg object-cover"
                   />
@@ -227,10 +295,14 @@ const BotInvitePage: Component = () => {
                 )}
               </div>
               <div class="flex-1">
-                <h2 class="text-xl font-bold text-text-primary mb-1">{bot()?.display_name || bot()?.username}</h2>
+                <h2 class="text-xl font-bold text-text-primary mb-1">
+                  {bot()?.display_name || bot()?.username}
+                </h2>
                 <p class="text-text-secondary text-sm">@{bot()?.username}</p>
                 <Show when={bot()?.description}>
-                  <p class="text-text-secondary text-sm mt-2">{bot()?.description}</p>
+                  <p class="text-text-secondary text-sm mt-2">
+                    {bot()?.description}
+                  </p>
                 </Show>
               </div>
             </div>
@@ -238,14 +310,18 @@ const BotInvitePage: Component = () => {
         )}
 
         <div class="mb-6">
-          <h3 class="text-lg font-semibold text-text-primary mb-4">Select a Space</h3>
-          
+          <h3 class="text-lg font-semibold text-text-primary mb-4">
+            Select a Space
+          </h3>
+
           <Show when={spaces().length === 0 && !loading()}>
-            <p class="text-text-secondary text-center py-4">You don't have any spaces yet.</p>
+            <p class="text-text-secondary text-center py-4">
+              You don't have any spaces yet.
+            </p>
           </Show>
-          
+
           <Show when={spaces().length > 0}>
-            <div class="space-y-3 mb-4">
+            <div class="max-h-64 overflow-y-auto space-y-3 mb-4 pr-2">
               <For each={spaces()}>
                 {(space) => (
                   <button
@@ -258,7 +334,7 @@ const BotInvitePage: Component = () => {
                   >
                     <div class="flex items-center gap-3">
                       {space.icon ? (
-                        <img 
+                        <img
                           src={`${FS_URL}/space_icons/${space.id}/${space.icon}`}
                           alt={space.name}
                           class="w-10 h-10 rounded-lg object-cover"
@@ -270,7 +346,9 @@ const BotInvitePage: Component = () => {
                           </span>
                         </div>
                       )}
-                      <span class="font-medium text-text-primary">{space.name}</span>
+                      <span class="font-medium text-text-primary">
+                        {space.name}
+                      </span>
                     </div>
                   </button>
                 )}
@@ -288,7 +366,7 @@ const BotInvitePage: Component = () => {
             >
               {inviting() ? (
                 <>
-                 <span>Adding Bot...</span>
+                  <span>Adding Bot...</span>
                 </>
               ) : (
                 <>
