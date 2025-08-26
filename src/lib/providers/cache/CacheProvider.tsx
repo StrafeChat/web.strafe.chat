@@ -12,7 +12,6 @@ import { InviteCache } from "./InviteCache";
 import { InviteInfo } from "../../../types/api";
 import { RoomWithRecipients, Room } from "../../../types/rooms";
 import { Relationship } from "../../../types/relationships";
-import { UserType } from "../../../types/users";
 import { VoiceUpdateData } from "../../events/voice/update";
 
 export type Presence = {
