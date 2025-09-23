@@ -583,6 +583,7 @@ export const AuthProvider: ParentComponent = (props) => {
         space_id: spaceId ? String(spaceId) : undefined,
         parent_id: parentId ? String(parentId) : undefined,
         position: room.Position ?? room.position ?? undefined,
+        participants: room.Participants || room.participants || [],
         recipients_data: (room.Recipients || room.recipients || [])
           ?.map((recipientId: string) =>
             users?.[recipientId]

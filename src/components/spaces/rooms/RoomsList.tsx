@@ -6,7 +6,6 @@ import {
   createSignal,
   createEffect,
 } from "solid-js";
-import { useAuth } from "../../../lib/providers/auth/AuthProvider";
 import { usePermissions } from "../../../lib/hooks/usePermissions";
 import { useContextMenu } from "../../../lib/providers/context/ContextMenuProvider";
 import { ClientUserArea } from "../../shared/ClientUserArea";
@@ -22,7 +21,6 @@ import { Tooltip } from "../../common/Tooltip";
 import RoomEditModal from "../../modals/RoomEditModal";
 import { useCache, User } from "../../../lib/providers/cache/CacheProvider";
 import { Avatar } from "../../common/Avatar";
-import { VoiceUpdateData } from "../../../lib/events/voice/update";
 
 interface RoomsListProps {
   spaceId?: string;
@@ -225,8 +223,6 @@ const DraggableRoomItem: Component<DraggableRoomItemProps> = (props) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { openContextMenu } = useContextMenu();
-
-  const { getRoomParticipants } = useAuth();
   const [participants, setParticipants] = createSignal<User[]>([]);
   const { getUser } = useCache();
 
@@ -262,56 +258,15 @@ const DraggableRoomItem: Component<DraggableRoomItemProps> = (props) => {
 
   // Remove drop functionality from room items - only drop zones should accept drops
 
-  createEffect(async () => {
-    const partsFetched = (await getRoomParticipants(props.room.id)).filter(
-      (e): e is User => e !== null,
-    );
-    const partsCached = props.room.participants
-      ?.map((p) => {
-        return getUser(p);
-      })
-      .filter((e): e is User => e !== undefined && e !== null);
-    if (partsCached) {
-      partsCached.forEach((p) => {
-        const idx = partsFetched.findIndex((e) => e.id === p.id);
-        if (idx === -1) return;
-        partsFetched.splice(idx, 1);
-      });
-      setParticipants([...partsCached, ...partsFetched]); // TODO: implement caching
-    } else {
-      setParticipants(partsFetched);
-    }
+  createEffect(() => {
+    const partsCached =
+      props.room.participants
+        ?.map((p) => {
+          return getUser(p);
+        })
+        .filter((e): e is User => e !== undefined && e !== null) || [];
+    setParticipants(partsCached);
   });
-  const handleUpdate = (d: CustomEvent) => {
-    const data = d.detail as VoiceUpdateData;
-    const ps = participants();
-    switch (data.event_type) {
-      case "VOICE_PARTICIPANT_JOIN":
-        var idx = ps.findIndex((e) => e.id === data.participant_id);
-        if (idx !== -1) return;
-        var user = getUser(data.participant_id);
-        if (!user) return;
-        ps.push(user);
-        setParticipants([...ps]);
-        break;
-      case "VOICE_PARTICIPANT_LEAVE":
-        var idx = ps.findIndex((e) => e.id === data.participant_id);
-        if (idx === -1) return;
-        ps.splice(idx, 1);
-        setParticipants([...ps]);
-        break;
-    }
-  };
-
-  window.addEventListener("roomVoiceUpdate", handleUpdate as EventListener);
-
-  const { wsClient } = useAuth();
-
-  wsClient()?.onMessage("DISPATCH", (d) => {
-    console.log(d);
-  });
-
-  console.log(wsClient());
 
   return (
     <div
@@ -840,7 +795,7 @@ const DraggableSection: Component<DraggableSectionProps> = (props) => {
 };
 
 const RoomsList: Component<RoomsListProps> = (props) => {
-  const { rooms } = useAuth();
+  const { rooms } = useCache();
   const { checkPermission } = usePermissions();
 
   // Permission checking
