@@ -1,6 +1,7 @@
 import { handleRelationshipUpdate } from "./relationships/update";
 import { handlePresenceUpdate } from "./presence/update";
 import { handleUserUpdate } from "./users/update";
+import { handleReactionUpdate } from "./reactions/update";
 
 export const handleWebSocketMessage = async (
   data: any,
@@ -39,6 +40,11 @@ export const handleWebSocketMessage = async (
 
     case "userUpdate":
       handleUserUpdate(data, cache);
+      break;
+
+    case "REACTION_ADD":
+    case "REACTION_REMOVE":
+      handleReactionUpdate(data, cache);
       break;
 
     default:

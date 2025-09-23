@@ -24,7 +24,7 @@ import {
   updateCodeBlockIndicator,
 } from "../../lib/utils/codeBlockUtils";
 import { RoomType } from "../../types/roomTypes";
-import { EmojiPicker } from "../shared/EmojiPicker";
+import { UnifiedEmojiPicker } from "../shared/UnifiedEmojiPicker";
 import { EmojiAutocomplete } from "../shared/EmojiAutocomplete";
 import { MentionAutocomplete } from "../shared/MentionAutocomplete";
 import DateDivider from "./DateDivider";
@@ -33,7 +33,12 @@ import MessageSkeleton from "./MessageSkeleton";
 import { Avatar } from "../common/Avatar";
 import { MessageAttachment } from "../../types/messageTypes";
 import { Message } from "./Message/index";
-import { detectMentionAtCursor, formatUserMention, formatRoleMention, formatRoomMention } from "../../lib/utils/mentions";
+import {
+  detectMentionAtCursor,
+  formatUserMention,
+  formatRoleMention,
+  formatRoomMention,
+} from "../../lib/utils/mentions";
 
 const ChatArea: Component = () => {
   const params = useParams();
@@ -47,7 +52,23 @@ const ChatArea: Component = () => {
     unreadMessages,
     markMessagesAsRead,
   } = useAuth();
-  const { getUser, getMessage, getRoom, getSpaceMember, getSpaceMembers, getSpaceRoles, getMessages, hasReachedBeginning: cacheHasReachedBeginning, hasReachedEnd: cacheHasReachedEnd, getOldestMessageId, setUser, setHasReachedBeginning: cacheSetHasReachedBeginning, setMessages: cacheSetMessages, getNewestMessageId, setHasReachedEnd: cacheSetHasReachedEnd, deleteMessage, getSpace } = useCache();
+  const {
+    getUser,
+    getSpaceMember,
+    getMessages,
+    hasReachedBeginning: cacheHasReachedBeginning,
+    hasReachedEnd: cacheHasReachedEnd,
+    getOldestMessageId,
+    setUser,
+    setHasReachedBeginning: cacheSetHasReachedBeginning,
+    setMessages: cacheSetMessages,
+    getNewestMessageId,
+    setHasReachedEnd: cacheSetHasReachedEnd,
+    deleteMessage,
+    getSpace,
+    onMessageUpdate,
+    offMessageUpdate,
+  } = useCache();
   const [t] = useTransContext();
   const { userSettings } = useUserSettings();
   const { checkPermission } = usePermissions();
@@ -81,9 +102,13 @@ const ChatArea: Component = () => {
     createSignal({ top: 0, left: 0, width: 0 });
   const [emojiAutocompleteRange, setEmojiAutocompleteRange] =
     createSignal<Range | null>(null);
-  const [showMentionAutocomplete, setShowMentionAutocomplete] = createSignal(false);
-  const [mentionAutocompleteQuery, setMentionAutocompleteQuery] = createSignal("");
-  const [mentionAutocompleteType, setMentionAutocompleteType] = createSignal<'user' | 'role' | 'room'>('user');
+  const [showMentionAutocomplete, setShowMentionAutocomplete] =
+    createSignal(false);
+  const [mentionAutocompleteQuery, setMentionAutocompleteQuery] =
+    createSignal("");
+  const [mentionAutocompleteType, setMentionAutocompleteType] = createSignal<
+    "user" | "role" | "room"
+  >("user");
   const [mentionAutocompletePosition, setMentionAutocompletePosition] =
     createSignal({ top: 0, left: 0, width: 0 });
   const [mentionAutocompleteRange, setMentionAutocompleteRange] =
@@ -99,7 +124,8 @@ const ChatArea: Component = () => {
     >
   >([]);
   const [, setUploadingFiles] = createSignal(false);
-  const [localHasReachedBeginning, setLocalHasReachedBeginning] = createSignal(false);
+  const [localHasReachedBeginning, setLocalHasReachedBeginning] =
+    createSignal(false);
   const [localHasReachedEnd, setLocalHasReachedEnd] = createSignal(false);
   const [loadingOlderPhase, setLoadingOlderPhase] = createSignal<
     "idle" | "loading" | "positioning"
@@ -306,8 +332,15 @@ const ChatArea: Component = () => {
   createEffect(() => {
     const roomId = params.roomId;
     const mobileStatus = isMobile();
-    console.log("[ChatArea] Room change effect - roomId:", roomId, "isMobile:", mobileStatus, "chatInputRef:", !!chatInputRef);
-    
+    console.log(
+      "[ChatArea] Room change effect - roomId:",
+      roomId,
+      "isMobile:",
+      mobileStatus,
+      "chatInputRef:",
+      !!chatInputRef,
+    );
+
     if (roomId && chatInputRef && !mobileStatus) {
       console.log("[ChatArea] Auto-focusing chat input for room:", roomId);
       // Small delay to ensure the component is fully rendered
@@ -460,7 +493,7 @@ const ChatArea: Component = () => {
   const canSendMessages = createMemo(() => {
     const room = currentRoom();
     if (!room) return false;
-    
+
     // For PMs and Group PMs, users can always send messages
     if (room.type === RoomType.PM || room.type === RoomType.GROUP_PM) {
       return true;
@@ -472,72 +505,107 @@ const ChatArea: Component = () => {
 
       const space = getSpace(room.space_id!);
       if (user()!.id == space?.owner_id) return true;
-      
-      console.log('[canSendMessages] Checking permission overrides for room:', room.id, {
-        roomType: room.type,
-        permissionOverrides: room.permission_overrides,
-        SEND_MESSAGES_BIT: SEND_MESSAGES
-      });
-      
+
+      console.log(
+        "[canSendMessages] Checking permission overrides for room:",
+        room.id,
+        {
+          roomType: room.type,
+          permissionOverrides: room.permission_overrides,
+          SEND_MESSAGES_BIT: SEND_MESSAGES,
+        },
+      );
+
       // Check member-specific overrides first
       if (room.permission_overrides.member) {
         const { granted, denied } = room.permission_overrides.member;
-        console.log('[canSendMessages] Member overrides:', { granted, denied, SEND_MESSAGES });
+        console.log("[canSendMessages] Member overrides:", {
+          granted,
+          denied,
+          SEND_MESSAGES,
+        });
         if (denied & SEND_MESSAGES) {
-          console.log('[canSendMessages] Member explicitly denied SEND_MESSAGES');
+          console.log(
+            "[canSendMessages] Member explicitly denied SEND_MESSAGES",
+          );
           return false; // Explicitly denied
         }
         if (granted & SEND_MESSAGES) {
-          console.log('[canSendMessages] Member explicitly granted SEND_MESSAGES');
+          console.log(
+            "[canSendMessages] Member explicitly granted SEND_MESSAGES",
+          );
           return true; // Explicitly granted
         }
       }
-      
+
       // Check role-specific overrides
-         if (room.permission_overrides.roles) {
-           const currentUserId = user()?.id;
-           console.log('[canSendMessages] Checking role overrides for user:', currentUserId);
-           if (currentUserId && room.space_id) {
-             // Get user's space membership to access their roles
-             const spaceMember = getSpaceMember(room.space_id.toString(), currentUserId);
-             const userRoles = spaceMember?.roles || [];
-             console.log('[canSendMessages] User roles:', userRoles, 'Space member:', spaceMember);
-             
-             let hasRoleDenial = false;
-             let hasRoleGrant = false;
-             
-             for (const roleId of userRoles) {
-               const roleOverride = room.permission_overrides.roles[roleId];
-               console.log('[canSendMessages] Checking role override for role:', roleId, roleOverride);
-               if (roleOverride) {
-                 if (roleOverride.denied & SEND_MESSAGES) {
-                   console.log('[canSendMessages] Role', roleId, 'explicitly denies SEND_MESSAGES');
-                   hasRoleDenial = true;
-                 }
-                 if (roleOverride.granted & SEND_MESSAGES) {
-                   console.log('[canSendMessages] Role', roleId, 'explicitly grants SEND_MESSAGES');
-                   hasRoleGrant = true;
-                 }
-               }
-             }
-             
-             if (hasRoleDenial) {
-               console.log('[canSendMessages] Role denial takes precedence');
-               return false; // Role explicitly denies
-             }
-             if (hasRoleGrant) {
-               console.log('[canSendMessages] Role grant takes precedence');
-               return true; // Role explicitly grants
-             }
-           }
-         }
+      if (room.permission_overrides.roles) {
+        const currentUserId = user()?.id;
+        console.log(
+          "[canSendMessages] Checking role overrides for user:",
+          currentUserId,
+        );
+        if (currentUserId && room.space_id) {
+          // Get user's space membership to access their roles
+          const spaceMember = getSpaceMember(
+            room.space_id.toString(),
+            currentUserId,
+          );
+          const userRoles = spaceMember?.roles || [];
+          console.log(
+            "[canSendMessages] User roles:",
+            userRoles,
+            "Space member:",
+            spaceMember,
+          );
+
+          let hasRoleDenial = false;
+          let hasRoleGrant = false;
+
+          for (const roleId of userRoles) {
+            const roleOverride = room.permission_overrides.roles[roleId];
+            console.log(
+              "[canSendMessages] Checking role override for role:",
+              roleId,
+              roleOverride,
+            );
+            if (roleOverride) {
+              if (roleOverride.denied & SEND_MESSAGES) {
+                console.log(
+                  "[canSendMessages] Role",
+                  roleId,
+                  "explicitly denies SEND_MESSAGES",
+                );
+                hasRoleDenial = true;
+              }
+              if (roleOverride.granted & SEND_MESSAGES) {
+                console.log(
+                  "[canSendMessages] Role",
+                  roleId,
+                  "explicitly grants SEND_MESSAGES",
+                );
+                hasRoleGrant = true;
+              }
+            }
+          }
+
+          if (hasRoleDenial) {
+            console.log("[canSendMessages] Role denial takes precedence");
+            return false; // Role explicitly denies
+          }
+          if (hasRoleGrant) {
+            console.log("[canSendMessages] Role grant takes precedence");
+            return true; // Role explicitly grants
+          }
+        }
+      }
     }
-    
+
     // For text rooms, check SEND_MESSAGES permission from space
     if (room.space_id) {
       return checkPermission(room.space_id.toString(), "SEND_MESSAGES");
     }
-    
+
     return false;
   });
 
@@ -728,6 +796,39 @@ const ChatArea: Component = () => {
         scrollToBottom();
       });
     }
+  });
+
+  // Subscribe to message updates from cache (for real-time reactions, edits, etc.)
+  createEffect(() => {
+    const roomId = params.roomId;
+    if (!roomId) return;
+
+    const handleMessageUpdate = (
+      updatedRoomId: string,
+      updatedMessage: CachedMessage,
+    ) => {
+      // Only handle updates for the current room
+      if (updatedRoomId !== roomId) return;
+
+      console.log("[ChatArea] Message update received:", {
+        updatedRoomId,
+        messageId: updatedMessage.id,
+        reactions: updatedMessage.reactions,
+      });
+
+      // Force a re-sync of messages from cache to pick up the updated message
+      const cachedMessages = getMessages(roomId);
+      const processed = processMessages(cachedMessages);
+      setLocalMessages(processed);
+    };
+
+    // Subscribe to message updates
+    onMessageUpdate(handleMessageUpdate);
+
+    // Cleanup subscription when room changes or component unmounts
+    onCleanup(() => {
+      offMessageUpdate(handleMessageUpdate);
+    });
   });
 
   // Sync messages with cache when cache is updated (with throttling)
@@ -1057,9 +1158,7 @@ const ChatArea: Component = () => {
         cacheSetMessages(params.roomId, fetchedMessages, "older");
 
         // Update displayed messages with batched DOM updates
-        const updatedMessages = processMessages(
-          getMessages(params.roomId),
-        );
+        const updatedMessages = processMessages(getMessages(params.roomId));
 
         // Use flushSync to ensure DOM updates are applied immediately
         batch(() => {
@@ -1193,9 +1292,7 @@ const ChatArea: Component = () => {
         cacheSetMessages(params.roomId, fetchedMessages, "newer");
 
         // Update displayed messages
-        const updatedMessages = processMessages(
-          getMessages(params.roomId),
-        );
+        const updatedMessages = processMessages(getMessages(params.roomId));
         setLocalMessages(updatedMessages);
 
         // Check if we got fewer messages than requested (reached end)
@@ -1298,12 +1395,12 @@ const ChatArea: Component = () => {
           setLocalHasReachedBeginning(true);
         } else {
           // Reset the flag to allow fetching older messages
-        setLocalHasReachedBeginning(false);
-      }
+          setLocalHasReachedBeginning(false);
+        }
 
-      // For initial load, assume we've reached the end (most recent messages)
-      // This prevents unnecessary "after" queries immediately after loading
-      setLocalHasReachedEnd(true);
+        // For initial load, assume we've reached the end (most recent messages)
+        // This prevents unnecessary "after" queries immediately after loading
+        setLocalHasReachedEnd(true);
       } else {
         console.log("No messages found or empty response:", data);
         // Don't set an error for empty messages, just show an empty chat
@@ -1333,6 +1430,8 @@ const ChatArea: Component = () => {
 
     // Enhanced smooth scrolling with momentum preservation
     const scrollToBottomImmediate = () => {
+      if (!chatContainerRef) return;
+
       const { scrollHeight, clientHeight } = chatContainerRef;
       const targetScrollTop = scrollHeight - clientHeight;
       const currentScrollTop = chatContainerRef.scrollTop;
@@ -1489,7 +1588,7 @@ const ChatArea: Component = () => {
     if (message.id) {
       setEditingMessageId(message.id);
       setEditingRoomId(params.roomId);
-      
+
       const content = message.content || "";
       setMessageText(content);
     }
@@ -1722,27 +1821,24 @@ const ChatArea: Component = () => {
 
     // Create a MutationObserver to watch for content changes
     const observer = new MutationObserver((_mutations) => {
-      // Configure observer to watch for text and node changes
-      observer.observe(chatInputRef, {
-        childList: true,
-        subtree: true,
-        characterData: true,
-      });
+      if (!chatInputRef) return;
 
       // Force reflow and empty check
-      chatInputRef?.offsetHeight;
+      chatInputRef.offsetHeight;
       const isEmpty =
-        !chatInputRef?.textContent || chatInputRef.textContent.trim() === "";
+        !chatInputRef.textContent || chatInputRef.textContent.trim() === "";
       chatInputRef.classList.toggle("empty", isEmpty);
       setMessageText(chatInputRef.textContent || "");
     });
 
     // Start observing the chat input for changes
-    observer.observe(chatInputRef, {
-      childList: true,
-      characterData: true,
-      subtree: true,
-    });
+    if (chatInputRef) {
+      observer.observe(chatInputRef, {
+        childList: true,
+        characterData: true,
+        subtree: true,
+      });
+    }
 
     // Clean up the observer when component is unmounted
     onCleanup(() => {
@@ -2142,6 +2238,7 @@ const ChatArea: Component = () => {
                                   message_references={
                                     message().message_references
                                   }
+                                  reactions={message().reactions}
                                   room_id={params.roomId}
                                   editingMessageId={editingMessageId()}
                                   onReply={handleReply}
@@ -2412,298 +2509,16 @@ const ChatArea: Component = () => {
             <div
               class={`bg-[var(--background1)] p-2 flex items-center relative min-w-0 ${isMobile() ? "rounded-none mx-0 px-4" : "rounded-lg"}`}
             >
-            {/* File attachment button */}
-            <button
-              onClick={() => {
-                if (fileInputRef()) {
-                  fileInputRef()?.click();
-                }
-              }}
-              class="p-2 rounded-full text-text-secondary hover:bg-surface hover:bg-opacity-20 transition-colors flex-shrink-0 mr-1"
-              title={t("chat.attachFile") || "Attach file"}
-              disabled={sending() || editingMessageId() !== null}
-            >
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                class="h-5 w-5"
-                viewBox="0 0 20 20"
-                fill="currentColor"
-              >
-                <path
-                  fill-rule="evenodd"
-                  d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z"
-                  clip-rule="evenodd"
-                />
-              </svg>
-            </button>
-            <input
-              type="file"
-              ref={setFileInputRef}
-              class="hidden"
-              multiple
-              onChange={(e) => {
-                const files = e.currentTarget.files;
-                if (files && files.length > 0) {
-                  handleFileUpload(files);
-                }
-                // Reset the input to allow selecting the same file again
-                e.currentTarget.value = "";
-              }}
-            />
-            <div
-              contentEditable
-              ref={chatInputRef}
-              data-placeholder={`${editingMessageId() ? "Edit message" : `Message ${getRoomName()}`}`}
-              class="bg-transparent w-full focus:outline-none text-text-primary min-h-[20px] max-h-[120px] overflow-y-auto whitespace-pre-wrap word-break break-all break-words break-anywhere relative empty:before:content-[attr(data-placeholder)] empty:before:text-text-secondary empty:before:absolute empty:before:left-0 empty:before:top-0 empty:before:pointer-events-none empty:before:transition-opacity empty:before:duration-100 empty:before:ease-in-out flex items-center empty min-w-0 max-w-full"
-              onPaste={(e) => {
-                e.preventDefault();
-
-                // Check for files first
-                const files = e.clipboardData?.files;
-                if (files && files.length > 0) {
-                  handleFileUpload(files);
-                  return;
-                }
-
-                const text = e.clipboardData?.getData("text/plain") || "";
-
-                const selection = window.getSelection();
-                if (selection && selection.rangeCount > 0) {
-                  const range = selection.getRangeAt(0);
-                  range.deleteContents();
-                  range.insertNode(document.createTextNode(text));
-
-                  range.collapse(false);
-                  selection.removeAllRanges();
-                  selection.addRange(range);
-
-                  const inputEvent = new Event("input", { bubbles: true });
-                  e.currentTarget.dispatchEvent(inputEvent);
-                }
-              }}
-              onInput={(e) => {
-                const text = e.currentTarget.textContent || "";
-                setMessageText(text);
-
-                // Toggle empty class based on content
-                // Check both raw content length and trimmed content to ensure placeholder shows correctly
-                if (text.length === 0 || text.trim() === "") {
-                  e.currentTarget.classList.add("empty");
-                  // Force a reflow to ensure the placeholder appears immediately
-                  void e.currentTarget.offsetHeight;
-                } else {
-                  e.currentTarget.classList.remove("empty");
-                }
-
-                // Check for unclosed code blocks and update visual indicator
-                const hasUnclosed = hasUnclosedCodeBlock(text);
-                updateCodeBlockIndicator(e.currentTarget, hasUnclosed);
-
-                // Emoji and mention autocomplete detection
-                const selection = window.getSelection();
-                if (selection && selection.rangeCount > 0) {
-                  const range = selection.getRangeAt(0);
-                  const textNode = range.startContainer;
-
-                  if (textNode.nodeType === Node.TEXT_NODE) {
-                    const textContent = textNode.textContent || "";
-                    const cursorPosition = range.startOffset;
-
-                    // Look for emoji shortcode pattern (:word) before cursor
-                    const beforeCursor = textContent.substring(
-                      0,
-                      cursorPosition,
-                    );
-                    const emojiMatch = beforeCursor.match(/:([a-zA-Z_]*)$/);
-
-                    // Calculate position for autocomplete menu - position above the input
-                    const inputContainer = e.currentTarget
-                      .parentElement as HTMLElement;
-                    const rect = inputContainer ? inputContainer.getBoundingClientRect() : null;
-                    
-                    // Calculate position that ensures the autocomplete is above the input
-                    // We're using the top position as a reference point for the bottom-based positioning
-                    const autocompletePosition = rect ? {
-                      top: rect.top + window.scrollY, // Just pass the top position as reference
-                      left: rect.left + window.scrollX,
-                      width: rect.width, // Match the width of the input container
-                    } : { top: 0, left: 0, width: 0 };
-
-                    if (emojiMatch) {
-                      const query = emojiMatch[1];
-                      setEmojiAutocompleteQuery(query);
-                      setEmojiAutocompletePosition(autocompletePosition);
-
-                      // Store the range for later replacement
-                      const emojiRange = document.createRange();
-                      emojiRange.setStart(textNode, emojiMatch.index || 0);
-                      emojiRange.setEnd(textNode, cursorPosition);
-                      setEmojiAutocompleteRange(emojiRange);
-
-                      setShowEmojiAutocomplete(true);
-                      setShowMentionAutocomplete(false); // Close mention autocomplete if open
-                    } else {
-                      setShowEmojiAutocomplete(false);
-                      setEmojiAutocompleteRange(null);
-                      
-                      // Check for mention patterns (@user, @&role, #room)
-                      const mentionInfo = detectMentionAtCursor(textContent, cursorPosition);
-                      
-                      if (mentionInfo) {
-                        setMentionAutocompleteQuery(mentionInfo.query);
-                        setMentionAutocompleteType(mentionInfo.type || 'user');
-                        setMentionAutocompletePosition(autocompletePosition);
-                        
-                        // Store the range for later replacement
-                        const mentionRange = document.createRange();
-                        mentionRange.setStart(textNode, mentionInfo.startPos);
-                        mentionRange.setEnd(textNode, mentionInfo.endPos);
-                        setMentionAutocompleteRange(mentionRange);
-                        
-                        setShowMentionAutocomplete(true);
-                      } else {
-                        setShowMentionAutocomplete(false);
-                        setMentionAutocompleteRange(null);
-                      }
-                    }
-                  } else {
-                    setShowEmojiAutocomplete(false);
-                    setEmojiAutocompleteRange(null);
-                    setShowMentionAutocomplete(false);
-                    setMentionAutocompleteRange(null);
-                  }
-                }
-
-                // Send typing indicator to backend after second character is typed
-                if (
-                  text.length >= 2 &&
-                  !editingMessageId() &&
-                  userSettings().privacy.sendTypingIndicators
-                ) {
-                  const currentTime = Date.now();
-                  const lastTypingTime = e.currentTarget.dataset.lastTypingTime
-                    ? parseInt(e.currentTarget.dataset.lastTypingTime)
-                    : 0;
-
-                  // Only send typing indicator if 7 seconds have passed since the last one
-                  if (currentTime - lastTypingTime > 7000) {
-                    const roomId = params.roomId;
-                    const currentUserId = user()?.id;
-
-                    if (roomId && currentUserId) {
-                      // Send typing indicator via the API
-                      sendTypingIndicator(roomId).catch((err) => {
-                        console.error(
-                          "[ChatArea] Failed to send typing indicator:",
-                          err,
-                        );
-                      });
-
-                      // Update last typing time
-                      e.currentTarget.dataset.lastTypingTime =
-                        currentTime.toString();
-                    }
-                  }
-                }
-              }}
-              onKeyDown={(e) => {
-                // Handle emoji autocomplete navigation first
-                if (showEmojiAutocomplete()) {
-                  if (
-                    e.key === "ArrowDown" ||
-                    e.key === "ArrowUp" ||
-                    e.key === "Enter" ||
-                    e.key === "Escape"
-                  ) {
-                    // Let the EmojiAutocomplete component handle these keys
-                    e.preventDefault(); // Prevent default to ensure the event is captured
-                    e.stopPropagation(); // Stop propagation to ensure the event is not handled by other handlers
-                    return;
-                  }
-                }
-
-                // Handle mention autocomplete navigation
-                if (showMentionAutocomplete()) {
-                  if (
-                    e.key === "ArrowDown" ||
-                    e.key === "ArrowUp" ||
-                    e.key === "Enter" ||
-                    e.key === "Escape"
-                  ) {
-                    // Let the MentionAutocomplete component handle these keys
-                    e.preventDefault(); // Prevent default to ensure the event is captured
-                    e.stopPropagation(); // Stop propagation to ensure the event is not handled by other handlers
-                    return;
-                  }
-                }
-
-                // Check if we're inside an unclosed code block
-                const text = e.currentTarget.textContent || "";
-                const isInUnclosedCodeBlock = hasUnclosedCodeBlock(text);
-
-                // Update visual indicator
-                updateCodeBlockIndicator(
-                  e.currentTarget,
-                  isInUnclosedCodeBlock,
-                );
-
-                if (e.key === "Enter" && !e.shiftKey) {
-                  if (isInUnclosedCodeBlock) {
-                    // Inside unclosed code block, insert new line instead of sending
-                    e.preventDefault();
-
-                    // Insert a new line at cursor position
-                    const selection = window.getSelection();
-                    const chatInput = e.currentTarget;
-                    if (
-                      selection &&
-                      selection.rangeCount > 0 &&
-                      chatInput.contains(selection.anchorNode)
-                    ) {
-                      // If selection is within the chat input
-                      const range = selection.getRangeAt(0);
-                      const newLine = document.createTextNode("\n");
-                      range.insertNode(newLine);
-
-                      // Move cursor after the inserted newline
-                      range.collapse(false);
-                      selection.removeAllRanges();
-                      selection.addRange(range);
-
-                      // Trigger input event to update state
-                      const inputEvent = new Event("input", { bubbles: true });
-                      chatInput.dispatchEvent(inputEvent);
-                    }
-                  } else {
-                    // Not in code block, proceed with normal send
-                    e.preventDefault();
-                    handleSendMessage(e.currentTarget);
-                  }
-                } else if (e.key === "Escape" && editingMessageId()) {
-                  e.preventDefault();
-                  // Cancel editing
-                  e.currentTarget.textContent = "";
-                  setMessageText("");
-                  setEditingMessageId(null);
-                  setEditingRoomId(null);
-                }
-              }}
-              aria-disabled={sending()}
-              style={{ "pointer-events": sending() ? "none" : "auto" }}
-            />
-            <div class="flex items-center gap-1">
-              {/* Emoji picker button */}
+              {/* File attachment button */}
               <button
-                onClick={(e) => {
-                  const rect = e.currentTarget.getBoundingClientRect();
-                  setEmojiPickerPosition({
-                    top: rect.top - 450, // Position above the button
-                    left: rect.left - 320 + rect.width, // Align right edge with button
-                  });
-                  setShowEmojiPicker(!showEmojiPicker());
+                onClick={() => {
+                  if (fileInputRef()) {
+                    fileInputRef()?.click();
+                  }
                 }}
-                class="p-2 rounded-full text-text-secondary hover:bg-surface hover:bg-opacity-20 transition-colors flex-shrink-0"
-                title={t("chat.emojiPicker") || "Emoji picker"}
+                class="p-2 rounded-full text-text-secondary hover:bg-surface hover:bg-opacity-20 transition-colors flex-shrink-0 mr-1"
+                title={t("chat.attachFile") || "Attach file"}
+                disabled={sending() || editingMessageId() !== null}
               >
                 <svg
                   xmlns="http://www.w3.org/2000/svg"
@@ -2713,11 +2528,305 @@ const ChatArea: Component = () => {
                 >
                   <path
                     fill-rule="evenodd"
-                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a1 1 0 10-1.415-1.414 3 3 0 01-4.242 0 1 1 0 00-1.415 1.414 5 5 0 007.072 0z"
+                    d="M8 4a3 3 0 00-3 3v4a5 5 0 0010 0V7a1 1 0 112 0v4a7 7 0 11-14 0V7a5 5 0 0110 0v4a3 3 0 11-6 0V7a1 1 0 012 0v4a1 1 0 102 0V7a3 3 0 00-3-3z"
                     clip-rule="evenodd"
                   />
                 </svg>
               </button>
+              <input
+                type="file"
+                ref={setFileInputRef}
+                class="hidden"
+                multiple
+                onChange={(e) => {
+                  const files = e.currentTarget.files;
+                  if (files && files.length > 0) {
+                    handleFileUpload(files);
+                  }
+                  // Reset the input to allow selecting the same file again
+                  e.currentTarget.value = "";
+                }}
+              />
+              <div
+                contentEditable
+                ref={chatInputRef}
+                data-placeholder={`${editingMessageId() ? "Edit message" : `Message ${getRoomName()}`}`}
+                class="bg-transparent w-full focus:outline-none text-text-primary min-h-[20px] max-h-[120px] overflow-y-auto whitespace-pre-wrap word-break break-all break-words break-anywhere relative empty:before:content-[attr(data-placeholder)] empty:before:text-text-secondary empty:before:absolute empty:before:left-0 empty:before:top-0 empty:before:pointer-events-none empty:before:transition-opacity empty:before:duration-100 empty:before:ease-in-out flex items-center empty min-w-0 max-w-full"
+                onPaste={(e) => {
+                  e.preventDefault();
+
+                  // Check for files first
+                  const files = e.clipboardData?.files;
+                  if (files && files.length > 0) {
+                    handleFileUpload(files);
+                    return;
+                  }
+
+                  const text = e.clipboardData?.getData("text/plain") || "";
+
+                  const selection = window.getSelection();
+                  if (selection && selection.rangeCount > 0) {
+                    const range = selection.getRangeAt(0);
+                    range.deleteContents();
+                    range.insertNode(document.createTextNode(text));
+
+                    range.collapse(false);
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+
+                    const inputEvent = new Event("input", { bubbles: true });
+                    e.currentTarget.dispatchEvent(inputEvent);
+                  }
+                }}
+                onInput={(e) => {
+                  const text = e.currentTarget.textContent || "";
+                  setMessageText(text);
+
+                  // Toggle empty class based on content
+                  // Check both raw content length and trimmed content to ensure placeholder shows correctly
+                  if (text.length === 0 || text.trim() === "") {
+                    e.currentTarget.classList.add("empty");
+                    // Force a reflow to ensure the placeholder appears immediately
+                    void e.currentTarget.offsetHeight;
+                  } else {
+                    e.currentTarget.classList.remove("empty");
+                  }
+
+                  // Check for unclosed code blocks and update visual indicator
+                  const hasUnclosed = hasUnclosedCodeBlock(text);
+                  updateCodeBlockIndicator(e.currentTarget, hasUnclosed);
+
+                  // Emoji and mention autocomplete detection
+                  const selection = window.getSelection();
+                  if (selection && selection.rangeCount > 0) {
+                    const range = selection.getRangeAt(0);
+                    const textNode = range.startContainer;
+
+                    if (textNode.nodeType === Node.TEXT_NODE) {
+                      const textContent = textNode.textContent || "";
+                      const cursorPosition = range.startOffset;
+
+                      // Look for emoji shortcode pattern (:word) before cursor
+                      const beforeCursor = textContent.substring(
+                        0,
+                        cursorPosition,
+                      );
+                      const emojiMatch = beforeCursor.match(/:([a-zA-Z_]*)$/);
+
+                      // Calculate position for autocomplete menu - position above the input
+                      const inputContainer = e.currentTarget
+                        .parentElement as HTMLElement;
+                      const rect = inputContainer
+                        ? inputContainer.getBoundingClientRect()
+                        : null;
+
+                      // Calculate position that ensures the autocomplete is above the input
+                      // We're using the top position as a reference point for the bottom-based positioning
+                      const autocompletePosition = rect
+                        ? {
+                            top: rect.top + window.scrollY, // Just pass the top position as reference
+                            left: rect.left + window.scrollX,
+                            width: rect.width, // Match the width of the input container
+                          }
+                        : { top: 0, left: 0, width: 0 };
+
+                      if (emojiMatch) {
+                        const query = emojiMatch[1];
+                        setEmojiAutocompleteQuery(query);
+                        setEmojiAutocompletePosition(autocompletePosition);
+
+                        // Store the range for later replacement
+                        const emojiRange = document.createRange();
+                        emojiRange.setStart(textNode, emojiMatch.index || 0);
+                        emojiRange.setEnd(textNode, cursorPosition);
+                        setEmojiAutocompleteRange(emojiRange);
+
+                        setShowEmojiAutocomplete(true);
+                        setShowMentionAutocomplete(false); // Close mention autocomplete if open
+                      } else {
+                        setShowEmojiAutocomplete(false);
+                        setEmojiAutocompleteRange(null);
+
+                        // Check for mention patterns (@user, @&role, #room)
+                        const mentionInfo = detectMentionAtCursor(
+                          textContent,
+                          cursorPosition,
+                        );
+
+                        if (mentionInfo) {
+                          setMentionAutocompleteQuery(mentionInfo.query);
+                          setMentionAutocompleteType(
+                            mentionInfo.type || "user",
+                          );
+                          setMentionAutocompletePosition(autocompletePosition);
+
+                          // Store the range for later replacement
+                          const mentionRange = document.createRange();
+                          mentionRange.setStart(textNode, mentionInfo.startPos);
+                          mentionRange.setEnd(textNode, mentionInfo.endPos);
+                          setMentionAutocompleteRange(mentionRange);
+
+                          setShowMentionAutocomplete(true);
+                        } else {
+                          setShowMentionAutocomplete(false);
+                          setMentionAutocompleteRange(null);
+                        }
+                      }
+                    } else {
+                      setShowEmojiAutocomplete(false);
+                      setEmojiAutocompleteRange(null);
+                      setShowMentionAutocomplete(false);
+                      setMentionAutocompleteRange(null);
+                    }
+                  }
+
+                  // Send typing indicator to backend after second character is typed
+                  if (
+                    text.length >= 2 &&
+                    !editingMessageId() &&
+                    userSettings().privacy.sendTypingIndicators
+                  ) {
+                    const currentTime = Date.now();
+                    const lastTypingTime = e.currentTarget.dataset
+                      .lastTypingTime
+                      ? parseInt(e.currentTarget.dataset.lastTypingTime)
+                      : 0;
+
+                    // Only send typing indicator if 7 seconds have passed since the last one
+                    if (currentTime - lastTypingTime > 7000) {
+                      const roomId = params.roomId;
+                      const currentUserId = user()?.id;
+
+                      if (roomId && currentUserId) {
+                        // Send typing indicator via the API
+                        sendTypingIndicator(roomId).catch((err) => {
+                          console.error(
+                            "[ChatArea] Failed to send typing indicator:",
+                            err,
+                          );
+                        });
+
+                        // Update last typing time
+                        e.currentTarget.dataset.lastTypingTime =
+                          currentTime.toString();
+                      }
+                    }
+                  }
+                }}
+                onKeyDown={(e) => {
+                  // Handle emoji autocomplete navigation first
+                  if (showEmojiAutocomplete()) {
+                    if (
+                      e.key === "ArrowDown" ||
+                      e.key === "ArrowUp" ||
+                      e.key === "Enter" ||
+                      e.key === "Escape"
+                    ) {
+                      // Let the EmojiAutocomplete component handle these keys
+                      e.preventDefault(); // Prevent default to ensure the event is captured
+                      e.stopPropagation(); // Stop propagation to ensure the event is not handled by other handlers
+                      return;
+                    }
+                  }
+
+                  // Handle mention autocomplete navigation
+                  if (showMentionAutocomplete()) {
+                    if (
+                      e.key === "ArrowDown" ||
+                      e.key === "ArrowUp" ||
+                      e.key === "Enter" ||
+                      e.key === "Escape"
+                    ) {
+                      // Let the MentionAutocomplete component handle these keys
+                      e.preventDefault(); // Prevent default to ensure the event is captured
+                      e.stopPropagation(); // Stop propagation to ensure the event is not handled by other handlers
+                      return;
+                    }
+                  }
+
+                  // Check if we're inside an unclosed code block
+                  const text = e.currentTarget.textContent || "";
+                  const isInUnclosedCodeBlock = hasUnclosedCodeBlock(text);
+
+                  // Update visual indicator
+                  updateCodeBlockIndicator(
+                    e.currentTarget,
+                    isInUnclosedCodeBlock,
+                  );
+
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    if (isInUnclosedCodeBlock) {
+                      // Inside unclosed code block, insert new line instead of sending
+                      e.preventDefault();
+
+                      // Insert a new line at cursor position
+                      const selection = window.getSelection();
+                      const chatInput = e.currentTarget;
+                      if (
+                        selection &&
+                        selection.rangeCount > 0 &&
+                        chatInput.contains(selection.anchorNode)
+                      ) {
+                        // If selection is within the chat input
+                        const range = selection.getRangeAt(0);
+                        const newLine = document.createTextNode("\n");
+                        range.insertNode(newLine);
+
+                        // Move cursor after the inserted newline
+                        range.collapse(false);
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+
+                        // Trigger input event to update state
+                        const inputEvent = new Event("input", {
+                          bubbles: true,
+                        });
+                        chatInput.dispatchEvent(inputEvent);
+                      }
+                    } else {
+                      // Not in code block, proceed with normal send
+                      e.preventDefault();
+                      handleSendMessage(e.currentTarget);
+                    }
+                  } else if (e.key === "Escape" && editingMessageId()) {
+                    e.preventDefault();
+                    // Cancel editing
+                    e.currentTarget.textContent = "";
+                    setMessageText("");
+                    setEditingMessageId(null);
+                    setEditingRoomId(null);
+                  }
+                }}
+                aria-disabled={sending()}
+                style={{ "pointer-events": sending() ? "none" : "auto" }}
+              />
+              <div class="flex items-center gap-1">
+                {/* Emoji picker button */}
+                <button
+                  onClick={(e) => {
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    setEmojiPickerPosition({
+                      top: rect.top - 450, // Position above the button
+                      left: rect.left - 320 + rect.width, // Align right edge with button
+                    });
+                    setShowEmojiPicker(!showEmojiPicker());
+                  }}
+                  class="p-2 rounded-full text-text-secondary hover:bg-surface hover:bg-opacity-20 transition-colors flex-shrink-0"
+                  title={t("chat.emojiPicker") || "Emoji picker"}
+                >
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    class="h-5 w-5"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fill-rule="evenodd"
+                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM7 9a1 1 0 100-2 1 1 0 000 2zm7-1a1 1 0 11-2 0 1 1 0 012 0zm-.464 5.535a1 1 0 10-1.415-1.414 3 3 0 01-4.242 0 1 1 0 00-1.415 1.414 5 5 0 007.072 0z"
+                      clip-rule="evenodd"
+                    />
+                  </svg>
+                </button>
               </div>
               <Show when={editingMessageId()}>
                 <button
@@ -2814,8 +2923,10 @@ const ChatArea: Component = () => {
 
           {/* Emoji Picker Portal */}
           <Show when={showEmojiPicker()}>
-            <EmojiPicker
+            <UnifiedEmojiPicker
+              isOpen={showEmojiPicker()}
               position={emojiPickerPosition()}
+              mode="chat"
               onSelect={(emojiShortcode) => {
                 const chatInput = document.querySelector(
                   "[data-placeholder]",
@@ -2920,21 +3031,21 @@ const ChatArea: Component = () => {
               query={mentionAutocompleteQuery()}
               position={mentionAutocompletePosition()}
               currentRoomId={params.roomId} // Pass current room ID for context
-              onSelect={(id, displayName, type) => {
+              onSelect={(id, _displayName, type) => {
                 const range = mentionAutocompleteRange();
                 if (range) {
                   // Replace the @query, @&query, or #query with the formatted mention
                   range.deleteContents();
-                  
+
                   let formattedMention = "";
-                  if (type === 'user') {
+                  if (type === "user") {
                     formattedMention = formatUserMention(id);
-                  } else if (type === 'role') {
+                  } else if (type === "role") {
                     formattedMention = formatRoleMention(id);
-                  } else if (type === 'room') {
+                  } else if (type === "room") {
                     formattedMention = formatRoomMention(id);
                   }
-                  
+
                   range.insertNode(document.createTextNode(formattedMention));
                   range.collapse(false);
 

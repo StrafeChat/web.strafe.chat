@@ -35,6 +35,9 @@ import { CompactTimestamp } from "./components/CompactTimestamp";
 import { EmojiDetailsPopup } from "./components/EmojiDetails";
 import { InviteEmbeds } from "./components/InviteEmbeds";
 import { SystemMessage } from "./components/SystemMessage";
+import { MessageReactions } from "./components/reactions";
+import { EmojiPicker } from "./components/EmojiPicker";
+import { addReaction } from "../../../lib/api/reactions";
 
 export function Message(props: MessageProps) {
   const { getUser, getMessage, getSpaceMember } = useCache();
@@ -44,12 +47,37 @@ export function Message(props: MessageProps) {
   const navigate = useNavigate();
   const { openContextMenu } = useContextMenu();
 
+  // Create a reactive signal for the current message to track cache updates
+  const currentMessage = createMemo(() => {
+    if (!props.id || !props.room_id) return props;
+    const cachedMessage = getMessage(props.room_id, props.id);
+    const result = cachedMessage || props;
+
+    // Debug logging to track reactivity
+    if (props.id) {
+      console.log(
+        `[Message] currentMessage memo re-evaluated for message ${props.id}:`,
+        {
+          hasReactions: !!result.reactions,
+          reactionCount: result.reactions
+            ? Object.keys(result.reactions).length
+            : 0,
+          reactions: result.reactions,
+        },
+      );
+    }
+
+    return result;
+  });
+
   const [isEditing, setIsEditing] = createSignal(false);
   const [editContent, setEditContent] = createSignal(props.content);
   const [isEditLoading, setIsEditLoading] = createSignal(false);
   const [editError, setEditError] = createSignal("");
   const [showDeleteConfirm, setShowDeleteConfirm] = createSignal(false);
   const [deleteError, setDeleteError] = createSignal("");
+  const [isHovered, setIsHovered] = createSignal(false);
+
   const [userPopupOpen, setUserPopupOpen] = createSignal(false);
   const [userPopupTrigger, setUserPopupTrigger] = createSignal<
     HTMLElement | undefined
@@ -69,11 +97,12 @@ export function Message(props: MessageProps) {
   const [selectedEmoji, setSelectedEmoji] = createSignal<any>(null);
   const [popupPosition, setPopupPosition] = createSignal({ x: 0, y: 0 });
 
-
   const refMessages = referencedMessages(() => props, getMessage, getUser);
   const inviteStates = useInviteStates(props, { getMessage, getUser });
   const author = createMemo(() => getUser(props.author_id));
-  const currentRoom = createMemo(() => rooms().find((r) => r.id === props.room_id));
+  const currentRoom = createMemo(() =>
+    rooms().find((r) => r.id === props.room_id),
+  );
   const currentSpaceId = createMemo(() => currentRoom()?.space_id);
   const currentSpaceMember = createMemo(() => {
     const spaceId = currentSpaceId();
@@ -245,10 +274,43 @@ export function Message(props: MessageProps) {
     }
   };
 
-  const handleEmojiClick = (emoji: { shortcode: string; emoji: { name: string; code: string } }, position: { x: number; y: number }) => {
+  const handleEmojiClick = (
+    emoji: { shortcode: string; emoji: { name: string; code: string } },
+    position: { x: number; y: number },
+  ) => {
     setSelectedEmoji(emoji);
     setPopupPosition(position);
     setShowEmojiDetails(true);
+  };
+
+  // Get recent emojis for quick reactions
+  const getRecentEmojis = () => {
+    try {
+      const stored = localStorage.getItem("recentEmojis");
+      if (stored) {
+        const recent = JSON.parse(stored);
+        return recent.slice(0, 3); // Get top 3 most recent
+      }
+    } catch (error) {
+      console.error("Failed to get recent emojis:", error);
+    }
+
+    // Default popular emojis if no recent ones
+    return [
+      { shortcode: "thumbsup" },
+      { shortcode: "heart" },
+      { shortcode: "joy" },
+    ];
+  };
+
+  const handleAddReaction = async (emoji: string) => {
+    if (!props.id || !props.room_id) return;
+
+    try {
+      await addReaction(props.room_id, props.id, emoji);
+    } catch (error) {
+      console.error("Failed to add reaction:", error);
+    }
   };
 
   // Handle message click events including mention clicks
@@ -259,21 +321,56 @@ export function Message(props: MessageProps) {
   // Handle message context menu (right-click)
   const handleMessageContextMenu = (e: MouseEvent) => {
     e.preventDefault();
-    
+
     const messageContextMenu = () => (
       <div class="py-1 w-48">
+        <Show when={props.id && props.room_id}>
+          <button
+            class="w-full px-3 py-1.5 text-left text-sm text-text-primary hover:bg-surface hover:bg-opacity-10 transition-colors flex items-center gap-2"
+            onClick={() => {
+              // Quick reaction with thumbs up
+              handleAddReaction("thumbsup");
+            }}
+          >
+            <svg
+              class="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <circle cx="12" cy="12" r="10" />
+              <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+              <line x1="9" y1="9" x2="9.01" y2="9" />
+              <line x1="15" y1="9" x2="15.01" y2="9" />
+            </svg>
+            Add Reaction
+          </button>
+        </Show>
+
+        <div class="border-t border-border-primary my-1"></div>
+
         <button
           class="w-full px-3 py-1.5 text-left text-sm text-text-primary hover:bg-surface hover:bg-opacity-10 transition-colors flex items-center gap-2"
           onClick={() => {
-            navigator.clipboard.writeText(props.content || '');
+            navigator.clipboard.writeText(props.content || "");
           }}
         >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          <svg
+            class="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+            />
           </svg>
           Copy Text
         </button>
-        
+
         <Show when={props.onReply && props.id}>
           <button
             class="w-full px-3 py-1.5 text-left text-sm text-text-primary hover:bg-surface hover:bg-opacity-10 transition-colors flex items-center gap-2"
@@ -281,13 +378,23 @@ export function Message(props: MessageProps) {
               props.onReply?.(props.id!);
             }}
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6" />
+            <svg
+              class="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M3 10h10a8 8 0 018 8v2M3 10l6 6m-6-6l6-6"
+              />
             </svg>
             Reply
           </button>
         </Show>
-        
+
         <Show when={canEdit()}>
           <button
             class="w-full px-3 py-1.5 text-left text-sm text-text-primary hover:bg-surface hover:bg-opacity-10 transition-colors flex items-center gap-2"
@@ -295,13 +402,23 @@ export function Message(props: MessageProps) {
               handleEdit();
             }}
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+            <svg
+              class="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
+              />
             </svg>
             Edit
           </button>
         </Show>
-        
+
         <Show when={canDelete()}>
           <button
             class="w-full px-3 py-1.5 text-left text-sm text-red-400 hover:bg-red-500 hover:bg-opacity-10 transition-colors flex items-center gap-2"
@@ -309,50 +426,82 @@ export function Message(props: MessageProps) {
               setShowDeleteConfirm(true);
             }}
           >
-            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            <svg
+              class="w-4 h-4"
+              fill="none"
+              stroke="currentColor"
+              viewBox="0 0 24 24"
+            >
+              <path
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                stroke-width="2"
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
+              />
             </svg>
             Delete
           </button>
         </Show>
-        
+
         <div class="border-t border-border-primary my-1"></div>
-        
+
         <button
           class="w-full px-3 py-1.5 text-left text-sm text-text-secondary hover:text-text-primary hover:bg-surface hover:bg-opacity-10 transition-colors flex items-center gap-2"
           onClick={() => {
-            navigator.clipboard.writeText(props.id || '');
+            navigator.clipboard.writeText(props.id || "");
           }}
         >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          <svg
+            class="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"
+            />
           </svg>
           Copy Message ID
         </button>
-        
+
         <button
           class="w-full px-3 py-1.5 text-left text-sm text-text-secondary hover:text-text-primary hover:bg-surface hover:bg-opacity-10 transition-colors flex items-center gap-2"
           onClick={() => {
-            const currentRoom = rooms().find(r => r.id === props.room_id);
+            const currentRoom = rooms().find((r) => r.id === props.room_id);
             if (currentRoom) {
-              let link = '';
-              if (currentRoom.type === 0 || currentRoom.type === 1) { // PM or GROUP_PM
+              let link = "";
+              if (currentRoom.type === 0 || currentRoom.type === 1) {
+                // PM or GROUP_PM
                 link = `${window.location.origin}/rooms/${props.room_id}/${props.id}`;
-              } else { // Space rooms
+              } else {
+                // Space rooms
                 link = `${window.location.origin}/spaces/${currentRoom.space_id}/rooms/${props.room_id}/${props.id}`;
               }
               navigator.clipboard.writeText(link);
             }
           }}
         >
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" />
+          <svg
+            class="w-4 h-4"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              stroke-linecap="round"
+              stroke-linejoin="round"
+              stroke-width="2"
+              d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1"
+            />
           </svg>
           Copy Message Link
         </button>
       </div>
     );
-    
+
     openContextMenu(e, messageContextMenu);
   };
 
@@ -382,15 +531,17 @@ export function Message(props: MessageProps) {
       const { roomId } = e.detail;
       if (roomId) {
         // Navigate to the room
-        const room = rooms().find(r => r.id === roomId);
+        const room = rooms().find((r) => r.id === roomId);
         if (room) {
           // Check room type to determine the correct URL format
           // Space rooms (TEXT_ROOM, VOICE_ROOM, SPACE_SECTION) use /spaces/id/rooms/id
           // PM rooms (PM, GROUP_PM) use /rooms/id
-          if (room.type === 0 || room.type === 1) { // PM or GROUP_PM
+          if (room.type === 0 || room.type === 1) {
+            // PM or GROUP_PM
             // Use the router to navigate without page reload
             navigate(`/rooms/${roomId}`);
-          } else { // Space rooms
+          } else {
+            // Space rooms
             // Use the router to navigate without page reload
             navigate(`/spaces/${room.space_id}/rooms/${roomId}`);
           }
@@ -399,16 +550,27 @@ export function Message(props: MessageProps) {
     };
 
     // Add event listeners
-    document.addEventListener('openUserPopup', handleOpenUserPopup as EventListener);
-    document.addEventListener('navigateToRoom', handleNavigateToRoom as EventListener);
+    document.addEventListener(
+      "openUserPopup",
+      handleOpenUserPopup as EventListener,
+    );
+    document.addEventListener(
+      "navigateToRoom",
+      handleNavigateToRoom as EventListener,
+    );
 
     // Clean up event listeners
     onCleanup(() => {
-      document.removeEventListener('openUserPopup', handleOpenUserPopup as EventListener);
-      document.removeEventListener('navigateToRoom', handleNavigateToRoom as EventListener);
+      document.removeEventListener(
+        "openUserPopup",
+        handleOpenUserPopup as EventListener,
+      );
+      document.removeEventListener(
+        "navigateToRoom",
+        handleNavigateToRoom as EventListener,
+      );
     });
   });
-
 
   createEffect(() => {
     const updateReplyWidth = () => {
@@ -448,14 +610,14 @@ export function Message(props: MessageProps) {
   const isCurrentUserMentioned = createMemo(() => {
     const currentUser = user();
     if (!currentUser || !props.content) return false;
-    
+
     // Check for user mention format: <@user_id>
-    const userMentionRegex = new RegExp(`<@${currentUser.id}>`, 'g');
+    const userMentionRegex = new RegExp(`<@${currentUser.id}>`, "g");
     if (userMentionRegex.test(props.content)) return true;
-    
+
     // Check for @everyone mention
     if (/@everyone/.test(props.content)) return true;
-    
+
     return false;
   });
 
@@ -465,6 +627,8 @@ export function Message(props: MessageProps) {
         <div
           class={`flex flex-col ${shouldShowCompact ? "mt-1" : "mt-5"} group hover:bg-surface hover:bg-opacity-10 transition-colors px-4 w-full relative overflow-visible min-w-0 ${isCurrentUserMentioned() ? "bg-yellow-900/30 border-l-4 border-yellow-700 pl-3" : ""}`}
           onContextMenu={handleMessageContextMenu}
+          onMouseEnter={() => setIsHovered(true)}
+          onMouseLeave={() => setIsHovered(false)}
         >
           <MessageReplies
             refMessages={refMessages()}
@@ -483,7 +647,9 @@ export function Message(props: MessageProps) {
                 setShowDeleteConfirm(true);
               }
             }}
+            onAddReaction={handleAddReaction}
             messageId={props.id}
+            recentEmojis={getRecentEmojis()}
           />
 
           <UserPopupMenu
@@ -491,8 +657,8 @@ export function Message(props: MessageProps) {
             onClose={() => {
               setUserPopupOpen(false);
               // Remove the marker class from any elements
-              document.querySelectorAll('.user-popup-open').forEach(el => {
-                el.classList.remove('user-popup-open');
+              document.querySelectorAll(".user-popup-open").forEach((el) => {
+                el.classList.remove("user-popup-open");
               });
             }}
             triggerRef={userPopupTrigger()}
@@ -500,21 +666,28 @@ export function Message(props: MessageProps) {
             spaceId={currentSpaceId()}
             spaceMember={currentSpaceMember()}
           />
-          
+
           {/* Popup for mentioned users (not the message author) */}
           <UserPopupMenu
             isOpen={systemUserPopupOpen()}
             onClose={() => {
               setSystemUserPopupOpen(false);
               // Remove the marker class from any elements
-              document.querySelectorAll('.user-popup-open').forEach(el => {
-                el.classList.remove('user-popup-open');
+              document.querySelectorAll(".user-popup-open").forEach((el) => {
+                el.classList.remove("user-popup-open");
               });
             }}
             triggerRef={systemUserPopupTrigger()}
-            userId={systemSelectedUserId() || ''}
+            userId={systemSelectedUserId() || ""}
             spaceId={currentSpaceId()}
-            spaceMember={systemSelectedUserId() ? getSpaceMember(currentSpaceId() || '', systemSelectedUserId() || '') : undefined}
+            spaceMember={
+              systemSelectedUserId()
+                ? getSpaceMember(
+                    currentSpaceId() || "",
+                    systemSelectedUserId() || "",
+                  )
+                : undefined
+            }
           />
 
           <div
@@ -578,6 +751,13 @@ export function Message(props: MessageProps) {
                   />
                 </Show>
                 <InviteEmbeds inviteStates={inviteStates() || []} />
+                <MessageReactions
+                  reactions={currentMessage().reactions}
+                  messageId={props.id}
+                  roomId={props.room_id}
+                />
+
+                {/* Quick Reaction Bar on Hover */}
               </Show>
 
               <Show when={isEditing()}>

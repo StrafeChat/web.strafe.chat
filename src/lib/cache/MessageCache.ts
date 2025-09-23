@@ -1,4 +1,4 @@
-import { MessageType, SystemMessageType } from '../../types/messageTypes';
+import { MessageType, SystemMessageType } from "../../types/messageTypes";
 
 export interface CachedMessage {
   id?: string;
@@ -14,6 +14,13 @@ export interface CachedMessage {
   error?: string;
   deleted?: boolean;
   message_references?: string[];
+  reactions?: Record<
+    string,
+    {
+      count: number;
+      users: string[];
+    }
+  >;
   attachments?: Array<{
     id: string;
     name: string;
@@ -37,10 +44,13 @@ export interface CachedMessage {
 
 export class MessageCache {
   private messages: Map<string, Map<string, CachedMessage>> = new Map();
-  private messageUpdateCallbacks: ((roomId: string, message: CachedMessage) => void)[] = [];
+  private messageUpdateCallbacks: ((
+    roomId: string,
+    message: CachedMessage,
+  ) => void)[] = [];
   private deletedMessageIds: Map<string, Set<string>> = new Map(); // Track deleted message IDs by room
   private readonly MAX_MESSAGES_PER_ROOM = 200; // Increased to 200 to reduce message loss
-  private readonly DELETED_MESSAGES_STORAGE_KEY = 'sc_deleted_messages';
+  private readonly DELETED_MESSAGES_STORAGE_KEY = "sc_deleted_messages";
   // Track the oldest and newest message IDs for each room
   private oldestMessageIds: Map<string, string> = new Map();
   private newestMessageIds: Map<string, string> = new Map();
@@ -54,85 +64,95 @@ export class MessageCache {
     this.loadDeletedMessagesFromStorage();
   }
 
-  public setMessages(roomId: string, messages: CachedMessage[], position: 'newer' | 'older' | 'replace' = 'replace') {
+  public setMessages(
+    roomId: string,
+    messages: CachedMessage[],
+    position: "newer" | "older" | "replace" = "replace",
+  ) {
     if (!this.messages.has(roomId)) {
       this.messages.set(roomId, new Map());
     }
 
     const roomMessages = this.messages.get(roomId)!;
     const deletedIds = this.getDeletedMessageIds(roomId);
-    
+
     // First, clear any existing messages that are in the deleted list
-    Array.from(roomMessages.keys()).forEach(existingId => {
+    Array.from(roomMessages.keys()).forEach((existingId) => {
       if (deletedIds.has(existingId)) {
         roomMessages.delete(existingId);
       }
     });
-    
+
     // If this is a replacement, clear existing messages
-    if (position === 'replace') {
+    if (position === "replace") {
       roomMessages.clear();
       this.reachedBeginning.set(roomId, false);
       this.reachedEnd.set(roomId, false);
     }
-    
+
     // Sort messages by creation date to ensure correct order
     const sortedMessages = [...messages].sort((a, b) => {
       const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
       const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
       return dateA - dateB;
     });
-    
+
     // If we received fewer messages than requested, we've reached a boundary
     if (sortedMessages.length < 50) {
-      if (position === 'older') {
+      if (position === "older") {
         this.reachedBeginning.set(roomId, true);
-      } else if (position === 'newer') {
+      } else if (position === "newer") {
         this.reachedEnd.set(roomId, true);
       }
     }
-    
+
     // Update oldest/newest message IDs if applicable
     if (sortedMessages.length > 0) {
       const firstMessage = sortedMessages[0];
       const lastMessage = sortedMessages[sortedMessages.length - 1];
-      
-      if (position === 'older' || position === 'replace') {
-        const firstMessageId = firstMessage.id || '';
+
+      if (position === "older" || position === "replace") {
+        const firstMessageId = firstMessage.id || "";
         if (firstMessageId) {
           this.oldestMessageIds.set(roomId, firstMessageId);
         }
       }
-      
-      if (position === 'newer' || position === 'replace') {
-        const lastMessageId = lastMessage.id || '';
+
+      if (position === "newer" || position === "replace") {
+        const lastMessageId = lastMessage.id || "";
         if (lastMessageId) {
           this.newestMessageIds.set(roomId, lastMessageId);
         }
       }
     }
-    
-    sortedMessages.forEach(message => {
-      const messageId = message.id || message.nonce || '';
+
+    sortedMessages.forEach((message) => {
+      const messageId = message.id || message.nonce || "";
       // Only add messages that haven't been deleted
       if (messageId && !deletedIds.has(messageId)) {
         roomMessages.set(messageId, message);
       } else if (messageId && deletedIds.has(messageId)) {
-        console.log(`[MessageCache] Skipping deleted message in setMessages: ${messageId}`);
+        console.log(
+          `[MessageCache] Skipping deleted message in setMessages: ${messageId}`,
+        );
       }
     });
 
     // Trim messages if they exceed the limit (more conservative approach)
     const TRIM_THRESHOLD = this.MAX_MESSAGES_PER_ROOM + 50; // Allow some buffer before trimming
     const TRIM_TARGET = this.MAX_MESSAGES_PER_ROOM - 25; // Trim to 25 messages below the limit
-    
+
     if (roomMessages.size > TRIM_THRESHOLD) {
       // If we're adding older messages, remove newer ones
-      if (position === 'older') {
+      if (position === "older") {
         const messagesToDelete = Array.from(roomMessages.entries())
           .sort((a, b) => {
-            const dateA = a[1].created_at ? new Date(a[1].created_at).getTime() : 0;
-            const dateB = b[1].created_at ? new Date(b[1].created_at).getTime() : 0;
+            const dateA = a[1].created_at
+              ? new Date(a[1].created_at).getTime()
+              : 0;
+            const dateB = b[1].created_at
+              ? new Date(b[1].created_at).getTime()
+              : 0;
             return dateB - dateA; // Sort newest first
           })
           .slice(0, roomMessages.size - TRIM_TARGET);
@@ -141,19 +161,25 @@ export class MessageCache {
         // Otherwise remove older messages
         const messagesToDelete = Array.from(roomMessages.entries())
           .sort((a, b) => {
-            const dateA = a[1].created_at ? new Date(a[1].created_at).getTime() : 0;
-            const dateB = b[1].created_at ? new Date(b[1].created_at).getTime() : 0;
+            const dateA = a[1].created_at
+              ? new Date(a[1].created_at).getTime()
+              : 0;
+            const dateB = b[1].created_at
+              ? new Date(b[1].created_at).getTime()
+              : 0;
             return dateA - dateB; // Sort oldest first
           })
           .slice(0, roomMessages.size - TRIM_TARGET);
         messagesToDelete.forEach(([key]) => roomMessages.delete(key));
       }
     }
-    
+
     // Update the last fetch time for this room
     this.setLastFetchTime(roomId);
-    
-    console.log(`[MessageCache] Set ${sortedMessages.length} messages for room ${roomId} (position: ${position})`);
+
+    console.log(
+      `[MessageCache] Set ${sortedMessages.length} messages for room ${roomId} (position: ${position})`,
+    );
   }
 
   public getMessages(roomId: string): CachedMessage[] {
@@ -170,7 +196,10 @@ export class MessageCache {
     return roomMessages ? roomMessages.size : 0;
   }
 
-  public getMessage(roomId: string, messageId: string): CachedMessage | undefined {
+  public getMessage(
+    roomId: string,
+    messageId: string,
+  ): CachedMessage | undefined {
     return this.messages.get(roomId)?.get(messageId);
   }
 
@@ -180,41 +209,49 @@ export class MessageCache {
     }
 
     const roomMessages = this.messages.get(roomId)!;
-    
+
     // For temporary messages, always use nonce as the key
     // For confirmed messages, use ID as the key
-    const messageKey = message.id || message.nonce || '';
-    
+    const messageKey = message.id || message.nonce || "";
+
     // Check if this message has been deleted before
     const deletedIds = this.getDeletedMessageIds(roomId);
     if (messageKey && deletedIds.has(messageKey)) {
       console.log(`[MessageCache] Skipping deleted message: ${messageKey}`);
       return;
     }
-    
+
     // Check if we're trying to add a message that already exists with same nonce
     if (message.nonce) {
-      const existingByNonce = Array.from(roomMessages.values()).find(m => m.nonce === message.nonce);
+      const existingByNonce = Array.from(roomMessages.values()).find(
+        (m) => m.nonce === message.nonce,
+      );
       if (existingByNonce) {
-        console.log(`[MessageCache] Message with nonce ${message.nonce} already exists, updating instead`);
-        const existingKey = existingByNonce.id || existingByNonce.nonce || '';
+        console.log(
+          `[MessageCache] Message with nonce ${message.nonce} already exists, updating instead`,
+        );
+        const existingKey = existingByNonce.id || existingByNonce.nonce || "";
         this.updateMessage(roomId, existingKey, message);
         return;
       }
     }
-    
+
     // Check for existing message with same ID to prevent duplicates
     if (message.id && roomMessages.has(message.id)) {
-      console.log(`[MessageCache] Message with ID ${message.id} already exists, updating instead`);
+      console.log(
+        `[MessageCache] Message with ID ${message.id} already exists, updating instead`,
+      );
       this.updateMessage(roomId, message.id, message);
       return;
     }
-    
+
     roomMessages.set(messageKey, message);
-    console.log(`[MessageCache] Added message with key: ${messageKey}, nonce: ${message.nonce}, id: ${message.id}`);
+    console.log(
+      `[MessageCache] Added message with key: ${messageKey}, nonce: ${message.nonce}, id: ${message.id}`,
+    );
 
     // Notify callbacks of message update
-    this.messageUpdateCallbacks.forEach(callback => {
+    this.messageUpdateCallbacks.forEach((callback) => {
       callback(roomId, message);
     });
 
@@ -224,8 +261,12 @@ export class MessageCache {
       // Remove older messages to make room
       const messagesToDelete = Array.from(roomMessages.entries())
         .sort((a, b) => {
-          const dateA = a[1].created_at ? new Date(a[1].created_at).getTime() : 0;
-          const dateB = b[1].created_at ? new Date(b[1].created_at).getTime() : 0;
+          const dateA = a[1].created_at
+            ? new Date(a[1].created_at).getTime()
+            : 0;
+          const dateB = b[1].created_at
+            ? new Date(b[1].created_at).getTime()
+            : 0;
           return dateA - dateB; // Sort oldest first
         })
         .slice(0, 25); // Remove 25 oldest messages
@@ -233,29 +274,35 @@ export class MessageCache {
     }
   }
 
-  public updateMessage(roomId: string, messageKey: string, updates: Partial<CachedMessage>) {
+  public updateMessage(
+    roomId: string,
+    messageKey: string,
+    updates: Partial<CachedMessage>,
+  ) {
     const roomMessages = this.messages.get(roomId);
     if (!roomMessages) return;
 
     let existingMessage = roomMessages.get(messageKey);
     let actualKey = messageKey;
-    
+
     // If not found by key, try to find by nonce
     if (!existingMessage && updates.nonce) {
-      const foundEntry = Array.from(roomMessages.entries()).find(([_, msg]) => msg.nonce === updates.nonce);
+      const foundEntry = Array.from(roomMessages.entries()).find(
+        ([_, msg]) => msg.nonce === updates.nonce,
+      );
       if (foundEntry) {
         actualKey = foundEntry[0];
         existingMessage = foundEntry[1];
       }
     }
-    
+
     if (!existingMessage) {
       console.log(`[MessageCache] Message not found for update: ${messageKey}`);
       return;
     }
 
     const updatedMessage = { ...existingMessage, ...updates };
-    
+
     // Handle transition from temporary (nonce-keyed) to confirmed (ID-keyed) message
     if (updates.id && !existingMessage.id && existingMessage.nonce) {
       // This is a temporary message being confirmed with a real ID
@@ -263,7 +310,9 @@ export class MessageCache {
       roomMessages.delete(actualKey);
       // Add the updated message with the new ID key
       roomMessages.set(updates.id, updatedMessage);
-      console.log(`[MessageCache] Transitioned message from nonce ${existingMessage.nonce} to ID ${updates.id}`);
+      console.log(
+        `[MessageCache] Transitioned message from nonce ${existingMessage.nonce} to ID ${updates.id}`,
+      );
     } else {
       // Regular in-place update
       roomMessages.set(actualKey, updatedMessage);
@@ -271,7 +320,7 @@ export class MessageCache {
     }
 
     // Notify callbacks of message update
-    this.messageUpdateCallbacks.forEach(callback => {
+    this.messageUpdateCallbacks.forEach((callback) => {
       callback(roomId, updatedMessage);
     });
   }
@@ -285,14 +334,16 @@ export class MessageCache {
 
     // Remove from the messages map
     roomMessages.delete(messageId);
-    
+
     // Add to the deleted messages tracking
     this.addDeletedMessageId(roomId, messageId);
-    
-    console.log(`[MessageCache] Deleted message ${messageId} from room ${roomId} and added to deleted list`);
+
+    console.log(
+      `[MessageCache] Deleted message ${messageId} from room ${roomId} and added to deleted list`,
+    );
 
     // Notify callbacks of message deletion
-    this.messageUpdateCallbacks.forEach(callback => {
+    this.messageUpdateCallbacks.forEach((callback) => {
       callback(roomId, { ...existingMessage, deleted: true });
     });
   }
@@ -317,9 +368,15 @@ export class MessageCache {
       this.deletedMessageIds.forEach((ids, roomId) => {
         serializable[roomId] = Array.from(ids);
       });
-      localStorage.setItem(this.DELETED_MESSAGES_STORAGE_KEY, JSON.stringify(serializable));
+      localStorage.setItem(
+        this.DELETED_MESSAGES_STORAGE_KEY,
+        JSON.stringify(serializable),
+      );
     } catch (error) {
-      console.error('[MessageCache] Failed to save deleted messages to storage:', error);
+      console.error(
+        "[MessageCache] Failed to save deleted messages to storage:",
+        error,
+      );
     }
   }
 
@@ -332,19 +389,29 @@ export class MessageCache {
           const set = new Set(ids);
           this.deletedMessageIds.set(roomId, set);
         });
-        console.log('[MessageCache] Loaded deleted messages from storage:', this.deletedMessageIds);
+        console.log(
+          "[MessageCache] Loaded deleted messages from storage:",
+          this.deletedMessageIds,
+        );
       }
     } catch (error) {
-      console.error('[MessageCache] Failed to load deleted messages from storage:', error);
+      console.error(
+        "[MessageCache] Failed to load deleted messages from storage:",
+        error,
+      );
     }
   }
 
-  public onMessageUpdate(callback: (roomId: string, message: CachedMessage) => void) {
+  public onMessageUpdate(
+    callback: (roomId: string, message: CachedMessage) => void,
+  ) {
     this.messageUpdateCallbacks.push(callback);
     return callback; // Return the callback for easier removal
   }
 
-  public offMessageUpdate(callback: (roomId: string, message: CachedMessage) => void) {
+  public offMessageUpdate(
+    callback: (roomId: string, message: CachedMessage) => void,
+  ) {
     const index = this.messageUpdateCallbacks.indexOf(callback);
     if (index !== -1) {
       this.messageUpdateCallbacks.splice(index, 1);
@@ -352,7 +419,11 @@ export class MessageCache {
   }
 
   // Update message by nonce - convenience method for temporary messages
-  public updateMessageByNonce(roomId: string, nonce: string, updates: Partial<CachedMessage>) {
+  public updateMessageByNonce(
+    roomId: string,
+    nonce: string,
+    updates: Partial<CachedMessage>,
+  ) {
     const roomMessages = this.messages.get(roomId);
     if (!roomMessages) {
       console.log(`[MessageCache] Room ${roomId} not found for nonce update`);
@@ -362,7 +433,7 @@ export class MessageCache {
     // Find message by nonce
     let foundKey: string | null = null;
     let foundMessage: CachedMessage | null = null;
-    
+
     for (const [key, message] of roomMessages.entries()) {
       if (message.nonce === nonce) {
         foundKey = key;
@@ -370,14 +441,16 @@ export class MessageCache {
         break;
       }
     }
-    
+
     if (!foundKey || !foundMessage) {
-      console.log(`[MessageCache] Message with nonce ${nonce} not found for update`);
+      console.log(
+        `[MessageCache] Message with nonce ${nonce} not found for update`,
+      );
       return;
     }
-    
+
     const updatedMessage = { ...foundMessage, ...updates };
-    
+
     // Handle transition from temporary (nonce-keyed) to confirmed (ID-keyed) message
     if (updates.id && !foundMessage.id) {
       // This is a temporary message being confirmed with a real ID
@@ -385,15 +458,19 @@ export class MessageCache {
       roomMessages.delete(foundKey);
       // Add the updated message with the new ID key
       roomMessages.set(updates.id, updatedMessage);
-      console.log(`[MessageCache] updateMessageByNonce: Transitioned message from nonce ${nonce} (key: ${foundKey}) to ID ${updates.id}`);
+      console.log(
+        `[MessageCache] updateMessageByNonce: Transitioned message from nonce ${nonce} (key: ${foundKey}) to ID ${updates.id}`,
+      );
     } else {
       // Regular in-place update
       roomMessages.set(foundKey, updatedMessage);
-      console.log(`[MessageCache] updateMessageByNonce: Updated message in-place with key: ${foundKey}`);
+      console.log(
+        `[MessageCache] updateMessageByNonce: Updated message in-place with key: ${foundKey}`,
+      );
     }
 
     // Notify callbacks of message update
-    this.messageUpdateCallbacks.forEach(callback => {
+    this.messageUpdateCallbacks.forEach((callback) => {
       callback(roomId, updatedMessage);
     });
   }
@@ -423,18 +500,18 @@ export class MessageCache {
   public hasReachedEnd(roomId: string): boolean {
     return this.reachedEnd.get(roomId) || false;
   }
-  
+
   public getLastFetchTime(roomId: string): number | undefined {
     return this.lastFetchTimes.get(roomId);
   }
-  
+
   public setLastFetchTime(roomId: string): void {
     this.lastFetchTimes.set(roomId, Date.now());
   }
-  
+
   public clearMessages(roomId: string): void {
     if (!this.messages.has(roomId)) return;
-    
+
     console.log(`[MessageCache] Clearing all messages for room ${roomId}`);
     this.messages.get(roomId)?.clear();
     this.oldestMessageIds.delete(roomId);
@@ -449,12 +526,12 @@ export class MessageCache {
     this.reachedBeginning.set(roomId, false);
     this.reachedEnd.set(roomId, false);
   }
-  
+
   // Set if we've reached the beginning of message history
   public setHasReachedBeginning(roomId: string, reached: boolean): void {
     this.reachedBeginning.set(roomId, reached);
   }
-  
+
   // Set if we've reached the end of message history
   public setHasReachedEnd(roomId: string, reached: boolean): void {
     this.reachedEnd.set(roomId, reached);

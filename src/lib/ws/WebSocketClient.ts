@@ -1,6 +1,6 @@
-export type VoicePayloadType = 
-	| "VOICE_PARTICIPANT_JOIN"
-	| "VOICE_PARTICIPANT_LEAVE";
+export type VoicePayloadType =
+  | "VOICE_PARTICIPANT_JOIN"
+  | "VOICE_PARTICIPANT_LEAVE";
 
 export type PayloadType =
   | "IDENTIFY"
@@ -19,8 +19,8 @@ export type PayloadType =
   | "MESSAGE_DELETE"
   | "MESSAGE_EDIT"
   | "TYPING_START"
-	| "TYPING_INDICATOR"
-	| VoicePayloadType;
+  | "TYPING_INDICATOR"
+  | VoicePayloadType;
 
 export interface BasePayload {
   type: PayloadType;
@@ -103,8 +103,8 @@ export interface PresenceUpdatePayload extends BasePayload {
   custom_status: string;
 }
 export interface VoiceUpdatePayload extends BasePayload {
-	type: "VOICE_PARTICIPANT_JOIN" | "VOICE_PARTICIPANT_LEAVE";
-	data: VoiceUpdateData;
+  type: "VOICE_PARTICIPANT_JOIN" | "VOICE_PARTICIPANT_LEAVE";
+  data: VoiceUpdateData;
 }
 
 export type WSPayload =
@@ -139,15 +139,17 @@ const EVENT_TYPE_TO_OP_CODE: Record<string, string> = {
   MESSAGE_DELETE: "MESSAGE_DELETE",
   MESSAGE_EDIT: "MESSAGE_EDIT",
   TYPING_START: "TYPING_INDICATOR",
-  TYPING_INDICATOR: "TYPING_INDICATOR"
+  TYPING_INDICATOR: "TYPING_INDICATOR",
 };
 
 export class WebSocketClient {
   private worker?: SharedWorker | null;
-  private readonly messageHandlers: Map<string, (data: any) => void> = new Map();
+  private readonly messageHandlers: Map<string, (data: any) => void> =
+    new Map();
   private connectPromise: Promise<boolean> | null = null;
   private readyPromise: Promise<ReadyPayload> | null = null;
-  private readonly connectionStateCallbacks: ((connected: boolean) => void)[] = [];
+  private readonly connectionStateCallbacks: ((connected: boolean) => void)[] =
+    [];
   private connected = false;
   public cache: UserCache;
   private relationships: Record<string, any> = {};
@@ -184,11 +186,20 @@ export class WebSocketClient {
     this.onMessage("ROOM_DELETE", this.handleRoomDelete.bind(this));
     this.onMessage("ROOM_UPDATE", this.handleRoomUpdate.bind(this));
     this.onMessage("ROOM_MEMBER_ADD", this.handleRoomMemberAdd.bind(this));
-    this.onMessage("ROOM_MEMBER_REMOVE", this.handleRoomMemberRemove.bind(this));
+    this.onMessage(
+      "ROOM_MEMBER_REMOVE",
+      this.handleRoomMemberRemove.bind(this),
+    );
     this.onMessage("SPACE_CREATE", this.handleSpaceCreate.bind(this));
-    this.onMessage("SPACE_MEMBER_REMOVE", this.handleSpaceMemberRemove.bind(this));
+    this.onMessage(
+      "SPACE_MEMBER_REMOVE",
+      this.handleSpaceMemberRemove.bind(this),
+    );
     this.onMessage("SPACE_MEMBER_ADD", this.handleSpaceMemberAdd.bind(this));
-    this.onMessage("TYPING_INDICATOR", this.handleTypingIndicator.bind(this));    console.log("[WebSocket] Message handlers set up:", [...this.messageHandlers.entries()]);
+    this.onMessage("TYPING_INDICATOR", this.handleTypingIndicator.bind(this));
+    console.log("[WebSocket] Message handlers set up:", [
+      ...this.messageHandlers.entries(),
+    ]);
   }
 
   private setupReadyPromise(): void {
@@ -215,7 +226,9 @@ export class WebSocketClient {
   private setupSharedWorker(): void {
     // Create or join the coordination channel
     if (!WebSocketClient.workerChannel) {
-      WebSocketClient.workerChannel = new BroadcastChannel("strafe-websocket-worker");
+      WebSocketClient.workerChannel = new BroadcastChannel(
+        "strafe-websocket-worker",
+      );
     }
 
     // Try to get existing worker or create new one
@@ -226,7 +239,7 @@ export class WebSocketClient {
           {
             type: "module",
             name: "StrafeChat WebSocket Worker",
-          }
+          },
         );
 
         // Notify other tabs that we've created a worker
@@ -234,7 +247,7 @@ export class WebSocketClient {
       } catch (error) {
         console.warn(
           "Failed to create SharedWorker, falling back to direct WebSocket:",
-          error
+          error,
         );
         WebSocketClient.isSharedWorkerSupported = false;
         this.setupDirectConnection();
@@ -262,7 +275,9 @@ export class WebSocketClient {
   }
 
   private setupDirectConnection(): void {
-    console.log("[WebSocket] Using direct WebSocket connection (SharedWorker not supported)");
+    console.log(
+      "[WebSocket] Using direct WebSocket connection (SharedWorker not supported)",
+    );
 
     this.ws.onopen = () => {
       console.log("[WebSocket] Direct connection opened");
@@ -326,18 +341,21 @@ export class WebSocketClient {
     });
   }
 
- private handleTypingIndicator(data: any): void {
+  private handleTypingIndicator(data: any): void {
     console.log("[WebSocket] Handling typing indicator:", data);
     const typingData = data.data || data;
-    
+
     if (typingData.room_id && typingData.user_id) {
-      console.log("[WebSocket] Dispatching typing indicator event:", typingData);
-      
+      console.log(
+        "[WebSocket] Dispatching typing indicator event:",
+        typingData,
+      );
+
       // Dispatch event for UI updates
       this.dispatchEvent("typingIndicator", {
         roomId: typingData.room_id,
         userId: typingData.user_id,
-        createdAt: typingData.created_at || new Date().toISOString()
+        createdAt: typingData.created_at || new Date().toISOString(),
       });
     }
   }
@@ -397,9 +415,15 @@ export class WebSocketClient {
           break;
 
         case OpCodes.RELATIONSHIP_CREATE:
-          console.log("[WebSocket] Received RELATIONSHIP_CREATE raw data:", data);
+          console.log(
+            "[WebSocket] Received RELATIONSHIP_CREATE raw data:",
+            data,
+          );
           if (!data.d || !data.d.id) {
-            console.error("[WebSocket] Invalid relationship data received:", data);
+            console.error(
+              "[WebSocket] Invalid relationship data received:",
+              data,
+            );
             break;
           }
           const relationship = {
@@ -411,17 +435,27 @@ export class WebSocketClient {
             sender: data.d.sender || null,
             recipient: data.d.recipient || null,
           };
-          console.log("[WebSocket] Processing relationshipCreate:", relationship);
-          const relationshipCreateHandler = this.messageHandlers.get("relationshipCreate");
+          console.log(
+            "[WebSocket] Processing relationshipCreate:",
+            relationship,
+          );
+          const relationshipCreateHandler =
+            this.messageHandlers.get("relationshipCreate");
           if (relationshipCreateHandler) {
             relationshipCreateHandler(relationship);
           }
           break;
 
         case OpCodes.RELATIONSHIP_UPDATE:
-          console.log("[WebSocket] Received RELATIONSHIP_UPDATE raw data:", data);
+          console.log(
+            "[WebSocket] Received RELATIONSHIP_UPDATE raw data:",
+            data,
+          );
           if (!data.d || !data.d.id) {
-            console.error("[WebSocket] Invalid relationship update data received:", data);
+            console.error(
+              "[WebSocket] Invalid relationship update data received:",
+              data,
+            );
             break;
           }
           const updatedRelationship = {
@@ -433,17 +467,27 @@ export class WebSocketClient {
             sender: data.d.sender || null,
             recipient: data.d.recipient || null,
           };
-          console.log("[WebSocket] Processing relationshipUpdate:", updatedRelationship);
-          const relationshipUpdateHandler = this.messageHandlers.get("relationshipUpdate");
+          console.log(
+            "[WebSocket] Processing relationshipUpdate:",
+            updatedRelationship,
+          );
+          const relationshipUpdateHandler =
+            this.messageHandlers.get("relationshipUpdate");
           if (relationshipUpdateHandler) {
             relationshipUpdateHandler(updatedRelationship);
           }
           break;
 
         case OpCodes.RELATIONSHIP_ACCEPT:
-          console.log("[WebSocket] Received RELATIONSHIP_ACCEPT raw data:", data);
+          console.log(
+            "[WebSocket] Received RELATIONSHIP_ACCEPT raw data:",
+            data,
+          );
           if (!data.d || !data.d.id) {
-            console.error("[WebSocket] Invalid relationship accept data received:", data);
+            console.error(
+              "[WebSocket] Invalid relationship accept data received:",
+              data,
+            );
             break;
           }
           const acceptedRelationship = {
@@ -455,17 +499,27 @@ export class WebSocketClient {
             sender: data.d.sender || null,
             recipient: data.d.recipient || null,
           };
-          console.log("[WebSocket] Processing relationshipAccept:", acceptedRelationship);
-          const relationshipAcceptHandler = this.messageHandlers.get("relationshipAccept");
+          console.log(
+            "[WebSocket] Processing relationshipAccept:",
+            acceptedRelationship,
+          );
+          const relationshipAcceptHandler =
+            this.messageHandlers.get("relationshipAccept");
           if (relationshipAcceptHandler) {
             relationshipAcceptHandler(acceptedRelationship);
           }
           break;
 
         case OpCodes.RELATIONSHIP_DELETE:
-          console.log("[WebSocket] Received RELATIONSHIP_DELETE raw data:", data);
+          console.log(
+            "[WebSocket] Received RELATIONSHIP_DELETE raw data:",
+            data,
+          );
           if (!data.d || !data.d.id) {
-            console.error("[WebSocket] Invalid relationship delete data received:", data);
+            console.error(
+              "[WebSocket] Invalid relationship delete data received:",
+              data,
+            );
             break;
           }
           const deletedRelationship = {
@@ -477,8 +531,12 @@ export class WebSocketClient {
             sender: data.d.sender || null,
             recipient: data.d.recipient || null,
           };
-          console.log("[WebSocket] Processing relationshipDelete:", deletedRelationship);
-          const relationshipDeleteHandler = this.messageHandlers.get("relationshipDelete");
+          console.log(
+            "[WebSocket] Processing relationshipDelete:",
+            deletedRelationship,
+          );
+          const relationshipDeleteHandler =
+            this.messageHandlers.get("relationshipDelete");
           if (relationshipDeleteHandler) {
             relationshipDeleteHandler(deletedRelationship);
           }
@@ -487,22 +545,40 @@ export class WebSocketClient {
         case OpCodes.MESSAGE:
           console.log("[WebSocket] Received MESSAGE:", data.d);
           // Check if this is a message with the new nested data structure
-          if (data.d && (data.d.type === "MESSAGE_CREATE" || data.d.event_type === "MESSAGE_CREATE") && data.d.data) {
-            console.log("[WebSocket] Routing message_create to MESSAGE_CREATE handler");
-            const messageCreateHandler = this.messageHandlers.get("MESSAGE_CREATE");
+          if (
+            data.d &&
+            (data.d.type === "MESSAGE_CREATE" ||
+              data.d.event_type === "MESSAGE_CREATE") &&
+            data.d.data
+          ) {
+            console.log(
+              "[WebSocket] Routing message_create to MESSAGE_CREATE handler",
+            );
+            const messageCreateHandler =
+              this.messageHandlers.get("MESSAGE_CREATE");
             if (messageCreateHandler) {
               messageCreateHandler({
                 type: "MESSAGE_CREATE",
-                data: data.d.data
+                data: data.d.data,
               });
             }
-          } else if (data.d && (data.d.type === "MESSAGE_DELETE" || data.d.event_type === "MESSAGE_DELETE") && data.d.data) {
+          } else if (
+            data.d &&
+            (data.d.type === "MESSAGE_DELETE" ||
+              data.d.event_type === "MESSAGE_DELETE") &&
+            data.d.data
+          ) {
             console.log("[WebSocket] Handling message delete:", data.d);
             this.handleMessageDelete({
               room_id: data.d.data.room_id,
-              message_id: data.d.data.id
+              message_id: data.d.data.id,
             });
-          } else if (data.d && (data.d.type === "MESSAGE_EDIT" || data.d.event_type === "MESSAGE_EDIT") && data.d.data) {
+          } else if (
+            data.d &&
+            (data.d.type === "MESSAGE_EDIT" ||
+              data.d.event_type === "MESSAGE_EDIT") &&
+            data.d.data
+          ) {
             console.log("[WebSocket] Handling message edit:", data.d);
             const messageEditHandler = this.messageHandlers.get("MESSAGE_EDIT");
             if (messageEditHandler) {
@@ -511,7 +587,7 @@ export class WebSocketClient {
                 message_id: data.d.data.id,
                 content: data.d.data.content,
                 edited_at: data.d.data.edited_at,
-                author_id: data.d.data.author_id
+                author_id: data.d.data.author_id,
               });
             }
           } else {
@@ -534,60 +610,152 @@ export class WebSocketClient {
               ports: [],
             });
             this.handleDirectMessage(messageEvent);
-          } 
+          }
           // Handle room creation events with nested data structure
-          else if (data.d && (data.d.type === "ROOM_CREATE" || data.d.event_type === "ROOM_CREATE") && data.d.data) {
+          else if (
+            data.d &&
+            (data.d.type === "ROOM_CREATE" ||
+              data.d.event_type === "ROOM_CREATE") &&
+            data.d.data
+          ) {
             this.handleRoomCreate(data.d);
           }
           // Handle room update events
-          else if (data.d && (data.d.type === "ROOM_UPDATE" || data.d.event_type === "ROOM_UPDATE") && data.d.data) {
+          else if (
+            data.d &&
+            (data.d.type === "ROOM_UPDATE" ||
+              data.d.event_type === "ROOM_UPDATE") &&
+            data.d.data
+          ) {
             this.handleRoomUpdate(data.d);
           }
           // Handle room delete events
-          else if (data.d && (data.d.type === "ROOM_DELETE" || data.d.event_type === "ROOM_DELETE") && data.d.data) {
+          else if (
+            data.d &&
+            (data.d.type === "ROOM_DELETE" ||
+              data.d.event_type === "ROOM_DELETE") &&
+            data.d.data
+          ) {
             this.handleRoomDelete(data.d);
           }
           // Handle room member add events
-          else if (data.d && (data.d.type === "ROOM_MEMBER_ADD" || data.d.event_type === "ROOM_MEMBER_ADD") && data.d.data) {
+          else if (
+            data.d &&
+            (data.d.type === "ROOM_MEMBER_ADD" ||
+              data.d.event_type === "ROOM_MEMBER_ADD") &&
+            data.d.data
+          ) {
             this.handleRoomMemberAdd(data.d);
           }
           // Handle room member remove events
-          else if (data.d && (data.d.type === "ROOM_MEMBER_REMOVE" || data.d.event_type === "ROOM_MEMBER_REMOVE") && data.d.data) {
+          else if (
+            data.d &&
+            (data.d.type === "ROOM_MEMBER_REMOVE" ||
+              data.d.event_type === "ROOM_MEMBER_REMOVE") &&
+            data.d.data
+          ) {
             this.handleRoomMemberRemove(data.d);
           }
           // Handle space creation events
-          else if (data.d && (data.d.type === "SPACE_CREATE" || data.d.event_type === "SPACE_CREATE") && data.d.data) {
+          else if (
+            data.d &&
+            (data.d.type === "SPACE_CREATE" ||
+              data.d.event_type === "SPACE_CREATE") &&
+            data.d.data
+          ) {
             this.handleSpaceCreate(data.d);
           }
           // Handle room ownership transfer events
-          else if (data.d && (data.d.type === "ROOM_OWNERSHIP_TRANSFER" || data.d.event_type === "ROOM_OWNERSHIP_TRANSFER") && data.d.data) {
-            const roomOwnershipHandler = this.messageHandlers.get("ROOM_OWNERSHIP_TRANSFER");
+          else if (
+            data.d &&
+            (data.d.type === "ROOM_OWNERSHIP_TRANSFER" ||
+              data.d.event_type === "ROOM_OWNERSHIP_TRANSFER") &&
+            data.d.data
+          ) {
+            const roomOwnershipHandler = this.messageHandlers.get(
+              "ROOM_OWNERSHIP_TRANSFER",
+            );
             if (roomOwnershipHandler) {
-              console.log("[WebSocket] Routing roomOwnershipTransfer to ROOM_OWNERSHIP_TRANSFER handler");
+              console.log(
+                "[WebSocket] Routing roomOwnershipTransfer to ROOM_OWNERSHIP_TRANSFER handler",
+              );
               roomOwnershipHandler(data.d);
             }
           }
           // Handle room icon change events
-          else if (data.d && (data.d.type === "ROOM_ICON_CHANGED" || data.d.event_type === "ROOM_ICON_CHANGED") && data.d.data) {
+          else if (
+            data.d &&
+            (data.d.type === "ROOM_ICON_CHANGED" ||
+              data.d.event_type === "ROOM_ICON_CHANGED") &&
+            data.d.data
+          ) {
             this.handleRoomUpdate(data.d);
           }
           // Handle typing indicator events
-          else if (data.d && (data.d.type === "TYPING_INDICATOR" || data.d.event_type === "TYPING_INDICATOR") && data.d.data) {
+          else if (
+            data.d &&
+            (data.d.type === "TYPING_INDICATOR" ||
+              data.d.event_type === "TYPING_INDICATOR") &&
+            data.d.data
+          ) {
             this.handleTypingIndicator(data.d.data);
           }
+          // Handle reaction events
+          else if (
+            data.d &&
+            (data.d.type === "ROOM_REACTION_ADD" ||
+              data.d.event_type === "ROOM_REACTION_ADD" ||
+              data.d.type === "REACTION_ADD" ||
+              data.d.event_type === "REACTION_ADD") &&
+            data.d.data
+          ) {
+            console.log("[WebSocket] Handling reaction add event:", data.d);
+            const reactionAddHandler =
+              this.messageHandlers.get("ROOM_REACTION_ADD") ||
+              this.messageHandlers.get("REACTION_ADD");
+            if (reactionAddHandler) {
+              reactionAddHandler(data.d.data);
+            } else {
+              console.warn("[WebSocket] No reaction add handler registered");
+            }
+          }
+          // Handle reaction remove events
+          else if (
+            data.d &&
+            (data.d.type === "ROOM_REACTION_REMOVE" ||
+              data.d.event_type === "ROOM_REACTION_REMOVE" ||
+              data.d.type === "REACTION_REMOVE" ||
+              data.d.event_type === "REACTION_REMOVE") &&
+            data.d.data
+          ) {
+            console.log("[WebSocket] Handling reaction remove event:", data.d);
+            const reactionRemoveHandler =
+              this.messageHandlers.get("ROOM_REACTION_REMOVE") ||
+              this.messageHandlers.get("REACTION_REMOVE");
+            if (reactionRemoveHandler) {
+              reactionRemoveHandler(data.d.data);
+            } else {
+              console.warn("[WebSocket] No reaction remove handler registered");
+            }
+          }
           // Handle space member role update events
-          else if (data.d && (data.d.type === "SPACE_MEMBER_ROLE_UPDATE" || data.d.event_type === "SPACE_MEMBER_ROLE_UPDATE") && data.d.data) {
-            const handler = this.messageHandlers.get("SPACE_MEMBER_ROLE_UPDATE");
+          else if (
+            data.d &&
+            (data.d.type === "SPACE_MEMBER_ROLE_UPDATE" ||
+              data.d.event_type === "SPACE_MEMBER_ROLE_UPDATE") &&
+            data.d.data
+          ) {
+            const handler = this.messageHandlers.get(
+              "SPACE_MEMBER_ROLE_UPDATE",
+            );
             if (handler) {
               handler(data.d);
             }
-          }
-					else if (data.d && data.d.type.startsWith("VOICE_")) {
-						console.log("VOICE UPDATE: ", data.d);
-						this.handleVoiceUpdate(data.d);
-						this.dispatchEvent(data.d.type as VoicePayloadType, data.d);
-					}
-          else {
+          } else if (data.d && data.d.type.startsWith("VOICE_")) {
+            console.log("VOICE UPDATE: ", data.d);
+            this.handleVoiceUpdate(data.d);
+            this.dispatchEvent(data.d.type as VoicePayloadType, data.d);
+          } else {
             const handler = this.messageHandlers.get("DISPATCH");
             if (handler) {
               handler(data.d);
@@ -598,7 +766,10 @@ export class WebSocketClient {
         case OpCodes.PRESENCE_UPDATE:
           console.log("[WebSocket] Received PRESENCE_UPDATE raw data:", data);
           if (!data.d || !data.d.user_id) {
-            console.error("[WebSocket] Invalid presence update data received:", data);
+            console.error(
+              "[WebSocket] Invalid presence update data received:",
+              data,
+            );
             break;
           }
           const presenceUpdate = {
@@ -607,12 +778,15 @@ export class WebSocketClient {
             status: data.d.status || "Offline",
             custom_status: data.d.custom_status || "",
           };
-          console.log("[WebSocket] Processing presence update:", presenceUpdate);
+          console.log(
+            "[WebSocket] Processing presence update:",
+            presenceUpdate,
+          );
           await this.handlePresenceUpdate({
             type: "PRESENCE_UPDATE",
             user_id: presenceUpdate.user_id,
             status: presenceUpdate.status,
-            custom_status: presenceUpdate.custom_status
+            custom_status: presenceUpdate.custom_status,
           } as PresenceUpdatePayload).catch((error: any) => {
             console.error("[WebSocket] Error handling presence update:", error);
           });
@@ -631,11 +805,22 @@ export class WebSocketClient {
     // Custom JSON parser that preserves large integers as strings
     return JSON.parse(jsonString, (key, value) => {
       // Convert large integers to strings to preserve precision
-      if (typeof value === 'number' && Number.isInteger(value) && Math.abs(value) > Number.MAX_SAFE_INTEGER) {
+      if (
+        typeof value === "number" &&
+        Number.isInteger(value) &&
+        Math.abs(value) > Number.MAX_SAFE_INTEGER
+      ) {
         return value.toString();
       }
       // Also handle specific ID fields that should always be strings
-      if ((key === 'space_id' || key === 'id' || key === 'user_id' || key === 'room_id' || key === 'parent_id') && typeof value === 'number') {
+      if (
+        (key === "space_id" ||
+          key === "id" ||
+          key === "user_id" ||
+          key === "room_id" ||
+          key === "parent_id") &&
+        typeof value === "number"
+      ) {
         return value.toString();
       }
       return value;
@@ -645,13 +830,17 @@ export class WebSocketClient {
   private async decodeMessage(data: any): Promise<any> {
     // For binary MessagePack data
     if (data instanceof ArrayBuffer || data instanceof Uint8Array) {
-      const uint8Array = data instanceof ArrayBuffer ? new Uint8Array(data) : data;
+      const uint8Array =
+        data instanceof ArrayBuffer ? new Uint8Array(data) : data;
       try {
         const decoded = decode(uint8Array);
         console.log("[WebSocket] Decoded MessagePack data:", decoded);
         return decoded;
       } catch (msgpackError) {
-        console.error("[WebSocket] Failed to decode MessagePack:", msgpackError);
+        console.error(
+          "[WebSocket] Failed to decode MessagePack:",
+          msgpackError,
+        );
         return null;
       }
     }
@@ -699,28 +888,47 @@ export class WebSocketClient {
 
   private handleWorkerMessage(event: MessageEvent): void {
     const { type, payload } = event.data;
-    console.log("[WebSocket] Received worker message with type:", type, "and payload:", payload);
+    console.log(
+      "[WebSocket] Received worker message with type:",
+      type,
+      "and payload:",
+      payload,
+    );
 
     switch (type) {
       case "message":
       case "dispatch":
-        console.log("[WebSocket] Processing dispatch/message with payload.type:", payload?.type);
+        console.log(
+          "[WebSocket] Processing dispatch/message with payload.type:",
+          payload?.type,
+        );
         // Handle presence updates specifically
         if (payload.type === "presenceUpdate") {
-          console.log("[WebSocket] Handling presence update from worker:", payload);
+          console.log(
+            "[WebSocket] Handling presence update from worker:",
+            payload,
+          );
           this.handlePresenceUpdate({
             type: "PRESENCE_UPDATE",
             user_id: payload.user_id,
             status: payload.status,
-            custom_status: payload.custom_status
+            custom_status: payload.custom_status,
           }).catch((error: any) => {
-            console.error("[WebSocket] Error handling presence update from worker:", error);
+            console.error(
+              "[WebSocket] Error handling presence update from worker:",
+              error,
+            );
           });
         } else if (payload.type === "spaceUpdate") {
-          console.log("[WebSocket] Handling space update from worker:", payload);
+          console.log(
+            "[WebSocket] Handling space update from worker:",
+            payload,
+          );
           const spaceUpdateHandler = this.messageHandlers.get("SPACE_UPDATE");
           if (spaceUpdateHandler) {
-            console.log("[WebSocket] Routing spaceUpdate to SPACE_UPDATE handler");
+            console.log(
+              "[WebSocket] Routing spaceUpdate to SPACE_UPDATE handler",
+            );
             spaceUpdateHandler(payload);
           } else {
             console.warn("[WebSocket] No SPACE_UPDATE handler registered");
@@ -728,26 +936,36 @@ export class WebSocketClient {
           // Also call the internal handler for custom events
           this.handleSpaceUpdate(payload);
         } else if (payload.type.startsWith("VOICE_")) {
-					console.log("VOICE UPDATE: ", payload);
-					this.handleVoiceUpdate(payload);
-					this.dispatchEvent(payload.type as VoicePayloadType, payload.data);
-				 } else {
+          console.log("VOICE UPDATE: ", payload);
+          this.handleVoiceUpdate(payload);
+          this.dispatchEvent(payload.type as VoicePayloadType, payload.data);
+        } else {
           const handler = this.messageHandlers.get(payload.type);
           if (handler) {
             handler(payload);
           } else {
-            console.warn("[WebSocket] No handler for message type:", payload.type);
+            console.warn(
+              "[WebSocket] No handler for message type:",
+              payload.type,
+            );
           }
         }
         break;
 
       case "message_create":
         // Route message_create events to MESSAGE_CREATE handler registered by AuthProvider
-        console.log("[WebSocket] Received message_create event with payload:", payload);
+        console.log(
+          "[WebSocket] Received message_create event with payload:",
+          payload,
+        );
         const messageCreateHandler = this.messageHandlers.get("MESSAGE_CREATE");
-        console.log("[WebSocket] Available handlers:", [...this.messageHandlers.keys()]);
+        console.log("[WebSocket] Available handlers:", [
+          ...this.messageHandlers.keys(),
+        ]);
         if (messageCreateHandler) {
-          console.log("[WebSocket] Routing message_create to MESSAGE_CREATE handler");
+          console.log(
+            "[WebSocket] Routing message_create to MESSAGE_CREATE handler",
+          );
           messageCreateHandler(payload);
         } else {
           console.warn("[WebSocket] No MESSAGE_CREATE handler registered");
@@ -763,14 +981,66 @@ export class WebSocketClient {
         // Route message_edit events to MESSAGE_EDIT handler registered by AuthProvider
         const messageEditHandler = this.messageHandlers.get("MESSAGE_EDIT");
         if (messageEditHandler) {
-          console.log("[WebSocket] Routing message_edit to MESSAGE_EDIT handler");
+          console.log(
+            "[WebSocket] Routing message_edit to MESSAGE_EDIT handler",
+          );
           messageEditHandler(payload);
         } else {
           console.warn("[WebSocket] No MESSAGE_EDIT handler registered");
         }
         break;
-       
-        case "typing_indicator":
+
+      case "ROOM_REACTION_ADD":
+        // Route reaction add events to ROOM_REACTION_ADD handler registered by AuthProvider
+        const reactionAddHandler =
+          this.messageHandlers.get("ROOM_REACTION_ADD");
+        if (reactionAddHandler) {
+          console.log("[WebSocket] Routing ROOM_REACTION_ADD to handler");
+          reactionAddHandler(payload);
+        } else {
+          console.warn("[WebSocket] No ROOM_REACTION_ADD handler registered");
+        }
+        break;
+
+      case "ROOM_REACTION_REMOVE":
+        // Route reaction remove events to ROOM_REACTION_REMOVE handler registered by AuthProvider
+        const reactionRemoveHandler = this.messageHandlers.get(
+          "ROOM_REACTION_REMOVE",
+        );
+        if (reactionRemoveHandler) {
+          console.log("[WebSocket] Routing ROOM_REACTION_REMOVE to handler");
+          reactionRemoveHandler(payload);
+        } else {
+          console.warn(
+            "[WebSocket] No ROOM_REACTION_REMOVE handler registered",
+          );
+        }
+        break;
+
+      case "REACTION_ADD":
+        // Route reaction add events to REACTION_ADD handler registered by AuthProvider
+        const reactionAddHandler2 = this.messageHandlers.get("REACTION_ADD");
+        if (reactionAddHandler2) {
+          console.log("[WebSocket] Routing REACTION_ADD to handler");
+          reactionAddHandler2(payload);
+        } else {
+          console.warn("[WebSocket] No REACTION_ADD handler registered");
+        }
+        break;
+
+      case "REACTION_REMOVE":
+        // Route reaction remove events to REACTION_REMOVE handler registered by AuthProvider
+        const reactionRemoveHandler2 =
+          this.messageHandlers.get("REACTION_REMOVE");
+        if (reactionRemoveHandler2) {
+          console.log("[WebSocket] Routing REACTION_REMOVE to handler");
+          reactionRemoveHandler2(payload);
+        } else {
+          console.warn("[WebSocket] No REACTION_REMOVE handler registered");
+        }
+        break;
+
+      case "typing_indicator":
         // Directly call the typing indicator handler
         this.handleTypingIndicator(payload);
         break;
@@ -780,10 +1050,9 @@ export class WebSocketClient {
       case "relationshipAccept":
       case "relationshipDelete":
         const relationshipHandler = this.messageHandlers.get(type);
-        if (relationshipHandler)
-          relationshipHandler(payload);
+        if (relationshipHandler) relationshipHandler(payload);
         break;
-      
+
       case "roomCreate":
         this.handleRoomCreate(payload);
         break;
@@ -806,12 +1075,18 @@ export class WebSocketClient {
 
       case "roomOwnershipTransfer":
         // Call the registered ROOM_OWNERSHIP_TRANSFER handler directly
-        const roomOwnershipHandler = this.messageHandlers.get("ROOM_OWNERSHIP_TRANSFER");
+        const roomOwnershipHandler = this.messageHandlers.get(
+          "ROOM_OWNERSHIP_TRANSFER",
+        );
         if (roomOwnershipHandler) {
-          console.log("[WebSocket] Routing roomOwnershipTransfer to ROOM_OWNERSHIP_TRANSFER handler");
+          console.log(
+            "[WebSocket] Routing roomOwnershipTransfer to ROOM_OWNERSHIP_TRANSFER handler",
+          );
           roomOwnershipHandler(payload);
         } else {
-          console.warn("[WebSocket] No ROOM_OWNERSHIP_TRANSFER handler registered");
+          console.warn(
+            "[WebSocket] No ROOM_OWNERSHIP_TRANSFER handler registered",
+          );
         }
         break;
 
@@ -819,7 +1094,9 @@ export class WebSocketClient {
         // Call the registered SPACE_CREATE handler directly
         const spaceCreateHandler = this.messageHandlers.get("SPACE_CREATE");
         if (spaceCreateHandler) {
-          console.log("[WebSocket] Routing spaceCreate to SPACE_CREATE handler");
+          console.log(
+            "[WebSocket] Routing spaceCreate to SPACE_CREATE handler",
+          );
           spaceCreateHandler(payload);
         } else {
           console.warn("[WebSocket] No SPACE_CREATE handler registered");
@@ -830,7 +1107,9 @@ export class WebSocketClient {
         // Call the registered SPACE_UPDATE handler directly
         const spaceUpdateHandler = this.messageHandlers.get("SPACE_UPDATE");
         if (spaceUpdateHandler) {
-          console.log("[WebSocket] Routing spaceUpdate to SPACE_UPDATE handler");
+          console.log(
+            "[WebSocket] Routing spaceUpdate to SPACE_UPDATE handler",
+          );
           spaceUpdateHandler(payload);
         } else {
           console.warn("[WebSocket] No SPACE_UPDATE handler registered");
@@ -875,9 +1154,9 @@ export class WebSocketClient {
         parent_id: roomData.parent_id || null,
         created_at: roomData.created_at || new Date().toISOString(),
         updated_at: roomData.updated_at || null,
-        space_id: roomData.space_id || null
+        space_id: roomData.space_id || null,
       });
-      
+
       // Also call the message handler directly to ensure it's processed
       const roomCreateHandler = this.messageHandlers.get("ROOM_CREATE");
       if (roomCreateHandler) {
@@ -929,9 +1208,13 @@ export class WebSocketClient {
     console.log("[WebSocket] Handling room member remove:", data);
     const roomData = data.data || data;
     if (roomData.room_id && roomData.user_id) {
-      console.log("[WebSocket] Dispatching room member remove event:", roomData);
+      console.log(
+        "[WebSocket] Dispatching room member remove event:",
+        roomData,
+      );
       // Call the registered ROOM_MEMBER_REMOVE handler directly
-      const roomMemberRemoveHandler = this.messageHandlers.get("ROOM_MEMBER_REMOVE");
+      const roomMemberRemoveHandler =
+        this.messageHandlers.get("ROOM_MEMBER_REMOVE");
       if (roomMemberRemoveHandler) {
         roomMemberRemoveHandler(roomData);
       }
@@ -943,7 +1226,7 @@ export class WebSocketClient {
     const spaceData = data.data || data;
     if (spaceData.id) {
       console.log("[WebSocket] Dispatching space create event:", spaceData);
-      
+
       // Dispatch spaceCreate event for the cache provider
       this.dispatchEvent("spaceCreate", {
         id: spaceData.id,
@@ -954,7 +1237,8 @@ export class WebSocketClient {
         banner: spaceData.banner || null,
         owner_id: spaceData.owner_id || "",
         verification_level: spaceData.verification_level || 0,
-        default_message_notifications: spaceData.default_message_notifications || 0,
+        default_message_notifications:
+          spaceData.default_message_notifications || 0,
         explicit_content_filter: spaceData.explicit_content_filter || 0,
         features: spaceData.features || [],
         afk_room_id: spaceData.afk_room_id || null,
@@ -970,12 +1254,14 @@ export class WebSocketClient {
         max_video_room_users: spaceData.max_video_room_users || null,
         nsfw_level: spaceData.nsfw_level || 0,
         created_at: spaceData.created_at || new Date().toISOString(),
-        updated_at: spaceData.updated_at || new Date().toISOString()
+        updated_at: spaceData.updated_at || new Date().toISOString(),
       });
-      
+
       // Cache rooms if they exist in the space creation event
       if (spaceData.rooms && Array.isArray(spaceData.rooms)) {
-        console.log(`[WebSocket] Caching ${spaceData.rooms.length} rooms for space ${spaceData.id}`);
+        console.log(
+          `[WebSocket] Caching ${spaceData.rooms.length} rooms for space ${spaceData.id}`,
+        );
         spaceData.rooms.forEach((room: any) => {
           this.dispatchEvent("roomCreate", {
             id: room.id,
@@ -987,14 +1273,16 @@ export class WebSocketClient {
             name: room.name,
             topic: room.topic,
             created_at: room.created_at,
-            updated_at: room.updated_at
+            updated_at: room.updated_at,
           });
         });
       }
-      
+
       // Cache members if they exist in the space creation event
       if (spaceData.members && Array.isArray(spaceData.members)) {
-        console.log(`[WebSocket] Caching ${spaceData.members.length} members for space ${spaceData.id}`);
+        console.log(
+          `[WebSocket] Caching ${spaceData.members.length} members for space ${spaceData.id}`,
+        );
         this.dispatchEvent("spaceMembersCache", {
           spaceId: spaceData.id,
           members: spaceData.members.map((member: any) => ({
@@ -1004,11 +1292,11 @@ export class WebSocketClient {
             deaf: member.deaf || false,
             mute: member.mute || false,
             flags: member.flags || 0,
-            pending: member.pending || false
-          }))
+            pending: member.pending || false,
+          })),
         });
       }
-      
+
       // Also call the message handler directly to ensure it's processed
       const spaceCreateHandler = this.messageHandlers.get("SPACE_CREATE");
       if (spaceCreateHandler) {
@@ -1022,13 +1310,13 @@ export class WebSocketClient {
     const spaceData = data.data || data;
     if (spaceData && data.space_id) {
       console.log("[WebSocket] Dispatching space update event:", spaceData);
-      
+
       // Create the updated space object with the changes
       const updatedSpace = {
         id: data.space_id,
-        ...spaceData
+        ...spaceData,
       };
-      
+
       // Dispatch spaceUpdate event for the cache provider
       this.dispatchEvent("spaceUpdate", updatedSpace);
     }
@@ -1038,13 +1326,16 @@ export class WebSocketClient {
     console.log("[WebSocket] Handling space member remove:", data);
     const memberData = data.data || data;
     if (memberData.space_id && memberData.user_id) {
-      console.log("[WebSocket] Dispatching space member remove event:", memberData);
-      
+      console.log(
+        "[WebSocket] Dispatching space member remove event:",
+        memberData,
+      );
+
       // Dispatch event for cache updates
       this.dispatchEvent("spaceMemberRemove", {
         spaceId: memberData.space_id,
         userId: memberData.user_id,
-        removedAt: memberData.removed_at || new Date().toISOString()
+        removedAt: memberData.removed_at || new Date().toISOString(),
       });
     }
   }
@@ -1053,14 +1344,17 @@ export class WebSocketClient {
     console.log("[WebSocket] Handling space member add:", data);
     const memberData = data.data || data;
     if (memberData.space_id && memberData.user_id) {
-      console.log("[WebSocket] Dispatching space member add event:", memberData);
-      
+      console.log(
+        "[WebSocket] Dispatching space member add event:",
+        memberData,
+      );
+
       // Dispatch event for cache updates
       this.dispatchEvent("spaceMemberAdd", {
         spaceId: memberData.space_id,
         userId: memberData.user_id,
         joinedAt: memberData.joined_at || new Date().toISOString(),
-        roles: memberData.roles || []
+        roles: memberData.roles || [],
       });
     }
   }
@@ -1101,19 +1395,22 @@ export class WebSocketClient {
     const messageData = data.data || data;
     if (messageData.room_id && messageData.message_id) {
       console.log("[WebSocket] Dispatching message delete event:", messageData);
-      
+
       // Dispatch event for UI updates
       this.dispatchEvent("messageDelete", {
         roomId: messageData.room_id,
-        messageId: messageData.message_id
+        messageId: messageData.message_id,
       });
-      
+
       // Remove the message from cache
       if (this.cache) {
         // Access the MessageCache through the UserCache if available
         const messageCache = window.messageCache;
         if (messageCache) {
-          messageCache.deleteMessage(messageData.room_id, messageData.message_id);
+          messageCache.deleteMessage(
+            messageData.room_id,
+            messageData.message_id,
+          );
         }
       }
     }
@@ -1121,37 +1418,44 @@ export class WebSocketClient {
 
   private async requestUserData(userIds: string[]): Promise<void> {
     if (!userIds.length) return;
-    
+
     try {
       const response = await fetch(`${BASE_URL}/users/bulk`, {
-        method: 'POST',
+        method: "POST",
         headers: {
-          'Content-Type': 'application/json',
-          'X-Session-Token': this.currentToken || localStorage.getItem('sc_token') || '',
+          "Content-Type": "application/json",
+          "X-Session-Token":
+            this.currentToken || localStorage.getItem("sc_token") || "",
         },
         body: JSON.stringify({ ids: userIds }),
       });
 
       if (!response.ok) {
-        console.error('[WebSocket] Failed to fetch user data:', response.status);
+        console.error(
+          "[WebSocket] Failed to fetch user data:",
+          response.status,
+        );
         return;
       }
 
       const userData = await response.json();
-      console.log('[WebSocket] Raw bulk user response:', userData);
+      console.log("[WebSocket] Raw bulk user response:", userData);
       if (userData && userData.users) {
-        console.log('[WebSocket] Users from bulk response:', userData.users);
-        console.log('[WebSocket] Sample user data:', Object.values(userData.users)[0]);
+        console.log("[WebSocket] Users from bulk response:", userData.users);
+        console.log(
+          "[WebSocket] Sample user data:",
+          Object.values(userData.users)[0],
+        );
         this.cache.setUsers(userData.users);
       }
     } catch (error) {
-      console.error('[WebSocket] Error fetching user data:', error);
+      console.error("[WebSocket] Error fetching user data:", error);
     }
   }
 
   private handleReady(data: ReadyPayload): void {
     console.log("[WebSocket] Received READY payload:", data);
-    
+
     // Set connected state
     this.connected = true;
     this.notifyConnectionState();
@@ -1160,7 +1464,10 @@ export class WebSocketClient {
     if (data.users && this.cache) {
       console.log("[WebSocket] Caching users:", Object.keys(data.users).length);
       console.log("[WebSocket] READY users data:", data.users);
-      console.log("[WebSocket] Sample READY user:", Object.values(data.users)[0]);
+      console.log(
+        "[WebSocket] Sample READY user:",
+        Object.values(data.users)[0],
+      );
       this.cache.setUsers(data.users);
     }
 
@@ -1177,51 +1484,65 @@ export class WebSocketClient {
           owner_id: space.owner_id || space.OwnerID,
           created_at: space.created_at || space.CreatedAt,
           updated_at: space.updated_at || space.UpdatedAt,
-          verification_level: space.verification_level || space.VerificationLevel || 0,
-          default_message_notifications: space.default_message_notifications || space.DefaultMessageNotifications || 0,
-          explicit_content_filter: space.explicit_content_filter || space.ExplicitContentFilter || 0,
+          verification_level:
+            space.verification_level || space.VerificationLevel || 0,
+          default_message_notifications:
+            space.default_message_notifications ||
+            space.DefaultMessageNotifications ||
+            0,
+          explicit_content_filter:
+            space.explicit_content_filter || space.ExplicitContentFilter || 0,
           features: space.features || space.Features || [],
           afk_timeout: space.afk_timeout || space.AfkTimeout || 300,
           icon: space.icon || space.Icon || null,
           banner: space.banner || space.Banner || null,
           afk_room_id: space.afk_room_id || space.AfkRoomID || null,
-          system_room_id: space.system_room_id || space.SystemRoomID || null
+          system_room_id: space.system_room_id || space.SystemRoomID || null,
         };
-        
+
         // Cache space members if they exist in the space object from Stargate
         if (space.members && Array.isArray(space.members)) {
-          console.log(`[WebSocket] Caching ${space.members.length} members for space ${spaceData.id}`);
-          
+          console.log(
+            `[WebSocket] Caching ${space.members.length} members for space ${spaceData.id}`,
+          );
+
           // Extract and cache user data from space members
           const usersToCache: { [key: string]: any } = {};
-          
+
           const normalizedMembers = space.members.map((member: any) => {
             const userId = member.user_id || member.UserID;
             const userData = member.user || member.User;
-            
+
             // If we have user data, add it to the users cache
             if (userData && userId) {
               usersToCache[userId] = {
                 id: userData.id || userData.ID || userId,
                 username: userData.username || userData.Username,
-                display_name: userData.display_name || userData.DisplayName || userData.username || userData.Username,
-                discriminator: userData.discriminator || userData.Discriminator || 0,
-                avatar: userData.avatar || userData.Avatar || '',
-                banner: userData.banner || userData.Banner || '',
+                display_name:
+                  userData.display_name ||
+                  userData.DisplayName ||
+                  userData.username ||
+                  userData.Username,
+                discriminator:
+                  userData.discriminator || userData.Discriminator || 0,
+                avatar: userData.avatar || userData.Avatar || "",
+                banner: userData.banner || userData.Banner || "",
                 bot: userData.bot || userData.Bot || false,
                 system: userData.system || userData.System || false,
-                bio: userData.bio || userData.Bio || '',
-                about_me: userData.about_me || userData.AboutMe || '',
+                bio: userData.bio || userData.Bio || "",
+                about_me: userData.about_me || userData.AboutMe || "",
                 flags: userData.flags || userData.Flags || 0,
-                presence: userData.presence || userData.Presence || {
-                  status: 'offline',
-                  custom_status: ''
-                }
+                presence: userData.presence ||
+                  userData.Presence || {
+                    status: "offline",
+                    custom_status: "",
+                  },
               };
             }
-            
+
             return {
-              space_id: member.space_id || member.SpaceID || String(spaceData.id),
+              space_id:
+                member.space_id || member.SpaceID || String(spaceData.id),
               user_id: userId,
               nick: member.nick || member.Nick,
               avatar: member.avatar || member.Avatar,
@@ -1236,37 +1557,41 @@ export class WebSocketClient {
                 username: `user_${userId}`,
                 display_name: `User ${userId}`,
                 discriminator: 0,
-                avatar: '',
-                banner: '',
+                avatar: "",
+                banner: "",
                 bot: false,
                 system: false,
-                bio: '',
-                about_me: '',
+                bio: "",
+                about_me: "",
                 flags: 0,
                 presence: {
-                  status: 'offline',
-                  custom_status: ''
-                }
-              }
+                  status: "offline",
+                  custom_status: "",
+                },
+              },
             };
           });
-          
+
           // Cache the extracted user data
           if (Object.keys(usersToCache).length > 0) {
-            console.log(`[WebSocket] Caching ${Object.keys(usersToCache).length} users from space members`);
+            console.log(
+              `[WebSocket] Caching ${Object.keys(usersToCache).length} users from space members`,
+            );
             this.cache.setUsers(usersToCache);
           }
-          
+
           // Dispatch event for CacheProvider to handle
           this.dispatchEvent("spaceMembersCache", {
             spaceId: String(spaceData.id),
-            members: normalizedMembers
+            members: normalizedMembers,
           });
         }
-        
+
         // Cache space roles if they exist in the space object from Stargate
         if (space.roles && Array.isArray(space.roles)) {
-          console.log(`[WebSocket] Caching ${space.roles.length} roles for space ${spaceData.id}`);
+          console.log(
+            `[WebSocket] Caching ${space.roles.length} roles for space ${spaceData.id}`,
+          );
           const normalizedRoles = space.roles.map((role: any) => ({
             space_id: role.space_id || role.SpaceID || String(spaceData.id),
             role_id: role.role_id || role.RoleID,
@@ -1277,15 +1602,15 @@ export class WebSocketClient {
             mentionable: role.mentionable || role.Mentionable || false,
             hoist: role.hoist || role.Hoist || false,
             created_at: role.created_at || role.CreatedAt,
-            updated_at: role.updated_at || role.UpdatedAt
+            updated_at: role.updated_at || role.UpdatedAt,
           }));
           // Dispatch event for CacheProvider to handle
           this.dispatchEvent("spaceRolesCache", {
             spaceId: String(spaceData.id),
-            roles: normalizedRoles
+            roles: normalizedRoles,
           });
         }
-        
+
         // Dispatch space create event for the cache provider to handle
         this.dispatchEvent("spaceCreate", spaceData);
       });
@@ -1295,14 +1620,17 @@ export class WebSocketClient {
     if (data.rooms) {
       const groupPMUsers = new Set<string>();
       data.rooms.forEach((room: { type: number; recipients?: string[] }) => {
-        if (room.type === 1 && room.recipients) { // type 1 is GROUP_PM
-          room.recipients.forEach(userId => groupPMUsers.add(userId));
+        if (room.type === 1 && room.recipients) {
+          // type 1 is GROUP_PM
+          room.recipients.forEach((userId) => groupPMUsers.add(userId));
         }
       });
 
       // Request user data for uncached group PM members
       if (groupPMUsers.size > 0) {
-        const uncachedUsers = Array.from(groupPMUsers).filter(userId => !this.cache.getUser(userId));
+        const uncachedUsers = Array.from(groupPMUsers).filter(
+          (userId) => !this.cache.getUser(userId),
+        );
         if (uncachedUsers.length > 0) {
           // Split into batches of 100 users
           for (let i = 0; i < uncachedUsers.length; i += 100) {
@@ -1320,8 +1648,13 @@ export class WebSocketClient {
         this.cache.setUser({
           id: data.client_user.id || data.client_user.ID,
           username: data.client_user.username || data.client_user.Username,
-          discriminator: data.client_user.discriminator || data.client_user.Discriminator,
-          display_name: data.client_user.display_name || data.client_user.DisplayName || data.client_user.username || data.client_user.Username,
+          discriminator:
+            data.client_user.discriminator || data.client_user.Discriminator,
+          display_name:
+            data.client_user.display_name ||
+            data.client_user.DisplayName ||
+            data.client_user.username ||
+            data.client_user.Username,
           avatar: data.client_user.avatar || data.client_user.Avatar,
           banner: data.client_user.banner || data.client_user.Banner,
           bio: data.client_user.bio || data.client_user.Bio,
@@ -1330,13 +1663,19 @@ export class WebSocketClient {
           updated_at: data.client_user.updated_at || data.client_user.UpdatedAt,
           flags: data.client_user.flags || data.client_user.Flags || 0,
           presence: {
-            status: data.client_user.presence?.status || data.client_user.Presence?.Status || "online",
-            custom_status: data.client_user.presence?.custom_status || data.client_user.Presence?.CustomStatus || ""
-          }
+            status:
+              data.client_user.presence?.status ||
+              data.client_user.Presence?.Status ||
+              "online",
+            custom_status:
+              data.client_user.presence?.custom_status ||
+              data.client_user.Presence?.CustomStatus ||
+              "",
+          },
         });
       }
     }
-    
+
     // Pass the full READY payload to any registered READY handlers
     const readyHandler = this.messageHandlers.get("READY");
     if (readyHandler) {
@@ -1353,7 +1692,7 @@ export class WebSocketClient {
     }
 
     const relationshipId = payload.relationship.id;
-    
+
     // Cache user data
     if (payload.relationship.sender) {
       this.cache.setUsers({
@@ -1393,7 +1732,9 @@ export class WebSocketClient {
     }
   }
 
-  private async handlePresenceUpdate(payload: PresenceUpdatePayload): Promise<void> {
+  private async handlePresenceUpdate(
+    payload: PresenceUpdatePayload,
+  ): Promise<void> {
     console.log("[WebSocketClient] Handling presence update:", payload);
     if (!this.cache) {
       console.warn("[WebSocketClient] No cache available for presence update");
@@ -1401,11 +1742,11 @@ export class WebSocketClient {
     }
     await handlePresenceUpdate(payload, this.cache);
   }
-	private async handleVoiceUpdate(payload: VoiceUpdatePayload): Promise<void> {
-		console.log("[WebSocketClient] Handling voice update:", payload);
-		this.dispatchEvent("roomVoiceUpdate", payload.data);
-		//await handleVoiceUpdate(payload.type as VoicePayloadType, payload.data as VoiceUpdateData);
-	}
+  private async handleVoiceUpdate(payload: VoiceUpdatePayload): Promise<void> {
+    console.log("[WebSocketClient] Handling voice update:", payload);
+    this.dispatchEvent("roomVoiceUpdate", payload.data);
+    //await handleVoiceUpdate(payload.type as VoicePayloadType, payload.data as VoiceUpdateData);
+  }
 
   private normalizePayload(data: any): any {
     // Normalize payload to use lowercase keys
@@ -1416,7 +1757,7 @@ export class WebSocketClient {
       if ("op" in data) normalizedData.op = data.op;
       if ("d" in data) normalizedData.d = data.d;
       if ("t" in data) normalizedData.t = data.t;
-      
+
       // Map uppercase keys to lowercase
       if ("Op" in data) normalizedData.op = data.Op;
       if ("D" in data) normalizedData.d = data.D;
@@ -1449,24 +1790,26 @@ export class WebSocketClient {
       // First 3 attempts: 1s, 2s, 4s
       delay = Math.min(
         this.baseReconnectDelay * Math.pow(2, this.reconnectAttempts),
-        4000
+        4000,
       );
     } else {
       // After 3 attempts, use exponential backoff up to 30s
       delay = Math.min(
         this.baseReconnectDelay * Math.pow(1.5, this.reconnectAttempts),
-        30000
+        30000,
       );
     }
 
     console.log(
-      `[WebSocket] Scheduling reconnect attempt ${this.reconnectAttempts + 1} in ${delay}ms`
+      `[WebSocket] Scheduling reconnect attempt ${this.reconnectAttempts + 1} in ${delay}ms`,
     );
 
     this.reconnectTimeout = setTimeout(() => {
       this.reconnectAttempts++;
       if (this.currentToken) {
-        console.log(`[WebSocket] Attempting reconnect ${this.reconnectAttempts}`);
+        console.log(
+          `[WebSocket] Attempting reconnect ${this.reconnectAttempts}`,
+        );
         // Reset reconnect attempts if we've been disconnected for a while
         if (this.reconnectAttempts > 5) {
           console.log("[WebSocket] Resetting reconnect attempts");
@@ -1565,7 +1908,6 @@ export class WebSocketClient {
           Object.entries(payload).map(([key, value]) => [
             key,
             typeof value === "bigint" ? Number(value) : value,
-
           ]),
         );
 
@@ -1628,15 +1970,18 @@ export class WebSocketClient {
     if (!token) {
       throw new Error("No token provided for identify");
     }
-    
-    console.log("[WebSocket] Sending identify with token:", token.substring(0, 10) + "...");
-    
+
+    console.log(
+      "[WebSocket] Sending identify with token:",
+      token.substring(0, 10) + "...",
+    );
+
     const payload: IdentifyPayload = {
       type: "IDENTIFY",
       token: token,
-      device: navigator.userAgent
+      device: navigator.userAgent,
     };
-    
+
     return this.send(payload);
   }
 }
