@@ -18,7 +18,7 @@ import { useVoice, VoiceState } from "../../lib/providers/voice/VoiceProvider";
 
 const RoomView: Component = () => {
   const params = useParams();
-  const { user, isMobile } = useAuth();
+  const { user, isMobile, startRinging } = useAuth();
   const { rooms, getUser } = useCache();
   const { state: voiceState, room: voiceRoom, connect: connectVoice } = useVoice();
   // const [t] = useTransContext();
@@ -406,6 +406,11 @@ const RoomView: Component = () => {
 								const room = currentRoom();
 								if (room) {
 									connectVoice(room.id);
+                  if (room.type === RoomType.PM) {
+                    console.log("start")
+                    console.log("test");
+                    startRinging(room.id);
+                  }
 								}
 							}}
 							disabled={voiceState() === VoiceState.CONNECTING}

@@ -33,6 +33,7 @@ export type RoomWithRecipients = {
   space_id?: string;
   parent_id?: string;
 	participants?: string[]; // voice participants
+  ringing?: string[]; // user ids of callers in this room
   position?: number;
   permission_overrides?: {
     member?: {

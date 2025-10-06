@@ -140,6 +140,7 @@ type AuthContextType = {
   fetchUnreadMessages: (roomId: string) => Promise<void>;
   markMessagesAsRead: (roomId: string) => Promise<void>;
   getJoinToken: (roomId: string) => Promise<string>;
+  startRinging: (roomId: string) => Promise<void>;
   getRoomParticipants: (roomId: string) => Promise<(User | null)[]>;
 };
 
@@ -350,6 +351,7 @@ export const AuthProvider: ParentComponent = (props) => {
       );
       const roomsData = normalizeRoomsData(data.rooms, data.users);
       setRooms(roomsData);
+      
       // Dispatch event to CacheProvider
       window.dispatchEvent(
         new CustomEvent("roomsCache", {
@@ -584,6 +586,7 @@ export const AuthProvider: ParentComponent = (props) => {
         parent_id: parentId ? String(parentId) : undefined,
         position: room.Position ?? room.position ?? undefined,
         participants: room.Participants || room.participants || [],
+        ringing: room.Ringing || room.ringing || [],
         recipients_data: (room.Recipients || room.recipients || [])
           ?.map((recipientId: string) =>
             users?.[recipientId]
@@ -2281,6 +2284,36 @@ export const AuthProvider: ParentComponent = (props) => {
       return "";
     }
   };
+  const startRinging = async (roomId: string): Promise<void> => {
+    const res = await fetch(`${BASE_URL}/rooms/call/${roomId}`, {
+      headers: {
+        ...API_HEADERS.JSON,
+        ...API_HEADERS.SESSION(),
+      },
+      method: "POST"
+    });
+
+    if (!res.ok) {
+      throw new Error(
+        `Failed to ring room ${roomId}: ${res.status}`,
+      );
+    }
+  }
+  const stopRinging = async (roomId: string): Promise<void> => {
+    const res = await fetch(`${BASE_URL}/rooms/call/${roomId}/stop`, {
+      headers: {
+        ...API_HEADERS.JSON,
+        ...API_HEADERS.SESSION(),
+      },
+      method: "POST"
+    });
+
+    if (!res.ok) {
+      throw new Error(
+        `Failed to ring room ${roomId}: ${res.status}`,
+      );
+    }
+  }
 
   const getRoomParticipants = async (
     roomId: string,
@@ -2420,6 +2453,7 @@ export const AuthProvider: ParentComponent = (props) => {
         markMessagesAsRead,
         sendTypingIndicator,
         getJoinToken,
+        startRinging,
         getRoomParticipants,
       }}
       data-auth-provider
