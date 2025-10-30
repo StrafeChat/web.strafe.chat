@@ -12,6 +12,13 @@ export interface MessageProps {
   error?: string;
   isCompact?: boolean;
   message_references?: string[];
+  reactions?: Record<
+    string,
+    {
+      count: number;
+      users: string[];
+    }
+  >;
   room_id?: string;
   editingMessageId?: string | null;
   onReply?: (messageId: string) => void;

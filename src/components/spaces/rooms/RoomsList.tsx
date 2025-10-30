@@ -6,7 +6,6 @@ import {
   createSignal,
   createEffect,
 } from "solid-js";
-import { useAuth } from "../../../lib/providers/auth/AuthProvider";
 import { usePermissions } from "../../../lib/hooks/usePermissions";
 import { useContextMenu } from "../../../lib/providers/context/ContextMenuProvider";
 import { ClientUserArea } from "../../shared/ClientUserArea";
@@ -20,7 +19,7 @@ import CreateRoomModal from "../../modals/CreateRoomModal";
 import RoomContextMenu from "../../contextMenus/RoomContextMenu";
 import { Tooltip } from "../../common/Tooltip";
 import RoomEditModal from "../../modals/RoomEditModal";
-import { User } from "../../../lib/providers/cache/CacheProvider";
+import { useCache, User } from "../../../lib/providers/cache/CacheProvider";
 import { Avatar } from "../../common/Avatar";
 
 interface RoomsListProps {
@@ -110,7 +109,11 @@ const OrphanedRoomItem: Component<OrphanedRoomItemProps> = (props) => {
       }`}
     >
       {/* Unread indicator - white dot on very left edge */}
-      <Show when={(props.room.unread_count ?? 0) > 0 && !(props.room.mention_count ?? 0)}>
+      <Show
+        when={
+          (props.room.unread_count ?? 0) > 0 && !(props.room.mention_count ?? 0)
+        }
+      >
         <div class="absolute -left-4 top-1/2 transform -translate-y-1/2 w-2 h-2 bg-white bg-opacity-80 rounded-full"></div>
       </Show>
       <div
@@ -145,18 +148,18 @@ const OrphanedRoomItem: Component<OrphanedRoomItemProps> = (props) => {
             }
           }}
           onContextMenu={(e) => {
-             e.preventDefault();
-             e.stopPropagation();
-             openContextMenu(e, () => (
-               <RoomContextMenu
-                 room={props.room}
-                 onEditRoom={() => {
-                   props.setSelectedRoom(props.room);
-                   props.setIsRoomEditModalOpen(true);
-                 }}
-               />
-             ));
-           }}
+            e.preventDefault();
+            e.stopPropagation();
+            openContextMenu(e, () => (
+              <RoomContextMenu
+                room={props.room}
+                onEditRoom={() => {
+                  props.setSelectedRoom(props.room);
+                  props.setIsRoomEditModalOpen(true);
+                }}
+              />
+            ));
+          }}
         >
           <Show
             when={props.room.type === RoomType.TEXT_ROOM}
@@ -182,7 +185,7 @@ const OrphanedRoomItem: Component<OrphanedRoomItemProps> = (props) => {
           </Show>
           <span class="flex-1 select-none">{props.room.name}</span>
         </div>
-{/* 
+        {/* 
         Drag indicator
         <Show when={props.canDrag}>
           <div
@@ -220,9 +223,8 @@ const DraggableRoomItem: Component<DraggableRoomItemProps> = (props) => {
   const navigate = useNavigate();
   const location = useLocation();
   const { openContextMenu } = useContextMenu();
-
-	const { getRoomParticipants } = useAuth();
-	const [participants, setParticipants] = createSignal<User[]>([]);
+  const [participants, setParticipants] = createSignal<User[]>([]);
+  const { getUser } = useCache();
 
   const isDragging = () => globalDragState().draggedId === props.room.id;
   const isActive = () =>
@@ -256,17 +258,15 @@ const DraggableRoomItem: Component<DraggableRoomItemProps> = (props) => {
 
   // Remove drop functionality from room items - only drop zones should accept drops
 
-	createEffect(async () => {
-		setParticipants((await getRoomParticipants(props.room.id)).filter(e => e !== null));
-	});
-
-	const { wsClient } = useAuth();
-
-	wsClient()?.onMessage("DISPATCH", (d) => {
-		console.log(d);
-	})
-
-	console.log(wsClient());
+  createEffect(() => {
+    const partsCached =
+      props.room.participants
+        ?.map((p) => {
+          return getUser(p);
+        })
+        .filter((e): e is User => e !== undefined && e !== null) || [];
+    setParticipants(partsCached);
+  });
 
   return (
     <div
@@ -275,7 +275,11 @@ const DraggableRoomItem: Component<DraggableRoomItemProps> = (props) => {
       }`}
     >
       {/* Unread indicator - white dot on very left edge */}
-      <Show when={(props.room.unread_count ?? 0) > 0 && !(props.room.mention_count ?? 0)}>
+      <Show
+        when={
+          (props.room.unread_count ?? 0) > 0 && !(props.room.mention_count ?? 0)
+        }
+      >
         <div class="absolute -left-4 top-1/2 transform -translate-y-1/2 w-2 h-2 bg-white bg-opacity-80 rounded-full"></div>
       </Show>
       <div
@@ -310,18 +314,18 @@ const DraggableRoomItem: Component<DraggableRoomItemProps> = (props) => {
             }
           }}
           onContextMenu={(e) => {
-             e.preventDefault();
-             e.stopPropagation();
-             openContextMenu(e, () => (
-               <RoomContextMenu
-                 room={props.room}
-                 onEditRoom={() => {
-                   props.setSelectedRoom(props.room);
-                   props.setIsRoomEditModalOpen(true);
-                 }}
-               />
-             ));
-           }}
+            e.preventDefault();
+            e.stopPropagation();
+            openContextMenu(e, () => (
+              <RoomContextMenu
+                room={props.room}
+                onEditRoom={() => {
+                  props.setSelectedRoom(props.room);
+                  props.setIsRoomEditModalOpen(true);
+                }}
+              />
+            ));
+          }}
         >
           <Show
             when={props.room.type === RoomType.TEXT_ROOM}
@@ -378,30 +382,29 @@ const DraggableRoomItem: Component<DraggableRoomItemProps> = (props) => {
         </Show> */}
       </div>
 
-			{/* Voice Participants */}
-			<Show when={props.room.type === RoomType.VOICE_ROOM}>
-				<ul>
-					<For each={participants()}>
-						{(user) => {
-								return (
-									<li style="margin-left: 1rem;">
-										<div style="display: flex; flex-direction: row; gap: 0.2rem; align-items: center;">
-											<Avatar
-												userId={user.id}
-												avatar={user.avatar}
-												alt={`${user.display_name || user.username}'s avatar`}
-												size="xs"
-												bot={user.bot}>
-
-											</Avatar>
-											<p>{ user.display_name || user.username }</p>
-										</div>
-									</li>
-								)
-						}}
-					</For>
-				</ul>
-			</Show>
+      {/* Voice Participants */}
+      <Show when={props.room.type === RoomType.VOICE_ROOM}>
+        <ul>
+          <For each={participants()}>
+            {(user) => {
+              return (
+                <li style="margin-left: 1rem;">
+                  <div style="display: flex; flex-direction: row; gap: 0.2rem; align-items: center;">
+                    <Avatar
+                      userId={user.id}
+                      avatar={user.avatar}
+                      alt={`${user.display_name || user.username}'s avatar`}
+                      size="xs"
+                      bot={user.bot}
+                    ></Avatar>
+                    <p>{user.display_name || user.username}</p>
+                  </div>
+                </li>
+              );
+            }}
+          </For>
+        </ul>
+      </Show>
     </div>
   );
 };
@@ -615,6 +618,10 @@ const DraggableSection: Component<DraggableSectionProps> = (props) => {
     }));
   };
 
+  createEffect(() => {
+    console.log(props.rooms);
+  });
+
   return (
     <div
       class={`transition-all duration-200 mt-3 ${
@@ -658,27 +665,27 @@ const DraggableSection: Component<DraggableSectionProps> = (props) => {
         </div>
         <Show when={props.canDrag}>
           <Tooltip content="Create Room">
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              props.onCreateRoom(props.section.id);
-            }}
-            class="opacity-100 transition-opacity p-1.5 hover:bg-surface rounded text-text-secondary hover:text-text-primary mr-2"
-          >
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              class="w-4 h-4"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                props.onCreateRoom(props.section.id);
+              }}
+              class="opacity-100 transition-opacity p-1.5 hover:bg-surface rounded text-text-secondary hover:text-text-primary mr-2"
             >
-              <line x1="12" y1="5" x2="12" y2="19"></line>
-              <line x1="5" y1="12" x2="19" y2="12"></line>
-            </svg>
-          </button>
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                class="w-4 h-4"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <line x1="12" y1="5" x2="12" y2="19"></line>
+                <line x1="5" y1="12" x2="19" y2="12"></line>
+              </svg>
+            </button>
           </Tooltip>
         </Show>
       </div>
@@ -788,7 +795,7 @@ const DraggableSection: Component<DraggableSectionProps> = (props) => {
 };
 
 const RoomsList: Component<RoomsListProps> = (props) => {
-  const { rooms } = useAuth();
+  const { rooms } = useCache();
   const { checkPermission } = usePermissions();
 
   // Permission checking
@@ -796,9 +803,12 @@ const RoomsList: Component<RoomsListProps> = (props) => {
 
   // Modal state
   const [isCreateRoomModalOpen, setIsCreateRoomModalOpen] = createSignal(false);
-  const [selectedSectionId, setSelectedSectionId] = createSignal<string | undefined>();
+  const [selectedSectionId, setSelectedSectionId] = createSignal<
+    string | undefined
+  >();
   const [isRoomEditModalOpen, setIsRoomEditModalOpen] = createSignal(false);
-  const [selectedRoom, setSelectedRoom] = createSignal<RoomWithRecipients | null>(null);
+  const [selectedRoom, setSelectedRoom] =
+    createSignal<RoomWithRecipients | null>(null);
 
   // Check MANAGE_CHANNELS permission when spaceId changes
   createEffect(() => {
@@ -916,12 +926,14 @@ const RoomsList: Component<RoomsListProps> = (props) => {
         room.type === RoomType.TEXT_ROOM ||
         room.type === RoomType.VOICE_ROOM ||
         room.type === RoomType.SPACE_SECTION;
-      
+
       // Enhanced debugging for space ID comparison
       if (!spaceIdMatch && room.name) {
-        console.log(`[RoomsList] Space ID mismatch for room "${room.name}": room.space_id="${roomSpaceId}" vs props.spaceId="${propsSpaceId}"`);
+        console.log(
+          `[RoomsList] Space ID mismatch for room "${room.name}": room.space_id="${roomSpaceId}" vs props.spaceId="${propsSpaceId}"`,
+        );
       }
-      
+
       return spaceIdMatch && typeMatch;
     });
     console.log(
@@ -1320,7 +1332,7 @@ const RoomsList: Component<RoomsListProps> = (props) => {
       </div>
 
       <ClientUserArea />
-      
+
       {/* Create Room Modal */}
       <CreateRoomModal
         isOpen={isCreateRoomModalOpen()}
@@ -1328,7 +1340,7 @@ const RoomsList: Component<RoomsListProps> = (props) => {
         spaceId={props.spaceId || ""}
         parentId={selectedSectionId()}
       />
-      
+
       {/* Room Edit Modal */}
       <Show when={selectedRoom()}>
         <RoomEditModal

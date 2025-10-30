@@ -12,6 +12,7 @@ import SpaceSecuritySettings from "./space/SpaceSecuritySettings";
 import SpaceModerationSettings from "./space/SpaceModerationSettings";
 import SpaceRolesSettings from "./space/SpaceRolesSettings";
 import SpaceMembersSettings from "./space/SpaceMembersSettings";
+import SpaceEmojiSettings from "./space/SpaceEmojiSettings";
 import DefaultSettings from "./user/DefaultSettings";
 import { ToastProvider } from "../common/Toast";
 
@@ -41,12 +42,14 @@ const SpaceSettings: Component<SpaceSettingsProps> = (props) => {
 
   const space = () => getSpace(props.spaceId);
   const isOwner = () => space()?.owner_id === user()?.id;
-  const canManageSpace = () => isOwner() || checkPermission(props.spaceId, "MANAGE_SPACE");
+  const canManageSpace = () =>
+    isOwner() || checkPermission(props.spaceId, "MANAGE_SPACE");
 
   const sections = [
     "overview",
     "roles",
     "members",
+    "emojis",
     "moderation",
     "security",
   ];
@@ -77,6 +80,8 @@ const SpaceSettings: Component<SpaceSettingsProps> = (props) => {
         return <SpaceRolesSettings space={space()!} />;
       case "members":
         return <SpaceMembersSettings space={space()!} />;
+      case "emojis":
+        return <SpaceEmojiSettings space={space()!} />;
       case "invites":
         return <SpaceInvitesSettings space={space()!} />;
       case "moderation":
@@ -146,7 +151,9 @@ const SpaceSettings: Component<SpaceSettingsProps> = (props) => {
                     <div class="px-2 mt-16 mb-4">
                       <div class="flex items-center gap-3 mb-4">
                         <div class="w-12 h-12 bg-primary rounded-lg flex items-center justify-center text-white font-bold text-lg">
-                          {space()?.name_acronym || space()?.name?.charAt(0) || "S"}
+                          {space()?.name_acronym ||
+                            space()?.name?.charAt(0) ||
+                            "S"}
                         </div>
                         <div class="flex-1 min-w-0">
                           <h2 class="text-lg font-semibold text-text-primary truncate">
@@ -188,9 +195,7 @@ const SpaceSettings: Component<SpaceSettingsProps> = (props) => {
                             isMobile() && setIsSidebarOpen(false);
                           }}
                           class={`w-full px-[10px] py-[6px] rounded-[4px] text-left text-base hover:bg-surface ${
-                            state.activeSection === "roles"
-                              ? "bg-surface"
-                              : ""
+                            state.activeSection === "roles" ? "bg-surface" : ""
                           } text-text-primary flex items-center gap-3`}
                         >
                           <Crown />
@@ -210,7 +215,25 @@ const SpaceSettings: Component<SpaceSettingsProps> = (props) => {
                           <Users />
                           Members
                         </button>
-                          <button
+                        <button
+                          onClick={() => {
+                            setActiveSection("emojis");
+                            isMobile() && setIsSidebarOpen(false);
+                          }}
+                          class={`w-full px-[10px] py-[6px] rounded-[4px] text-left text-base hover:bg-surface ${
+                            state.activeSection === "emojis" ? "bg-surface" : ""
+                          } text-text-primary flex items-center gap-3`}
+                        >
+                          <svg
+                            class="w-5 h-5"
+                            fill="currentColor"
+                            viewBox="0 0 24 24"
+                          >
+                            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                          </svg>
+                          Emojis
+                        </button>
+                        <button
                           onClick={() => {
                             setActiveSection("invites");
                             isMobile() && setIsSidebarOpen(false);

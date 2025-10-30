@@ -4,15 +4,21 @@ import {
   useContext,
   createSignal,
   createEffect,
+  onCleanup,
 } from "solid-js";
 import { MessageCache, CachedMessage } from "../../cache/MessageCache";
-import { SpaceCache, Space, SpaceMember, SpaceRole } from "../../cache/SpaceCache";
+import {
+  SpaceCache,
+  Space,
+  SpaceMember,
+  SpaceRole,
+} from "../../cache/SpaceCache";
 import { RoomCache } from "../../cache/RoomCache";
 import { InviteCache } from "./InviteCache";
 import { InviteInfo } from "../../../types/api";
 import { RoomWithRecipients, Room } from "../../../types/rooms";
 import { Relationship } from "../../../types/relationships";
-import { UserType } from "../../../types/users";
+import { VoiceUpdateData } from "../../events/voice/update";
 
 export type Presence = {
   status: string;
@@ -45,7 +51,11 @@ type CacheContextType = {
   setUsers: (usersData: Record<string, any>) => void;
   // Room management
   rooms: () => RoomWithRecipients[];
-  setRooms: (rooms: RoomWithRecipients[] | ((prev: RoomWithRecipients[]) => RoomWithRecipients[])) => void;
+  setRooms: (
+    rooms:
+      | RoomWithRecipients[]
+      | ((prev: RoomWithRecipients[]) => RoomWithRecipients[]),
+  ) => void;
   // Relationship management
   relationships: () => string[];
   setRelationships: (relationships: string[]) => void;
@@ -55,10 +65,22 @@ type CacheContextType = {
   getMessages: (roomId: string) => CachedMessage[];
   getMessage: (roomId: string, messageId: string) => CachedMessage | undefined;
   getMessageCount: (roomId: string) => number;
-  setMessages: (roomId: string, messages: CachedMessage[], position?: 'newer' | 'older' | 'replace') => void;
+  setMessages: (
+    roomId: string,
+    messages: CachedMessage[],
+    position?: "newer" | "older" | "replace",
+  ) => void;
   addMessage: (roomId: string, message: CachedMessage) => void;
-  updateMessage: (roomId: string, messageId: string, updates: Partial<CachedMessage>) => void;
-  updateMessageByNonce: (roomId: string, nonce: string, updates: Partial<CachedMessage>) => void;
+  updateMessage: (
+    roomId: string,
+    messageId: string,
+    updates: Partial<CachedMessage>,
+  ) => void;
+  updateMessageByNonce: (
+    roomId: string,
+    nonce: string,
+    updates: Partial<CachedMessage>,
+  ) => void;
   deleteMessage: (roomId: string, messageId: string) => void;
   hasMessages: (roomId: string) => boolean;
   getOldestMessageId: (roomId: string) => string | undefined;
@@ -69,6 +91,12 @@ type CacheContextType = {
   setHasReachedEnd: (roomId: string, reached: boolean) => void;
   resetReachedFlags: (roomId: string) => void;
   getLastFetchTime: (roomId: string) => number | undefined;
+  onMessageUpdate: (
+    callback: (roomId: string, message: CachedMessage) => void,
+  ) => void;
+  offMessageUpdate: (
+    callback: (roomId: string, message: CachedMessage) => void,
+  ) => void;
   // Space management
   spaces: () => Space[];
   getSpace: (spaceId: string) => Space | undefined;
@@ -77,7 +105,10 @@ type CacheContextType = {
   getSpaceMembers: (spaceId: string) => SpaceMember[];
   getSpaceMember: (spaceId: string, userId: string) => SpaceMember | undefined;
   setSpaceMember: (spaceMember: SpaceMember) => void;
-  addSpaceMember: (spaceId: string, memberData: Partial<SpaceMember> & { user_id: string }) => void;
+  addSpaceMember: (
+    spaceId: string,
+    memberData: Partial<SpaceMember> & { user_id: string },
+  ) => void;
   removeSpaceMember: (spaceId: string, userId: string) => void;
   deleteSpace: (spaceId: string) => void;
   // Space members cache
@@ -98,7 +129,10 @@ type CacheContextType = {
   setInvite: (invite: InviteInfo) => void;
   deleteInvite: (code: string) => void;
   clearInvites: () => void;
-  getInviteInfo: (code: string, fetchFn: () => Promise<InviteInfo>) => Promise<InviteInfo>;
+  getInviteInfo: (
+    code: string,
+    fetchFn: () => Promise<InviteInfo>,
+  ) => Promise<InviteInfo>;
 };
 
 const CacheContext = createContext<CacheContextType>();
@@ -128,7 +162,40 @@ export const CacheProvider: ParentComponent = (props) => {
   const [spaces, setSpaces] = createSignal<Space[]>([]);
   const [rooms, setRooms] = createSignal<RoomWithRecipients[]>([]);
   const [relationships, setRelationships] = createSignal<string[]>([]);
-  const [relationshipRequests, setRelationshipRequests] = createSignal<Relationship[]>([]);
+  const [relationshipRequests, setRelationshipRequests] = createSignal<
+    Relationship[]
+  >([]);
+
+  // Signal to trigger reactivity when messages are updated
+  const [messageUpdateTrigger, setMessageUpdateTrigger] = createSignal(0);
+
+  // Set up message update callback to trigger reactivity
+  const messageUpdateCallback = (roomId: string, message: CachedMessage) => {
+    console.log("[CacheProvider] Message updated, triggering reactivity:", {
+      roomId,
+      messageId: message.id,
+      hasReactions: !!message.reactions,
+      reactionCount: message.reactions
+        ? Object.keys(message.reactions).length
+        : 0,
+      reactions: message.reactions,
+    });
+    setMessageUpdateTrigger((prev) => {
+      const newValue = prev + 1;
+      console.log(
+        `[CacheProvider] messageUpdateTrigger updated: ${prev} -> ${newValue}`,
+      );
+      return newValue;
+    });
+  };
+
+  // Register the callback and clean up on unmount
+  createEffect(() => {
+    messageCache.onMessageUpdate(messageUpdateCallback);
+    onCleanup(() => {
+      messageCache.offMessageUpdate(messageUpdateCallback);
+    });
+  });
 
   // Listen for user updates, message events, and space events
   createEffect(() => {
@@ -150,7 +217,10 @@ export const CacheProvider: ParentComponent = (props) => {
     const handleMessageDelete = (event: CustomEvent) => {
       const { roomId, messageId } = event.detail;
       if (roomId && messageId) {
-        console.log("[CacheProvider] Deleting message from cache:", { roomId, messageId });
+        console.log("[CacheProvider] Deleting message from cache:", {
+          roomId,
+          messageId,
+        });
         messageCache.deleteMessage(roomId, messageId);
       }
     };
@@ -170,7 +240,7 @@ export const CacheProvider: ParentComponent = (props) => {
         console.log("[CacheProvider] Adding room to cache:", room);
         roomCache.setRoom(room);
         // Add to reactive rooms signal
-        setRooms(prev => [...prev, room]);
+        setRooms((prev) => [...prev, room]);
       }
     };
 
@@ -178,23 +248,81 @@ export const CacheProvider: ParentComponent = (props) => {
       const roomData = event.detail;
       if (roomData && roomData.room_id) {
         console.log("[CacheProvider] Updating room:", roomData);
-        setRooms(prev => prev.map(room => {
-          if (room.id === roomData.room_id) {
-            return { ...room, ...roomData };
+        setRooms((prev) =>
+          prev.map((room) => {
+            if (room.id === roomData.room_id) {
+              return { ...room, ...roomData };
+            }
+            return room;
+          }),
+        );
+      }
+    };
+    const handleRoomVoiceUpdate = (event: CustomEvent) => {
+      const data = event.detail as VoiceUpdateData;
+      if (data && data.room_id) {
+        const r = rooms().find((room) => room.id === data.room_id);
+        if (!r)
+          return console.warn(
+            "[CacheProvider] Room to update voice state not found",
+            data,
+          );
+
+        const p = r.participants || [];
+        const id = data.participant_id;
+        if (data.event_type === "VOICE_PARTICIPANT_JOIN" && id) {
+          if (p.findIndex((e) => e === id) !== -1) return;
+          p.push(id);
+        } else if (data.event_type === "VOICE_PARTICIPANT_LEAVE" && id) {
+          const idx = p.findIndex((e) => e === id);
+          if (idx === -1) return;
+          p.splice(idx, 1);
+        } else if (data.event_type === "VOICE_STOP_RINGING" || data.event_type === "VOICE_START_RINGING") {
+          const ringing = (data.event_type === "VOICE_STOP_RINGING") ? false : true;
+          const caller = data.caller;
+          const current = r.ringing || [];
+
+          if (!caller) throw "Caller not specified in " + data.event_type + " Event";
+          if (ringing) { // START_RINGING
+            current.push(caller);
+          } else {
+            const idx = current.findIndex(e => e === caller)
+            if (idx === -1) return;
+            current.splice(idx, 1);
           }
-          return room;
-        }));
+        } else {
+          return console.error("[CacheProvider] Unknown event processing voice events: ", data);
+        }
+
+        console.log("[CacheProvider] Updating room:", data.room_id);
+        setRooms((prev) =>
+          prev.map((room) => {
+            if (room.id === data.room_id) {
+              return { ...room, participants: p };
+            }
+            return room;
+          }),
+        );
       }
     };
 
     const handleRelationshipUpdate = (event: CustomEvent) => {
-      const { relationships: newRelationships, relationshipRequests: newRequests } = event.detail;
+      const {
+        relationships: newRelationships,
+        relationshipRequests: newRequests,
+      } = event.detail;
       if (newRelationships) {
-        console.log("[CacheProvider] Updating relationships:", newRelationships);
+        console.log(
+          "[CacheProvider] Updating relationships:",
+          newRelationships,
+        );
         setRelationships(newRelationships);
       }
       if (newRequests) {
-        console.log("[CacheProvider] Updating relationship requests:", newRequests);
+        console.log(
+          "[CacheProvider] Updating relationship requests:",
+          newRequests,
+        );
         setRelationshipRequests(newRequests);
       }
     };
@@ -205,7 +333,7 @@ export const CacheProvider: ParentComponent = (props) => {
         console.log("[CacheProvider] Caching rooms:", roomsData);
         setRooms(roomsData);
         // Also cache in RoomCache
-        roomsData.forEach(room => roomCache.setRoom(room));
+        roomsData.forEach((room) => roomCache.setRoom(room));
       }
     };
 
@@ -230,7 +358,10 @@ export const CacheProvider: ParentComponent = (props) => {
     const handleSpaceMemberCreate = (event: CustomEvent) => {
       const spaceMember = event.detail;
       if (spaceMember && spaceMember.space_id && spaceMember.user_id) {
-        console.log("[CacheProvider] Adding space member to cache:", spaceMember);
+        console.log(
+          "[CacheProvider] Adding space member to cache:",
+          spaceMember,
+        );
         spaceCache.setSpaceMember(spaceMember);
         setSpaces(spaceCache.getAllSpaces());
       }
@@ -239,7 +370,9 @@ export const CacheProvider: ParentComponent = (props) => {
     const handleSpaceMembersCache = (event: CustomEvent) => {
       const { spaceId, members } = event.detail;
       if (spaceId && members && Array.isArray(members)) {
-        console.log(`[CacheProvider] Caching ${members.length} members for space ${spaceId}`);
+        console.log(
+          `[CacheProvider] Caching ${members.length} members for space ${spaceId}`,
+        );
         spaceCache.setCachedSpaceMembers(spaceId, members);
       }
     };
@@ -247,49 +380,66 @@ export const CacheProvider: ParentComponent = (props) => {
     const handleSpaceRolesCache = (event: CustomEvent) => {
       const { spaceId, roles } = event.detail;
       if (spaceId && roles && Array.isArray(roles)) {
-        console.log(`[CacheProvider] Caching ${roles.length} roles for space ${spaceId}`);
+        console.log(
+          `[CacheProvider] Caching ${roles.length} roles for space ${spaceId}`,
+        );
         spaceCache.setCachedSpaceRoles(spaceId, roles);
       }
     };
 
     const handleSpaceMemberRoleUpdate = (event: CustomEvent) => {
-      console.log(`[CacheProvider] Received spaceMemberRoleUpdate event:`, event.detail);
+      console.log(
+        `[CacheProvider] Received spaceMemberRoleUpdate event:`,
+        event.detail,
+      );
       const { spaceId, member } = event.detail;
       if (spaceId && member) {
-        console.log(`[CacheProvider] Member role updated for space ${spaceId}:`, member);
+        console.log(
+          `[CacheProvider] Member role updated for space ${spaceId}:`,
+          member,
+        );
         spaceCache.updateCachedSpaceMember(spaceId, member);
         // Dispatch a general spaceMemberUpdate event to trigger UI reactivity
-        console.log(`[CacheProvider] Dispatching spaceMemberUpdate event for space ${spaceId}`);
-        window.dispatchEvent(new CustomEvent('spaceMemberUpdate', { 
-          detail: { spaceId, member }
-        }));
+        console.log(
+          `[CacheProvider] Dispatching spaceMemberUpdate event for space ${spaceId}`,
+        );
+        window.dispatchEvent(
+          new CustomEvent("spaceMemberUpdate", {
+            detail: { spaceId, member },
+          }),
+        );
       } else {
-        console.warn(`[CacheProvider] Invalid spaceMemberRoleUpdate event data:`, event.detail);
+        console.warn(
+          `[CacheProvider] Invalid spaceMemberRoleUpdate event data:`,
+          event.detail,
+        );
       }
     };
 
     const handleSpaceMemberRemove = (event: CustomEvent) => {
       console.log("[CacheProvider] Space member remove event:", event.detail);
       const { spaceId, userId } = event.detail;
-      
+
       if (spaceId && userId) {
         // Remove member from space cache
         spaceCache.removeSpaceMember(spaceId, userId);
-        
+
         // Update spaces state to trigger reactivity
-        setSpaces(prev => [...prev]);
-        
+        setSpaces((prev) => [...prev]);
+
         // Dispatch spaceMemberUpdate event for UI reactivity
-        window.dispatchEvent(new CustomEvent('spaceMemberUpdate', {
-          detail: { spaceId, userId, action: 'remove' }
-        }));
+        window.dispatchEvent(
+          new CustomEvent("spaceMemberUpdate", {
+            detail: { spaceId, userId, action: "remove" },
+          }),
+        );
       }
     };
 
     const handleSpaceMemberAdd = (event: CustomEvent) => {
       console.log("[CacheProvider] Space member add event:", event.detail);
       const { spaceId, userId, roles } = event.detail;
-      
+
       if (spaceId && userId) {
         // Add member to space cache
         spaceCache.addSpaceMember(spaceId, {
@@ -299,53 +449,134 @@ export const CacheProvider: ParentComponent = (props) => {
           deaf: false,
           mute: false,
           flags: 0,
-          pending: false
+          pending: false,
         });
-        
+
         // Update spaces state to trigger reactivity
-        setSpaces(prev => [...prev]);
-        
+        setSpaces((prev) => [...prev]);
+
         // Dispatch spaceMemberUpdate event for UI reactivity
-        window.dispatchEvent(new CustomEvent('spaceMemberUpdate', {
-          detail: { spaceId, userId, action: 'add' }
-        }));
+        window.dispatchEvent(
+          new CustomEvent("spaceMemberUpdate", {
+            detail: { spaceId, userId, action: "add" },
+          }),
+        );
       }
     };
 
     window.addEventListener("userUpdate", handleUserUpdate as EventListener);
-    window.addEventListener("messageCreate", handleMessageCreate as EventListener);
-    window.addEventListener("messageDelete", handleMessageDelete as EventListener);
+    window.addEventListener(
+      "messageCreate",
+      handleMessageCreate as EventListener,
+    );
+    window.addEventListener(
+      "messageDelete",
+      handleMessageDelete as EventListener,
+    );
     window.addEventListener("spaceCreate", handleSpaceCreate as EventListener);
     window.addEventListener("roomCreate", handleRoomCreate as EventListener);
     window.addEventListener("roomUpdate", handleRoomUpdate as EventListener);
+    window.addEventListener(
+      "roomVoiceUpdate",
+      handleRoomVoiceUpdate as EventListener,
+    );
     window.addEventListener("roomsCache", handleRoomsCache as EventListener);
-    window.addEventListener("relationshipUpdate", handleRelationshipUpdate as EventListener);
+    window.addEventListener(
+      "relationshipUpdate",
+      handleRelationshipUpdate as EventListener,
+    );
     window.addEventListener("spaceUpdate", handleSpaceUpdate as EventListener);
     window.addEventListener("spaceDelete", handleSpaceDelete as EventListener);
-    window.addEventListener("spaceMemberCreate", handleSpaceMemberCreate as EventListener);
-    window.addEventListener("spaceMembersCache", handleSpaceMembersCache as EventListener);
-    window.addEventListener("spaceRolesCache", handleSpaceRolesCache as EventListener);
-    window.addEventListener("spaceMemberRoleUpdate", handleSpaceMemberRoleUpdate as EventListener);
-    window.addEventListener("spaceMemberRemove", handleSpaceMemberRemove as EventListener);
-    window.addEventListener("spaceMemberAdd", handleSpaceMemberAdd as EventListener);
+    window.addEventListener(
+      "spaceMemberCreate",
+      handleSpaceMemberCreate as EventListener,
+    );
+    window.addEventListener(
+      "spaceMembersCache",
+      handleSpaceMembersCache as EventListener,
+    );
+    window.addEventListener(
+      "spaceRolesCache",
+      handleSpaceRolesCache as EventListener,
+    );
+    window.addEventListener(
+      "spaceMemberRoleUpdate",
+      handleSpaceMemberRoleUpdate as EventListener,
+    );
+    window.addEventListener(
+      "spaceMemberRemove",
+      handleSpaceMemberRemove as EventListener,
+    );
+    window.addEventListener(
+      "spaceMemberAdd",
+      handleSpaceMemberAdd as EventListener,
+    );
 
     return () => {
-      window.removeEventListener("userUpdate", handleUserUpdate as EventListener);
-      window.removeEventListener("messageCreate", handleMessageCreate as EventListener);
-      window.removeEventListener("messageDelete", handleMessageDelete as EventListener);
-      window.removeEventListener("spaceCreate", handleSpaceCreate as EventListener);
-      window.removeEventListener("roomCreate", handleRoomCreate as EventListener);
-      window.removeEventListener("roomUpdate", handleRoomUpdate as EventListener);
-      window.removeEventListener("roomsCache", handleRoomsCache as EventListener);
-      window.removeEventListener("relationshipUpdate", handleRelationshipUpdate as EventListener);
-      window.removeEventListener("spaceUpdate", handleSpaceUpdate as EventListener);
-      window.removeEventListener("spaceDelete", handleSpaceDelete as EventListener);
-      window.removeEventListener("spaceMemberCreate", handleSpaceMemberCreate as EventListener);
-      window.removeEventListener("spaceMembersCache", handleSpaceMembersCache as EventListener);
-      window.removeEventListener("spaceRolesCache", handleSpaceRolesCache as EventListener);
-      window.removeEventListener("spaceMemberRoleUpdate", handleSpaceMemberRoleUpdate as EventListener);
-      window.removeEventListener("spaceMemberRemove", handleSpaceMemberRemove as EventListener);
-      window.removeEventListener("spaceMemberAdd", handleSpaceMemberAdd as EventListener);
+      window.removeEventListener(
+        "userUpdate",
+        handleUserUpdate as EventListener,
+      );
+      window.removeEventListener(
+        "messageCreate",
+        handleMessageCreate as EventListener,
+      );
+      window.removeEventListener(
+        "messageDelete",
+        handleMessageDelete as EventListener,
+      );
+      window.removeEventListener(
+        "spaceCreate",
+        handleSpaceCreate as EventListener,
+      );
+      window.removeEventListener(
+        "roomCreate",
+        handleRoomCreate as EventListener,
+      );
+      window.removeEventListener(
+        "roomUpdate",
+        handleRoomUpdate as EventListener,
+      );
+      window.removeEventListener(
+        "roomsCache",
+        handleRoomsCache as EventListener,
+      );
+      window.removeEventListener(
+        "relationshipUpdate",
+        handleRelationshipUpdate as EventListener,
+      );
+      window.removeEventListener(
+        "spaceUpdate",
+        handleSpaceUpdate as EventListener,
+      );
+      window.removeEventListener(
+        "spaceDelete",
+        handleSpaceDelete as EventListener,
+      );
+      window.removeEventListener(
+        "spaceMemberCreate",
+        handleSpaceMemberCreate as EventListener,
+      );
+      window.removeEventListener(
+        "spaceMembersCache",
+        handleSpaceMembersCache as EventListener,
+      );
+      window.removeEventListener(
+        "spaceRolesCache",
+        handleSpaceRolesCache as EventListener,
+      );
+      window.removeEventListener(
+        "spaceMemberRoleUpdate",
+        handleSpaceMemberRoleUpdate as EventListener,
+      );
+      window.removeEventListener(
+        "spaceMemberRemove",
+        handleSpaceMemberRemove as EventListener,
+      );
+      window.removeEventListener(
+        "spaceMemberAdd",
+        handleSpaceMemberAdd as EventListener,
+      );
     };
   });
 
@@ -394,10 +625,12 @@ export const CacheProvider: ParentComponent = (props) => {
             flags: userData.flags || userData.Flags,
             bot: userData.bot || userData.Bot,
             system: userData.system || userData.System,
-            presence: userData.Presence ? {
-              status: userData.Presence.Status,
-              custom_status: userData.Presence.CustomStatus,
-            } : undefined,
+            presence: userData.Presence
+              ? {
+                  status: userData.Presence.Status,
+                  custom_status: userData.Presence.CustomStatus,
+                }
+              : undefined,
           };
         } else {
           console.warn("[CacheProvider] Skipping invalid user data:", userData);
@@ -424,23 +657,59 @@ export const CacheProvider: ParentComponent = (props) => {
     setRelationships,
     relationshipRequests,
     setRelationshipRequests,
-    getMessages: (roomId: string) => messageCache.getMessages(roomId),
-    getMessage: (roomId: string, messageId: string) => messageCache.getMessages(roomId).find(m => m.id === messageId || m.nonce === messageId),
+    getMessages: (roomId: string) => {
+      // Access the trigger to make this function reactive
+      messageUpdateTrigger();
+      return messageCache.getMessages(roomId);
+    },
+    getMessage: (roomId: string, messageId: string) => {
+      // Access the trigger to make this function reactive
+      messageUpdateTrigger();
+      return messageCache
+        .getMessages(roomId)
+        .find((m) => m.id === messageId || m.nonce === messageId);
+    },
     getMessageCount: (roomId: string) => messageCache.getMessageCount(roomId),
-    setMessages: (roomId: string, messages: CachedMessage[], position?: 'newer' | 'older' | 'replace') => messageCache.setMessages(roomId, messages, position),
-    addMessage: (roomId: string, message: CachedMessage) => messageCache.addMessage(roomId, message),
-    updateMessage: (roomId: string, messageId: string, updates: Partial<CachedMessage>) => messageCache.updateMessage(roomId, messageId, updates),
-    updateMessageByNonce: (roomId: string, nonce: string, updates: Partial<CachedMessage>) => messageCache.updateMessageByNonce(roomId, nonce, updates),
-    deleteMessage: (roomId: string, messageId: string) => messageCache.deleteMessage(roomId, messageId),
+    setMessages: (
+      roomId: string,
+      messages: CachedMessage[],
+      position?: "newer" | "older" | "replace",
+    ) => messageCache.setMessages(roomId, messages, position),
+    addMessage: (roomId: string, message: CachedMessage) =>
+      messageCache.addMessage(roomId, message),
+    updateMessage: (
+      roomId: string,
+      messageId: string,
+      updates: Partial<CachedMessage>,
+    ) => messageCache.updateMessage(roomId, messageId, updates),
+    updateMessageByNonce: (
+      roomId: string,
+      nonce: string,
+      updates: Partial<CachedMessage>,
+    ) => messageCache.updateMessageByNonce(roomId, nonce, updates),
+    deleteMessage: (roomId: string, messageId: string) =>
+      messageCache.deleteMessage(roomId, messageId),
     hasMessages: (roomId: string) => messageCache.hasMessages(roomId),
-    getOldestMessageId: (roomId: string) => messageCache.getOldestMessageId(roomId),
-    getNewestMessageId: (roomId: string) => messageCache.getNewestMessageId(roomId),
-    hasReachedBeginning: (roomId: string) => messageCache.hasReachedBeginning(roomId),
+    getOldestMessageId: (roomId: string) =>
+      messageCache.getOldestMessageId(roomId),
+    getNewestMessageId: (roomId: string) =>
+      messageCache.getNewestMessageId(roomId),
+    hasReachedBeginning: (roomId: string) =>
+      messageCache.hasReachedBeginning(roomId),
     hasReachedEnd: (roomId: string) => messageCache.hasReachedEnd(roomId),
-    setHasReachedBeginning: (roomId: string, reached: boolean) => messageCache.setHasReachedBeginning(roomId, reached),
-    setHasReachedEnd: (roomId: string, reached: boolean) => messageCache.setHasReachedEnd(roomId, reached),
-    resetReachedFlags: (roomId: string) => messageCache.resetReachedFlags(roomId),
+    setHasReachedBeginning: (roomId: string, reached: boolean) =>
+      messageCache.setHasReachedBeginning(roomId, reached),
+    setHasReachedEnd: (roomId: string, reached: boolean) =>
+      messageCache.setHasReachedEnd(roomId, reached),
+    resetReachedFlags: (roomId: string) =>
+      messageCache.resetReachedFlags(roomId),
     getLastFetchTime: (roomId: string) => messageCache.getLastFetchTime(roomId),
+    onMessageUpdate: (
+      callback: (roomId: string, message: CachedMessage) => void,
+    ) => messageCache.onMessageUpdate(callback),
+    offMessageUpdate: (
+      callback: (roomId: string, message: CachedMessage) => void,
+    ) => messageCache.offMessageUpdate(callback),
     // Space management
     spaces,
     getSpace: (spaceId: string) => spaceCache.getSpace(spaceId),
@@ -450,12 +719,16 @@ export const CacheProvider: ParentComponent = (props) => {
     },
     getUserSpaces: (userId: string) => spaceCache.getUserSpaces(userId),
     getSpaceMembers: (spaceId: string) => spaceCache.getSpaceMembers(spaceId),
-    getSpaceMember: (spaceId: string, userId: string) => spaceCache.getSpaceMember(spaceId, userId),
+    getSpaceMember: (spaceId: string, userId: string) =>
+      spaceCache.getSpaceMember(spaceId, userId),
     setSpaceMember: (spaceMember: SpaceMember) => {
       spaceCache.setSpaceMember(spaceMember);
       setSpaces(spaceCache.getAllSpaces());
     },
-    addSpaceMember: (spaceId: string, memberData: Partial<SpaceMember> & { user_id: string }) => {
+    addSpaceMember: (
+      spaceId: string,
+      memberData: Partial<SpaceMember> & { user_id: string },
+    ) => {
       spaceCache.addSpaceMember(spaceId, memberData);
       setSpaces(spaceCache.getAllSpaces());
     },
@@ -468,15 +741,22 @@ export const CacheProvider: ParentComponent = (props) => {
       setSpaces(spaceCache.getAllSpaces());
     },
     // Space members cache
-    getCachedSpaceMembers: (spaceId: string) => spaceCache.getCachedSpaceMembers(spaceId),
-    setCachedSpaceMembers: (spaceId: string, members: SpaceMember[]) => spaceCache.setCachedSpaceMembers(spaceId, members),
-    updateCachedSpaceMember: (spaceId: string, member: SpaceMember) => spaceCache.updateCachedSpaceMember(spaceId, member),
+    getCachedSpaceMembers: (spaceId: string) =>
+      spaceCache.getCachedSpaceMembers(spaceId),
+    setCachedSpaceMembers: (spaceId: string, members: SpaceMember[]) =>
+      spaceCache.setCachedSpaceMembers(spaceId, members),
+    updateCachedSpaceMember: (spaceId: string, member: SpaceMember) =>
+      spaceCache.updateCachedSpaceMember(spaceId, member),
     // Space roles
     getSpaceRoles: (spaceId: string) => spaceCache.getSpaceRoles(spaceId),
-    getSpaceRole: (spaceId: string, roleId: string) => spaceCache.getSpaceRole(spaceId, roleId),
-    setSpaceRole: (spaceId: string, role: SpaceRole) => spaceCache.setSpaceRole(spaceId, role),
-    getCachedSpaceRoles: (spaceId: string) => spaceCache.getCachedSpaceRoles(spaceId),
-    setCachedSpaceRoles: (spaceId: string, roles: SpaceRole[]) => spaceCache.setCachedSpaceRoles(spaceId, roles),
+    getSpaceRole: (spaceId: string, roleId: string) =>
+      spaceCache.getSpaceRole(spaceId, roleId),
+    setSpaceRole: (spaceId: string, role: SpaceRole) =>
+      spaceCache.setSpaceRole(spaceId, role),
+    getCachedSpaceRoles: (spaceId: string) =>
+      spaceCache.getCachedSpaceRoles(spaceId),
+    setCachedSpaceRoles: (spaceId: string, roles: SpaceRole[]) =>
+      spaceCache.setCachedSpaceRoles(spaceId, roles),
     // Room management
     getRoom: (roomId: string) => roomCache.getRoom(roomId),
     setRoom: (room: Room) => roomCache.setRoom(room),
@@ -485,7 +765,8 @@ export const CacheProvider: ParentComponent = (props) => {
     setInvite: (invite: InviteInfo) => inviteCache.setInvite(invite),
     deleteInvite: (code: string) => inviteCache.deleteInvite(code),
     clearInvites: () => inviteCache.clearInvites(),
-    getInviteInfo: (code: string, fetchFn: () => Promise<InviteInfo>) => inviteCache.getInviteInfo(code, fetchFn),
+    getInviteInfo: (code: string, fetchFn: () => Promise<InviteInfo>) =>
+      inviteCache.getInviteInfo(code, fetchFn),
   };
 
   return (
@@ -504,4 +785,3 @@ export const useCache = () => {
 };
 
 export type { Space };
-
