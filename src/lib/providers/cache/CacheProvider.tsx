@@ -270,13 +270,28 @@ export const CacheProvider: ParentComponent = (props) => {
 
         const p = r.participants || [];
         const id = data.participant_id;
-        if (data.event_type === "VOICE_PARTICIPANT_JOIN") {
+        if (data.event_type === "VOICE_PARTICIPANT_JOIN" && id) {
           if (p.findIndex((e) => e === id) !== -1) return;
           p.push(id);
-        } else if (data.event_type === "VOICE_PARTICIPANT_LEAVE") {
+        } else if (data.event_type === "VOICE_PARTICIPANT_LEAVE" && id) {
           const idx = p.findIndex((e) => e === id);
           if (idx === -1) return;
           p.splice(idx, 1);
+        } else if (data.event_type === "VOICE_STOP_RINGING" || data.event_type === "VOICE_START_RINGING") {
+          const ringing = (data.event_type === "VOICE_STOP_RINGING") ? false : true;
+          const caller = data.caller;
+          const current = r.ringing || [];
+
+          if (!caller) throw "Caller not specified in " + data.event_type + " Event";
+          if (ringing) { // START_RINGING
+            current.push(caller);
+          } else {
+            const idx = current.findIndex(e => e === caller)
+            if (idx === -1) return;
+            current.splice(idx, 1);
+          }
+        } else {
+          return console.error("[CacheProvider] Unknown event processing voice events: ", data);
         }
 
         console.log("[CacheProvider] Updating room:", data.room_id);

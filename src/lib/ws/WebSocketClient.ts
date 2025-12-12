@@ -1,6 +1,8 @@
 export type VoicePayloadType =
   | "VOICE_PARTICIPANT_JOIN"
-  | "VOICE_PARTICIPANT_LEAVE";
+  | "VOICE_PARTICIPANT_LEAVE"
+  | "VOICE_START_RINGING"
+  | "VOICE_STOP_RINGING";
 
 export type PayloadType =
   | "IDENTIFY"

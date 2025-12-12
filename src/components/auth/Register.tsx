@@ -5,7 +5,6 @@ import { useTransContext } from "@mbarzda/solid-i18next";
 import { LanguageSelector } from "../shared/LanguageSelector";
 import DatePicker from "../shared/DatePicker";
 
-
 const Register = () => {
   const [username, setUsername] = createSignal("");
   const [discriminator, setDiscriminator] = createSignal("");
@@ -16,57 +15,103 @@ const Register = () => {
   const [tosAgreed, setTosAgreed] = createSignal(false);
   const [error, setError] = createSignal("");
   const [step, setStep] = createSignal(1);
-  
   const [confirmPassword, setConfirmPassword] = createSignal("");
   const { register, isMobile } = useAuth();
   const [t] = useTransContext();
   const navigate = useNavigate();
 
-  
+  const validateEmail = (e: string) => {
+    if (!e) return false;
+    const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return re.test(e);
+  };
 
-  const handleNext = (e: Event) => {
-    e.preventDefault();
-    setError("");
-
-    let valid = true;
-
-    if (step() === 1) {
-      if (!email() || !dateOfBirth()) {
-        setError(t("auth.register.error.requiredFields"));
-        valid = false;
+  const isStepValid = (s: number) => {
+    if (s === 1) {
+      if (!validateEmail(email())) {
+        setError(t("auth.register.error.invalidEmail") || "Invalid email");
+        return false;
       }
-    } else if (step() === 2) {
+      if (!dateOfBirth()) {
+        setError(t("auth.register.error.requiredFields"));
+        return false;
+      }
+      const dob = new Date(dateOfBirth());
+      if (isNaN(dob.getTime()) || dob > new Date()) {
+        setError(
+          t("auth.register.error.invalidDate") || "Invalid date of birth",
+        );
+        return false;
+      }
+      return true;
+    }
+    if (s === 2) {
       if (!password() || !confirmPassword()) {
         setError(t("auth.register.error.requiredFields"));
-        valid = false;
-      } else if (password() !== confirmPassword()) {
+        return false;
+      }
+      if (password() !== confirmPassword()) {
         setError(t("auth.register.error.passwordMismatch"));
-        valid = false;
+        return false;
       }
-    } else if (step() === 3) {
-      if (!username() || !discriminator()) {
+      const pwd = password();
+      const minLength = 8;
+      const hasLower = /[a-z]/.test(pwd);
+      const hasUpper = /[A-Z]/.test(pwd);
+      const hasSpecial = /[^A-Za-z0-9]/.test(pwd);
+      if (pwd.length < minLength || !hasLower || !hasUpper || !hasSpecial) {
+        setError(
+          t("auth.register.error.weakPassword") ||
+            `Password must be at least ${minLength} characters and include uppercase, lowercase, and a special characters`,
+        );
+        return false;
+      }
+      return true;
+    }
+    if (s === 3) {
+      if (!username()) {
         setError(t("auth.register.error.requiredFields"));
-        valid = false;
-      } else if (discriminator().length !== 4 || isNaN(parseInt(discriminator()))) {
-        setError("Discriminator must be exactly 4 numbers");
-        valid = false;
+        return false;
       }
-    } else if (step() === 4) {
+      if (discriminator().length !== 4) {
+        setError(
+          t("auth.register.error.discriminatorLength") ||
+            "Discriminator must be exactly 4 digits",
+        );
+        return false;
+      }
+      if (!/^\d{4}$/.test(discriminator())) {
+        setError(
+          t("auth.register.error.discriminatorDigits") ||
+            "Discriminator must contain only numbers",
+        );
+        return false;
+      }
+      return true;
+    }
+    if (s === 4) {
       if (!tosAgreed()) {
-        setError(t("auth.register.error.requiredFields"));
-        valid = false;
+        setError(
+          t("auth.register.error.tosRequired") || "You must agree to the terms",
+        );
+        return false;
       }
+      return true;
     }
+    return false;
+  };
 
-    if (valid) {
-      
-      setStep((prev) => prev + 1);
-    }
+  const handleNext = (e?: Event) => {
+    e?.preventDefault();
+    setError("");
+    const current = step();
+    if (!isStepValid(current)) return;
+    setStep((prev) => Math.min(4, prev + 1));
   };
 
   const handleBack = () => {
-    
-    setStep((prev) => prev - 1);
+    setError("");
+    setStep((prev) => Math.max(1, prev - 1));
   };
 
   const handleSubmit = async (e: Event) => {
@@ -74,31 +119,20 @@ const Register = () => {
     setError("");
 
     if (
-      !email() ||
-      !password() ||
-      !confirmPassword() ||
-      !dateOfBirth() ||
-      !username() ||
-      !discriminator() ||
-      !tosAgreed()
+      !isStepValid(1) ||
+      !isStepValid(2) ||
+      !isStepValid(3) ||
+      !isStepValid(4)
     ) {
-      setError(t("auth.register.error.requiredFields"));
-      return;
-    }
-
-    if (password() !== confirmPassword()) {
-      setError(t("auth.register.error.passwordMismatch"));
-      return;
-    }
-
-    if (discriminator().length !== 4) {
-      setError("Discriminator must be exactly 4 digits");
       return;
     }
 
     const discNumber = parseInt(discriminator(), 10);
     if (isNaN(discNumber)) {
-      setError("Discriminator must be a valid number");
+      setError(
+        t("auth.register.error.discriminatorDigits") ||
+          "Discriminator must be a valid number",
+      );
       return;
     }
 
@@ -119,10 +153,8 @@ const Register = () => {
 
     if (result.success) {
       if (result.message) {
-
         navigate("/verify-email", { replace: true });
       } else {
-        
         navigate("/", { replace: true });
       }
     } else {
@@ -130,9 +162,12 @@ const Register = () => {
     }
   };
 
+  const sanitizeDiscriminatorInput = (value: string) => {
+    return value.replace(/\D/g, "").slice(0, 4);
+  };
+
   return (
     <div class="min-h-screen bg-[#1a1b26] flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Animated turtle emojis */}
       <div class="fixed inset-0 opacity-40 pointer-events-none">
         <img
           src="https://raw.githubusercontent.com/googlefonts/noto-emoji/main/png/512/emoji_u1f422.png"
@@ -166,7 +201,6 @@ const Register = () => {
         />
       </div>
 
-      {/* Dark gradient overlay */}
       <div class="absolute inset-0 bg-gradient-to-br from-[#1a1b26]/80 via-[#1a1b26]/60 to-[#1a1b26]/90 pointer-events-none"></div>
 
       <div class="absolute top-1 right-1 z-50">
@@ -320,9 +354,48 @@ const Register = () => {
                       value={discriminator()}
                       required
                       maxLength={4}
+                      inputMode="numeric"
+                      pattern="[0-9]*"
                       onInput={(e) => {
-                        const value = e.currentTarget.value.replace(/\D/g, "");
-                        setDiscriminator(value.slice(0, 4));
+                        const sanitized = sanitizeDiscriminatorInput(
+                          e.currentTarget.value,
+                        );
+                        setDiscriminator(sanitized);
+                      }}
+                      onBeforeInput={(e: any) => {
+                        const data = e.data;
+                        if (data && !/^[0-9]+$/.test(data)) {
+                          e.preventDefault();
+                        }
+                      }}
+                      onKeyDown={(e: KeyboardEvent) => {
+                        const key = (e as KeyboardEvent).key;
+                        if (
+                          (e as KeyboardEvent).ctrlKey ||
+                          (e as KeyboardEvent).metaKey
+                        )
+                          return;
+                        const allowedKeys = [
+                          "Backspace",
+                          "Tab",
+                          "Enter",
+                          "Escape",
+                          "ArrowLeft",
+                          "ArrowRight",
+                          "Delete",
+                          "Home",
+                          "End",
+                        ];
+                        if (allowedKeys.includes(key)) return;
+                        if (!/^[0-9]$/.test(key)) {
+                          e.preventDefault();
+                        }
+                      }}
+                      onPaste={(e) => {
+                        const text = e.clipboardData?.getData("text") || "";
+                        const sanitized = sanitizeDiscriminatorInput(text);
+                        setDiscriminator(sanitized);
+                        e.preventDefault();
                       }}
                       class="w-full px-3 py-2 border border-[#414868] rounded-md bg-[#24283b] text-white focus:outline-none "
                     />

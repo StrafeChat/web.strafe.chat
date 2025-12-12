@@ -10,6 +10,7 @@ import { useAuth } from "../auth/AuthProvider"
 import { AudioCaptureOptions, DisconnectReason, LocalTrackPublication, ParticipantEvent, RemoteParticipant, RemoteTrack, RemoteTrackPublication, Room, RoomEvent, Track, VideoCaptureOptions } from "livekit-client";
 import { LIVEKIT_URL } from "../../../constants";
 import { RNNoiseResult, useRNNoise } from "./RNNoise";
+import { CallProvider } from "./CallProvider";
 
 export enum VoiceState {
 	DISCONNECTED, // order is important
@@ -416,7 +417,9 @@ export const VoiceProvider: ParentComponent = (props) => {
 			<div ref={audioCon}>
 
 			</div>
-			{props.children}
+			<CallProvider>
+				{props.children}
+			</CallProvider>
 		</VoiceContext.Provider>
 	)
 }

@@ -140,6 +140,7 @@ type AuthContextType = {
   fetchUnreadMessages: (roomId: string) => Promise<void>;
   markMessagesAsRead: (roomId: string) => Promise<void>;
   getJoinToken: (roomId: string) => Promise<string>;
+  startRinging: (roomId: string) => Promise<void>;
   getRoomParticipants: (roomId: string) => Promise<(User | null)[]>;
 };
 
@@ -593,7 +594,29 @@ export const AuthProvider: ParentComponent = (props) => {
         parent_id: parentId ? String(parentId) : undefined,
         position: room.Position ?? room.position ?? undefined,
         participants: room.Participants || room.participants || [],
-        recipients_data,
+        recipients_data: (room.Recipients || room.recipients || [])
+          ?.map((recipientId: string) =>
+            users?.[recipientId]
+              ? {
+                  id: recipientId,
+                  username:
+                    users[recipientId].Username || users[recipientId].username,
+                  discriminator:
+                    users[recipientId].Discriminator ||
+                    users[recipientId].discriminator,
+                  display_name:
+                    users[recipientId].DisplayName ||
+                    users[recipientId].display_name ||
+                    users[recipientId].Username ||
+                    users[recipientId].username,
+                  avatar:
+                    users[recipientId].Avatar || users[recipientId].avatar,
+                  presence:
+                    users[recipientId].Presence || users[recipientId].presence,
+                }
+              : null,
+          )
+          .filter(Boolean),
       };
     });
 
@@ -2271,6 +2294,32 @@ export const AuthProvider: ParentComponent = (props) => {
       return "";
     }
   };
+  const startRinging = async (roomId: string): Promise<void> => {
+    const res = await fetch(`${BASE_URL}/rooms/call/${roomId}`, {
+      headers: {
+        ...API_HEADERS.JSON,
+        ...API_HEADERS.SESSION(),
+      },
+      method: "POST",
+    });
+
+    if (!res.ok) {
+      throw new Error(`Failed to ring room ${roomId}: ${res.status}`);
+    }
+  };
+  const stopRinging = async (roomId: string): Promise<void> => {
+    const res = await fetch(`${BASE_URL}/rooms/call/${roomId}/stop`, {
+      headers: {
+        ...API_HEADERS.JSON,
+        ...API_HEADERS.SESSION(),
+      },
+      method: "POST",
+    });
+
+    if (!res.ok) {
+      throw new Error(`Failed to ring room ${roomId}: ${res.status}`);
+    }
+  };
 
   const getRoomParticipants = async (
     roomId: string,
@@ -2410,6 +2459,7 @@ export const AuthProvider: ParentComponent = (props) => {
         markMessagesAsRead,
         sendTypingIndicator,
         getJoinToken,
+        startRinging,
         getRoomParticipants,
       }}
       data-auth-provider
