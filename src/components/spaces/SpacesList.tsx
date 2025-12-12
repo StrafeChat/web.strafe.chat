@@ -1,4 +1,12 @@
-import { Component, createMemo, Show, For, createSignal, createEffect, Accessor } from "solid-js";
+import {
+  Component,
+  createMemo,
+  Show,
+  For,
+  createSignal,
+  createEffect,
+  Accessor,
+} from "solid-js";
 import { useNavigate, useLocation } from "@solidjs/router";
 import { useAuth } from "../../lib/providers/auth/AuthProvider";
 import { useCache } from "../../lib/providers/cache/CacheProvider";
@@ -38,7 +46,8 @@ const SpacesList: Component = () => {
   const { getLastHomeRoute, getLastSpaceRoute } = useNavigationHistory();
   const [showCreateModal, setShowCreateModal] = createSignal(false);
   const [showCreateFolderModal, setShowCreateFolderModal] = createSignal(false);
-  const [showFolderSettingsModal, setShowFolderSettingsModal] = createSignal(false);
+  const [showFolderSettingsModal, setShowFolderSettingsModal] =
+    createSignal(false);
   const [selectedFolder, setSelectedFolder] = createSignal<Folder | null>(null);
   const [contextMenu, setContextMenu] = createSignal<{
     isOpen: boolean;
@@ -54,7 +63,10 @@ const SpacesList: Component = () => {
   const [dragOverSpace, setDragOverSpace] = createSignal<string | null>(null);
   const [spacesOrder, setSpacesOrder] = createSignal<string[]>([]);
   const [folders, setFolders] = createSignal<Folder[]>([]);
-  const [draggedItem, setDraggedItem] = createSignal<{ type: "space" | "folder"; id: string } | null>(null);
+  const [draggedItem, setDraggedItem] = createSignal<{
+    type: "space" | "folder";
+    id: string;
+  } | null>(null);
   const [dragOverFolder, setDragOverFolder] = createSignal<string | null>(null);
 
   // localStorage keys
@@ -86,7 +98,10 @@ const SpacesList: Component = () => {
       const stored = localStorage.getItem(SPACES_ORDER_KEY);
       return stored ? JSON.parse(stored) : [];
     } catch (error) {
-      console.warn("[SpacesList] Failed to load spaces order from localStorage:", error);
+      console.warn(
+        "[SpacesList] Failed to load spaces order from localStorage:",
+        error,
+      );
       return [];
     }
   };
@@ -96,7 +111,10 @@ const SpacesList: Component = () => {
     try {
       localStorage.setItem(SPACES_ORDER_KEY, JSON.stringify(order));
     } catch (error) {
-      console.warn("[SpacesList] Failed to save spaces order to localStorage:", error);
+      console.warn(
+        "[SpacesList] Failed to save spaces order to localStorage:",
+        error,
+      );
     }
   };
 
@@ -106,7 +124,10 @@ const SpacesList: Component = () => {
       const stored = localStorage.getItem(FOLDERS_KEY);
       return stored ? JSON.parse(stored) : [];
     } catch (error) {
-      console.warn("[SpacesList] Failed to load folders from localStorage:", error);
+      console.warn(
+        "[SpacesList] Failed to load folders from localStorage:",
+        error,
+      );
       return [];
     }
   };
@@ -116,7 +137,10 @@ const SpacesList: Component = () => {
     try {
       localStorage.setItem(FOLDERS_KEY, JSON.stringify(folderList));
     } catch (error) {
-      console.warn("[SpacesList] Failed to save folders to localStorage:", error);
+      console.warn(
+        "[SpacesList] Failed to save folders to localStorage:",
+        error,
+      );
     }
   };
 
@@ -138,7 +162,10 @@ const SpacesList: Component = () => {
       if (folder.id === folderId) {
         return { ...folder, spaceIds: [...folder.spaceIds, spaceId] };
       }
-      return { ...folder, spaceIds: folder.spaceIds.filter((id) => id !== spaceId) };
+      return {
+        ...folder,
+        spaceIds: folder.spaceIds.filter((id) => id !== spaceId),
+      };
     });
     setFolders(updatedFolders);
     saveFolders(updatedFolders);
@@ -159,7 +186,7 @@ const SpacesList: Component = () => {
   const toggleFolder = (folderId: string) => {
     const currentFolders = folders();
     const updatedFolders = currentFolders.map((folder) =>
-      folder.id === folderId ? { ...folder, isOpen: !folder.isOpen } : folder
+      folder.id === folderId ? { ...folder, isOpen: !folder.isOpen } : folder,
     );
     setFolders(updatedFolders);
     saveFolders(updatedFolders);
@@ -188,7 +215,9 @@ const SpacesList: Component = () => {
       folder.spaceIds.forEach((spaceId) => spacesInFolders.add(spaceId));
     });
 
-    const standaloneSpaces = allSpaces.filter((space) => !spacesInFolders.has(space.id));
+    const standaloneSpaces = allSpaces.filter(
+      (space) => !spacesInFolders.has(space.id),
+    );
     const sortedStandaloneSpaces: Space[] = [];
     const addedIds = new Set<string>();
 
@@ -223,8 +252,12 @@ const SpacesList: Component = () => {
   // Get spaces within a folder
   const getFolderSpaces = (folder: Folder): Space[] => {
     const allSpaces = userSpaces();
-    const spaceMap = new Map(allSpaces.map((space: Space) => [space.id, space]));
-    return folder.spaceIds.map((id) => spaceMap.get(id)).filter((space): space is Space => !!space);
+    const spaceMap = new Map(
+      allSpaces.map((space: Space) => [space.id, space]),
+    );
+    return folder.spaceIds
+      .map((id) => spaceMap.get(id))
+      .filter((space): space is Space => !!space);
   };
 
   // Initialize spaces order and folders from localStorage
@@ -252,32 +285,56 @@ const SpacesList: Component = () => {
     return allRooms.filter(
       (room: any) =>
         (room.unread_count ?? 0) > 0 &&
-        (room.type === RoomType.PM || room.type === RoomType.GROUP_PM)
+        (room.type === RoomType.PM || room.type === RoomType.GROUP_PM),
     );
   });
 
-  // Calculate unread count for a specific space (excluding mentions)
-  const getSpaceUnreadCount = (spaceId: string) => {
+  // Optimized space unread/mention counts with memoized lookup maps
+  const spaceCountsMap = createMemo(() => {
+    const startTime = performance.now();
     const allRooms = rooms();
     const currentUser = user();
-    if (currentUser?.presence?.status === "dnd") return 0;
-    return allRooms
-      .filter((room: any) => String(room.space_id) === String(spaceId))
-      .reduce((total: number, room: any) => {
-        const unreads = room.unread_count || 0;
-        const mentions = room.mention_count || 0;
-        return total + Math.max(0, unreads - mentions);
-      }, 0);
+
+    if (currentUser?.presence?.status === "dnd") {
+      return new Map<string, { unreadCount: number; mentionCount: number }>();
+    }
+
+    const countsMap = new Map<
+      string,
+      { unreadCount: number; mentionCount: number }
+    >();
+
+    // Single pass through all rooms to calculate both counts
+    allRooms.forEach((room: any) => {
+      const spaceId = String(room.space_id);
+      const existing = countsMap.get(spaceId) || {
+        unreadCount: 0,
+        mentionCount: 0,
+      };
+
+      const unreads = room.unread_count || 0;
+      const mentions = room.mention_count || 0;
+
+      existing.unreadCount += Math.max(0, unreads - mentions);
+      existing.mentionCount += mentions;
+
+      countsMap.set(spaceId, existing);
+    });
+
+    const endTime = performance.now();
+    console.log(
+      `[SpacesList] 🚀 Built space counts map for ${countsMap.size} spaces in ${(endTime - startTime).toFixed(2)}ms`,
+    );
+    return countsMap;
+  });
+
+  // Fast lookup functions using the memoized map
+  const getSpaceUnreadCount = (spaceId: string) => {
+    return spaceCountsMap().get(String(spaceId))?.unreadCount || 0;
   };
 
-  // Calculate mention count for a specific space
   const getSpaceMentionCount = (spaceId: string) => {
-    const allRooms = rooms();
-    const currentUser = user();
-    if (currentUser?.presence?.status === "dnd") return 0;
-    return allRooms
-      .filter((room: any) => String(room.space_id) === String(spaceId))
-      .reduce((total: number, room: any) => total + (room.mention_count || 0), 0);
+    return spaceCountsMap().get(String(spaceId))?.mentionCount || 0;
   };
 
   // Helper function to get room avatar
@@ -286,7 +343,9 @@ const SpacesList: Component = () => {
     if (room.type === RoomType.GROUP_PM) return null;
     if (room.recipients_data && room.recipients_data.length > 0) {
       const currentUserId = user()?.id;
-      const recipient = room.recipients_data.find((r: any) => r.id !== currentUserId);
+      const recipient = room.recipients_data.find(
+        (r: any) => r.id !== currentUserId,
+      );
       if (recipient) {
         return `${FS_URL}/avatars/${recipient.id}/${recipient.avatar || "default.webp"}`;
       }
@@ -298,7 +357,11 @@ const SpacesList: Component = () => {
   };
 
   // Enhanced drag and drop handlers
-  const handleItemDragStart = (e: DragEvent, type: "space" | "folder", id: string) => {
+  const handleItemDragStart = (
+    e: DragEvent,
+    type: "space" | "folder",
+    id: string,
+  ) => {
     e.dataTransfer!.effectAllowed = "move";
     e.dataTransfer!.setData("text/plain", `${type}:${id}`);
     setDraggedItem({ type, id });
@@ -307,7 +370,11 @@ const SpacesList: Component = () => {
     }
   };
 
-  const handleItemDragOver = (e: DragEvent, type: "space" | "folder", id: string) => {
+  const handleItemDragOver = (
+    e: DragEvent,
+    type: "space" | "folder",
+    id: string,
+  ) => {
     e.preventDefault();
     e.stopPropagation();
     e.dataTransfer!.dropEffect = "move";
@@ -341,13 +408,13 @@ const SpacesList: Component = () => {
   const handleFolderDrop = (e: DragEvent, folderId: string) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     // Immediately clear drag states to hide drop zones
     setDraggedItem(null);
     setDraggedSpace(null);
     setDragOverSpace(null);
     setDragOverFolder(null);
-    
+
     const draggedData = e.dataTransfer!.getData("text/plain");
     if (draggedData.startsWith("space:")) {
       const spaceId = draggedData.replace("space:", "");
@@ -355,29 +422,33 @@ const SpacesList: Component = () => {
     }
   };
 
-  const handleItemDrop = (e: DragEvent, targetType: "space" | "folder", targetId: string) => {
+  const handleItemDrop = (
+    e: DragEvent,
+    targetType: "space" | "folder",
+    targetId: string,
+  ) => {
     e.preventDefault();
     e.stopPropagation();
-    
+
     // Immediately clear drag states to hide drop zones
     setDraggedItem(null);
     setDraggedSpace(null);
     setDragOverSpace(null);
     setDragOverFolder(null);
-    
+
     const draggedData = e.dataTransfer!.getData("text/plain");
-    
+
     if (draggedData.startsWith("space:")) {
       const draggedSpaceId = draggedData.replace("space:", "");
       if (targetType === "space" && draggedSpaceId !== targetId) {
         // Remove space from any folder it might be in
         removeSpaceFromFolder(draggedSpaceId);
-        
+
         // Find the target space position in the current order
         const currentOrder = spacesOrder();
         const targetIndex = currentOrder.indexOf(targetId);
         const draggedIndex = currentOrder.indexOf(draggedSpaceId);
-        
+
         if (targetIndex !== -1 && draggedIndex !== -1) {
           const newOrder = [...currentOrder];
           // Remove dragged space from its current position
@@ -398,43 +469,45 @@ const SpacesList: Component = () => {
     const draggedData = e.dataTransfer!.getData("text/plain");
     const currentItems = organizedItems();
     const currentDraggedItem = draggedItem();
-    
+
     // Immediately clear drag states to hide drop zones
     setDraggedItem(null);
     setDraggedSpace(null);
     setDragOverSpace(null);
     setDragOverFolder(null);
-    
+
     if (!currentDraggedItem || !draggedData) {
       return;
     }
-    
+
     const currentIndex = currentItems.findIndex(
-      (item) => item.data.id === currentDraggedItem.id && item.type === currentDraggedItem.type
+      (item) =>
+        item.data.id === currentDraggedItem.id &&
+        item.type === currentDraggedItem.type,
     );
-    
+
     if (currentIndex === -1 || currentIndex === targetIndex) {
       return;
     }
-    
+
     if (draggedData.startsWith("space:")) {
       const spaceId = draggedData.replace("space:", "");
       removeSpaceFromFolder(spaceId);
       const currentOrder = spacesOrder();
       const newOrder = [...currentOrder];
       const spaceIndex = newOrder.indexOf(spaceId);
-      
+
       if (spaceIndex > -1) {
         newOrder.splice(spaceIndex, 1);
       }
-      
+
       let spacePosition = 0;
       for (let i = 0; i < targetIndex; i++) {
         if (currentItems[i].type === "space") {
           spacePosition++;
         }
       }
-      
+
       newOrder.splice(spacePosition, 0, spaceId);
       setSpacesOrder(newOrder);
       saveSpacesOrder(newOrder);
@@ -442,18 +515,18 @@ const SpacesList: Component = () => {
       const folderId = draggedData.replace("folder:", "");
       const currentFolders = folders();
       const folderIndex = currentFolders.findIndex((f) => f.id === folderId);
-      
+
       if (folderIndex > -1) {
         const newFolders = [...currentFolders];
         const [movedFolder] = newFolders.splice(folderIndex, 1);
-        
+
         let folderPosition = 0;
         for (let i = 0; i < targetIndex; i++) {
           if (currentItems[i].type === "folder") {
             folderPosition++;
           }
         }
-        
+
         newFolders.splice(folderPosition, 0, movedFolder);
         setFolders(newFolders);
         saveFolders(newFolders);
@@ -477,10 +550,14 @@ const SpacesList: Component = () => {
     saveFolders([...currentFolders, newFolder]);
   };
 
-  const handleUpdateFolder = (folderId: string, name: string, color: string) => {
+  const handleUpdateFolder = (
+    folderId: string,
+    name: string,
+    color: string,
+  ) => {
     const currentFolders = folders();
     const updatedFolders = currentFolders.map((folder) =>
-      folder.id === folderId ? { ...folder, name, color } : folder
+      folder.id === folderId ? { ...folder, name, color } : folder,
     );
     setFolders(updatedFolders);
     saveFolders(updatedFolders);
@@ -571,7 +648,10 @@ const SpacesList: Component = () => {
         <div class="flex flex-col gap-2 mt-1 w-full items-center">
           <For each={unreadRooms().slice(0, 3)}>
             {(room) => (
-              <Tooltip content={`Unread messages in ${room.name || "chat"}`} position="right">
+              <Tooltip
+                content={`Unread messages in ${room.name || "chat"}`}
+                position="right"
+              >
                 <button
                   class="w-10 h-10 rounded-full relative border-2 border-surface transition-all"
                   onClick={() => {
@@ -607,7 +687,10 @@ const SpacesList: Component = () => {
             )}
           </For>
           <Show when={unreadRooms().length > 3}>
-            <Tooltip content={`${unreadRooms().length - 3} more rooms with unread messages`} position="right">
+            <Tooltip
+              content={`${unreadRooms().length - 3} more rooms with unread messages`}
+              position="right"
+            >
               <div class="w-10 h-10 rounded-full bg-surface text-text-primary flex items-center justify-center text-xs font-medium relative">
                 +{unreadRooms().length - 3}
                 <div class="absolute bottom-0 right-0 bg-red-500 w-[12px] h-[12px] rounded-full border-2 border-[var(--background)]"></div>
@@ -622,7 +705,8 @@ const SpacesList: Component = () => {
         <For each={organizedItems()}>
           {(item, index: Accessor<number>) => {
             const currentDraggedItem = draggedItem();
-            const showDropZone = draggedItem() && draggedItem()!.id !== item.data.id;
+            const showDropZone =
+              draggedItem() && draggedItem()!.id !== item.data.id;
 
             return (
               <div class="w-full flex flex-col items-center">
@@ -642,7 +726,9 @@ const SpacesList: Component = () => {
                 {item.type === "folder" ? (
                   <div
                     class={`relative flex flex-col items-center w-12 transition-all duration-200 ${
-                      dragOverFolder() === item.data.id ? "bg-accent bg-opacity-20 rounded-lg p-1" : ""
+                      dragOverFolder() === item.data.id
+                        ? "bg-accent bg-opacity-20 rounded-lg p-1"
+                        : ""
                     }`}
                     onDragOver={(e) => handleFolderDragOver(e, item.data.id)}
                     onDragLeave={handleItemDragLeave}
@@ -652,18 +738,27 @@ const SpacesList: Component = () => {
                     <Tooltip content={item.data.name} position="right">
                       <button
                         class={`w-12 h-12 ${item.data.isOpen ? "rounded-2xl" : "rounded-full hover:rounded-2xl"} bg-surface hover:bg-accent transition-all duration-200 relative overflow-hidden ${
-                          !item.data.isOpen && folderContainsActiveSpace(item.data) ? "ring-2 ring-primary" : ""
+                          !item.data.isOpen &&
+                          folderContainsActiveSpace(item.data)
+                            ? "ring-2 ring-primary"
+                            : ""
                         }`}
                         onClick={() => toggleFolder(item.data.id)}
-                        onContextMenu={(e) => handleFolderContextMenu(e, item.data.id)}
+                        onContextMenu={(e) =>
+                          handleFolderContextMenu(e, item.data.id)
+                        }
                         draggable={true}
-                        onDragStart={(e) => handleItemDragStart(e, "folder", item.data.id)}
+                        onDragStart={(e) =>
+                          handleItemDragStart(e, "folder", item.data.id)
+                        }
                         onDragEnd={handleItemDragEnd}
                       >
                         <Show
                           when={item.data.isOpen}
                           fallback={
-                            <Show when={getFolderSpaces(item.data).length === 0}>
+                            <Show
+                              when={getFolderSpaces(item.data).length === 0}
+                            >
                               <div class="w-full h-full flex items-center justify-center">
                                 <svg
                                   xmlns="http://www.w3.org/2000/svg"
@@ -690,13 +785,20 @@ const SpacesList: Component = () => {
                             </svg>
                           </div>
                         </Show>
-                        <Show when={!item.data.isOpen && getFolderSpaces(item.data).length > 0}>
+                        <Show
+                          when={
+                            !item.data.isOpen &&
+                            getFolderSpaces(item.data).length > 0
+                          }
+                        >
                           <div class="w-full h-full grid grid-cols-2 gap-0.5 p-1">
                             <For each={getFolderSpaces(item.data).slice(0, 4)}>
                               {(space, index) => (
                                 <div
                                   class={`${index() < 2 ? "row-start-1" : "row-start-2"} ${
-                                    index() % 2 === 0 ? "col-start-1" : "col-start-2"
+                                    index() % 2 === 0
+                                      ? "col-start-1"
+                                      : "col-start-2"
                                   } aspect-square rounded-sm overflow-hidden`}
                                 >
                                   <Show
@@ -719,7 +821,12 @@ const SpacesList: Component = () => {
                             </For>
                           </div>
                         </Show>
-                        <Show when={!item.data.isOpen && folderContainsActiveSpace(item.data)}>
+                        <Show
+                          when={
+                            !item.data.isOpen &&
+                            folderContainsActiveSpace(item.data)
+                          }
+                        >
                           <div class="absolute -left-3 top-1/2 transform -translate-y-1/2 w-1 h-8 bg-primary rounded-r-md" />
                         </Show>
                       </button>
@@ -730,29 +837,37 @@ const SpacesList: Component = () => {
                       <div class="flex flex-col gap-1 w-full items-center bg-surface bg-opacity-30 rounded-lg p-1 mt-1">
                         <For each={getFolderSpaces(item.data)}>
                           {(space) => {
-                            const isDragging = () => draggedSpace() === space.id;
-                            // Calculate unread rooms for this specific space
-                            const spaceUnreadRooms = createMemo(() => {
-                              const allRooms = rooms();
-                              return allRooms.filter(
-                                (room: any) => String(room.space_id) === String(space.id) && room.unread_count > 0
-                              );
-                            });
+                            const isDragging = () =>
+                              draggedSpace() === space.id;
+                            // Use optimized space counts instead of createMemo inside For loop
+                            const hasUnreadMessages = () =>
+                              getSpaceUnreadCount(space.id) > 0;
 
                             return (
                               <div
                                 class={`relative flex-shrink-0 w-12 h-12 transition-all duration-200 bg-surface bg-opacity-50 rounded-lg p-1 ${
                                   isDragging() ? "opacity-50 scale-95" : ""
                                 } ${dragOverSpace() === space.id ? "transform translate-y-1" : ""}`}
-                                onDragOver={(e) => handleItemDragOver(e, "space", space.id)}
+                                onDragOver={(e) =>
+                                  handleItemDragOver(e, "space", space.id)
+                                }
                                 onDragLeave={handleItemDragLeave}
-                                onDrop={(e) => handleItemDrop(e, "space", space.id)}
+                                onDrop={(e) =>
+                                  handleItemDrop(e, "space", space.id)
+                                }
                               >
                                 {/* Space indicators */}
-                                <Show when={isSpaceActive() === String(space.id)}>
+                                <Show
+                                  when={isSpaceActive() === String(space.id)}
+                                >
                                   <div class="absolute -left-2 top-1/2 transform -translate-y-1/2 w-0.5 h-8 bg-primary rounded-r-md z-30"></div>
                                 </Show>
-                                <Show when={hoveredSpace() === String(space.id) && isSpaceActive() !== String(space.id)}>
+                                <Show
+                                  when={
+                                    hoveredSpace() === String(space.id) &&
+                                    isSpaceActive() !== String(space.id)
+                                  }
+                                >
                                   <div class="absolute -left-2 top-1/2 transform -translate-y-1/2 w-0.5 h-4 bg-primary rounded-r-md z-30"></div>
                                 </Show>
                                 <Show
@@ -782,16 +897,22 @@ const SpacesList: Component = () => {
                                         : "rounded-full hover:rounded-2xl"
                                     } bg-surface relative group transition-all duration-200 cursor-grab active:cursor-grabbing`}
                                     draggable={true}
-                                    onDragStart={(e) => handleItemDragStart(e, "space", space.id)}
+                                    onDragStart={(e) =>
+                                      handleItemDragStart(e, "space", space.id)
+                                    }
                                     onDragEnd={handleItemDragEnd}
                                     onClick={() => {
-                                      const lastSpaceRoute = getLastSpaceRoute(String(space.id));
+                                      const lastSpaceRoute = getLastSpaceRoute(
+                                        String(space.id),
+                                      );
                                       navigate(lastSpaceRoute);
                                       if (isMobile()) {
                                         setCurrentView("content");
                                       }
                                     }}
-                                    onMouseEnter={() => setHoveredSpace(String(space.id))}
+                                    onMouseEnter={() =>
+                                      setHoveredSpace(String(space.id))
+                                    }
                                     onMouseLeave={() => setHoveredSpace(null)}
                                   >
                                     <Show
@@ -801,9 +922,10 @@ const SpacesList: Component = () => {
                                           class={`w-full h-full bg-surface bg-opacity-20 text-text-primary flex items-center justify-center text-sm font-semibold transition-all duration-200 ${
                                             isSpaceActive() === String(space.id)
                                               ? "rounded-2xl"
-                                              : hoveredSpace() === String(space.id)
-                                              ? "rounded-2xl"
-                                              : "rounded-full"
+                                              : hoveredSpace() ===
+                                                  String(space.id)
+                                                ? "rounded-2xl"
+                                                : "rounded-full"
                                           }`}
                                         >
                                           {space.name_acronym}
@@ -816,9 +938,10 @@ const SpacesList: Component = () => {
                                         class={`w-full h-full object-cover transition-all duration-200 ${
                                           isSpaceActive() === String(space.id)
                                             ? "rounded-2xl"
-                                            : hoveredSpace() === String(space.id)
-                                            ? "rounded-2xl"
-                                            : "rounded-full"
+                                            : hoveredSpace() ===
+                                                String(space.id)
+                                              ? "rounded-2xl"
+                                              : "rounded-full"
                                         }`}
                                         draggable="false"
                                       />
@@ -831,17 +954,30 @@ const SpacesList: Component = () => {
                                     {getSpaceMentionCount(space.id)}
                                   </div>
                                 </Show>
-                                {/* Unread indicator for spaces in folders */}
-                                <Show when={spaceUnreadRooms().length > 0 && getSpaceMentionCount(space.id) === 0}>
+                                {/* Optimized unread indicator for spaces in folders */}
+                                <Show
+                                  when={
+                                    hasUnreadMessages() &&
+                                    getSpaceMentionCount(space.id) === 0
+                                  }
+                                >
                                   <div class="absolute -top-1 -right-1 flex flex-wrap gap-0.5 max-w-6">
-                                    <For each={spaceUnreadRooms().slice(0, 3)}>
-                                      {() => (
-                                        <div class="w-2 h-2 rounded-full bg-red-500 border border-background"></div>
-                                      )}
-                                    </For>
-                                    <Show when={spaceUnreadRooms().length > 3}>
+                                    {/* Show up to 3 unread dots */}
+                                    {Array.from({
+                                      length: Math.min(
+                                        3,
+                                        getSpaceUnreadCount(space.id),
+                                      ),
+                                    }).map(() => (
+                                      <div class="w-2 h-2 rounded-full bg-red-500 border border-background"></div>
+                                    ))}
+                                    <Show
+                                      when={getSpaceUnreadCount(space.id) > 3}
+                                    >
                                       <div class="w-2 h-2 rounded-full bg-red-500 border border-background flex items-center justify-center">
-                                        <span class="text-xs text-white font-bold">+</span>
+                                        <span class="text-xs text-white font-bold">
+                                          +
+                                        </span>
                                       </div>
                                     </Show>
                                   </div>
@@ -856,21 +992,36 @@ const SpacesList: Component = () => {
                 ) : (
                   <div class="w-full flex flex-col items-center">
                     {/* Drop indicator line above */}
-                    <Show when={dragOverSpace() === item.data.id && draggedSpace() !== null && draggedSpace() !== item.data.id}>
+                    <Show
+                      when={
+                        dragOverSpace() === item.data.id &&
+                        draggedSpace() !== null &&
+                        draggedSpace() !== item.data.id
+                      }
+                    >
                       <div class="w-8 h-0.5 bg-primary rounded-full transition-all duration-200"></div>
                     </Show>
                     <div
                       class={`relative flex-shrink-0 w-12 h-12 transition-all duration-200 ${
-                        draggedSpace() === item.data.id ? "opacity-50 scale-95" : ""
+                        draggedSpace() === item.data.id
+                          ? "opacity-50 scale-95"
+                          : ""
                       } ${dragOverSpace() === item.data.id ? "transform translate-y-1" : ""}`}
-                      onDragOver={(e) => handleItemDragOver(e, "space", item.data.id)}
+                      onDragOver={(e) =>
+                        handleItemDragOver(e, "space", item.data.id)
+                      }
                       onDragLeave={handleItemDragLeave}
                       onDrop={(e) => handleItemDrop(e, "space", item.data.id)}
                     >
                       <Show when={isSpaceActive() === String(item.data.id)}>
                         <div class="absolute -left-3 top-1/2 transform -translate-y-1/2 w-1 h-10 bg-primary rounded-r-md z-30"></div>
                       </Show>
-                      <Show when={hoveredSpace() === String(item.data.id) && isSpaceActive() !== String(item.data.id)}>
+                      <Show
+                        when={
+                          hoveredSpace() === String(item.data.id) &&
+                          isSpaceActive() !== String(item.data.id)
+                        }
+                      >
                         <div class="absolute -left-3 top-1/2 transform -translate-y-1/2 w-1 h-5 bg-primary rounded-r-md z-30"></div>
                       </Show>
                       <Show
@@ -895,19 +1046,27 @@ const SpacesList: Component = () => {
                       <Tooltip content={item.data.name} position="right">
                         <button
                           class={`w-12 h-12 flex-shrink-0 ${
-                            isSpaceActive() === String(item.data.id) ? "rounded-2xl" : "rounded-full hover:rounded-2xl"
+                            isSpaceActive() === String(item.data.id)
+                              ? "rounded-2xl"
+                              : "rounded-full hover:rounded-2xl"
                           } bg-surface relative group transition-all duration-200 cursor-grab active:cursor-grabbing`}
                           draggable={true}
-                          onDragStart={(e) => handleItemDragStart(e, "space", item.data.id)}
+                          onDragStart={(e) =>
+                            handleItemDragStart(e, "space", item.data.id)
+                          }
                           onDragEnd={handleItemDragEnd}
                           onClick={() => {
-                            const lastSpaceRoute = getLastSpaceRoute(String(item.data.id));
+                            const lastSpaceRoute = getLastSpaceRoute(
+                              String(item.data.id),
+                            );
                             navigate(lastSpaceRoute);
                             if (isMobile()) {
                               setCurrentView("content");
                             }
                           }}
-                          onMouseEnter={() => setHoveredSpace(String(item.data.id))}
+                          onMouseEnter={() =>
+                            setHoveredSpace(String(item.data.id))
+                          }
                           onMouseLeave={() => setHoveredSpace(null)}
                         >
                           <Show
@@ -918,8 +1077,8 @@ const SpacesList: Component = () => {
                                   isSpaceActive() === String(item.data.id)
                                     ? "rounded-2xl"
                                     : hoveredSpace() === String(item.data.id)
-                                    ? "rounded-2xl"
-                                    : "rounded-full"
+                                      ? "rounded-2xl"
+                                      : "rounded-full"
                                 }`}
                               >
                                 {item.data.name_acronym}
@@ -933,17 +1092,22 @@ const SpacesList: Component = () => {
                                 isSpaceActive() === String(item.data.id)
                                   ? "rounded-2xl"
                                   : hoveredSpace() === String(item.data.id)
-                                  ? "rounded-2xl"
-                                  : "rounded-full"
+                                    ? "rounded-2xl"
+                                    : "rounded-full"
                               }`}
                               draggable="false"
                               onError={(e) => {
                                 const target = e.target as HTMLImageElement;
                                 const container = target.parentElement;
                                 if (container) {
-                                  const isActive = isSpaceActive() === String(item.data.id);
-                                  const isHovered = hoveredSpace() === String(item.data.id);
-                                  const roundingClass = isActive || isHovered ? "rounded-2xl" : "rounded-full";
+                                  const isActive =
+                                    isSpaceActive() === String(item.data.id);
+                                  const isHovered =
+                                    hoveredSpace() === String(item.data.id);
+                                  const roundingClass =
+                                    isActive || isHovered
+                                      ? "rounded-2xl"
+                                      : "rounded-full";
                                   container.innerHTML = `<div class="w-full h-full bg-surface bg-opacity-20 text-text-primary flex items-center justify-center text-lg font-semibold transition-all duration-200 ${roundingClass}">${item.data.name_acronym}</div>`;
                                 }
                               }}
@@ -960,12 +1124,21 @@ const SpacesList: Component = () => {
                     </div>
                     {/* Drop indicator line below (for last item) */}
                     <Show
-                      when={index() === organizedItems().length - 1 && dragOverSpace() === item.data.id && draggedSpace() !== null && draggedSpace() !== item.data.id}
+                      when={
+                        index() === organizedItems().length - 1 &&
+                        dragOverSpace() === item.data.id &&
+                        draggedSpace() !== null &&
+                        draggedSpace() !== item.data.id
+                      }
                     >
                       <div class="w-8 h-0.5 bg-primary rounded-full transition-all duration-200 animate-pulse"></div>
                     </Show>
                     {/* Drop zone below item */}
-                    <Show when={showDropZone && index() === organizedItems().length - 1}>
+                    <Show
+                      when={
+                        showDropZone && index() === organizedItems().length - 1
+                      }
+                    >
                       <div
                         class="w-full h-2 bg-primary opacity-50 hover:opacity-100 transition-opacity duration-200 rounded-full mt-1"
                         onDragOver={(e) => {
@@ -1031,7 +1204,10 @@ const SpacesList: Component = () => {
       </div>
 
       {/* Create Space Modal */}
-      <CreateSpaceModal isOpen={showCreateModal()} onClose={() => setShowCreateModal(false)} />
+      <CreateSpaceModal
+        isOpen={showCreateModal()}
+        onClose={() => setShowCreateModal(false)}
+      />
 
       {/* Create Folder Modal */}
       <CreateFolderModal
@@ -1067,7 +1243,9 @@ const SpacesList: Component = () => {
             {
               label: "Edit Folder",
               onClick: () => {
-                const folder = folders().find((f) => f.id === contextMenu().folderId);
+                const folder = folders().find(
+                  (f) => f.id === contextMenu().folderId,
+                );
                 if (folder) {
                   setSelectedFolder(folder);
                   setShowFolderSettingsModal(true);

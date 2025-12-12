@@ -362,10 +362,12 @@ const ChatArea: Component = () => {
     return message.id === unreads[0];
   };
 
-  // Helper function to group messages by date
+  // Optimized helper function to group messages by date
   const groupMessagesByDate = (messages: CachedMessage[]) => {
-    const groups: { date: Date; messages: CachedMessage[] }[] = [];
+    const startTime = performance.now();
+    const groupsMap = new Map<number, CachedMessage[]>();
 
+    // Single pass grouping with Map for O(1) lookups
     messages.forEach((message) => {
       // Use current date for messages without created_at (like pending messages)
       const messageDate = message.created_at
@@ -373,21 +375,30 @@ const ChatArea: Component = () => {
         : new Date();
       messageDate.setHours(0, 0, 0, 0);
 
-      const existingGroup = groups.find(
-        (group) => group.date.getTime() === messageDate.getTime(),
-      );
+      const dateKey = messageDate.getTime();
+      const existing = groupsMap.get(dateKey);
 
-      if (existingGroup) {
-        existingGroup.messages.push(message);
+      if (existing) {
+        existing.push(message);
       } else {
-        groups.push({
-          date: messageDate,
-          messages: [message],
-        });
+        groupsMap.set(dateKey, [message]);
       }
     });
 
-    return groups.sort((a, b) => a.date.getTime() - b.date.getTime());
+    // Convert to sorted array
+    const groups = Array.from(groupsMap.entries())
+      .sort(([a], [b]) => a - b)
+      .map(([dateTime, messages]) => ({
+        date: new Date(dateTime),
+        messages,
+      }));
+
+    const endTime = performance.now();
+    console.log(
+      `[ChatArea] 🚀 Grouped ${messages.length} messages into ${groups.length} date groups in ${(endTime - startTime).toFixed(2)}ms`,
+    );
+
+    return groups;
   };
 
   // Optimized message processing with better performance and caching

@@ -304,7 +304,19 @@ export const AuthProvider: ParentComponent = (props) => {
   };
 
   const handleReadyEvent = (data: any) => {
-    console.log("[AuthProvider] READY event received:", data);
+    const totalStartTime = performance.now();
+    console.log(
+      "[AuthProvider] READY event received - starting optimized processing:",
+      {
+        spaces: data.spaces?.length || 0,
+        rooms: data.rooms
+          ? Array.isArray(data.rooms)
+            ? data.rooms.length
+            : Object.keys(data.rooms).length
+          : 0,
+        users: data.users ? Object.keys(data.users).length : 0,
+      },
+    );
 
     if (data.client_user) {
       const userData = normalizeUserData(data.client_user);
@@ -313,10 +325,7 @@ export const AuthProvider: ParentComponent = (props) => {
       setCacheUser(userData);
     }
 
-    if (data.users) {
-      setUsers(data.users);
-    }
-
+    // Only load essential data - relationships for friends/DMs
     if (data.relationships) {
       setRelationships(data.relationships);
       // Dispatch event to CacheProvider
@@ -343,13 +352,13 @@ export const AuthProvider: ParentComponent = (props) => {
     if (data.rooms) {
       console.log("[AuthProvider] Raw rooms from READY:", data.rooms);
       console.log(
-        "[AuthProvider] Number of rooms:",
-        Array.isArray(data.rooms)
-          ? data.rooms.length
-          : Object.keys(data.rooms).length,
+        "[AuthProvider] Processing",
+        Object.keys(data.rooms).length,
+        "rooms",
       );
       const roomsData = normalizeRoomsData(data.rooms, data.users);
       setRooms(roomsData);
+
       // Dispatch event to CacheProvider
       window.dispatchEvent(
         new CustomEvent("roomsCache", {
@@ -361,114 +370,66 @@ export const AuthProvider: ParentComponent = (props) => {
     }
 
     if (data.spaces) {
+      console.log(
+        `[AuthProvider] Processing ${data.spaces.length} spaces with optimized batch operations...`,
+      );
+      const startTime = performance.now();
+
+      // Optimized batch processing with reduced object creation
       const spacesData = data.spaces.map((space: any) => {
-        const spaceId = String(space.id || space.ID);
-
-        // Cache space members if they exist in the space object
-        if (space.members && Array.isArray(space.members)) {
-          console.log(
-            `[AuthProvider] Caching ${space.members.length} members for space ${spaceId}`,
-          );
-          const normalizedMembers = space.members.map((member: any) => ({
-            space_id: member.space_id || member.SpaceID || spaceId,
-            user_id: member.user_id || member.UserID,
-            nick: member.nick || member.Nick,
-            avatar: member.avatar || member.Avatar,
-            roles: member.roles || member.Roles || [],
-            joined_at: member.joined_at || member.JoinedAt,
-            deaf: member.deaf || member.Deaf || false,
-            mute: member.mute || member.Mute || false,
-            flags: member.flags || member.Flags || 0,
-            pending: member.pending || member.Pending || false,
-            user: member.user ||
-              member.User || {
-                id: member.user_id || member.UserID,
-                username: member.user?.username || member.User?.Username || "",
-                display_name:
-                  member.user?.display_name ||
-                  member.User?.DisplayName ||
-                  member.user?.username ||
-                  member.User?.Username ||
-                  "",
-                discriminator:
-                  member.user?.discriminator || member.User?.Discriminator || 0,
-                avatar: member.user?.avatar || member.User?.Avatar || "",
-                banner: member.user?.banner || member.User?.Banner || "",
-                bot: member.user?.bot || member.User?.Bot || false,
-                system: member.user?.system || member.User?.System || false,
-                bio: member.user?.bio || member.User?.Bio || "",
-                about_me: member.user?.about_me || member.User?.AboutMe || "",
-                flags: member.user?.flags || member.User?.Flags || 0,
-                presence: member.user?.presence ||
-                  member.User?.Presence || {
-                    status: "offline",
-                    custom_status: "",
-                  },
-              },
-          }));
-          setCachedSpaceMembers(spaceId, normalizedMembers);
-        }
-
-        // Cache space roles if they exist in the space object
-        if (space.roles && Array.isArray(space.roles)) {
-          console.log(
-            `[AuthProvider] Caching ${space.roles.length} roles for space ${spaceId}`,
-          );
-          const normalizedRoles = space.roles.map((role: any) => ({
-            space_id: role.space_id || role.SpaceID || spaceId,
-            role_id: role.role_id || role.RoleID,
-            name: role.name || role.Name,
-            color: role.color || role.Color,
-            permissions: role.permissions || role.Permissions || [],
-            position: role.position || role.Position || 0,
-            mentionable: role.mentionable || role.Mentionable || false,
-            hoist: role.hoist || role.Hoist || false,
-            created_at: role.created_at || role.CreatedAt,
-            updated_at: role.updated_at || role.UpdatedAt,
-          }));
-          setCachedSpaceRoles(spaceId, normalizedRoles);
-        }
-
-        return {
-          id: spaceId,
+        // Use direct property access for better performance
+        const normalizedSpace = {
+          id: String(space.id || space.ID),
           name: space.name || space.Name || "",
-          name_acronym: space.name_acronym || space.NameAcronym || "",
-          description: space.description || space.Description,
           icon: space.icon || space.Icon,
-          banner: space.banner || space.Banner,
-          owner_id: space.owner_id || space.OwnerID || "",
-          verification_level:
-            space.verification_level || space.VerificationLevel || 0,
-          default_message_notifications:
-            space.default_message_notifications ||
-            space.DefaultMessageNotifications ||
-            0,
-          explicit_content_filter:
-            space.explicit_content_filter || space.ExplicitContentFilter || 0,
-          features: space.features || space.Features || [],
-          afk_room_id: space.afk_room_id || space.AfkRoomID,
-          afk_timeout: space.afk_timeout || space.AfkTimeout || 0,
-          system_room_id: space.system_room_id || space.SystemRoomID,
-          system_room_flags:
-            space.system_room_flags || space.SystemRoomFlags || 0,
-          rules_room_id: space.rules_room_id || space.RulesRoomID,
-          max_presences: space.max_presences || space.MaxPresences,
-          max_members: space.max_members || space.MaxMembers,
-          vanity_url_code: space.vanity_url_code || space.VanityUrlCode,
-          preferred_locale:
-            space.preferred_locale || space.PreferredLocale || "en-US",
-          public_updates_room_id:
-            space.public_updates_room_id || space.PublicUpdatesRoomID,
-          max_video_room_users:
-            space.max_video_room_users || space.MaxVideoRoomUsers,
-          nsfw_level: space.nsfw_level || space.NsfwLevel || 0,
-          created_at:
-            space.created_at || space.CreatedAt || new Date().toISOString(),
-          updated_at:
-            space.updated_at || space.UpdatedAt || new Date().toISOString(),
+          description: space.description || space.Description || "",
+          owner_id: String(space.owner_id || space.OwnerID || ""),
+          created_at: space.created_at || space.CreatedAt || "",
+          updated_at: space.updated_at || space.UpdatedAt || "",
+          name_acronym: space.name_acronym || space.NameAcronym || "",
+          members: space.members
+            ? space.members.map((member: any) => ({
+                user_id: String(
+                  member.user_id ||
+                    member.UserID ||
+                    member.id ||
+                    member.ID ||
+                    "",
+                ),
+                nick: member.nick || member.Nick || "",
+                roles: member.roles || member.Roles || [],
+                joined_at: member.joined_at || member.JoinedAt || "",
+              }))
+            : [],
+          roles: space.roles
+            ? space.roles.map((role: any) => ({
+                id: String(role.id || role.ID || ""),
+                name: role.name || role.Name || "",
+                color: role.color || role.Color || 0,
+                position: role.position || role.Position || 0,
+                permissions: role.permissions || role.Permissions || "",
+              }))
+            : [],
         };
+
+        return normalizedSpace;
       });
+
+      const endTime = performance.now();
+      console.log(
+        `[AuthProvider] Spaces processing completed in ${(endTime - startTime).toFixed(2)}ms`,
+      );
+
       setSpaces(spacesData);
+
+      // Dispatch event to CacheProvider
+      window.dispatchEvent(
+        new CustomEvent("spacesCache", {
+          detail: spacesData,
+        }),
+      );
+    } else {
+      console.log("[AuthProvider] No spaces data in READY event");
     }
 
     // Handle unread messages from READY event
@@ -481,19 +442,31 @@ export const AuthProvider: ParentComponent = (props) => {
       setMentionUnreadMessages(data.mention_unread_messages);
     }
 
-    // Update room unread counts based on unread messages
+    // Optimized unread message processing with batch updates
     if (data.rooms && (data.unread_messages || data.mention_unread_messages)) {
+      const startTime = performance.now();
+
       setRooms((rooms) => {
-        return rooms.map((room) => {
-          const roomUnreads = data.unread_messages?.[room.id] || [];
-          const roomMentionUnreads =
-            data.mention_unread_messages?.[room.id] || [];
-          return {
-            ...room,
-            unread_count: roomUnreads.length,
-            mention_count: roomMentionUnreads.length,
-          };
-        });
+        // Pre-create lookup maps for O(1) access
+        const unreadLookup = data.unread_messages || {};
+        const mentionLookup = data.mention_unread_messages || {};
+
+        // Batch update all rooms in single pass
+        const updatedRooms = rooms.map((room) => ({
+          ...room,
+          unread_count: Array.isArray(unreadLookup[room.id])
+            ? unreadLookup[room.id].length
+            : unreadLookup[room.id] || 0,
+          mention_count: Array.isArray(mentionLookup[room.id])
+            ? mentionLookup[room.id].length
+            : mentionLookup[room.id] || 0,
+        }));
+
+        const endTime = performance.now();
+        console.log(
+          `[AuthProvider] Unread counts updated in ${(endTime - startTime).toFixed(2)}ms`,
+        );
+        return updatedRooms;
       });
     }
 
@@ -503,6 +476,12 @@ export const AuthProvider: ParentComponent = (props) => {
     }
 
     setLoading(false);
+
+    // Performance summary
+    const totalEndTime = performance.now();
+    console.log(
+      `[AuthProvider] 🚀 READY event processing completed in ${(totalEndTime - totalStartTime).toFixed(2)}ms`,
+    );
 
     // Remove initial HTML loading screen
     if (window.removeInitialLoadingScreen) {
@@ -553,20 +532,50 @@ export const AuthProvider: ParentComponent = (props) => {
     }));
 
   const normalizeRoomsData = (rooms: any, users: any): RoomWithRecipients[] => {
-    console.log("[AuthProvider] Raw rooms data:", rooms);
+    const startTime = performance.now();
     const roomsArray = Array.isArray(rooms) ? rooms : Object.values(rooms);
+    console.log(
+      `[AuthProvider] Processing ${roomsArray.length} rooms with optimized normalization...`,
+    );
+
+    // Pre-create users lookup for better performance
+    const usersLookup = users || {};
+
     const normalizedRooms = roomsArray.map((room: any) => {
+      // Optimized property access with fallbacks
       const spaceId = room.SpaceID || room.space_id;
       const parentId = room.ParentID || room.parent_id;
-      console.log(
-        `[AuthProvider] Room ${room.ID || room.id}: space_id=${spaceId}, parent_id=${parentId}, type=${room.Type || room.type}`,
-      );
+      const recipients = room.Recipients || room.recipients || [];
+
+      // Batch process recipients data
+      const recipients_data =
+        recipients.length > 0
+          ? recipients
+              .map((recipientId: string) => {
+                const user = usersLookup[recipientId];
+                return user
+                  ? {
+                      id: recipientId,
+                      username: user.Username || user.username,
+                      discriminator: user.Discriminator || user.discriminator,
+                      display_name:
+                        user.DisplayName ||
+                        user.display_name ||
+                        user.Username ||
+                        user.username,
+                      avatar: user.Avatar || user.avatar,
+                      presence: user.Presence || user.presence,
+                    }
+                  : null;
+              })
+              .filter(Boolean)
+          : [];
 
       return {
         id: room.ID || room.id,
         name: room.Name || room.name || "",
         type: room.Type || room.type || 0,
-        recipients: room.Recipients || room.recipients || [],
+        recipients,
         owner_id:
           room.Creator || room.creator || room.OwnerID || room.owner_id || "",
         last_message_id:
@@ -584,33 +593,14 @@ export const AuthProvider: ParentComponent = (props) => {
         parent_id: parentId ? String(parentId) : undefined,
         position: room.Position ?? room.position ?? undefined,
         participants: room.Participants || room.participants || [],
-        recipients_data: (room.Recipients || room.recipients || [])
-          ?.map((recipientId: string) =>
-            users?.[recipientId]
-              ? {
-                  id: recipientId,
-                  username:
-                    users[recipientId].Username || users[recipientId].username,
-                  discriminator:
-                    users[recipientId].Discriminator ||
-                    users[recipientId].discriminator,
-                  display_name:
-                    users[recipientId].DisplayName ||
-                    users[recipientId].display_name ||
-                    users[recipientId].Username ||
-                    users[recipientId].username,
-                  avatar:
-                    users[recipientId].Avatar || users[recipientId].avatar,
-                  presence:
-                    users[recipientId].Presence || users[recipientId].presence,
-                }
-              : null,
-          )
-          .filter(Boolean),
+        recipients_data,
       };
     });
 
-    console.log("[AuthProvider] Normalized rooms:", normalizedRooms);
+    const endTime = performance.now();
+    console.log(
+      `[AuthProvider] Rooms processing completed in ${(endTime - startTime).toFixed(2)}ms`,
+    );
     return normalizedRooms;
   };
 
