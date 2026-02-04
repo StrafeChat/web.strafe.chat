@@ -5,6 +5,7 @@ import {
   For,
   createSignal,
   createEffect,
+  batch,
 } from "solid-js";
 import { usePermissions } from "../../../lib/hooks/usePermissions";
 import { useContextMenu } from "../../../lib/providers/context/ContextMenuProvider";
