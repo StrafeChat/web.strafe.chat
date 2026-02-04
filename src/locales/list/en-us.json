@@ -75,6 +75,7 @@
       "next": "Next",
       "haveAccount": "Already have an account? Login",
       "error": {
+        "discriminatorLength": "Discriminator must be exactly 4 digits",
         "passwordMismatch": "Passwords do not match",
         "requiredFields": "Please fill in all required fields",
         "registrationFailed": "Registration failed. Please try again."
