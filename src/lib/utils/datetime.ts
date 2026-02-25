@@ -8,3 +8,12 @@ export function formatMessageTimestamp(date: Date): string {
     minute: '2-digit',
   });
 }
+
+/** Format date for chat date headers (e.g. "February 25, 2026") */
+export function formatDateHeader(date: Date): string {
+  return date.toLocaleDateString(undefined, {
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}

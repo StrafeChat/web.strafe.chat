@@ -45,3 +45,20 @@ export function listDevices(userId: string) {
 export function getPrekeyBundle(userId: string, deviceId: string) {
   return api<PrekeyBundle>(`/users/${userId}/devices/${deviceId}/prekey_bundle`);
 }
+
+export interface KeyBackupResponse {
+  exists: boolean;
+  encrypted_backup?: string;
+  salt?: string;
+}
+
+export function getKeyBackup() {
+  return api<KeyBackupResponse>('/devices/backup');
+}
+
+export function setKeyBackup(encryptedBackup: string, salt: string) {
+  return api<{ ok: boolean }>('/devices/backup', {
+    method: 'PUT',
+    json: { encrypted_backup: encryptedBackup, salt },
+  });
+}

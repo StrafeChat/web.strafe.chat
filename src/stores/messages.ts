@@ -1,12 +1,21 @@
 import { createStore } from 'solid-js/store';
 import { listMessages, createMessage, type Message } from '../api/messages';
 import { listDevices } from '../api/devices';
-import { ensureDevice, getOrCreateSession, encryptMessage, decryptMessage } from '../lib/e2ee';
-import { PLAINTEXT_PREFIX } from '../lib/e2ee/constants';
+import {
+  ensureDevice,
+  getOrCreateSession,
+  encryptMessage,
+  encryptMessageForSelf,
+  decryptMessage,
+} from '../lib/e2ee';
+import { PLAINTEXT_PREFIX, DUAL_CIPHERTEXT_PREFIX } from '../lib/e2ee/constants';
 import { getDeviceIdentity, setSentPlaintext, getSentPlaintext } from '../lib/e2ee/store';
+import { removeTyping } from './typing';
 import { auth } from './auth';
 import { rooms } from './rooms';
 import { onStargateEvent } from '../services/stargate/client';
+
+const SENT_PLAINTEXT_PLACEHOLDER = '[Your message]';
 
 /** Sort messages by created_at ascending (oldest first) */
 function sortByCreatedAt<T extends { created_at: string }>(list: T[]): T[] {
@@ -32,36 +41,93 @@ export interface DecryptedMessage extends Message {
 export interface MessagesState {
   byRoom: Record<string, DecryptedMessage[]>;
   loading: Record<string, boolean>;
+  loadingOlder: Record<string, boolean>;
+  hasMoreOlder: Record<string, boolean>;
   sending: Record<string, boolean>;
+  scrollToBottomTick: Record<string, number>;
 }
 
 export const [messages, setMessages] = createStore<MessagesState>({
   byRoom: {},
   loading: {},
+  loadingOlder: {},
+  hasMoreOlder: {},
   sending: {},
+  scrollToBottomTick: {},
 });
 
-export async function loadMessages(roomId: string, before?: string) {
-  setMessages('loading', roomId, true);
+const MESSAGES_PAGE_SIZE = 50;
+
+export async function loadMessages(
+  roomId: string,
+  before?: string,
+  getScrollContainer?: () => HTMLDivElement | undefined
+) {
+  const isInitialLoad = !before;
+  if (isInitialLoad) {
+    setMessages('loading', roomId, true);
+    setMessages('hasMoreOlder', roomId, true);
+  } else {
+    setMessages('loadingOlder', roomId, true);
+  }
+  const currentUserId = auth.user?.id;
+  if (!currentUserId) {
+    if (isInitialLoad) setMessages('loading', roomId, false);
+    else setMessages('loadingOlder', roomId, false);
+    return;
+  }
+
   try {
-    const list = await listMessages(roomId, { before, limit: 50 });
+    try {
+      await ensureDevice(currentUserId);
+    } catch (e) {
+      console.warn('ensureDevice failed, decryption may fail:', e);
+    }
+    const list = await listMessages(roomId, { before, limit: MESSAGES_PAGE_SIZE });
     const decrypted = await Promise.all(
       list.map(async (m): Promise<DecryptedMessage> => {
         if (m.ciphertext.startsWith(PLAINTEXT_PREFIX)) {
           return { ...m, plaintext: m.ciphertext.slice(PLAINTEXT_PREFIX.length), notEncrypted: true };
         }
-        if (m.sender_id === auth.user?.id) {
+        if (String(m.sender_id) === auth.user?.id) {
           const stored = await getSentPlaintext(m.id);
-          return { ...m, plaintext: stored ?? '[Your message]' };
+          if (stored != null) return { ...m, plaintext: stored };
+          if (m.ciphertext.startsWith(DUAL_CIPHERTEXT_PREFIX)) {
+            try {
+              const dual = JSON.parse(
+                m.ciphertext.slice(DUAL_CIPHERTEXT_PREFIX.length)
+              ) as { s?: string };
+              if (dual.s) {
+                const plaintext = await decryptMessage(dual.s, currentUserId);
+                return { ...m, plaintext };
+              }
+            } catch {
+              // fall through to placeholder
+            }
+          }
+          return { ...m, plaintext: SENT_PLAINTEXT_PLACEHOLDER };
         }
         try {
-          const plaintext = await decryptMessage(m.ciphertext);
+          let toDecrypt = m.ciphertext;
+          if (m.ciphertext.startsWith(DUAL_CIPHERTEXT_PREFIX)) {
+            const dual = JSON.parse(
+              m.ciphertext.slice(DUAL_CIPHERTEXT_PREFIX.length)
+            ) as { r?: string };
+            toDecrypt = dual.r ?? m.ciphertext;
+          }
+          const plaintext = await decryptMessage(toDecrypt, currentUserId);
           return { ...m, plaintext };
-        } catch {
+        } catch (e) {
+          console.error('[E2EE] Decrypt failed for message', m.id, 'from', m.sender_id, e);
           return { ...m, decryptError: true };
         }
       })
     );
+    const container = getScrollContainer?.();
+    const saved = container
+      ? { scrollTop: container.scrollTop, scrollHeight: container.scrollHeight }
+      : null;
+    setMessages('hasMoreOlder', roomId, list.length >= MESSAGES_PAGE_SIZE);
     setMessages('byRoom', roomId, (prev) => {
       const existing = prev ?? [];
       const ids = new Set(existing.map((x) => x.id));
@@ -74,9 +140,41 @@ export async function loadMessages(roomId: string, before?: string) {
       }
       return sortByCreatedAt(merged);
     });
+    if (isInitialLoad && decrypted.length > 0) {
+      setMessages('scrollToBottomTick', roomId, (t) => (t ?? 0) + 1);
+    }
+    if (!isInitialLoad && saved && container) {
+      const restore = () => {
+        const heightAdded = container.scrollHeight - saved.scrollHeight;
+        if (heightAdded > 0) {
+          container.scrollTop = saved.scrollTop + heightAdded;
+          return true;
+        }
+        return false;
+      };
+      if (!restore()) requestAnimationFrame(restore);
+    }
   } finally {
-    setMessages('loading', roomId, false);
+    if (isInitialLoad) {
+      setMessages('loading', roomId, false);
+    } else {
+      setMessages('loadingOlder', roomId, false);
+    }
   }
+}
+
+/** Load older messages (for infinite scroll up). Uses oldest message id as cursor. */
+export async function loadOlderMessages(
+  roomId: string,
+  getScrollContainer?: () => HTMLDivElement | undefined
+): Promise<boolean> {
+  const list = messages.byRoom[roomId] ?? [];
+  if (list.length === 0 || messages.loadingOlder[roomId]) return false;
+  if (messages.hasMoreOlder[roomId] === false) return false;
+  const oldest = list.find((m) => !m.id.startsWith('temp-'));
+  if (!oldest) return false;
+  await loadMessages(roomId, oldest.id, getScrollContainer);
+  return true;
 }
 
 export async function sendMessage(roomId: string, plaintext: string): Promise<Message | null> {
@@ -103,24 +201,34 @@ export async function sendMessage(roomId: string, plaintext: string): Promise<Me
 
   // Optimistic add – show message immediately (nonce pattern)
   setMessages('byRoom', roomId, (prev) => sortByCreatedAt([...(prev ?? []), tempMsg]));
+  setMessages('scrollToBottomTick', roomId, (t) => (t ?? 0) + 1);
 
   setMessages('sending', roomId, true);
   try {
-    await ensureDevice();
+    await ensureDevice(currentUserId);
     const devices = await listDevices(otherParticipant.id);
     const deviceId = devices[0]?.device_id;
     let ciphertext: string;
     let notEncrypted = false;
 
     if (deviceId != null) {
-      await getOrCreateSession(otherParticipant.id, deviceId);
-      ciphertext = await encryptMessage(plaintext, otherParticipant.id, deviceId);
+      await getOrCreateSession(currentUserId, otherParticipant.id, deviceId);
+      const recipientCipher = await encryptMessage(
+        plaintext,
+        currentUserId,
+        otherParticipant.id,
+        deviceId
+      );
+      const senderCipher = await encryptMessageForSelf(plaintext, currentUserId);
+      ciphertext =
+        DUAL_CIPHERTEXT_PREFIX +
+        JSON.stringify({ r: recipientCipher, s: senderCipher });
     } else {
       ciphertext = PLAINTEXT_PREFIX + plaintext;
       notEncrypted = true;
     }
 
-    const device = await getDeviceIdentity();
+    const device = await getDeviceIdentity(currentUserId);
     const msg = await createMessage(roomId, {
       sender_device_id: device?.deviceId ?? 1,
       ciphertext,
@@ -139,6 +247,7 @@ export async function sendMessage(roomId: string, plaintext: string): Promise<Me
       }
       return sortByCreatedAt([...list, confirmed]);
     });
+    setMessages('scrollToBottomTick', roomId, (t) => (t ?? 0) + 1);
     return msg;
   } catch (err) {
     setMessages('byRoom', roomId, (prev) => (prev ?? []).filter((m) => m.id !== nonce));
@@ -168,6 +277,15 @@ export async function addMessageFromEvent(payload: {
   updated_at: string;
 }) {
   const roomId = payload.room_id;
+  removeTyping(roomId, String(payload.sender_id));
+  const currentUserId = auth.user?.id;
+  if (currentUserId) {
+    try {
+      await ensureDevice(currentUserId);
+    } catch {
+      // fall through; decrypt will fail and we'll set decryptError
+    }
+  }
   let plaintext: string | undefined;
   let decryptError = false;
   let notEncrypted = false;
@@ -175,18 +293,47 @@ export async function addMessageFromEvent(payload: {
   if (payload.ciphertext.startsWith(PLAINTEXT_PREFIX)) {
     plaintext = payload.ciphertext.slice(PLAINTEXT_PREFIX.length);
     notEncrypted = true;
-  } else if (payload.sender_id !== auth.user?.id) {
+  } else if (String(payload.sender_id) !== currentUserId && currentUserId) {
     try {
-      plaintext = await decryptMessage(payload.ciphertext);
-    } catch {
+      let toDecrypt = payload.ciphertext;
+      if (payload.ciphertext.startsWith(DUAL_CIPHERTEXT_PREFIX)) {
+        const dual = JSON.parse(
+          payload.ciphertext.slice(DUAL_CIPHERTEXT_PREFIX.length)
+        ) as { r?: string };
+        toDecrypt = dual.r ?? payload.ciphertext;
+      }
+      plaintext = await decryptMessage(toDecrypt, currentUserId);
+    } catch (e) {
+      console.error('[E2EE] Decrypt failed for real-time message', payload.id, 'from', payload.sender_id, e);
       decryptError = true;
     }
   } else {
-    plaintext = (await getSentPlaintext(payload.id)) ?? '[Your message]';
+    const stored = await getSentPlaintext(payload.id);
+    if (stored != null) {
+      plaintext = stored;
+    } else if (
+      currentUserId &&
+      payload.ciphertext.startsWith(DUAL_CIPHERTEXT_PREFIX)
+    ) {
+      try {
+        const dual = JSON.parse(
+          payload.ciphertext.slice(DUAL_CIPHERTEXT_PREFIX.length)
+        ) as { s?: string };
+        if (dual.s) {
+          plaintext = await decryptMessage(dual.s, currentUserId);
+        } else {
+          plaintext = SENT_PLAINTEXT_PLACEHOLDER;
+        }
+      } catch {
+        plaintext = SENT_PLAINTEXT_PLACEHOLDER;
+      }
+    } else {
+      plaintext = SENT_PLAINTEXT_PLACEHOLDER;
+    }
   }
   const msg: DecryptedMessage = {
     ...payload,
-    plaintext,
+    plaintext: plaintext ?? SENT_PLAINTEXT_PLACEHOLDER,
     decryptError: decryptError || undefined,
     notEncrypted,
   };
@@ -200,12 +347,13 @@ export async function addMessageFromEvent(payload: {
         ...existing,
         ...msg,
         plaintext:
-          msg.plaintext && msg.plaintext !== '[Your message]' ? msg.plaintext : existing.plaintext,
+          msg.plaintext && msg.plaintext !== SENT_PLAINTEXT_PLACEHOLDER ? msg.plaintext : existing.plaintext,
       };
       return sortByCreatedAt(merged);
     }
     return sortByCreatedAt([...list, msg]);
   });
+  setMessages('scrollToBottomTick', roomId, (t) => (t ?? 0) + 1);
 }
 
 /** Register Stargate event handlers. Call once on app init. */

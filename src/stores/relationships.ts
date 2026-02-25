@@ -37,6 +37,17 @@ export function clearRelationships() {
   setRelationships({ relationships: [], loading: false, hydrated: false });
 }
 
+/** Update a user's online status from a PRESENCE_UPDATE WebSocket event. */
+export function updatePresence(userId: string, online: boolean): void {
+  setRelationships(
+    'relationships',
+    (rels: Relationship[]) =>
+      rels.map((r) =>
+        r.user.id === userId ? { ...r, user: { ...r.user, online } } : r,
+      ),
+  );
+}
+
 export function friendDisplayName(rel: Relationship): string {
   return rel.user.display_name || rel.user.username || 'Unknown';
 }

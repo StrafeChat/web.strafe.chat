@@ -4,11 +4,17 @@ import { auth } from '../stores/auth';
 import { stargate } from '../stores/stargate';
 import { connectStargate, disconnectStargate, subscribe } from '../services/stargate/client';
 import { initStargateMessageHandler } from '../stores/messages';
+import { initPresenceHandler } from '../stores/presence';
+import { initTypingHandler } from '../stores/typing';
 import { ensureDevice } from '../lib/e2ee';
 
 /** Connects Stargate WebSocket when authenticated, disconnects on logout. */
 export const StargateProvider: Component<{ children?: import('solid-js').JSX.Element }> = (props) => {
-  onMount(() => initStargateMessageHandler());
+  onMount(() => {
+    initStargateMessageHandler();
+    initPresenceHandler();
+    initTypingHandler();
+  });
 
   createEffect(() => {
     const token = auth.token;
@@ -20,8 +26,9 @@ export const StargateProvider: Component<{ children?: import('solid-js').JSX.Ele
   });
   // Register E2EE device for current user when authenticated (enables receiving messages)
   createEffect(() => {
-    if (auth.user?.id) {
-      ensureDevice().catch((err) => console.error('ensureDevice failed:', err));
+    const uid = auth.user?.id;
+    if (uid) {
+      ensureDevice(uid).catch((err) => console.error('ensureDevice failed:', err));
     }
   });
   createEffect(() => {

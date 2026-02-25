@@ -1,6 +1,9 @@
 /**
- * E2EE crypto – Signal-inspired X25519 ECDH + HKDF + AES-256-GCM
- * Uses Web Crypto API. Keys from prekey bundle are base64 (Curve25519).
+ * E2EE crypto – Signal Protocol (X3DH) aligned
+ *
+ * X25519 ECDH + HKDF-SHA256 + AES-256-GCM.
+ * Ciphertext format: sender_identity_public (32B) || iv (12B) || aes_gcm(plaintext).
+ * Keys from prekey bundle are base64 (Curve25519 raw bytes).
  */
 
 import {
@@ -10,19 +13,7 @@ import {
   HKDF_INFO,
   X25519_KEY_LENGTH as IDENTITY_KEY_LENGTH,
 } from './constants';
-
-function b64Decode(s: string): Uint8Array {
-  const bin = atob(s.replace(/-/g, '+').replace(/_/g, '/'));
-  const bytes = new Uint8Array(bin.length);
-  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
-  return bytes;
-}
-
-function b64Encode(bytes: Uint8Array): string {
-  let bin = '';
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  return btoa(bin);
-}
+import { b64Decode, b64Encode } from './util';
 
 /** Generate X25519 keypair */
 export async function generateKeyPair(): Promise<{ publicKey: string; privateKey: string }> {
@@ -186,10 +177,13 @@ export async function encryptWithHeader(
 
 /**
  * Decrypt from sender. Extracts sender identity from header, derives key using our signed prekey.
+ * Primary path: ECDH(our signed prekey private, sender identity public) – Signal X3DH compliant.
+ * Fallback: identity key derivation for backward compatibility with alternate protocol variants.
  */
 export async function decryptWithHeader(
   ciphertextB64: string,
-  ourSignedPrekeyPrivateB64: string
+  ourSignedPrekeyPrivateB64: string,
+  ourIdentityPrivateB64?: string
 ): Promise<string> {
   const combined = b64Decode(ciphertextB64);
   if (combined.length < IDENTITY_KEY_LENGTH + IV_LENGTH) {
@@ -199,12 +193,25 @@ export async function decryptWithHeader(
   const iv = combined.slice(IDENTITY_KEY_LENGTH, IDENTITY_KEY_LENGTH + IV_LENGTH);
   const encrypted = combined.slice(IDENTITY_KEY_LENGTH + IV_LENGTH);
 
-  const keyB64 = await deriveSessionKey(ourSignedPrekeyPrivateB64, senderIdentityB64);
-  const key = await importAesKey(keyB64);
-  const plaintext = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv, tagLength: TAG_LENGTH },
-    key,
-    encrypted
-  );
-  return new TextDecoder().decode(plaintext);
+  const tryDecrypt = async (keyB64: string) => {
+    const key = await importAesKey(keyB64);
+    return crypto.subtle.decrypt(
+      { name: 'AES-GCM', iv, tagLength: TAG_LENGTH },
+      key,
+      encrypted
+    );
+  };
+
+  try {
+    const keyB64 = await deriveSessionKey(ourSignedPrekeyPrivateB64, senderIdentityB64);
+    const plaintext = await tryDecrypt(keyB64);
+    return new TextDecoder().decode(plaintext);
+  } catch (e) {
+    if (ourIdentityPrivateB64) {
+      const keyB64 = await deriveSessionKey(ourIdentityPrivateB64, senderIdentityB64);
+      const plaintext = await tryDecrypt(keyB64);
+      return new TextDecoder().decode(plaintext);
+    }
+    throw e;
+  }
 }

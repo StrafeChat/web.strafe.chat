@@ -10,6 +10,7 @@ import NotesPage from '../pages/NotesPage';
 import SpacePage from '../pages/SpacePage';
 import RoomPage from '../pages/RoomPage';
 import { StargateProvider } from '../components/StargateProvider';
+import { RecoveryPinModal } from '../components/RecoveryPinModal';
 import { auth, hydrateAuth } from '../stores/auth';
 
 function LoadingScreen() {
@@ -43,6 +44,7 @@ function RootLayout(props: { children?: import('solid-js').JSX.Element }) {
     <Show when={auth.hydrated} fallback={<LoadingScreen />}>
       <StargateProvider>
         {props.children}
+        <RecoveryPinModal />
       </StargateProvider>
     </Show>
   );

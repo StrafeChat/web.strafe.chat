@@ -33,3 +33,8 @@ export function getRoom(id: string) {
 export function createPM(recipientId: string) {
   return api<Room>('/rooms', { method: 'POST', json: { recipient_id: recipientId } });
 }
+
+/** Trigger typing indicator. Rate-limited by backend (~5s). Returns 204. */
+export function sendTyping(roomId: string) {
+  return api<void>(`/rooms/${roomId}/typing`, { method: 'POST' });
+}
