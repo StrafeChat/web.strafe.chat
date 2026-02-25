@@ -43,7 +43,7 @@
     "@types/msgpack-lite": "^0.1.11",
     "@types/node": "^22.7.7",
     "autoprefixer": "^10.4.20",
-    "esbuild": "^0.20.1",
+    "esbuild": "^0.25.0",
     "msgpack-lite": "^0.1.26",
     "postcss": "^8.4.47",
     "prettier": "3.5.2",
