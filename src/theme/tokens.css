@@ -1,0 +1,45 @@
+/**
+ * StrafeChat design tokens – CSS variables
+ * Accent colors from strafe_chat globals
+ */
+
+:root {
+  /* Accent – from strafe_chat globals.css */
+  --color-accent: hsl(0 0% 18%);
+  --color-accent-foreground: hsl(0 0% 95%);
+
+  /* Layout – responsive widths */
+  --space-bar-width: 72px;
+  --rooms-bar-width: 240px;
+  --header-height: 48px;
+  --sidebar-width-mobile: 100%;
+
+  /* Typography */
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+
+  /* Radius */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --space-bar-width: 56px;
+    --rooms-bar-width: 100%;
+    --header-height: 56px;
+  }
+}
+
+@media (min-width: 768px) {
+  :root {
+    --rooms-bar-width: 260px;
+  }
+}
+
+/* Light theme override */
+[data-theme='light'] {
+  --color-accent: hsl(0 0% 24%);
+  --color-accent-foreground: hsl(0 0% 10%);
+}

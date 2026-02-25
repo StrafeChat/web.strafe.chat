@@ -1,0 +1,42 @@
+@import 'tailwindcss';
+
+/* StrafeChat design system – aligned with strafe_chat globals */
+@theme {
+  --color-background: hsl(0 0% 6%);
+  --color-foreground: hsl(0 0% 95%);
+
+  --color-card: hsl(0 0% 9%);
+  --color-card-foreground: hsl(0 0% 95%);
+
+  --color-popover: hsl(0 0% 9%);
+  --color-popover-foreground: hsl(0 0% 95%);
+
+  --color-primary: hsl(118 28% 45%);
+  --color-primary-foreground: hsl(0 0% 0%);
+  --color-primary-hover: hsl(118 28% 40%);
+
+  --color-secondary: hsl(0 0% 18%);
+  --color-secondary-foreground: hsl(0 0% 95%);
+
+  --color-muted: hsl(0 0% 18%);
+  --color-muted-foreground: hsl(0 0% 75%);
+
+  --color-accent: hsl(0 0% 18%);
+  --color-accent-foreground: hsl(0 0% 95%);
+
+  --color-destructive: hsl(0 62% 30%);
+  --color-destructive-foreground: hsl(0 0% 95%);
+
+  --color-border: hsl(0 0% 18%);
+  --color-input: hsl(0 0% 18%);
+  --color-ring: hsl(118 28% 45%);
+
+  /* Responsive breakpoints (Tailwind defaults) */
+  --breakpoint-sm: 640px;
+  --breakpoint-md: 768px;
+  --breakpoint-lg: 1024px;
+  --breakpoint-xl: 1280px;
+  --breakpoint-2xl: 1536px;
+}
+
+@import './theme/tokens.css';
