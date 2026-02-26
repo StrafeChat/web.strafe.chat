@@ -7,6 +7,12 @@ export interface Session {
   createdAt: number;
 }
 
+/** Group message payload: s = sender self-encrypt; recipients = per (user_id, device_id) ciphertext */
+export interface GroupCipherPayload {
+  s?: string;
+  recipients?: Array<{ user_id: string; device_id: number; ciphertext: string }>;
+}
+
 /** Device identity – stored in IndexedDB, never leaves device */
 export interface DeviceIdentity {
   deviceId: number;

@@ -23,7 +23,11 @@ export function setStargateStatus(status: ConnectionStatus, error?: string) {
   setStargate({ status, error: error ?? null });
 }
 
-export function setStargateReady(ready: boolean) {
+/** Ready payload from server (user, rooms, relationships). */
+export let lastReadyPayload: unknown = null;
+
+export function setStargateReady(ready: boolean, payload?: unknown) {
+  if (payload != null) lastReadyPayload = payload;
   setStargate('ready', ready);
 }
 

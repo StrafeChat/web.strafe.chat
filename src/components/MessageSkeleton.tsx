@@ -4,8 +4,8 @@ const SKELETON_COUNT = 6;
 
 export const MessageSkeleton: Component = () => {
   return (
-    <div class="flex-1 min-h-0 overflow-hidden flex flex-col">
-      <div class="flex flex-col p-4 gap-2">
+    <div class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden flex flex-col">
+      <div class="flex flex-col p-4 gap-2 min-h-full justify-end">
         {Array.from({ length: SKELETON_COUNT }, (_, i) => (
           <div class="flex gap-3 -mx-2 px-2 py-1">
             <div class="size-10 shrink-0 rounded-full bg-muted animate-pulse" />

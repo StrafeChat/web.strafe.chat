@@ -5,6 +5,8 @@ import { messages } from '../stores/messages';
 import type { RoomParticipant } from '../api/rooms';
 import { auth } from '../stores/auth';
 import { settings } from '../stores/settings';
+import { messageIdGt } from '../stores/readState';
+import { newHeaderDismissed } from '../stores/newHeaderDismissed';
 import { formatMessageTimestamp, formatDateHeader } from '../lib/utils/datetime';
 
 const MESSAGE_GROUP_THRESHOLD_MS = 5 * 60 * 1000;
@@ -61,6 +63,10 @@ export interface MessageListProps {
   loadingOlder?: boolean;
   hasMoreOlder?: boolean;
   onLoadOlder?: (getScrollContainer: () => HTMLDivElement | undefined) => void;
+  /** Last read message ID - NEW header shown above first unread (from others, id > this) */
+  lastReadMessageId?: string | null;
+  /** Max message ID when we entered - don't show NEW for messages that arrived while viewing (id > this) */
+  maxMessageIdWhenEntered?: string | null;
 }
 
 export const MessageList: Component<MessageListProps> = (props) => {
@@ -71,7 +77,22 @@ export const MessageList: Component<MessageListProps> = (props) => {
   const currentUserId = () => auth.user?.id;
   const compact = () => props.compact !== undefined ? props.compact : settings.messageCompact;
 
-  // Track whether user is near bottom (for auto-scroll decision) and load older when near top
+  /** Index of first unread that existed when we entered and NEW header not dismissed. */
+  const firstUnreadIndex = () => {
+    if (props.roomId && newHeaderDismissed.byRoom[props.roomId]) return -1;
+    const lastRead = props.lastReadMessageId ?? null;
+    const maxWhenEntered = props.maxMessageIdWhenEntered ?? null;
+    const uid = currentUserId();
+    for (let i = 0; i < props.messages.length; i++) {
+      const m = props.messages[i];
+      if (m.sender_id === uid || !/^\d+$/.test(m.id)) continue;
+      if (maxWhenEntered != null && messageIdGt(m.id, maxWhenEntered)) continue; // arrived while viewing
+      if (lastRead == null || messageIdGt(m.id, lastRead)) return i;
+    }
+    return -1;
+  };
+
+  // Track scroll position for auto-scroll and load older
   createEffect(() => {
     const el = listRef[0]?.();
     const roomId = props.roomId;
@@ -94,7 +115,6 @@ export const MessageList: Component<MessageListProps> = (props) => {
       }
     };
     el.addEventListener('scroll', onScroll, { passive: true });
-    // Don't run initial isNearBottom check – keep default true so scroll-to-bottom works on first load
     onCleanup(() => el.removeEventListener('scroll', onScroll));
   });
 
@@ -105,8 +125,8 @@ export const MessageList: Component<MessageListProps> = (props) => {
     const el = listRef[0]?.();
     const nearBottom = isNearBottom[0]();
     if (!el || !roomId || tick === 0) return;
-    if (!nearBottom) return;
     const scrollToBottom = () => { el.scrollTop = el.scrollHeight; };
+    if (!nearBottom) return;
     scrollToBottom();
     const rafId = requestAnimationFrame(scrollToBottom);
     const timeoutId = setTimeout(scrollToBottom, SCROLL_TO_BOTTOM_DELAY_MS);
@@ -157,6 +177,26 @@ export const MessageList: Component<MessageListProps> = (props) => {
     return prevDate !== currDate;
   }
 
+  /** True if msg is the first unread that existed when we entered (excludes messages that arrived while viewing). */
+  function isFirstUnreadMessage(msg: DecryptedMessage, index: number): boolean {
+    if (props.roomId && newHeaderDismissed.byRoom[props.roomId]) return false;
+    if (msg.sender_id === currentUserId() || !/^\d+$/.test(msg.id)) return false;
+    const lastRead = props.lastReadMessageId ?? null;
+    const maxWhenEntered = props.maxMessageIdWhenEntered ?? null;
+    if (maxWhenEntered != null && messageIdGt(msg.id, maxWhenEntered)) return false;
+    const isUnread = lastRead == null || messageIdGt(msg.id, lastRead);
+    if (!isUnread) return false;
+    for (let j = 0; j < index; j++) {
+      const m = props.messages[j];
+      if (m.sender_id !== currentUserId() && /^\d+$/.test(m.id)) {
+        if (maxWhenEntered != null && messageIdGt(m.id, maxWhenEntered)) continue;
+        const prevUnread = lastRead == null || messageIdGt(m.id, lastRead);
+        if (prevUnread) return false;
+      }
+    }
+    return true;
+  }
+
   return (
     <div
       ref={(el) => listRef[1](el)}
@@ -200,6 +240,13 @@ export const MessageList: Component<MessageListProps> = (props) => {
 
             return (
               <>
+                <Show when={isFirstUnreadMessage(msg, i())}>
+                  <div class="flex items-center gap-3 py-2">
+                    <div class="flex-1 h-px bg-primary/60" />
+                    <span class="text-xs font-semibold text-primary shrink-0 uppercase tracking-wide">New messages</span>
+                    <div class="flex-1 h-px bg-primary/60" />
+                  </div>
+                </Show>
                 <Show when={needsDateHeader()}>
                   <div class="flex items-center gap-3 py-3">
                     <div class="flex-1 h-px bg-border" />
@@ -211,8 +258,10 @@ export const MessageList: Component<MessageListProps> = (props) => {
                 </Show>
                 <div
                   data-msg-id={msg.id}
-                  class={`flex gap-3 hover:bg-[hsl(var(--background)/0.3)] -mx-2 px-2 py-0.5 rounded group ${
-                    showHeader() ? (prev() ? 'mt-3' : '') : '-mt-1'
+                  class={`flex gap-3 hover:bg-[hsl(var(--background)/0.3)] -mx-2 px-2 rounded group ${
+                    compact() ? 'py-0.5' : 'py-0.5'
+                  } ${
+                    showHeader() ? (prev() ? 'mt-3' : '') : compact() ? '-mt-0.5' : '-mt-1'
                   }`}
                 >
                 <Show when={!compact()}>
@@ -224,22 +273,44 @@ export const MessageList: Component<MessageListProps> = (props) => {
                   </Show>
                 </Show>
                 <div class="flex-1 min-w-0">
-                  <Show when={showHeader()}>
-                    <div class="flex items-baseline gap-2 flex-wrap mb-0.5">
-                      <span class="text-sm font-semibold text-foreground shrink-0 truncate">{sender().name}</span>
-                      <span class="text-[13px] text-muted-foreground shrink-0">
+                  <Show when={compact()}>
+                    <div class="flex items-baseline gap-x-2 gap-y-0.5 flex-wrap">
+                      <span class="text-sm font-semibold text-foreground shrink-0">{sender().name}</span>
+                      <span class="text-[11px] text-muted-foreground shrink-0">
                         {formatMessageTimestamp(new Date(msg.created_at))}
                       </span>
+                      <span class="text-muted-foreground/70 shrink-0">·</span>
+                      <span
+                        class={`text-sm break-words whitespace-pre-wrap flex-1 min-w-0 transition-colors duration-200 ${
+                          msg.pending ? 'text-muted-foreground/60' : 'text-muted-foreground'
+                        }`}
+                      >
+                        {getMessageBodyText(msg)}
+                      </span>
+                      <Show when={msg.notEncrypted && !msg.pending}>
+                        <span class="text-[10px] text-amber-500/90 shrink-0">Not encrypted</span>
+                      </Show>
                     </div>
                   </Show>
-                  <p class="text-sm text-muted-foreground break-words whitespace-pre-wrap">
-                    {getMessageBodyText(msg)}
-                  </p>
-                  <Show when={msg.pending}>
-                    <span class="text-[10px] text-muted-foreground/70">Sending...</span>
-                  </Show>
-                  <Show when={msg.notEncrypted && !msg.pending}>
-                    <span class="text-[10px] text-amber-500/90">Not encrypted</span>
+                  <Show when={!compact()}>
+                    <Show when={showHeader()}>
+                      <div class="flex items-baseline gap-2 flex-wrap mb-0.5">
+                        <span class="text-sm font-semibold text-foreground shrink-0 truncate">{sender().name}</span>
+                        <span class="text-[13px] text-muted-foreground shrink-0">
+                          {formatMessageTimestamp(new Date(msg.created_at))}
+                        </span>
+                      </div>
+                    </Show>
+                    <p
+                      class={`text-sm break-words whitespace-pre-wrap transition-colors duration-200 ${
+                        msg.pending ? 'text-muted-foreground/60' : 'text-muted-foreground'
+                      }`}
+                    >
+                      {getMessageBodyText(msg)}
+                    </p>
+                    <Show when={msg.notEncrypted && !msg.pending}>
+                      <span class="text-[10px] text-amber-500/90">Not encrypted</span>
+                    </Show>
                   </Show>
                 </div>
               </div>

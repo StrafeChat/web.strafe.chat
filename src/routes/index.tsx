@@ -41,12 +41,12 @@ function NotFound() {
 function RootLayout(props: { children?: import('solid-js').JSX.Element }) {
   onMount(() => hydrateAuth());
   return (
-    <Show when={auth.hydrated} fallback={<LoadingScreen />}>
-      <StargateProvider>
+    <StargateProvider>
+      <Show when={auth.hydrated} fallback={<LoadingScreen />}>
         {props.children}
         <RecoveryPinModal />
-      </StargateProvider>
-    </Show>
+      </Show>
+    </StargateProvider>
   );
 }
 

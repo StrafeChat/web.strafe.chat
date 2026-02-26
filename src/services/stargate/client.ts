@@ -10,6 +10,21 @@ const DEFAULT_URL = 'ws://localhost:4001/events';
 type EventHandler = (event: { t: string; space_id?: string; room_id?: string; user_id?: string; d: unknown }) => void;
 const eventHandlers = new Set<EventHandler>();
 
+type ReadyHandler = (payload: ReadyPayload) => void;
+let readyHandler: ReadyHandler | null = null;
+
+export interface ReadyPayload {
+  user?: { id: string; username: string; discriminator: number | string; display_name: string };
+  session_id?: string;
+  rooms?: unknown[];
+  relationships?: unknown[];
+}
+
+export function onStargateReady(handler: ReadyHandler): () => void {
+  readyHandler = handler;
+  return () => { readyHandler = null; };
+}
+
 export function onStargateEvent(handler: EventHandler): () => void {
   eventHandlers.add(handler);
   return () => eventHandlers.delete(handler);
@@ -54,7 +69,13 @@ export function connectStargate(token: string): void {
       const msg = JSON.parse(event.data) as { op: number; d?: unknown; t?: string };
       switch (msg.op) {
         case Op.Ready:
-          setStargateReady(true);
+          const ready = msg.d as ReadyPayload;
+          setStargateReady(true, ready);
+          try {
+            readyHandler?.(ready);
+          } catch (e) {
+            console.error('Stargate ready handler error:', e);
+          }
           break;
         case Op.Event:
           setStargateLastEvent();

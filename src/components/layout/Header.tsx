@@ -36,7 +36,7 @@ export const Header: Component = () => {
         <input
           type="search"
           placeholder="Search..."
-          class="w-full h-8 rounded-md border border-input bg-background px-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+          class="w-full h-8 rounded-md border border-input bg-background px-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
         />
       </div>
       <div class="flex items-center gap-3 ml-auto">

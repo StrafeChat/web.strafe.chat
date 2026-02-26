@@ -8,11 +8,12 @@ import {
   encryptMessageForSelf,
   decryptMessage,
 } from '../lib/e2ee';
-import { PLAINTEXT_PREFIX, DUAL_CIPHERTEXT_PREFIX } from '../lib/e2ee/constants';
+import { PLAINTEXT_PREFIX, DUAL_CIPHERTEXT_PREFIX, GROUP_CIPHERTEXT_PREFIX } from '../lib/e2ee/constants';
+import type { GroupCipherPayload } from '../lib/e2ee/types';
 import { getDeviceIdentity, setSentPlaintext, getSentPlaintext } from '../lib/e2ee/store';
 import { removeTyping } from './typing';
 import { auth } from './auth';
-import { rooms } from './rooms';
+import { rooms, updateRoomLastMessage } from './rooms';
 import { onStargateEvent } from '../services/stargate/client';
 
 const SENT_PLAINTEXT_PLACEHOLDER = '[Your message]';
@@ -89,6 +90,47 @@ export async function loadMessages(
         if (m.ciphertext.startsWith(PLAINTEXT_PREFIX)) {
           return { ...m, plaintext: m.ciphertext.slice(PLAINTEXT_PREFIX.length), notEncrypted: true };
         }
+        if (m.ciphertext.startsWith(GROUP_CIPHERTEXT_PREFIX)) {
+          try {
+            const group = JSON.parse(
+              m.ciphertext.slice(GROUP_CIPHERTEXT_PREFIX.length)
+            ) as GroupCipherPayload;
+            const isSender = String(m.sender_id) === currentUserId;
+            if (isSender) {
+              const stored = await getSentPlaintext(m.id);
+              if (stored != null) return { ...m, plaintext: stored };
+              if (group.s) {
+                const plaintext = await decryptMessage(group.s, currentUserId);
+                return { ...m, plaintext };
+              }
+              return { ...m, plaintext: SENT_PLAINTEXT_PLACEHOLDER };
+            }
+            const myDeviceId = (await getDeviceIdentity(currentUserId))?.deviceId;
+            const forMeSlots = group.recipients?.filter((r) => r.user_id === currentUserId) ?? [];
+            for (const slot of forMeSlots) {
+              if (myDeviceId != null && slot.device_id !== myDeviceId) continue;
+              try {
+                const plaintext = await decryptMessage(slot.ciphertext, currentUserId);
+                return { ...m, plaintext };
+              } catch {
+                continue;
+              }
+            }
+            for (const slot of forMeSlots) {
+              if (myDeviceId != null && slot.device_id === myDeviceId) continue;
+              try {
+                const plaintext = await decryptMessage(slot.ciphertext, currentUserId);
+                return { ...m, plaintext };
+              } catch {
+                continue;
+              }
+            }
+            return { ...m, decryptError: true };
+          } catch (e) {
+            console.error('[E2EE] Group decrypt failed for message', m.id, e);
+            return { ...m, decryptError: true };
+          }
+        }
         if (String(m.sender_id) === auth.user?.id) {
           const stored = await getSentPlaintext(m.id);
           if (stored != null) return { ...m, plaintext: stored };
@@ -101,6 +143,14 @@ export async function loadMessages(
                 const plaintext = await decryptMessage(dual.s, currentUserId);
                 return { ...m, plaintext };
               }
+            } catch {
+              // fall through to placeholder
+            }
+          } else {
+            // Notes room: ciphertext is self-encrypted only (no dual wrapper)
+            try {
+              const plaintext = await decryptMessage(m.ciphertext, currentUserId);
+              return { ...m, plaintext };
             } catch {
               // fall through to placeholder
             }
@@ -182,8 +232,11 @@ export async function sendMessage(roomId: string, plaintext: string): Promise<Me
   const currentUserId = auth.user?.id;
   if (!room || !currentUserId) return null;
 
-  const otherParticipant = room.participants?.find((p) => p.id !== currentUserId);
-  if (!otherParticipant) return null;
+  const participants = room.participants ?? [];
+  const otherParticipant = participants.find((p) => p.id !== currentUserId);
+  const isNotesRoom = !otherParticipant && participants.length === 1;
+  const isGroupRoom = room.type === 2 && participants.length >= 2;
+  if (!otherParticipant && !isNotesRoom && !isGroupRoom) return null;
 
   const nonce = createTempId();
   const now = new Date().toISOString();
@@ -199,33 +252,65 @@ export async function sendMessage(roomId: string, plaintext: string): Promise<Me
     pending: true,
   };
 
-  // Optimistic add – show message immediately (nonce pattern)
   setMessages('byRoom', roomId, (prev) => sortByCreatedAt([...(prev ?? []), tempMsg]));
   setMessages('scrollToBottomTick', roomId, (t) => (t ?? 0) + 1);
 
   setMessages('sending', roomId, true);
   try {
     await ensureDevice(currentUserId);
-    const devices = await listDevices(otherParticipant.id);
-    const deviceId = devices[0]?.device_id;
     let ciphertext: string;
     let notEncrypted = false;
 
-    if (deviceId != null) {
-      await getOrCreateSession(currentUserId, otherParticipant.id, deviceId);
-      const recipientCipher = await encryptMessage(
-        plaintext,
-        currentUserId,
-        otherParticipant.id,
-        deviceId
-      );
+    if (isGroupRoom) {
+      const others = participants.filter((p) => p.id !== currentUserId);
+      const recipients: GroupCipherPayload['recipients'] = [];
+      for (const p of others) {
+        try {
+          const devices = await listDevices(p.id);
+          for (const d of devices) {
+            const deviceId = d.device_id;
+            await getOrCreateSession(currentUserId, p.id, deviceId);
+            const c = await encryptMessage(plaintext, currentUserId, p.id, deviceId);
+            recipients.push({ user_id: p.id, device_id: deviceId, ciphertext: c });
+          }
+        } catch (e) {
+          console.warn('[E2EE] Group: could not encrypt for', p.id, e);
+        }
+      }
       const senderCipher = await encryptMessageForSelf(plaintext, currentUserId);
-      ciphertext =
-        DUAL_CIPHERTEXT_PREFIX +
-        JSON.stringify({ r: recipientCipher, s: senderCipher });
+      if (recipients.length === 0) {
+        ciphertext = PLAINTEXT_PREFIX + plaintext;
+        notEncrypted = true;
+      } else {
+        ciphertext =
+          GROUP_CIPHERTEXT_PREFIX +
+          JSON.stringify({ s: senderCipher, recipients });
+      }
     } else {
-      ciphertext = PLAINTEXT_PREFIX + plaintext;
-      notEncrypted = true;
+      const recipientId = otherParticipant?.id ?? currentUserId;
+      const devices = await listDevices(recipientId);
+      const deviceId = devices[0]?.device_id;
+
+      if (deviceId != null) {
+        await getOrCreateSession(currentUserId, recipientId, deviceId);
+        if (isNotesRoom) {
+          ciphertext = await encryptMessageForSelf(plaintext, currentUserId);
+        } else {
+          const recipientCipher = await encryptMessage(
+            plaintext,
+            currentUserId,
+            recipientId,
+            deviceId
+          );
+          const senderCipher = await encryptMessageForSelf(plaintext, currentUserId);
+          ciphertext =
+            DUAL_CIPHERTEXT_PREFIX +
+            JSON.stringify({ r: recipientCipher, s: senderCipher });
+        }
+      } else {
+        ciphertext = PLAINTEXT_PREFIX + plaintext;
+        notEncrypted = true;
+      }
     }
 
     const device = await getDeviceIdentity(currentUserId);
@@ -236,18 +321,27 @@ export async function sendMessage(roomId: string, plaintext: string): Promise<Me
 
     await setSentPlaintext(msg.id, plaintext);
 
+    const confirmed: DecryptedMessage = { ...msg, plaintext, notEncrypted };
+    let didReplaceInPlace = false;
     setMessages('byRoom', roomId, (prev) => {
-      const list = (prev ?? []).filter((m) => m.id !== nonce);
-      const existing = list.find((m) => m.id === msg.id);
-      const confirmed: DecryptedMessage = { ...msg, plaintext, notEncrypted };
-      if (existing) {
-        return sortByCreatedAt(
-          list.map((m) => (m.id === msg.id ? { ...m, ...confirmed, plaintext } : m))
-        );
+      const list = prev ?? [];
+      const tempIdx = list.findIndex((m) => m.id === nonce);
+      const existingIdx = list.findIndex((m) => m.id === msg.id);
+      if (existingIdx >= 0) {
+        didReplaceInPlace = true;
+        return list.map((m, i) => (i === existingIdx ? { ...m, ...confirmed, plaintext } : m));
+      }
+      if (tempIdx >= 0) {
+        didReplaceInPlace = true;
+        const merged = [...list];
+        merged[tempIdx] = confirmed;
+        return merged;
       }
       return sortByCreatedAt([...list, confirmed]);
     });
-    setMessages('scrollToBottomTick', roomId, (t) => (t ?? 0) + 1);
+    if (!didReplaceInPlace) {
+      setMessages('scrollToBottomTick', roomId, (t) => (t ?? 0) + 1);
+    }
     return msg;
   } catch (err) {
     setMessages('byRoom', roomId, (prev) => (prev ?? []).filter((m) => m.id !== nonce));
@@ -293,6 +387,46 @@ export async function addMessageFromEvent(payload: {
   if (payload.ciphertext.startsWith(PLAINTEXT_PREFIX)) {
     plaintext = payload.ciphertext.slice(PLAINTEXT_PREFIX.length);
     notEncrypted = true;
+  } else if (payload.ciphertext.startsWith(GROUP_CIPHERTEXT_PREFIX) && currentUserId) {
+    try {
+      const group = JSON.parse(
+        payload.ciphertext.slice(GROUP_CIPHERTEXT_PREFIX.length)
+      ) as GroupCipherPayload;
+      const isSender = String(payload.sender_id) === currentUserId;
+      if (isSender) {
+        const stored = await getSentPlaintext(payload.id);
+        if (stored != null) plaintext = stored;
+        else if (group.s) plaintext = await decryptMessage(group.s, currentUserId);
+        else plaintext = SENT_PLAINTEXT_PLACEHOLDER;
+      } else {
+        const myDeviceId = (await getDeviceIdentity(currentUserId))?.deviceId;
+        const forMeSlots = group.recipients?.filter((r) => r.user_id === currentUserId) ?? [];
+        for (const slot of forMeSlots) {
+          if (myDeviceId != null && slot.device_id !== myDeviceId) continue;
+          try {
+            plaintext = await decryptMessage(slot.ciphertext, currentUserId);
+            break;
+          } catch {
+            continue;
+          }
+        }
+        if (plaintext == null) {
+          for (const slot of forMeSlots) {
+            if (myDeviceId != null && slot.device_id === myDeviceId) continue;
+            try {
+              plaintext = await decryptMessage(slot.ciphertext, currentUserId);
+              break;
+            } catch {
+              continue;
+            }
+          }
+        }
+        if (plaintext == null) decryptError = true;
+      }
+    } catch (e) {
+      console.error('[E2EE] Group decrypt failed for real-time message', payload.id, e);
+      decryptError = true;
+    }
   } else if (String(payload.sender_id) !== currentUserId && currentUserId) {
     try {
       let toDecrypt = payload.ciphertext;
@@ -327,6 +461,13 @@ export async function addMessageFromEvent(payload: {
       } catch {
         plaintext = SENT_PLAINTEXT_PLACEHOLDER;
       }
+    } else if (currentUserId && !payload.ciphertext.startsWith(PLAINTEXT_PREFIX) && !payload.ciphertext.startsWith(GROUP_CIPHERTEXT_PREFIX)) {
+      // Notes room: ciphertext is self-encrypted only
+      try {
+        plaintext = await decryptMessage(payload.ciphertext, currentUserId);
+      } catch {
+        plaintext = SENT_PLAINTEXT_PLACEHOLDER;
+      }
     } else {
       plaintext = SENT_PLAINTEXT_PLACEHOLDER;
     }
@@ -337,23 +478,45 @@ export async function addMessageFromEvent(payload: {
     decryptError: decryptError || undefined,
     notEncrypted,
   };
+  let didReplaceInPlace = false;
   setMessages('byRoom', roomId, (prev) => {
     const list = prev ?? [];
-    const idx = list.findIndex((m) => m.id === msg.id);
-    if (idx >= 0) {
-      const existing = list[idx]!;
+    const existingIdx = list.findIndex((m) => m.id === msg.id);
+    if (existingIdx >= 0) {
+      didReplaceInPlace = true;
+      const existing = list[existingIdx]!;
+      return list.map((m, i) =>
+        i === existingIdx
+          ? {
+              ...existing,
+              ...msg,
+              plaintext:
+                msg.plaintext && msg.plaintext !== SENT_PLAINTEXT_PLACEHOLDER ? msg.plaintext : existing.plaintext,
+            }
+          : m
+      );
+    }
+    const isOwn = String(payload.sender_id) === currentUserId;
+    const tempIdx =
+      isOwn && plaintext
+        ? list.findIndex(
+            (m) =>
+              m.pending &&
+              m.sender_id === payload.sender_id &&
+              m.plaintext === plaintext
+          )
+        : -1;
+    if (tempIdx >= 0) {
+      didReplaceInPlace = true;
       const merged = [...list];
-      merged[idx] = {
-        ...existing,
-        ...msg,
-        plaintext:
-          msg.plaintext && msg.plaintext !== SENT_PLAINTEXT_PLACEHOLDER ? msg.plaintext : existing.plaintext,
-      };
-      return sortByCreatedAt(merged);
+      merged[tempIdx] = msg;
+      return merged;
     }
     return sortByCreatedAt([...list, msg]);
   });
-  setMessages('scrollToBottomTick', roomId, (t) => (t ?? 0) + 1);
+  if (!didReplaceInPlace) {
+    setMessages('scrollToBottomTick', roomId, (t) => (t ?? 0) + 1);
+  }
 }
 
 /** Register Stargate event handlers. Call once on app init. */
@@ -365,6 +528,8 @@ export function initStargateMessageHandler() {
       const roomId = data?.room_id ?? (evt as { room_id?: string }).room_id;
       if (data && typeof roomId === 'string') {
         addMessageFromEvent({ ...data, room_id: roomId } as Parameters<typeof addMessageFromEvent>[0]);
+        const msgId = data?.id;
+        if (typeof msgId === 'string') updateRoomLastMessage(roomId, msgId);
       }
     }
   });

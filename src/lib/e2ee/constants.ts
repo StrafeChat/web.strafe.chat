@@ -23,6 +23,9 @@ export const PLAINTEXT_PREFIX = 'PLAINTEXT:';
 /** Prefix for dual ciphertext: encrypted for both recipient and sender (cross-device). */
 export const DUAL_CIPHERTEXT_PREFIX = 'DUAL:';
 
+/** Prefix for group ciphertext: encrypted for sender (s) and each recipient (recipients[].ciphertext). */
+export const GROUP_CIPHERTEXT_PREFIX = 'GROUP:';
+
 /** HKDF salt – fixed; changing breaks all existing encrypted messages */
 export const HKDF_SALT = new TextEncoder().encode('StrafeChat-E2EE-Salt');
 

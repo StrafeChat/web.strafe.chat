@@ -1,9 +1,14 @@
 import type { Component } from 'solid-js';
-import { For, Show } from 'solid-js';
+import { createSignal, For, Show } from 'solid-js';
 import { A, useLocation, useMatch } from '@solidjs/router';
 import { UserArea } from './UserArea';
-import { rooms, roomDisplayName } from '../../stores/rooms';
+import { CreateGroupModal } from '../CreateGroupModal';
+import { rooms, roomDisplayName, isNotesRoom, sortRoomsByLastMessage } from '../../stores/rooms';
 import { auth } from '../../stores/auth';
+import { lastVisited } from '../../stores/lastVisited';
+import { getUnreadCountForDisplay } from '../../stores/readState';
+import { messages } from '../../stores/messages';
+import { PresenceDot } from '../PresenceDot';
 
 const PlusIcon = () => (
   <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -35,33 +40,85 @@ const PaneButton: Component<PaneButtonProps> = (props) => (
 
 interface ConvItemProps {
   name: string;
-  active?: boolean;
   href?: string;
+  roomId?: string;
+  /** User ID for presence indicator (1:1 PMs) */
+  presenceUserId?: string;
+  /** Avatar URL for 1:1 PMs */
+  avatar?: string | null;
+  /** Group DM: show group icon instead of avatar */
+  isGroup?: boolean;
+  /** Unread count (0 = no badge) */
+  unreadCount?: number;
 }
 
 const ConvItem: Component<ConvItemProps> = (props) => {
   const base = 'flex items-center gap-3 w-full min-w-0 px-2 py-2 rounded-md text-left transition-colors text-foreground hover:bg-accent hover:text-accent-foreground';
-  const active = props.active ? 'bg-accent text-accent-foreground' : '';
   const content = (
     <>
-      <div class="size-8 shrink-0 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
-        {props.name[0].toUpperCase()}
+      <div class="relative shrink-0">
+        <Show
+          when={props.isGroup}
+          fallback={
+            props.avatar ? (
+              <img
+                src={props.avatar}
+                alt=""
+                class="size-8 rounded-full object-cover"
+              />
+            ) : (
+              <div class="size-8 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
+                {props.name[0].toUpperCase()}
+              </div>
+            )
+          }
+        >
+          <div class="size-8 rounded-full bg-muted flex items-center justify-center">
+            <i class="fa-solid fa-user-group text-sm text-muted-foreground" />
+          </div>
+        </Show>
+        <Show when={props.presenceUserId}>
+          <span class="absolute bottom-[-1px] right-[-1px]">
+            <PresenceDot userId={props.presenceUserId!} class="size-3.25" />
+          </span>
+        </Show>
       </div>
-      <span class="text-sm font-medium truncate min-w-0">{props.name}</span>
+      <span class="text-sm font-medium truncate min-w-0 flex-1 py-0.5">{props.name}</span>
+      <Show when={(props.unreadCount ?? 0) > 0}>
+        <span class="shrink-0 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-semibold px-1.5">
+          {(props.unreadCount ?? 0) > 99 ? '99+' : props.unreadCount}
+        </span>
+      </Show>
     </>
   );
   if (props.href) {
-    return <A href={props.href} class={`${base} ${active}`}>{content}</A>;
+    return (
+      <A
+        href={props.href}
+        end
+        class={base}
+        activeClass="bg-accent text-accent-foreground"
+      >
+        {content}
+      </A>
+    );
   }
-  return <button type="button" class={`${base} ${active}`}>{content}</button>;
+  return <button type="button" class={base}>{content}</button>;
 };
 
 export const RoomsBar: Component = () => {
+  const [showCreateGroup, setShowCreateGroup] = createSignal(false);
   const location = useLocation();
   const roomMatch = useMatch(() => '/rooms/:roomId');
   const pathname = () => location.pathname;
   const currentUserId = () => auth.user?.id ?? '';
   const activeRoomId = () => roomMatch()?.params?.roomId;
+  const activeRoom = () => rooms.rooms.find((r) => r.id === activeRoomId());
+  const isNotesActive = () =>
+    pathname() === '/notes' || !!(activeRoomId() && activeRoom() && isNotesRoom(activeRoom()!, currentUserId()));
+
+  const conversationRooms = () =>
+    sortRoomsByLastMessage(rooms.rooms.filter((r) => !isNotesRoom(r, currentUserId())));
 
   return (
     <aside class="w-[240px] shrink-0 flex flex-col bg-[hsl(0_0%_8%)] border-r border-border overflow-hidden hidden md:flex">
@@ -71,7 +128,7 @@ export const RoomsBar: Component = () => {
           <div class="flex flex-col gap-0.5">
             <PaneButton href="/" active={pathname() === '/'} icon="fa-house" label="Home" />
             <PaneButton href="/friends" active={pathname() === '/friends'} icon="fa-user-group" label="Friends" />
-            <PaneButton href="/notes" active={pathname() === '/notes'} icon="fa-note-sticky" label="Notes" />
+            <PaneButton href="/notes" active={isNotesActive()} icon="fa-note-sticky" label="Notes" />
           </div>
         </div>
         <div class="flex-1 flex flex-col min-h-0 overflow-hidden py-2 px-3">
@@ -82,26 +139,45 @@ export const RoomsBar: Component = () => {
             <button
               type="button"
               class="p-1 rounded shrink-0 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              title="New DM"
+              title="New group"
+              onClick={() => setShowCreateGroup(true)}
             >
               <PlusIcon />
             </button>
           </div>
+          <CreateGroupModal open={showCreateGroup()} onClose={() => setShowCreateGroup(false)} />
           <div class="flex-1 overflow-y-auto min-h-0 space-y-0.5">
             <Show when={rooms.loading}>
               <div class="py-2 text-xs text-muted-foreground">Loading...</div>
             </Show>
-            <Show when={!rooms.loading && rooms.rooms.length === 0}>
+            <Show when={!rooms.loading && conversationRooms().length === 0}>
               <div class="py-2 text-xs text-muted-foreground">No conversations yet</div>
             </Show>
-            <For each={rooms.rooms}>
-              {(room) => (
-                <ConvItem
-                  name={roomDisplayName(room, currentUserId())}
-                  href={`/rooms/${room.id}`}
-                  active={activeRoomId() === room.id}
-                />
-              )}
+            <For each={conversationRooms()}>
+              {(room) => {
+                const otherParticipant = () =>
+                  room.participants?.find((p) => p.id !== currentUserId());
+                const isGroup = () => room.type === 2;
+                const avatar = () =>
+                  isGroup() ? null : otherParticipant()?.avatar;
+                const roomMsgList = () => messages.byRoom[room.id] ?? [];
+                const unreadCount = () => {
+                  if (activeRoomId() === room.id) return 0;
+                  const list = roomMsgList();
+                  return getUnreadCountForDisplay(room.id, room, list, currentUserId());
+                };
+                return (
+                  <ConvItem
+                    name={roomDisplayName(room, currentUserId())}
+                    href={`/rooms/${room.id}`}
+                    roomId={room.id}
+                    presenceUserId={isGroup() ? undefined : otherParticipant()?.id}
+                    avatar={avatar()}
+                    isGroup={isGroup()}
+                    unreadCount={unreadCount()}
+                  />
+                );
+              }}
             </For>
           </div>
         </div>

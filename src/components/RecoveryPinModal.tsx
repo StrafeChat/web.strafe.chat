@@ -28,7 +28,7 @@ export const RecoveryPinModal: Component = () => {
 
   return (
     <Show when={pending()}>
-      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" data-modal>
         <div class="w-full max-w-sm rounded-lg bg-card p-6 shadow-lg border border-border">
           <h3 class="text-lg font-semibold text-foreground mb-1">
             {pending()!.mode === 'restore'
@@ -48,7 +48,7 @@ export const RecoveryPinModal: Component = () => {
                 pattern="[0-9]*"
                 autocomplete="one-time-code"
                 placeholder="6+ digit PIN"
-                class="w-full rounded-lg border border-input bg-background px-4 py-3 text-sm placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
+                class="w-full rounded-lg border border-input bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 value={pin()}
                 onInput={(e) => {
                   setPin((e.target as HTMLInputElement).value);

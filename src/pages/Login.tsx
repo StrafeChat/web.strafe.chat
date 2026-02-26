@@ -5,8 +5,6 @@ import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { login } from '../api/auth';
 import { setAuth, setAuthToken } from '../stores/auth';
-import { loadRooms } from '../stores/rooms';
-import { loadRelationships } from '../stores/relationships';
 
 export default function Login() {
   const navigate = useNavigate();
@@ -35,7 +33,6 @@ export default function Login() {
         loading: false,
         hydrated: true,
       });
-      void Promise.all([loadRooms(), loadRelationships()]);
       navigate('/', { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Something went wrong');

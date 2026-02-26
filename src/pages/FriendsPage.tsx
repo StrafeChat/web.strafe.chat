@@ -1,6 +1,14 @@
 import type { Component } from 'solid-js';
 import { createSignal, For, Show } from 'solid-js';
-import { relationships, RelType, friendDisplayName } from '../stores/relationships';
+import { useNavigate } from '@solidjs/router';
+import { relationships, RelType, friendDisplayName, loadRelationships, removeRelationshipLocally } from '../stores/relationships';
+import { presence, isVisibleStatus } from '../stores/presence';
+import { PresenceDot } from '../components/PresenceDot';
+import { sendFriendRequest, putRelationship, removeRelationship } from '../api/relationships';
+import { createPM } from '../api/rooms';
+import { addOrUpdateRoom } from '../stores/rooms';
+import { Input } from '../components/ui/Input';
+import { Button } from '../components/ui/Button';
 
 const FriendsIcon = () => (
   <svg class="size-24 text-muted-foreground/40 mx-auto mb-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -21,13 +29,97 @@ const TABS: { id: TabId; label: string }[] = [
 ];
 
 const FriendsPage: Component = () => {
+  const navigate = useNavigate();
   const [tab, setTab] = createSignal<TabId>('all');
+  const [showAddModal, setShowAddModal] = createSignal(false);
+  const [addUsername, setAddUsername] = createSignal('');
+  const [addDiscriminator, setAddDiscriminator] = createSignal('');
+  const [addError, setAddError] = createSignal('');
+  const [addLoading, setAddLoading] = createSignal(false);
+  const [actionLoading, setActionLoading] = createSignal<string | null>(null);
+  const [messageLoading, setMessageLoading] = createSignal<string | null>(null);
+
+  async function handleAddFriend(e: Event) {
+    e.preventDefault();
+    const username = addUsername().trim();
+    const discriminator = addDiscriminator().trim().replace(/^#/, '');
+    setAddError('');
+    if (!username || !discriminator) {
+      setAddError('Username and discriminator are required');
+      return;
+    }
+    setAddLoading(true);
+    try {
+      await sendFriendRequest({ username, discriminator });
+      await loadRelationships();
+      setShowAddModal(false);
+      setAddUsername('');
+      setAddDiscriminator('');
+    } catch (err) {
+      setAddError(err instanceof Error ? err.message : 'Failed to send request');
+    } finally {
+      setAddLoading(false);
+    }
+  }
+
+  async function handleAccept(rel: { user: { id: string } }) {
+    const id = rel.user.id;
+    setActionLoading(id);
+    try {
+      await putRelationship(id);
+      // RELATIONSHIP_ADD event will update the list
+    } catch {
+      setActionLoading(null);
+    }
+    setActionLoading(null);
+  }
+
+  async function handleDecline(rel: { user: { id: string } }) {
+    const id = rel.user.id;
+    setActionLoading(id);
+    try {
+      await removeRelationship(id);
+      removeRelationshipLocally(id);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleCancelRequest(rel: { user: { id: string } }) {
+    const id = rel.user.id;
+    setActionLoading(id);
+    try {
+      await removeRelationship(id);
+      removeRelationshipLocally(id);
+    } finally {
+      setActionLoading(null);
+    }
+  }
+
+  async function handleMessage(rel: { user: { id: string } }) {
+    const userId = rel.user.id;
+    setMessageLoading(userId);
+    try {
+      const room = await createPM(userId);
+      addOrUpdateRoom(room);
+      navigate(`/rooms/${room.id}`);
+    } catch (err) {
+      console.error('Open PM failed:', err);
+    } finally {
+      setMessageLoading(null);
+    }
+  }
 
   const friends = () => relationships.relationships.filter((r) => r.type === RelType.Friend);
   const incoming = () => relationships.relationships.filter((r) => r.type === RelType.IncomingRequest);
   const outgoing = () => relationships.relationships.filter((r) => r.type === RelType.OutgoingRequest);
   const blocked = () => relationships.relationships.filter((r) => r.type === RelType.Blocked);
-  const onlineFriends = () => friends().filter((r) => r.user.online === true);
+  const onlineFriends = () =>
+    friends().filter(
+      (r) =>
+        isVisibleStatus(presence.byUser[r.user.id]?.status) ||
+        isVisibleStatus(r.user.presence?.status)
+    );
 
   const hasAny = () =>
     friends().length > 0 || incoming().length > 0 || outgoing().length > 0 || blocked().length > 0;
@@ -46,7 +138,52 @@ const FriendsPage: Component = () => {
 
   return (
     <div class="flex-1 flex flex-col">
-      <div class="h-12 flex items-center gap-1 px-4 border-b border-border shrink-0">
+      <Show when={showAddModal()}>
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" data-modal>
+          <div class="w-full max-w-sm rounded-lg bg-card p-6 shadow-lg border border-border mx-4">
+            <h3 class="text-lg font-semibold text-foreground mb-1">Add Friend</h3>
+            <p class="text-sm text-muted-foreground mb-4">Enter username and discriminator (e.g. 1234).</p>
+            <form onSubmit={handleAddFriend} class="space-y-4">
+              <Input
+                type="text"
+                label="Username"
+                placeholder="username"
+                value={addUsername()}
+                onInput={(e) => { setAddUsername(e.currentTarget.value); setAddError(''); }}
+                disabled={addLoading()}
+                autocomplete="username"
+              />
+              <Input
+                type="text"
+                label="Discriminator"
+                placeholder="1234"
+                value={addDiscriminator()}
+                onInput={(e) => { setAddDiscriminator(e.currentTarget.value); setAddError(''); }}
+                disabled={addLoading()}
+              />
+              {addError() && (
+                <p class="text-xs text-destructive">{addError()}</p>
+              )}
+              <div class="flex gap-2">
+                <Button
+                  type="button"
+                  class="flex-1"
+                  variant="outline"
+                  onClick={() => { setShowAddModal(false); setAddError(''); setAddUsername(''); setAddDiscriminator(''); }}
+                  disabled={addLoading()}
+                >
+                  Cancel
+                </Button>
+                <Button type="submit" class="flex-1" loading={addLoading()}>
+                  Send Request
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </Show>
+      <div class="h-12 flex items-center gap-2 px-4 border-b border-border shrink-0">
+        <i class="fa-solid fa-user-group text-muted-foreground shrink-0" />
         <h1 class="text-base font-semibold text-foreground mr-4">Friends</h1>
         <div class="flex gap-0.5">
           {TABS.map((t) => (
@@ -63,6 +200,13 @@ const FriendsPage: Component = () => {
             </button>
           ))}
         </div>
+        <button
+          type="button"
+          class="ml-auto px-3 py-1.5 rounded text-sm font-medium bg-primary text-primary-foreground hover:bg-primary-hover transition-colors"
+          onClick={() => setShowAddModal(true)}
+        >
+          Add Friend
+        </button>
       </div>
       <div class="flex-1 flex flex-col overflow-y-auto">
         <Show when={relationships.loading}>
@@ -80,7 +224,7 @@ const FriendsPage: Component = () => {
             <button
               type="button"
               class="px-6 py-3 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary-hover transition-colors"
-              // TODO: open Add Friend modal
+              onClick={() => setShowAddModal(true)}
             >
               Add Friend
             </button>
@@ -105,7 +249,7 @@ const FriendsPage: Component = () => {
               <button
                 type="button"
                 class="px-6 py-3 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary-hover transition-colors"
-                // TODO: open Add Friend modal
+                onClick={() => setShowAddModal(true)}
               >
                 Add Friend
               </button>
@@ -124,11 +268,13 @@ const FriendsPage: Component = () => {
                     {(rel) => (
                       <div class="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors">
                         <div class="flex items-center gap-3">
-                          <div class="relative">
+                          <div class="relative shrink-0">
                             <div class="size-10 rounded-full bg-primary/30 flex items-center justify-center text-sm font-medium">
                               {friendDisplayName(rel)[0].toUpperCase()}
                             </div>
-                            <div class="absolute bottom-0 right-0 size-2.5 rounded-full bg-green-500 border-2 border-background" title="Online" />
+                            <span class="absolute bottom-[-1px] right-[-1px]">
+                              <PresenceDot userId={rel.user.id} class="size-4" />
+                            </span>
                           </div>
                           <div>
                             <div class="font-medium">{friendDisplayName(rel)}</div>
@@ -138,7 +284,15 @@ const FriendsPage: Component = () => {
                           </div>
                         </div>
                         <div class="flex gap-2">
-                          {/* TODO: Message button */}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleMessage(rel)}
+                            disabled={messageLoading() === rel.user.id}
+                            loading={messageLoading() === rel.user.id}
+                          >
+                            Message
+                          </Button>
                         </div>
                       </div>
                     )}
@@ -156,8 +310,13 @@ const FriendsPage: Component = () => {
                     {(rel) => (
                       <div class="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors">
                         <div class="flex items-center gap-3">
-                          <div class="size-10 rounded-full bg-primary/30 flex items-center justify-center text-sm font-medium">
-                            {friendDisplayName(rel)[0].toUpperCase()}
+                          <div class="relative">
+                            <div class="size-10 rounded-full bg-primary/30 flex items-center justify-center text-sm font-medium">
+                              {friendDisplayName(rel)[0].toUpperCase()}
+                            </div>
+                              <span class="absolute bottom-[-1px] right-[-1px]">
+                                <PresenceDot userId={rel.user.id} class="size-4" />
+                              </span>
                           </div>
                           <div>
                             <div class="font-medium">{friendDisplayName(rel)}</div>
@@ -167,7 +326,15 @@ const FriendsPage: Component = () => {
                           </div>
                         </div>
                         <div class="flex gap-2">
-                          {/* TODO: Message button */}
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleMessage(rel)}
+                            disabled={messageLoading() === rel.user.id}
+                            loading={messageLoading() === rel.user.id}
+                          >
+                            Message
+                          </Button>
                         </div>
                       </div>
                     )}
@@ -197,7 +364,24 @@ const FriendsPage: Component = () => {
                                 </div>
                               </div>
                             </div>
-                            {/* TODO: Accept / Decline buttons */}
+                            <div class="flex gap-2">
+                              <Button
+                                size="sm"
+                                onClick={() => handleAccept(rel)}
+                                disabled={actionLoading() === rel.user.id}
+                                loading={actionLoading() === rel.user.id}
+                              >
+                                Accept
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleDecline(rel)}
+                                disabled={actionLoading() === rel.user.id}
+                              >
+                                Decline
+                              </Button>
+                            </div>
                           </div>
                         )}
                       </For>
@@ -224,7 +408,14 @@ const FriendsPage: Component = () => {
                                 </div>
                               </div>
                             </div>
-                            <span class="text-xs text-muted-foreground">Pending</span>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => handleCancelRequest(rel)}
+                              disabled={actionLoading() === rel.user.id}
+                            >
+                              Cancel
+                            </Button>
                           </div>
                         )}
                       </For>

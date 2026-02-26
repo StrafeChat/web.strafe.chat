@@ -15,7 +15,7 @@ export interface RegisterInput {
   email: string;
   username: string;
   password: string;
-  date_of_birth: string; // ISO date YYYY-MM-DD
+  date_of_birth: string; // RFC3339 e.g. 1999-10-13T00:00:00.000Z
   discriminator?: number;
 }
 

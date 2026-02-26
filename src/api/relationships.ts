@@ -9,13 +9,18 @@ export type RelationshipType =
   | 5  // implicit
   | 6; // suggestion
 
+export interface UserPresence {
+  status: 'online' | 'idle' | 'dnd' | 'offline';
+  custom_status?: string;
+}
+
 export interface RelationshipUser {
   id: string;
   username: string;
   discriminator: string;
   display_name: string;
   avatar?: string;
-  online?: boolean;
+  presence?: UserPresence;
 }
 
 export interface Relationship {
@@ -31,4 +36,25 @@ export interface Relationship {
 
 export function listRelationships() {
   return api<Relationship[]>('/users/@me/relationships');
+}
+
+/** Send a friend request by username and discriminator (e.g. "1234"). */
+export function sendFriendRequest(params: { username: string; discriminator: string }) {
+  return api<void>('/users/@me/relationships', {
+    method: 'POST',
+    json: {
+      username: params.username.trim(),
+      discriminator: String(params.discriminator).trim(),
+    },
+  });
+}
+
+/** Send friend request by user id, or accept an incoming request (PUT accepts if they already sent). */
+export function putRelationship(userId: string) {
+  return api<void>(`/users/@me/relationships/${userId}`, { method: 'PUT' });
+}
+
+/** Remove relationship: unfriend, decline incoming, or cancel outgoing. */
+export function removeRelationship(userId: string) {
+  return api<void>(`/users/@me/relationships/${userId}`, { method: 'DELETE' });
 }

@@ -17,6 +17,10 @@ const HomePage: Component = () => {
 
   return (
     <div class="flex-1 flex flex-col">
+      <div class="h-12 flex items-center gap-2 px-4 border-b border-border shrink-0">
+        <i class="fa-solid fa-house text-muted-foreground shrink-0" />
+        <h1 class="text-base font-semibold text-foreground">Home</h1>
+      </div>
       <div class="flex-1 flex flex-col items-center justify-center p-8 text-center">
         <h1 class="text-3xl font-bold text-foreground mb-2">
           {greeting()}, {name()}!

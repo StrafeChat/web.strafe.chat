@@ -31,11 +31,13 @@ export default function Register() {
     }
     setLoading(true);
     try {
+      // Backend z.Time() expects RFC3339; date input gives YYYY-MM-DD
+      const dateOfBirthRFC3339 = `${dob}T00:00:00.000Z`;
       await register({
         email: eVal,
         username: uVal,
         password: pVal,
-        date_of_birth: dob,
+        date_of_birth: dateOfBirthRFC3339,
       });
       navigate('/login?registered=1', { replace: true });
     } catch (err) {
