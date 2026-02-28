@@ -9,6 +9,7 @@ import { createPM } from '../api/rooms';
 import { addOrUpdateRoom } from '../stores/rooms';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
+import { showContextMenu } from '../stores/contextMenu';
 
 const FriendsIcon = () => (
   <svg class="size-24 text-muted-foreground/40 mx-auto mb-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -266,7 +267,22 @@ const FriendsPage: Component = () => {
                 <div class="space-y-1">
                   <For each={onlineFriends()}>
                     {(rel) => (
-                      <div class="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors">
+                      <div
+                        class="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors cursor-context-menu"
+                        onContextMenu={(e) => {
+                          const tag = `${rel.user.username}#${rel.user.discriminator}`;
+                          showContextMenu(e, [
+                            { label: 'Message', icon: 'fa-message', onClick: () => handleMessage(rel) },
+                            { label: 'Copy username', icon: 'fa-copy', onClick: () => navigator.clipboard.writeText(tag) },
+                            {
+                              label: 'Remove friend',
+                              icon: 'fa-user-minus',
+                              danger: true,
+                              onClick: () => removeRelationship(rel.user.id).then(() => removeRelationshipLocally(rel.user.id)).catch(() => {}),
+                            },
+                          ]);
+                        }}
+                      >
                         <div class="flex items-center gap-3">
                           <div class="relative shrink-0">
                             <div class="size-10 rounded-full bg-primary/30 flex items-center justify-center text-sm font-medium">
@@ -308,7 +324,22 @@ const FriendsPage: Component = () => {
                 <div class="space-y-1">
                   <For each={friends()}>
                     {(rel) => (
-                      <div class="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors">
+                      <div
+                        class="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors cursor-context-menu"
+                        onContextMenu={(e) => {
+                          const tag = `${rel.user.username}#${rel.user.discriminator}`;
+                          showContextMenu(e, [
+                            { label: 'Message', icon: 'fa-message', onClick: () => handleMessage(rel) },
+                            { label: 'Copy username', icon: 'fa-copy', onClick: () => navigator.clipboard.writeText(tag) },
+                            {
+                              label: 'Remove friend',
+                              icon: 'fa-user-minus',
+                              danger: true,
+                              onClick: () => removeRelationship(rel.user.id).then(() => removeRelationshipLocally(rel.user.id)).catch(() => {}),
+                            },
+                          ]);
+                        }}
+                      >
                         <div class="flex items-center gap-3">
                           <div class="relative">
                             <div class="size-10 rounded-full bg-primary/30 flex items-center justify-center text-sm font-medium">

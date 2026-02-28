@@ -153,7 +153,7 @@ export const UserArea: Component = () => {
       </div>
       <button
         type="button"
-        class="p-1.5 rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0"
+        class="size-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0"
         title="Settings"
         aria-label="Settings"
         onClick={() => {

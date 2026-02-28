@@ -40,3 +40,30 @@
 }
 
 @import './theme/tokens.css';
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(0 0% 28% / 0.6) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: hsl(0 0% 28% / 0.5);
+  border-radius: 4px;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+  background: hsl(0 0% 35% / 0.6);
+}
+
+*::-webkit-scrollbar-corner {
+  background: transparent;
+}

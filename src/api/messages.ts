@@ -15,7 +15,7 @@ export interface Message {
 export interface CreateMessageInput {
   sender_device_id: number;
   ciphertext: string;
-  reply_to_id?: string;
+  reply_to_id?: number;
 }
 
 export function listMessages(roomId: string, params?: { before?: string; limit?: number }) {

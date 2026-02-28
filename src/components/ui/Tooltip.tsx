@@ -5,7 +5,9 @@ import { Portal } from 'solid-js/web';
 interface TooltipProps {
   label: string;
   children: import('solid-js').JSX.Element;
-  side?: 'right' | 'left';
+  side?: 'right' | 'left' | 'top';
+  /** When true, wrapper does not take full width (e.g. for icon rows). */
+  inline?: boolean;
 }
 
 export const Tooltip: Component<TooltipProps> = (props) => {
@@ -16,13 +18,20 @@ export const Tooltip: Component<TooltipProps> = (props) => {
   function updatePosition() {
     if (!triggerEl) return;
     const rect = triggerEl.getBoundingClientRect();
-    const gap = 8;
+    const gap = props.side === 'top' ? 18 : 8;
     const tooltipHeight = 28;
-    const centerY = rect.top + rect.height / 2 - tooltipHeight / 2 - 4;
-    if (props.side === 'left') {
-      setPos({ top: centerY, left: rect.left - gap });
+    if (props.side === 'top') {
+      setPos({
+        top: rect.top - tooltipHeight - gap,
+        left: rect.left + rect.width / 2,
+      });
     } else {
-      setPos({ top: centerY, left: rect.right + gap });
+      const centerY = rect.top + rect.height / 2 - tooltipHeight / 2 - 4;
+      if (props.side === 'left') {
+        setPos({ top: centerY, left: rect.left - gap });
+      } else {
+        setPos({ top: centerY, left: rect.right + gap });
+      }
     }
   }
 
@@ -36,11 +45,15 @@ export const Tooltip: Component<TooltipProps> = (props) => {
   }
 
   const isLeft = props.side === 'left';
+  const isTop = props.side === 'top';
+
+  const transform =
+    isTop ? 'translateX(-50%)' : isLeft ? 'translateX(-100%)' : 'none';
 
   return (
     <div
       ref={(el) => { triggerEl = el; }}
-      class="w-full flex justify-center"
+      class={props.inline ? 'inline-flex' : 'w-full flex justify-center'}
       onMouseEnter={handleMouseEnter}
       onMouseLeave={handleMouseLeave}
     >
@@ -52,18 +65,23 @@ export const Tooltip: Component<TooltipProps> = (props) => {
             style={{
               top: `${pos().top}px`,
               left: `${pos().left}px`,
-              transform: isLeft ? 'translateX(-100%)' : 'none',
+              transform,
             }}
           >
             <div class="relative flex items-center px-3 py-2 rounded-md bg-[hsl(0_0%_14%)] text-white text-sm font-medium whitespace-nowrap shadow-xl">
-              {/* Arrow pointing towards trigger (left when tooltip is right, right when tooltip is left) */}
-              <div
-                class={`absolute top-1/2 -translate-y-1/2 w-0 h-0 border-y-[6px] border-y-transparent ${
-                  isLeft
-                    ? 'left-full border-l-[6px] border-l-[hsl(0_0%_14%)]'
-                    : 'right-full border-r-[6px] border-r-[hsl(0_0%_14%)]'
-                }`}
-              />
+              {isTop ? (
+                <div
+                  class="absolute left-1/2 top-full -translate-x-1/2 -mt-px w-0 h-0 border-x-[6px] border-x-transparent border-t-[6px] border-t-[hsl(0_0%_14%)]"
+                />
+              ) : (
+                <div
+                  class={`absolute top-1/2 -translate-y-1/2 w-0 h-0 border-y-[6px] border-y-transparent ${
+                    isLeft
+                      ? 'left-full border-l-[6px] border-l-[hsl(0_0%_14%)]'
+                      : 'right-full border-r-[6px] border-r-[hsl(0_0%_14%)]'
+                  }`}
+                />
+              )}
               {props.label}
             </div>
           </div>

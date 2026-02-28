@@ -3,6 +3,7 @@ import { createEffect } from 'solid-js';
 import { useLocation } from '@solidjs/router';
 import { SpaceBar } from './SpaceBar';
 import { RoomsBar } from './RoomsBar';
+import { ContextMenu } from '../ContextMenu';
 import { lastVisited } from '../../stores/lastVisited';
 
 interface AppShellProps {
@@ -21,6 +22,7 @@ export const AppShell: Component<AppShellProps> = (props) => {
       <main class="flex-1 flex flex-col min-w-0 overflow-hidden bg-[hsl(0_0%_6%)]">
         {props.children}
       </main>
+      <ContextMenu />
     </div>
   );
 };

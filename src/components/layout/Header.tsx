@@ -48,7 +48,7 @@ export const Header: Component = () => {
         </Show>
         <button
           type="button"
-          class="flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
+          class="flex items-center gap-2 min-h-8 px-3 py-1.5 rounded-md hover:bg-accent hover:text-accent-foreground transition-colors"
           aria-label="User menu"
         >
           <div class="size-8 rounded-full bg-primary/20 flex items-center justify-center text-sm font-medium text-primary">

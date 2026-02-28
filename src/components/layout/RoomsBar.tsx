@@ -6,9 +6,11 @@ import { CreateGroupModal } from '../CreateGroupModal';
 import { rooms, roomDisplayName, isNotesRoom, sortRoomsByLastMessage } from '../../stores/rooms';
 import { auth } from '../../stores/auth';
 import { lastVisited } from '../../stores/lastVisited';
-import { getUnreadCountForDisplay } from '../../stores/readState';
+import { getUnreadCountForDisplay, setReadState } from '../../stores/readState';
 import { messages } from '../../stores/messages';
 import { PresenceDot } from '../PresenceDot';
+import { showContextMenu } from '../../stores/contextMenu';
+import { ackRoom } from '../../api/rooms';
 
 const PlusIcon = () => (
   <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -50,6 +52,8 @@ interface ConvItemProps {
   isGroup?: boolean;
   /** Unread count (0 = no badge) */
   unreadCount?: number;
+  /** Right-click context menu */
+  onContextMenu?: (e: MouseEvent) => void;
 }
 
 const ConvItem: Component<ConvItemProps> = (props) => {
@@ -91,6 +95,7 @@ const ConvItem: Component<ConvItemProps> = (props) => {
       </Show>
     </>
   );
+  const contextMenu = props.onContextMenu;
   if (props.href) {
     return (
       <A
@@ -98,12 +103,17 @@ const ConvItem: Component<ConvItemProps> = (props) => {
         end
         class={base}
         activeClass="bg-accent text-accent-foreground"
+        onContextMenu={contextMenu}
       >
         {content}
       </A>
     );
   }
-  return <button type="button" class={base}>{content}</button>;
+  return (
+    <button type="button" class={base} onContextMenu={contextMenu}>
+      {content}
+    </button>
+  );
 };
 
 export const RoomsBar: Component = () => {
@@ -138,7 +148,7 @@ export const RoomsBar: Component = () => {
             </h3>
             <button
               type="button"
-              class="p-1 rounded shrink-0 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+              class="size-8 inline-flex items-center justify-center rounded shrink-0 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
               title="New group"
               onClick={() => setShowCreateGroup(true)}
             >
@@ -166,6 +176,15 @@ export const RoomsBar: Component = () => {
                   const list = roomMsgList();
                   return getUnreadCountForDisplay(room.id, room, list, currentUserId());
                 };
+                const lastMsgId = () => {
+                  const list = roomMsgList();
+                  const snowflakes = list.filter((m) => /^\d+$/.test(m.id));
+                  if (snowflakes.length === 0) return room.last_message_id ?? null;
+                  const latest = snowflakes.reduce((a, b) =>
+                    BigInt(b.id) > BigInt(a.id) ? b : a
+                  );
+                  return latest.id;
+                };
                 return (
                   <ConvItem
                     name={roomDisplayName(room, currentUserId())}
@@ -175,6 +194,29 @@ export const RoomsBar: Component = () => {
                     avatar={avatar()}
                     isGroup={isGroup()}
                     unreadCount={unreadCount()}
+                    onContextMenu={(e) => {
+                      const msgId = lastMsgId();
+                      showContextMenu(e, [
+                        ...(msgId && unreadCount() > 0
+                          ? [{
+                              label: 'Mark as read',
+                              icon: 'fa-check-double',
+                              onClick: () => {
+                                setReadState('byRoom', room.id, {
+                                  lastReadMessageId: msgId,
+                                  mentionCount: 0,
+                                });
+                                ackRoom(room.id, msgId).catch(() => {});
+                              },
+                            }]
+                          : []),
+                        {
+                          label: 'Copy room ID',
+                          icon: 'fa-copy',
+                          onClick: () => navigator.clipboard.writeText(room.id),
+                        },
+                      ]);
+                    }}
                   />
                 );
               }}

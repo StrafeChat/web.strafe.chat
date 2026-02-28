@@ -99,6 +99,7 @@ function roomFromPayload(payload: unknown): Room | null {
         id: String(p.id ?? ''),
         username: typeof p.username === 'string' ? p.username : '',
         display_name: typeof p.display_name === 'string' ? p.display_name : '',
+        discriminator: typeof p.discriminator === 'number' ? p.discriminator : undefined,
         avatar: typeof p.avatar === 'string' ? p.avatar : undefined,
         presence: p.presence as RoomParticipant['presence'],
       }))

@@ -1,34 +1,51 @@
 import type { Component } from 'solid-js';
-import { createSignal, createEffect, createMemo, Show, For, onMount, onCleanup } from 'solid-js';
-import { useParams } from '@solidjs/router';
+import { createSignal, createEffect, createMemo, Show, onMount, onCleanup } from 'solid-js';
+import { useParams, useNavigate } from '@solidjs/router';
 import { roomDisplayName } from '../stores/rooms';
 import { rooms, isNotesRoom } from '../stores/rooms';
 import { auth } from '../stores/auth';
-import { messages, setMessages, loadMessages, loadOlderMessages, sendMessage } from '../stores/messages';
+import {
+  messages,
+  setMessages,
+  loadMessages,
+  loadOlderMessages,
+  sendMessage,
+  type DecryptedMessage,
+} from '../stores/messages';
 import { typing, typingVersion, removeTyping } from '../stores/typing';
-import { sendTyping, ackRoom, ackRoomKeepalive } from '../api/rooms';
+import { sendTyping, ackRoom, ackRoomKeepalive, createPM } from '../api/rooms';
 import { subscribe, unsubscribe } from '../services/stargate/client';
 import { MessageList } from '../components/MessageList';
 import { MessageSkeleton } from '../components/MessageSkeleton';
-import { PresenceDot } from '../components/PresenceDot';
 import { AddPeopleModal } from '../components/AddPeopleModal';
+import { RoomHeader, RoomMessageInput, RoomMembersSidebar, RoomSearchPanel, RoomPinnedPanel } from '../components/room';
 import { settings, setMessageCompact, setMembersPanelOpen } from '../stores/settings';
 import type { SettingsData } from '../stores/settings';
 import { stargate } from '../stores/stargate';
 import { messageIdGt, readState, setReadState } from '../stores/readState';
 import { setPendingAck, clearPendingAck, getPendingAck } from '../stores/pendingAck';
 import { dismissNewHeader, clearNewHeaderDismissed } from '../stores/newHeaderDismissed';
+import { getMessageBodyText, getSenderDisplay } from '../components/messageList';
+import { formatMessageTimestamp } from '../lib/utils/datetime';
+import { scrollToMessage } from '../lib/utils/messages';
+import { pinnedMessages } from '../stores/pinnedMessages';
 
 const TYPING_DEBOUNCE_MS = 5000;
 
 const RoomPage: Component = () => {
   const params = useParams<{ roomId: string }>();
+  const navigate = useNavigate();
   const [draft, setDraft] = createSignal('');
   const [inputRef, setInputRef] = createSignal<HTMLInputElement | undefined>();
   const [maxMessageIdWhenEntered, setMaxMessageIdWhenEntered] = createSignal<string | null>(null);
   const [showAddPeople, setShowAddPeople] = createSignal(false);
+  const [searchQuery, setSearchQuery] = createSignal('');
+  const [searchOpen, setSearchOpen] = createSignal(false);
+  const [pinnedOpen, setPinnedOpen] = createSignal(false);
+  const [replyToMessageId, setReplyToMessageId] = createSignal<string | null>(null);
   let lastTypingSent = 0;
   const leaveAckRef = { roomId: '' as string, toAck: '' as string };
+  let prevRoomIdRef = '';
   const room = () => rooms.rooms.find((r) => r.id === params.roomId);
   const pmOtherUserId = createMemo(() => {
     const r = room();
@@ -54,6 +71,7 @@ const RoomPage: Component = () => {
     return r.type === 1 ? `Message @${displayName}` : `Message ${displayName}`;
   };
   const roomMessages = () => messages.byRoom[params.roomId] ?? [];
+  const isGroupRoom = () => room()?.type === 2;
   const typingUserIds = createMemo(() => {
     typingVersion();
     const roomId = params.roomId;
@@ -75,6 +93,51 @@ const RoomPage: Component = () => {
       return `${p?.display_name ?? p?.username ?? 'Someone'} is typing...`;
     }
     return ids.length === 2 ? '2 people are typing...' : 'Several people are typing...';
+  });
+
+  const pinnedIdsForRoom = createMemo(() => {
+    const roomId = params.roomId;
+    if (!roomId) return [] as string[];
+    return pinnedMessages.byRoom[roomId] ?? [];
+  });
+
+  const pinnedMessagesForRoom = createMemo(() => {
+    const ids = new Set(pinnedIdsForRoom());
+    if (ids.size === 0) return [] as DecryptedMessage[];
+    const list: DecryptedMessage[] = roomMessages();
+    const found: DecryptedMessage[] = [];
+    for (const m of list) {
+      if (ids.has(m.id)) found.push(m);
+    }
+    found.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+    return found;
+  });
+
+  const searchResults = createMemo(() => {
+    const q = searchQuery().trim().toLowerCase();
+    if (!q) return [];
+    const list: DecryptedMessage[] = roomMessages();
+    const r = room();
+    const participants = r?.participants ?? [];
+    const currentUserId = auth.user?.id;
+    const matches: {
+      id: string;
+      preview: string;
+      sender: string;
+      createdAt: string;
+    }[] = [];
+    for (const m of list) {
+      const text = getMessageBodyText(m);
+      if (!text.toLowerCase().includes(q)) continue;
+      const sender = getSenderDisplay(m.sender_id, participants, currentUserId);
+      matches.push({
+        id: m.id,
+        preview: text.length > 80 ? `${text.slice(0, 77)}…` : text,
+        sender: sender.name,
+        createdAt: formatMessageTimestamp(new Date(m.created_at)),
+      });
+    }
+    return matches.reverse();
   });
 
   function onInput(e: InputEvent) {
@@ -163,6 +226,34 @@ const RoomPage: Component = () => {
     leaveAckRef.toAck = toAck;
   });
 
+  // When switching to a different room, ack the room we're leaving so unread clears immediately
+  createEffect(() => {
+    const roomId = params.roomId;
+    if (!roomId) {
+      prevRoomIdRef = '';
+      return;
+    }
+    const prevRoomId = prevRoomIdRef;
+    prevRoomIdRef = roomId;
+    if (!prevRoomId || prevRoomId === roomId) return;
+    const r = rooms.rooms.find((x) => x.id === prevRoomId);
+    const lastRead = readState.byRoom[prevRoomId]?.lastReadMessageId ?? r?.last_read_message_id ?? null;
+    const list = messages.byRoom[prevRoomId] ?? [];
+    const snowflakes = list.filter((m) => /^\d+$/.test(m.id));
+    let toAck = '';
+    if (snowflakes.length > 0) {
+      const latest = snowflakes.reduce((a, b) => (messageIdGt(b.id, a.id) ? b : a));
+      if (messageIdGt(latest.id, lastRead ?? '0')) toAck = latest.id;
+    } else if (r?.last_message_id && messageIdGt(r.last_message_id, lastRead ?? '0')) {
+      toAck = r.last_message_id;
+    }
+    clearNewHeaderDismissed(prevRoomId);
+    if (toAck) {
+      setReadState('byRoom', prevRoomId, { lastReadMessageId: toAck, mentionCount: 0 });
+      ackRoom(prevRoomId, toAck).catch(() => {});
+    }
+  });
+
   onCleanup(() => {
     clearPendingAck();
     if (leaveAckRef.roomId) clearNewHeaderDismissed(leaveAckRef.roomId);
@@ -236,8 +327,9 @@ const RoomPage: Component = () => {
     if (!text || isSending()) return;
     if (auth.user?.id) removeTyping(params.roomId, auth.user.id);
     try {
-      await sendMessage(params.roomId, text);
+      await sendMessage(params.roomId, text, replyToMessageId() ?? undefined);
       setDraft('');
+      setReplyToMessageId(null);
       inputRef()?.focus();
       dismissNewHeader(params.roomId);
     } catch (err) {
@@ -245,58 +337,71 @@ const RoomPage: Component = () => {
     }
   }
 
+  function handleSelectSearchedMessage(messageId: string) {
+    scrollToMessage(messageId);
+  }
+
+  function handleOpenSearch() {
+    setSearchOpen(true);
+    setPinnedOpen(false);
+  }
+
+  function handleCloseSearch() {
+    setSearchOpen(false);
+  }
+
+  function handleSelectPinnedMessage(messageId: string) {
+    scrollToMessage(messageId);
+  }
+
+  function handleTogglePinned() {
+    const next = !pinnedOpen();
+    setPinnedOpen(next);
+    if (next) {
+      setSearchOpen(false);
+    }
+  }
+
+  function handleReplyToMessage(msg: DecryptedMessage) {
+    setReplyToMessageId(msg.id);
+    queueMicrotask(() => inputRef()?.focus());
+  }
+
   return (
     <div class="flex-1 flex flex-col min-h-0">
-      <div class="h-12 flex items-center justify-between px-4 border-b border-border shrink-0">
-        <div class="flex items-center gap-2 min-w-0">
-          <i class={`fa-solid ${headerIcon()} text-muted-foreground shrink-0`} />
-          <h1 class="text-base font-semibold text-foreground truncate">{name()}</h1>
-          <Show when={pmOtherUserId()}>
-            {(uid) => <PresenceDot userId={uid()} class="size-2 shrink-0 mt-0.5" />}
-          </Show>
-        </div>
-        <div class="flex items-center gap-1 shrink-0">
-          <Show when={room()?.type === 2}>
-            <button
-              type="button"
-              class={`p-2 rounded transition-colors ${
-                (settings as SettingsData).membersPanelOpen
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-              }`}
-              title={(settings as SettingsData).membersPanelOpen ? 'Hide members' : 'Show members'}
-              onClick={() => setMembersPanelOpen(!(settings as SettingsData).membersPanelOpen)}
-              aria-label={(settings as SettingsData).membersPanelOpen ? 'Hide members' : 'Show members'}
-              aria-pressed={(settings as SettingsData).membersPanelOpen}
-            >
-              <i class="fa-solid fa-user-group text-sm" />
-            </button>
-            <button
-              type="button"
-              class="p-2 rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              title="Add people"
-              onClick={() => setShowAddPeople(true)}
-              aria-label="Add people"
-            >
-              <i class="fa-solid fa-user-plus text-sm" />
-            </button>
-          </Show>
-          <button
-            type="button"
-            onclick={() => setMessageCompact(!settings.messageCompact)}
-            class="text-xs text-muted-foreground hover:text-foreground px-2 py-1 rounded"
-            title={settings.messageCompact ? 'Switch to normal' : 'Switch to compact'}
-          >
-            {settings.messageCompact ? 'Normal' : 'Compact'}
-          </button>
-        </div>
-      </div>
+      <RoomHeader
+        headerIcon={headerIcon()}
+        name={name()}
+        pmOtherUserId={pmOtherUserId()}
+        isGroup={room()?.type === 2}
+        messageCompact={!!settings.messageCompact}
+        onToggleCompact={() => setMessageCompact(!settings.messageCompact)}
+        hasPinned={pinnedMessagesForRoom().length > 0}
+        pinnedOpen={pinnedOpen()}
+        onTogglePinned={handleTogglePinned}
+        searchQuery={searchQuery()}
+        onSearchChange={setSearchQuery}
+        onSearchFocus={handleOpenSearch}
+        membersPanelOpen={!!(settings as SettingsData).membersPanelOpen}
+        onToggleMembers={() => setMembersPanelOpen(!(settings as SettingsData).membersPanelOpen)}
+        onAddPeople={() => setShowAddPeople(true)}
+      />
       <AddPeopleModal
         open={showAddPeople()}
         roomId={params.roomId}
         participantIds={room()?.participants?.map((p) => p.id) ?? []}
         onClose={() => setShowAddPeople(false)}
       />
+      <Show when={pinnedOpen()}>
+        <div class="fixed md:absolute top-14 right-4 z-40">
+          <RoomPinnedPanel
+            roomId={params.roomId}
+            messages={pinnedMessagesForRoom()}
+            participants={room()?.participants ?? []}
+            onSelectMessage={handleSelectPinnedMessage}
+          />
+        </div>
+      </Show>
       <div class="flex-1 flex min-h-0 overflow-hidden">
         <div class="flex-1 flex flex-col min-h-0 min-w-0">
           <Show when={!room()}>
@@ -309,6 +414,8 @@ const RoomPage: Component = () => {
               <MessageList
                 messages={roomMessages()}
                 roomId={params.roomId}
+                roomType={room()?.type}
+                roomName={room()?.name}
                 participants={room()?.participants}
                 loadingOlder={messages.loadingOlder[params.roomId]}
                 hasMoreOlder={messages.hasMoreOlder[params.roomId]}
@@ -319,84 +426,112 @@ const RoomPage: Component = () => {
                   null
                 }
                 maxMessageIdWhenEntered={maxMessageIdWhenEntered()}
+                onReply={handleReplyToMessage}
               />
             }>
               <MessageSkeleton />
             </Show>
-            <form
-              onSubmit={handleSubmit}
-              class="p-3 shrink-0"
-            >
-              <div class="flex gap-2">
-                <input
-                  ref={(el) => setInputRef(el)}
-                  type="text"
-                  value={draft()}
-                  onInput={onInput}
-                  placeholder={inputPlaceholder()}
-                  class="flex-1 rounded-lg border border-input bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-                  disabled={isSending()}
-                />
-                <button
-                  type="submit"
-                  disabled={!draft().trim() || isSending()}
-                  class="md:hidden p-2 rounded-lg bg-primary text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary-hover transition-colors"
-                  title="Send"
-                  aria-label="Send"
-                >
-                  <i class={`fa-solid fa-paper-plane text-sm ${isSending() ? 'opacity-70' : ''}`} />
-                </button>
-              </div>
-            </form>
-            <div class="h-3 flex items-center px-4 min-h-0 pb-3">
-              <Show when={typingUserIds().length > 0}>
-                <p class="text-xs text-muted-foreground">{typingMessage()}</p>
+            <div class="border-t border-border">
+              <Show when={replyToMessageId()}>
+                {(() => {
+                  const targetId = replyToMessageId();
+                  const list = roomMessages();
+                  const target = list.find((m) => m.id === targetId) as DecryptedMessage | undefined;
+                  if (!target) {
+                    return (
+                      <div class="px-3 pt-2 pb-1 text-xs text-muted-foreground bg-[hsl(0_0%_8%)] flex items-center justify-between gap-2">
+                        <span class="truncate">
+                          Replying to message <span class="font-mono text-[10px]">#{targetId}</span>
+                        </span>
+                        <button
+                          type="button"
+                          class="text-[11px] text-muted-foreground hover:text-foreground"
+                          onClick={() => setReplyToMessageId(null)}
+                        >
+                          Cancel
+                        </button>
+                      </div>
+                    );
+                  }
+                  const sender = getSenderDisplay(
+                    target.sender_id,
+                    room()?.participants ?? [],
+                    auth.user?.id
+                  );
+                  const text = getMessageBodyText(target);
+                  const preview =
+                    text.length > 120 ? `${text.slice(0, 117)}…` : text;
+                  return (
+                    <div class="px-3 pt-2 pb-1 text-xs bg-[hsl(0_0%_8%)] flex items-start justify-between gap-2 border-b border-border/80">
+                      <div class="min-w-0">
+                        <p class="text-[11px] text-muted-foreground mb-0.5">
+                          Replying to <span class="text-foreground font-medium">{sender.name}</span>
+                        </p>
+                        <p class="text-[12px] text-muted-foreground truncate">{preview}</p>
+                      </div>
+                      <button
+                        type="button"
+                        class="mt-0.5 text-[11px] text-muted-foreground hover:text-foreground shrink-0"
+                        onClick={() => {
+                          if (targetId) scrollToMessage(targetId);
+                        }}
+                      >
+                        Jump
+                      </button>
+                      <button
+                        type="button"
+                        class="mt-0.5 text-[11px] text-muted-foreground hover:text-foreground shrink-0"
+                        onClick={() => setReplyToMessageId(null)}
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  );
+                })()}
               </Show>
+              <RoomMessageInput
+                draft={draft()}
+                onInput={onInput}
+                onSubmit={handleSubmit}
+                placeholder={inputPlaceholder()}
+                disabled={isSending()}
+                inputRef={setInputRef}
+                typingMessage={typingMessage()}
+                showTyping={typingUserIds().length > 0}
+              />
             </div>
           </Show>
         </div>
-        <Show when={room()?.type === 2 && (settings as SettingsData).membersPanelOpen}>
-          <aside
-            class="w-60 shrink-0 border-l border-border bg-[hsl(0_0%_8%)] flex flex-col overflow-hidden hidden md:flex"
-            aria-label="Group members"
+        <Show
+          when={
+            room() &&
+            (isGroupRoom()
+              ? (settings as SettingsData).membersPanelOpen || searchOpen()
+              : searchOpen())
+          }
+        >
+          <Show
+            when={searchOpen()}
+            fallback={
+              <Show when={isGroupRoom()}>
+                <RoomMembersSidebar
+                  participants={room()!.participants ?? []}
+                  currentUserId={auth.user?.id}
+                  onMessageUser={(userId) => {
+                    createPM(userId).then((r) => navigate(`/rooms/${r.id}`)).catch((err) => console.error(err));
+                  }}
+                />
+              </Show>
+            }
           >
-            <div class="px-3 pt-4 shrink-0">
-              <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-                Members — {room()!.participants?.length ?? 0}
-              </h2>
-            </div>
-            <div class="flex-1 overflow-y-auto min-h-0 p-2 space-y-1">
-              <For each={room()!.participants ?? []}>
-                {(p) => {
-                  const displayName = () => p.display_name || p.username || 'Unknown';
-                  const isSelf = () => p.id === auth.user?.id;
-                  return (
-                    <div class="flex items-center gap-3 px-2 py-2 rounded-md hover:bg-muted/30 transition-colors">
-                      <div class="relative shrink-0">
-                        <div class="size-9 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
-                          {displayName()[0].toUpperCase()}
-                        </div>
-                        <span class="absolute bottom-[-1px] right-[-1px]">
-                          <PresenceDot userId={p.id} class="size-3.5" />
-                        </span>
-                      </div>
-                      <div class="min-w-0 flex-1">
-                        <p class="text-sm font-medium truncate">
-                          {displayName()}
-                          <Show when={isSelf()}>
-                            <span class="text-muted-foreground font-normal ml-1">(you)</span>
-                          </Show>
-                        </p>
-                        <p class="text-xs text-muted-foreground truncate">
-                          @{p.username}
-                        </p>
-                      </div>
-                    </div>
-                  );
-                }}
-              </For>
-            </div>
-          </aside>
+            <RoomSearchPanel
+              query={searchQuery()}
+              onQueryChange={setSearchQuery}
+              onClose={handleCloseSearch}
+              results={searchResults()}
+              onSelectMessage={handleSelectSearchedMessage}
+            />
+          </Show>
         </Show>
       </div>
     </div>

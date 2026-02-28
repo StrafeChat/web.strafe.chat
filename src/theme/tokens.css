@@ -43,3 +43,15 @@
   --color-accent: hsl(0 0% 24%);
   --color-accent-foreground: hsl(0 0% 10%);
 }
+
+[data-theme='light'] * {
+  scrollbar-color: hsl(0 0% 0% / 0.2) transparent;
+}
+
+[data-theme='light'] *::-webkit-scrollbar-thumb {
+  background: hsl(0 0% 0% / 0.18);
+}
+
+[data-theme='light'] *::-webkit-scrollbar-thumb:hover {
+  background: hsl(0 0% 0% / 0.28);
+}

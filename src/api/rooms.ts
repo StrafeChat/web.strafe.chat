@@ -4,6 +4,7 @@ import type { UserPresence } from '../api/relationships';
 export interface RoomParticipant {
   id: string;
   username: string;
+  discriminator?: number;
   display_name: string;
   avatar?: string;
   presence?: UserPresence;
