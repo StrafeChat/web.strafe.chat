@@ -20,6 +20,9 @@ export interface Room {
   name?: string;
   topic?: string;
   position?: number;
+  creator_id?: string;
+  /** When false, messages are stored as plaintext (group owner can change). Default true. */
+  e2ee_enabled?: boolean;
   last_message_id?: string;
   last_read_message_id?: string;
   mention_count?: number;
@@ -44,11 +47,14 @@ export function createPM(recipientId: string) {
   return api<Room>('/rooms', { method: 'POST', json: { recipient_id: recipientId } });
 }
 
-/** Create a group PM. Returns the new room. */
-export function createGroupPM(params: { name: string; recipient_ids: string[] }) {
+/** Create a group PM. Returns the new room. Name is optional; if omitted, client shows member names. */
+export function createGroupPM(params: { recipient_ids: string[]; name?: string }) {
   return api<Room>('/rooms', {
     method: 'POST',
-    json: { name: params.name.trim(), recipient_ids: params.recipient_ids },
+    json: {
+      recipient_ids: params.recipient_ids,
+      ...(params.name != null && params.name !== '' && { name: params.name.trim() }),
+    },
   });
 }
 
@@ -58,6 +64,27 @@ export function addRoomParticipant(roomId: string, userId: string) {
     method: 'POST',
     json: { user_id: userId },
   });
+}
+
+/** Remove a user from a group PM. Only the group creator can remove. */
+export function removeRoomParticipant(roomId: string, userId: string) {
+  return api<void>(`/rooms/${roomId}/participants/${userId}`, { method: 'DELETE' });
+}
+
+/** Update room (name and/or E2EE setting). Only the group creator. */
+export function updateRoom(roomId: string, payload: { name?: string; e2ee_enabled?: boolean }) {
+  const body: { name?: string; e2ee_enabled?: boolean } = {};
+  if (payload.name !== undefined) body.name = payload.name.trim();
+  if (payload.e2ee_enabled !== undefined) body.e2ee_enabled = payload.e2ee_enabled;
+  return api<Room>(`/rooms/${roomId}`, {
+    method: 'PATCH',
+    json: body,
+  });
+}
+
+/** Update group name. Only the group creator. */
+export function updateRoomName(roomId: string, name: string) {
+  return updateRoom(roomId, { name: name.trim() });
 }
 
 /** Trigger typing indicator. Rate-limited by backend (~5s). Returns 204. */

@@ -6,11 +6,7 @@ interface CardProps {
 }
 
 export const Card: Component<CardProps> = (props) => (
-  <div
-    class={`rounded-lg border border-border bg-card text-card-foreground shadow-sm ${props.class ?? ''}`}
-  >
-    {props.children}
-  </div>
+  <div class={`border border-border bg-card text-card-foreground ${props.class ?? ''}`}>{props.children}</div>
 );
 
 interface CardHeaderProps {
@@ -61,7 +57,5 @@ interface CardFooterProps {
 }
 
 export const CardFooter: Component<CardFooterProps> = (props) => (
-  <div class={`flex items-center p-6 pt-0 ${props.class ?? ''}`}>
-    {props.children}
-  </div>
+  <div class={`p-6 pt-0 ${props.class ?? ''}`}>{props.children}</div>
 );

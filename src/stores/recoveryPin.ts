@@ -14,17 +14,33 @@ export interface RecoveryPinState {
     resolve: (pin: string) => void;
     reject: (err: Error) => void;
   } | null;
+  /** Shown after a failed restore attempt (wrong PIN / corrupt backup) */
+  lastSubmitError: string | null;
+  /** Web Crypto unavailable (non-secure context); not a wrong PIN */
+  e2eeEnvironmentError: string | null;
 }
 
 export const [recoveryPin, setRecoveryPin] = createStore<RecoveryPinState>({
   pending: null,
+  lastSubmitError: null,
+  e2eeEnvironmentError: null,
 });
 
+export type PromptRecoveryPinOptions = {
+  /** Keep `lastSubmitError` visible (used when re-prompting after a wrong PIN). */
+  retainSubmitError?: boolean;
+};
+
 /** Show recovery PIN modal. Returns promise that resolves with the PIN when user submits. */
-export function promptRecoveryPin(mode: RecoveryPinMode): Promise<string> {
+export function promptRecoveryPin(
+  mode: RecoveryPinMode,
+  opts?: PromptRecoveryPinOptions
+): Promise<string> {
   return new Promise((resolve, reject) => {
+    const keepErr = opts?.retainSubmitError === true;
     setRecoveryPin({
       pending: { mode, resolve, reject },
+      lastSubmitError: keepErr ? recoveryPin.lastSubmitError : null,
     });
   });
 }
@@ -33,10 +49,12 @@ export function promptRecoveryPin(mode: RecoveryPinMode): Promise<string> {
 export function submitRecoveryPin(pin: string | null): void {
   const { pending } = recoveryPin;
   if (!pending) return;
-  setRecoveryPin({ pending: null });
   if (pin !== null) {
+    setRecoveryPin('lastSubmitError', null);
     pending.resolve(pin);
+    setRecoveryPin({ pending: null });
   } else {
+    setRecoveryPin({ pending: null, lastSubmitError: null });
     pending.reject(new Error('Recovery cancelled'));
   }
 }

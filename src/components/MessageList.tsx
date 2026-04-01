@@ -1,5 +1,5 @@
 import type { Component } from 'solid-js';
-import { createEffect, createSignal, For, Show, onCleanup } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, Show, onCleanup } from 'solid-js';
 import type { DecryptedMessage } from '../stores/messages';
 import { messages, setMessages, editMessage as editMessageInStore } from '../stores/messages';
 import type { RoomParticipant } from '../api/rooms';
@@ -15,11 +15,15 @@ import {
   getMessageBodyText,
   isEdited,
   getSenderDisplay,
+  isSystemMessage,
+  formatSystemMessageText,
   MessageAvatar,
+  MessageBody,
   DeleteMessageModal,
   MessageListIntro,
   LoadOlderBlock,
 } from './messageList';
+import { appFloatPanel } from '../theme/appChrome';
 import { isMessagePinned, pinMessage, unpinMessage } from '../stores/pinnedMessages';
 import { scrollToMessage } from '../lib/utils/messages';
 
@@ -47,6 +51,12 @@ export interface MessageListProps {
   maxMessageIdWhenEntered?: string | null;
   /** Called when user chooses to reply to a specific message. */
   onReply?: (message: DecryptedMessage) => void;
+  /** When false, room messages are plaintext (no E2EE). Show one banner and hide per-message "Not encrypted". */
+  e2eeEnabled?: boolean;
+  /** Reports near-bottom state for parent read/ack logic. */
+  onNearBottomChange?: (nearBottom: boolean) => void;
+  /** Exposes scroll container element to parent. */
+  onScrollContainer?: (el: HTMLDivElement | undefined) => void;
 }
 
 export const MessageList: Component<MessageListProps> = (props) => {
@@ -98,6 +108,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
       const near =
         scrollHeight - scrollTop - clientHeight < SCROLL_NEAR_BOTTOM_THRESHOLD;
       isNearBottom[1](near);
+      props.onNearBottomChange?.(near);
       const hasMore = messages.hasMoreOlder[roomId] ?? true;
       const loading = messages.loadingOlder[roomId] ?? false;
       if (
@@ -110,7 +121,9 @@ export const MessageList: Component<MessageListProps> = (props) => {
       }
     };
     el.addEventListener('scroll', onScroll, { passive: true });
+    props.onScrollContainer?.(el);
     onCleanup(() => el.removeEventListener('scroll', onScroll));
+    onCleanup(() => props.onScrollContainer?.(undefined));
   });
 
   // Scroll to bottom when new messages arrive – only if user was near bottom (else they’re reading history)
@@ -207,6 +220,28 @@ export const MessageList: Component<MessageListProps> = (props) => {
     currentUserId() &&
     props.participants[0]?.id === currentUserId();
 
+  /** Indices for E2EE/plaintext section headers (single pass). */
+  const e2eeHeaderIndices = createMemo(() => {
+    const list = props.messages;
+    let firstPlaintext = -1;
+    let firstE2EEAfterPlaintext = -1;
+    let seenPlaintext = false;
+    for (let i = 0; i < list.length; i++) {
+      const m = list[i]!;
+      if (m.id.startsWith('temp-')) continue;
+      if (m.notEncrypted === true) {
+        if (firstPlaintext < 0) firstPlaintext = i;
+        seenPlaintext = true;
+        continue;
+      }
+      if (seenPlaintext && firstE2EEAfterPlaintext < 0) firstE2EEAfterPlaintext = i;
+    }
+    return { firstPlaintext, firstE2EEAfterPlaintext };
+  });
+
+  const firstPlaintextMessageIndex = () => e2eeHeaderIndices().firstPlaintext;
+  const firstE2EEMessageIndex = () => e2eeHeaderIndices().firstE2EEAfterPlaintext;
+
   return (
     <>
     <div
@@ -267,6 +302,29 @@ export const MessageList: Component<MessageListProps> = (props) => {
                     <div class="flex-1 h-px bg-border" />
                   </div>
                 </Show>
+                <Show when={firstPlaintextMessageIndex() === i()}>
+                  <div class="flex items-center gap-3 py-3">
+                    <div class="flex-1 h-px bg-border" />
+                    <span class="text-xs text-muted-foreground shrink-0 flex items-center gap-1.5">
+                      <i class="fa-solid fa-lock-open text-[10px]" />
+                      Messages are no longer end-to-end encrypted
+                    </span>
+                    <div class="flex-1 h-px bg-border" />
+                  </div>
+                </Show>
+                <Show when={firstE2EEMessageIndex() === i()}>
+                  <div class="flex items-center gap-3 py-3">
+                    <div class="flex-1 h-px bg-border" />
+                    <span class="text-xs text-muted-foreground shrink-0 flex items-center gap-1.5">
+                      <i class="fa-solid fa-lock text-[10px]" />
+                      Messages are now end-to-end encrypted
+                    </span>
+                    <div class="flex-1 h-px bg-border" />
+                  </div>
+                </Show>
+                <Show
+                  when={isSystemMessage(msg)}
+                  fallback={(
                 <div
                   data-msg-id={msg.id}
                   class={`flex gap-3 -mx-2 px-2 rounded group relative transition-colors md:hover:bg-muted/50 ${
@@ -450,20 +508,20 @@ export const MessageList: Component<MessageListProps> = (props) => {
                       </span>
                       <span class="text-muted-foreground/70 shrink-0">·</span>
                       <span
-                        class={`text-sm break-words whitespace-pre-wrap flex-1 min-w-0 transition-colors duration-200 ${
+                        class={`text-sm break-words flex-1 min-w-0 transition-colors duration-200 ${
                           msg.pending ? 'text-muted-foreground/60' : 'text-muted-foreground'
                         }`}
                       >
-                        {getMessageBodyText(msg)}
+                        <MessageBody text={getMessageBodyText(msg)} participants={props.participants} />
                         <Show when={isEdited(msg)}>
                           <Tooltip label={`Edited ${formatMessageTimestamp(new Date(msg.updated_at!))}`} inline side="top">
                             <span class="text-[10px] text-muted-foreground/80 ml-1 cursor-default">(edited)</span>
                           </Tooltip>
                         </Show>
                       </span>
-                      <Show when={msg.notEncrypted && !msg.pending}>
+                      {/* <Show when={msg.notEncrypted && !msg.pending && props.e2eeEnabled !== false}>
                         <span class="text-[10px] text-amber-500/90 shrink-0">Not encrypted</span>
-                      </Show>
+                      </Show> */}
                     </div>
                   </Show>
                   <Show when={!compact()}>
@@ -475,25 +533,25 @@ export const MessageList: Component<MessageListProps> = (props) => {
                         </span>
                       </div>
                     </Show>
-                    <p
-                      class={`text-sm break-words whitespace-pre-wrap transition-colors duration-200 ${
+                    <div
+                      class={`text-sm break-words transition-colors duration-200 ${
                         msg.pending ? 'text-muted-foreground/60' : 'text-muted-foreground'
                       }`}
                     >
-                      {getMessageBodyText(msg)}
+                      <MessageBody text={getMessageBodyText(msg)} participants={props.participants} />
                       <Show when={isEdited(msg)}>
                         <Tooltip label={`Edited ${formatMessageTimestamp(new Date(msg.updated_at!))}`} inline side="top">
                           <span class="text-[9px] text-muted-foreground/80 ml-1 cursor-default">(edited)</span>
                         </Tooltip>
                       </Show>
-                    </p>
-                    <Show when={msg.notEncrypted && !msg.pending}>
-                      <span class="text-[10px] text-amber-500/90">Not encrypted</span>
-                    </Show>
+                      {/* <Show when={msg.notEncrypted && !msg.pending && props.e2eeEnabled !== false}>
+                        <span class="text-[10px] text-amber-500/90">Not encrypted</span>
+                      </Show> */}
+                    </div>
                   </Show>
                   </Show>
                 </div>
-                <div class="hidden md:flex items-center gap-0.5 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity absolute right-2 top-0 -translate-y-1/2 bg-[hsl(0_0%_10%)] rounded-md border border-border py-0.5 px-1 shadow">
+                <div class={`absolute right-2 top-0 hidden shrink-0 -translate-y-1/2 items-center gap-0.5 px-1 py-0.5 opacity-0 transition-opacity group-hover:opacity-100 md:flex ${appFloatPanel}`}>
                   <Show when={props.onReply}>
                     <Tooltip label="Reply" inline side="top">
                       <button
@@ -585,6 +643,18 @@ export const MessageList: Component<MessageListProps> = (props) => {
                   </Show>
                 </div>
               </div>
+                )}
+              >
+                <div class="flex justify-center py-2" data-msg-id={msg.id}>
+                  <span class="text-xs text-muted-foreground">
+                    {formatSystemMessageText(
+                      msg as DecryptedMessage & { system_type: string; system_payload: string },
+                      props.participants,
+                      currentUserId()
+                    )}
+                  </span>
+                </div>
+              </Show>
               </>
             );
           }}

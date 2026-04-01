@@ -18,11 +18,49 @@ import {
   getKeyBackup,
   setKeyBackup,
 } from '../../api/devices';
-import { promptRecoveryPin } from '../../stores/recoveryPin';
+import { promptRecoveryPin, setRecoveryPin } from '../../stores/recoveryPin';
+import { E2eeUnavailableError } from './subtle';
 
 const DEFAULT_DEVICE_ID = 1;
 
+/**
+ * Serialize ensureDevice per user. Without this, StargateProvider + loadMessages + realtime
+ * handlers can run ensureDevice in parallel: each sees no IndexedDB row, each calls
+ * promptRecoveryPin(), and later calls overwrite recoveryPin.pending — leaving promises
+ * unresolved and PIN / restore broken (common on mobile when everything loads at once).
+ */
+const ensureDeviceInflight = new Map<string, Promise<DeviceIdentity>>();
+
 export async function ensureDevice(userId: string): Promise<DeviceIdentity> {
+  const uid = String(userId);
+  const existing = ensureDeviceInflight.get(uid);
+  if (existing) return existing;
+
+  const done = ensureDeviceOnce(uid).finally(() => {
+    if (ensureDeviceInflight.get(uid) === done) {
+      ensureDeviceInflight.delete(uid);
+    }
+  });
+  ensureDeviceInflight.set(uid, done);
+  return done;
+}
+
+function isPersistFailure(e: unknown): boolean {
+  return e instanceof Error && e.message.includes('did not persist to IndexedDB');
+}
+
+async function ensureDeviceOnce(userId: string): Promise<DeviceIdentity> {
+  try {
+    return await loadOrCreateDevice(userId);
+  } catch (e) {
+    if (e instanceof E2eeUnavailableError) {
+      setRecoveryPin('e2eeEnvironmentError', e.message);
+    }
+    throw e;
+  }
+}
+
+async function loadOrCreateDevice(userId: string): Promise<DeviceIdentity> {
   let device = await store.getDeviceIdentity(userId);
   if (device) return device;
 
@@ -30,12 +68,30 @@ export async function ensureDevice(userId: string): Promise<DeviceIdentity> {
   try {
     const backupRes = await getKeyBackup();
     if (backupRes.exists && backupRes.encrypted_backup && backupRes.salt) {
-      const pin = await promptRecoveryPin('restore');
-      device = await backup.decryptFromBackup(
-        backupRes.encrypted_backup,
-        backupRes.salt,
-        pin
-      );
+      const enc = backupRes.encrypted_backup;
+      const salt = backupRes.salt;
+      let restoreAttempt = 0;
+      // Retry PIN on decrypt failure (wrong PIN) without treating it as a fatal error.
+      for (;;) {
+        const pin = await promptRecoveryPin('restore', {
+          retainSubmitError: restoreAttempt > 0,
+        });
+        restoreAttempt += 1;
+        try {
+          device = await backup.decryptFromBackup(enc, salt, pin);
+          setRecoveryPin('lastSubmitError', null);
+          break;
+        } catch (decErr) {
+          if (decErr instanceof E2eeUnavailableError) {
+            throw decErr;
+          }
+          console.warn('Backup decrypt failed:', decErr);
+          setRecoveryPin(
+            'lastSubmitError',
+            'That PIN did not unlock your backup. Try again or check Caps Lock / keyboard layout.'
+          );
+        }
+      }
       if (!device.identityKeyPublic || !device.signedPrekeyPublic) {
         const bundle = await getPrekeyBundle(userId, String(device.deviceId));
         if (bundle) {
@@ -43,13 +99,23 @@ export async function ensureDevice(userId: string): Promise<DeviceIdentity> {
           device.signedPrekeyPublic = bundle.signed_prekey;
         }
       }
-      await store.setDeviceIdentity(userId, device);
+      try {
+        await store.setDeviceIdentity(userId, device);
+      } catch (persistErr) {
+        if (isPersistFailure(persistErr)) throw persistErr;
+        throw persistErr;
+      }
       return device;
     }
   } catch (e) {
+    if (e instanceof E2eeUnavailableError) throw e;
     if (e instanceof Error && e.message.includes('cancelled')) throw e;
     if (e instanceof Error && e.message.includes('Recovery PIN required'))
       throw e;
+    if (isPersistFailure(e)) {
+      console.error('E2EE device keys could not be saved:', e);
+      throw e;
+    }
     console.warn('Backup restore failed:', e);
     throw new Error('Invalid recovery PIN. Please try again.');
   }
@@ -94,6 +160,7 @@ export async function ensureDevice(userId: string): Promise<DeviceIdentity> {
     );
     await setKeyBackup(encryptedBackup, salt);
   } catch (e) {
+    if (e instanceof E2eeUnavailableError) throw e;
     if (e instanceof Error && e.message.includes('cancelled')) {
       // User skipped – device works but no cross-device recovery
     } else {

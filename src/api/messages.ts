@@ -6,7 +6,11 @@ export interface Message {
   sender_id: string;
   sender_device_id: string;
   ciphertext: string;
+  /** Set when room has E2EE disabled (server-stored plaintext). */
+  plaintext?: string;
   reply_to_id?: string;
+  system_type?: string;
+  system_payload?: string;
   created_at: string;
   updated_at: string;
   deleted_at?: string;
@@ -14,7 +18,8 @@ export interface Message {
 
 export interface CreateMessageInput {
   sender_device_id: number;
-  ciphertext: string;
+  ciphertext?: string;
+  plaintext?: string;
   reply_to_id?: number;
 }
 

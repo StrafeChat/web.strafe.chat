@@ -6,6 +6,7 @@
  */
 
 import type { DeviceIdentity } from './types';
+import { getSubtleCrypto } from './subtle';
 import { b64Decode, b64Encode } from './util';
 
 /** PBKDF2 iterations. Do not increase – existing backups would become unrecoverable. */
@@ -14,28 +15,43 @@ const SALT_LENGTH = 16;
 const IV_LENGTH = 12;
 const TAG_LENGTH = 128;
 
+/** Map common Unicode digits to ASCII so mobile keyboards match desktop PBKDF2 input. */
+function normalizeRecoveryPin(pin: string): string {
+  const s = pin.normalize('NFKC').trim();
+  return [...s]
+    .map((ch) => {
+      const cp = ch.codePointAt(0)!;
+      if (cp >= 0x0660 && cp <= 0x0669) return String.fromCodePoint(0x30 + (cp - 0x0660));
+      if (cp >= 0x06f0 && cp <= 0x06f9) return String.fromCodePoint(0x30 + (cp - 0x06f0));
+      if (cp >= 0xff10 && cp <= 0xff19) return String.fromCodePoint(0x30 + (cp - 0xff10));
+      return ch;
+    })
+    .join('');
+}
+
 /** Derive AES key from PIN using PBKDF2. */
 async function deriveKeyFromPin(pin: string, salt: Uint8Array): Promise<CryptoKey> {
+  const subtle = getSubtleCrypto();
   const enc = new TextEncoder();
-  const normalized = pin.normalize('NFKC');
-  const keyMaterial = await crypto.subtle.importKey(
+  const normalized = normalizeRecoveryPin(pin);
+  const keyMaterial = await subtle.importKey(
     'raw',
     enc.encode(normalized),
     'PBKDF2',
     false,
     ['deriveBits']
   );
-  const bits = await crypto.subtle.deriveBits(
+  const bits = await subtle.deriveBits(
     {
       name: 'PBKDF2',
       hash: 'SHA-256',
-      salt,
+      salt: salt.slice(0),
       iterations: PBKDF2_ITERATIONS,
     },
     keyMaterial,
     256
   );
-  return crypto.subtle.importKey(
+  return subtle.importKey(
     'raw',
     bits,
     { name: 'AES-GCM' },
@@ -64,7 +80,7 @@ export async function encryptForBackup(
   });
 
   const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
-  const ciphertext = await crypto.subtle.encrypt(
+  const ciphertext = await getSubtleCrypto().encrypt(
     { name: 'AES-GCM', iv, tagLength: TAG_LENGTH },
     key,
     new TextEncoder().encode(payload)
@@ -97,7 +113,7 @@ export async function decryptFromBackup(
   const iv = combined.slice(0, IV_LENGTH);
   const ciphertext = combined.slice(IV_LENGTH);
 
-  const plaintext = await crypto.subtle.decrypt(
+  const plaintext = await getSubtleCrypto().decrypt(
     { name: 'AES-GCM', iv, tagLength: TAG_LENGTH },
     key,
     ciphertext

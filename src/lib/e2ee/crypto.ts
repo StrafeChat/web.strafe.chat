@@ -13,18 +13,19 @@ import {
   HKDF_INFO,
   X25519_KEY_LENGTH as IDENTITY_KEY_LENGTH,
 } from './constants';
+import { getSubtleCrypto } from './subtle';
 import { b64Decode, b64Encode } from './util';
 
 /** Generate X25519 keypair */
 export async function generateKeyPair(): Promise<{ publicKey: string; privateKey: string }> {
-  const pair = (await crypto.subtle.generateKey(
+  const pair = (await getSubtleCrypto().generateKey(
     { name: 'X25519' },
     true,
     ['deriveBits']
   )) as CryptoKeyPair;
   const [pubRaw, privRaw] = await Promise.all([
-    crypto.subtle.exportKey('raw', pair.publicKey),
-    crypto.subtle.exportKey('pkcs8', pair.privateKey),
+    getSubtleCrypto().exportKey('raw', pair.publicKey),
+    getSubtleCrypto().exportKey('pkcs8', pair.privateKey),
   ]);
   return {
     publicKey: b64Encode(new Uint8Array(pubRaw)),
@@ -36,7 +37,7 @@ export async function generateKeyPair(): Promise<{ publicKey: string; privateKey
 async function importPublicKey(b64: string): Promise<CryptoKey> {
   const raw = b64Decode(b64);
   const buf = new Uint8Array(raw).buffer as ArrayBuffer;
-  return crypto.subtle.importKey(
+  return getSubtleCrypto().importKey(
     'raw',
     buf,
     { name: 'X25519' },
@@ -49,7 +50,7 @@ async function importPublicKey(b64: string): Promise<CryptoKey> {
 async function importPrivateKey(b64: string): Promise<CryptoKey> {
   const raw = b64Decode(b64);
   const buf = new Uint8Array(raw).buffer as ArrayBuffer;
-  return crypto.subtle.importKey(
+  return getSubtleCrypto().importKey(
     'pkcs8',
     buf,
     { name: 'X25519' },
@@ -60,14 +61,14 @@ async function importPrivateKey(b64: string): Promise<CryptoKey> {
 
 /** Derive AES key from ECDH shared secret */
 async function deriveAesKey(sharedSecret: ArrayBuffer): Promise<CryptoKey> {
-  const keyMaterial = await crypto.subtle.importKey(
+  const keyMaterial = await getSubtleCrypto().importKey(
     'raw',
     sharedSecret,
     'HKDF',
     false,
     ['deriveBits']
   );
-  const bits = await crypto.subtle.deriveBits(
+  const bits = await getSubtleCrypto().deriveBits(
     {
       name: 'HKDF',
       hash: 'SHA-256',
@@ -77,7 +78,7 @@ async function deriveAesKey(sharedSecret: ArrayBuffer): Promise<CryptoKey> {
     keyMaterial,
     256
   );
-  return crypto.subtle.importKey(
+  return getSubtleCrypto().importKey(
     'raw',
     bits,
     { name: 'AES-GCM' },
@@ -95,13 +96,13 @@ export async function deriveSessionKey(
     importPrivateKey(ourPrivateKeyB64),
     importPublicKey(theirPublicKeyB64),
   ]);
-  const sharedBits = await crypto.subtle.deriveBits(
+  const sharedBits = await getSubtleCrypto().deriveBits(
     { name: 'X25519', public: theirPub },
     ourPriv,
     256
   );
   const aesKey = await deriveAesKey(sharedBits);
-  const raw = await crypto.subtle.exportKey('raw', aesKey);
+  const raw = await getSubtleCrypto().exportKey('raw', aesKey);
   return b64Encode(new Uint8Array(raw));
 }
 
@@ -110,7 +111,7 @@ export async function encrypt(plaintext: string, keyB64: string): Promise<string
   const key = await importAesKey(keyB64);
   const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
   const encoded = new TextEncoder().encode(plaintext);
-  const ciphertext = await crypto.subtle.encrypt(
+  const ciphertext = await getSubtleCrypto().encrypt(
     { name: 'AES-GCM', iv, tagLength: TAG_LENGTH },
     key,
     encoded
@@ -127,7 +128,7 @@ export async function decrypt(ciphertextB64: string, keyB64: string): Promise<st
   const combined = b64Decode(ciphertextB64);
   const iv = combined.slice(0, IV_LENGTH);
   const data = combined.slice(IV_LENGTH);
-  const plaintext = await crypto.subtle.decrypt(
+  const plaintext = await getSubtleCrypto().decrypt(
     { name: 'AES-GCM', iv, tagLength: TAG_LENGTH },
     key,
     data
@@ -138,7 +139,7 @@ export async function decrypt(ciphertextB64: string, keyB64: string): Promise<st
 async function importAesKey(b64: string): Promise<CryptoKey> {
   const raw = b64Decode(b64);
   const buf = new Uint8Array(raw).buffer as ArrayBuffer;
-  return crypto.subtle.importKey(
+  return getSubtleCrypto().importKey(
     'raw',
     buf,
     { name: 'AES-GCM' },
@@ -161,7 +162,7 @@ export async function encryptWithHeader(
   const senderIdentity = b64Decode(senderIdentityPublicB64);
   if (senderIdentity.length !== IDENTITY_KEY_LENGTH) throw new Error('Invalid identity key length');
   const encoded = new TextEncoder().encode(plaintext);
-  const ciphertext = await crypto.subtle.encrypt(
+  const ciphertext = await getSubtleCrypto().encrypt(
     { name: 'AES-GCM', iv, tagLength: TAG_LENGTH },
     key,
     encoded
@@ -195,7 +196,7 @@ export async function decryptWithHeader(
 
   const tryDecrypt = async (keyB64: string) => {
     const key = await importAesKey(keyB64);
-    return crypto.subtle.decrypt(
+    return getSubtleCrypto().decrypt(
       { name: 'AES-GCM', iv, tagLength: TAG_LENGTH },
       key,
       encrypted

@@ -6,6 +6,7 @@ import { getMessageBodyText, getSenderDisplay } from '../messageList';
 import { formatMessageTimestamp } from '../../lib/utils/datetime';
 import { auth } from '../../stores/auth';
 import { unpinMessage } from '../../stores/pinnedMessages';
+import { appFloatPanel, appHeaderBar } from '../../theme/appChrome';
 
 export interface RoomPinnedPanelProps {
   roomId?: string;
@@ -19,10 +20,10 @@ export const RoomPinnedPanel: Component<RoomPinnedPanelProps> = (props) => {
 
   return (
     <aside
-      class="w-72 md:w-80 border border-border bg-[hsl(0_0%_8%)] flex flex-col overflow-hidden rounded-md shadow-xl"
+      class={`flex w-72 flex-col overflow-hidden md:w-80 ${appFloatPanel}`}
       aria-label="Pinned messages"
     >
-      <div class="px-3 pt-4 pb-3 shrink-0 border-b border-border/70 flex items-center justify-between gap-2">
+      <div class={`flex shrink-0 items-center justify-between gap-2 px-3 pb-3 pt-4 ${appHeaderBar}`}>
         <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1">
           <i class="fa-solid fa-thumbtack text-[11px]" />
           Pinned Messages
@@ -46,7 +47,7 @@ export const RoomPinnedPanel: Component<RoomPinnedPanelProps> = (props) => {
                 return (
                   <button
                     type="button"
-                    class="w-full text-left rounded-md border border-border bg-[hsl(0_0%_10%)] hover:bg-[hsl(0_0%_14%)] transition-colors px-3 py-2 text-xs flex flex-col gap-1"
+                    class="flex w-full flex-col gap-1 rounded-lg border border-border bg-card/50 px-3 py-2 text-start text-xs transition-colors hover:bg-card/80"
                     onClick={() => props.onSelectMessage(msg.id)}
                   >
                     <div class="flex items-start gap-2">

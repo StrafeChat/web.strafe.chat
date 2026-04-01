@@ -11,6 +11,9 @@ import { initReadStateHandler } from '../stores/readState';
 import { initTypingHandler } from '../stores/typing';
 import { initRelationshipHandlers } from '../stores/relationships';
 import { initRoomHandlers } from '../stores/rooms';
+import { spaces, initSpaceHandlers } from '../stores/spaces';
+import { initSpaceMembersHandlers } from '../stores/spaceMembers';
+import { initSpaceRealtimeHandlers } from '../stores/spaceSync';
 import { ensureDevice } from '../lib/e2ee';
 
 const READY_FALLBACK_MS = 12000;
@@ -24,6 +27,9 @@ export const StargateProvider: Component<{ children?: import('solid-js').JSX.Ele
     initTypingHandler();
     initRelationshipHandlers();
     initRoomHandlers();
+    initSpaceHandlers();
+    initSpaceMembersHandlers();
+    initSpaceRealtimeHandlers();
   });
 
   onMount(() => {
@@ -63,6 +69,19 @@ export const StargateProvider: Component<{ children?: import('solid-js').JSX.Ele
     if (stargate.ready && auth.user?.id) {
       subscribe(undefined, auth.user.id);
     }
+  });
+
+  createEffect(() => {
+    if (!stargate.ready) return;
+    const list = spaces.spaces;
+    for (const s of list) {
+      if (s.id) subscribe(s.id, undefined);
+    }
+    return () => {
+      for (const s of list) {
+        if (s.id) unsubscribe(s.id, undefined);
+      }
+    };
   });
 
   createEffect(() => {

@@ -2,6 +2,7 @@ import type { Component } from 'solid-js';
 import { createMemo } from 'solid-js';
 import { A } from '@solidjs/router';
 import { auth } from '../stores/auth';
+import { appHeaderBar } from '../theme/appChrome';
 
 function getGreeting(): string {
   const hour = new Date().getHours();
@@ -17,7 +18,7 @@ const HomePage: Component = () => {
 
   return (
     <div class="flex-1 flex flex-col">
-      <div class="h-12 flex items-center gap-2 px-4 border-b border-border shrink-0">
+      <div class={`flex h-12 shrink-0 items-center gap-2 px-4 ${appHeaderBar}`}>
         <i class="fa-solid fa-house text-muted-foreground shrink-0" />
         <h1 class="text-base font-semibold text-foreground">Home</h1>
       </div>
@@ -26,7 +27,7 @@ const HomePage: Component = () => {
           {greeting()}, {name()}!
         </h1>
         <p class="text-muted-foreground mb-8 max-w-md">
-          Welcome to StrafeChat. Your messages are end-to-end encrypted.
+          Welcome to Strafe. Your messages are end-to-end encrypted.
         </p>
         <div class="flex flex-wrap gap-4 justify-center">
           <A

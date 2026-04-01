@@ -1,6 +1,6 @@
 import { onMount } from 'solid-js';
 import { Show } from 'solid-js';
-import { Router, Route, Navigate } from '@solidjs/router';
+import { Router, Route, Navigate, useLocation } from '@solidjs/router';
 import Login from '../pages/Login';
 import Register from '../pages/Register';
 import Main from '../pages/Main';
@@ -9,9 +9,14 @@ import FriendsPage from '../pages/FriendsPage';
 import NotesPage from '../pages/NotesPage';
 import SpacePage from '../pages/SpacePage';
 import RoomPage from '../pages/RoomPage';
+import InvitePage from '../pages/InvitePage';
 import { StargateProvider } from '../components/StargateProvider';
 import { RecoveryPinModal } from '../components/RecoveryPinModal';
+import { E2eeEnvironmentModal } from '../components/E2eeEnvironmentModal';
+import { ExternalLinkModal } from '../components/ExternalLinkModal';
+import { UserSettingsModal } from '../components/UserSettingsModal';
 import { auth, hydrateAuth } from '../stores/auth';
+import { AuthTurtleBackground } from '../components/auth/AuthTurtleBackground';
 
 function LoadingScreen() {
   return (
@@ -40,11 +45,17 @@ function NotFound() {
 
 function RootLayout(props: { children?: import('solid-js').JSX.Element }) {
   onMount(() => hydrateAuth());
+  const location = useLocation();
+  const isAuthRoute = () => location.pathname === '/login' || location.pathname === '/register';
   return (
     <StargateProvider>
       <Show when={auth.hydrated} fallback={<LoadingScreen />}>
+        <AuthTurtleBackground show={isAuthRoute()} />
         {props.children}
         <RecoveryPinModal />
+        <E2eeEnvironmentModal />
+        <ExternalLinkModal />
+        <UserSettingsModal />
       </Show>
     </StargateProvider>
   );
@@ -65,8 +76,10 @@ export function AppRouter() {
         <Route path="/friends" component={FriendsPage} />
         <Route path="/notes" component={NotesPage} />
         <Route path="/rooms/:roomId" component={RoomPage} />
-        <Route path="/s/:spaceId" component={SpacePage} />
+        <Route path="/spaces/:spaceId" component={SpacePage} />
+        <Route path="/spaces/:spaceId/rooms/:roomId" component={SpacePage} />
       </Route>
+      <Route path="/invite/:code" component={InvitePage} />
       <Route path="*404" component={NotFound} />
     </Router>
   );

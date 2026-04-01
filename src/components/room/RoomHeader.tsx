@@ -1,6 +1,8 @@
 import type { Component } from 'solid-js';
 import { Show } from 'solid-js';
 import { PresenceDot } from '../PresenceDot';
+import { appHeaderBar } from '../../theme/appChrome';
+import { MobileRailsOpenButton } from '../layout/MobileRailsOpenButton';
 
 export interface RoomHeaderProps {
   headerIcon: string;
@@ -18,12 +20,17 @@ export interface RoomHeaderProps {
   membersPanelOpen: boolean;
   onToggleMembers: () => void;
   onAddPeople: () => void;
+  /** When true and isGroup, show settings (cog) in the header button row. */
+  isCreator?: boolean;
+  /** Opens group settings modal (name, E2EE). Shown as cog next to add people when isCreator. */
+  onOpenSettings?: () => void;
 }
 
 export const RoomHeader: Component<RoomHeaderProps> = (props) => (
-  <div class="h-12 flex items-center justify-between px-4 border-b border-border shrink-0">
-    <div class="flex items-center gap-2 min-w-0">
-      <i class={`fa-solid ${props.headerIcon} text-muted-foreground shrink-0`} />
+  <div class={`flex h-12 shrink-0 items-center justify-between px-4 ${appHeaderBar}`}>
+    <div class="flex min-w-0 items-center gap-2">
+      <MobileRailsOpenButton />
+      <i class={`fa-solid ${props.headerIcon} shrink-0 text-muted-foreground`} />
       <h1 class="text-base font-semibold text-foreground truncate">{props.name}</h1>
       <Show when={props.pmOtherUserId}>
         {(uid) => <PresenceDot userId={uid()} class="size-2 shrink-0 mt-0.5" />}
@@ -70,6 +77,17 @@ export const RoomHeader: Component<RoomHeaderProps> = (props) => (
         >
           <i class="fa-solid fa-user-plus text-sm" />
         </button>
+        <Show when={props.isCreator && props.onOpenSettings}>
+          <button
+            type="button"
+            class="size-8 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+            title="Group settings"
+            onClick={() => props.onOpenSettings?.()}
+            aria-label="Group settings"
+          >
+            <i class="fa-solid fa-gear text-sm" />
+          </button>
+        </Show>
       </Show>
       <div class="hidden sm:flex items-center gap-2">
         <div class="relative">

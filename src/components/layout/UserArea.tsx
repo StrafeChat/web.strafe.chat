@@ -5,6 +5,8 @@ import { auth } from '../../stores/auth';
 import { presence, setUserPresence, type UserPresence } from '../../stores/presence';
 import { PresenceDot } from '../PresenceDot';
 import { patchMe } from '../../api/users';
+import { openUserSettings } from '../../stores/userSettingsModal';
+import { appMenuPopover, appUserDock } from '../../theme/appChrome';
 
 const STATUS_OPTIONS: { id: UserPresence['status']; label: string; color: string }[] = [
   { id: 'online', label: 'Online', color: 'bg-green-500' },
@@ -124,7 +126,7 @@ export const UserArea: Component = () => {
     <>
     <div
       ref={(el) => { areaEl = el; }}
-      class="relative px-2 py-2.5 border-t border-border bg-[hsl(0_0%_7%)] flex items-center gap-1"
+      class={`relative flex items-center gap-1 px-2 py-2.5 ${appUserDock}`}
     >
       <div
         id="user-area-trigger"
@@ -157,7 +159,8 @@ export const UserArea: Component = () => {
         title="Settings"
         aria-label="Settings"
         onClick={() => {
-          // TODO: open settings
+          setPopoverOpen(false);
+          openUserSettings();
         }}
       >
         <i class="fa-solid fa-gear text-xs" />
@@ -170,7 +173,7 @@ export const UserArea: Component = () => {
         <div
           id="user-popover"
           data-modal
-          class="fixed z-50 w-[300px] max-h-[85vh] rounded-xl border border-border bg-[hsl(0_0%_9%)] shadow-2xl overflow-y-auto overflow-x-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden"
+          class={`fixed z-50 max-h-[85vh] w-[300px] overflow-y-auto overflow-x-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${appMenuPopover}`}
           style={{
             left: `${pos().left}px`,
             bottom: `${pos().bottom}px`,
@@ -182,7 +185,7 @@ export const UserArea: Component = () => {
           {/* Avatar + name */}
           <div class="px-5 -mt-10 pb-4">
             <div class="relative inline-block">
-              <div class="size-20 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-2xl font-semibold border-4 border-[hsl(0_0%_9%)]">
+              <div class="size-20 rounded-full border-4 border-card bg-primary flex items-center justify-center text-2xl font-semibold text-primary-foreground">
                 {displayName()[0]?.toUpperCase() ?? '?'}
               </div>
               <span class="absolute bottom-1 right-1">
@@ -247,7 +250,7 @@ export const UserArea: Component = () => {
             </button>
 
             <Show when={statusMenuOpen()}>
-              <div class="px-5 py-3 bg-[hsl(0_0%_7%)] border-y border-border">
+              <div class="border-y border-border bg-card/40 px-5 py-3 backdrop-blur-sm">
                 <For each={STATUS_OPTIONS}>
                   {(opt) => (
                     <button

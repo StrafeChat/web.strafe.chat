@@ -2,7 +2,11 @@
  * Base API client – fetch wrapper with auth and base URL
  */
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
+import { ApiError } from './ApiError';
+
+const API_URL = import.meta.env.VITE_API_URL ?? 'http://192.168.1.115:4000';
+
+export { ApiError } from './ApiError';
 
 function getToken(): string | null {
   return localStorage.getItem('session_token');
@@ -32,7 +36,8 @@ export async function api<T>(
 
   if (!res.ok) {
     const err = (await res.json().catch(() => ({}))) as { error?: string };
-    throw new Error(err.error ?? `HTTP ${res.status}`);
+    const message = err.error ?? `HTTP ${res.status}`;
+    throw new ApiError(message, res.status);
   }
 
   if (res.status === 204) return undefined as T;

@@ -1,4 +1,5 @@
 import type { Component } from 'solid-js';
+import { appActivityRail, appHeaderBar } from '../../theme/appChrome';
 import { For, Show } from 'solid-js';
 
 export interface RoomSearchPanelProps {
@@ -16,10 +17,10 @@ export interface RoomSearchPanelProps {
 
 export const RoomSearchPanel: Component<RoomSearchPanelProps> = (props) => (
   <aside
-    class="w-60 shrink-0 border-l border-border bg-[hsl(0_0%_8%)] flex flex-col overflow-hidden hidden md:flex"
+    class={`hidden w-60 shrink-0 flex-col overflow-hidden md:flex md:flex-col ${appActivityRail}`}
     aria-label="Search messages"
   >
-    <div class="px-3 pt-4 pb-3 shrink-0 border-b border-border/70 flex items-center justify-between gap-2">
+    <div class={`flex shrink-0 items-center justify-between gap-2 px-3 pb-3 pt-4 ${appHeaderBar}`}>
       <div class="flex items-center gap-2 flex-1 min-w-0">
         <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider flex items-center gap-1 shrink-0">
           <i class="fa-solid fa-magnifying-glass text-[11px]" />
@@ -65,7 +66,7 @@ export const RoomSearchPanel: Component<RoomSearchPanelProps> = (props) => (
             {(r) => (
               <button
                 type="button"
-                class="w-full text-left rounded-md border border-border bg-[hsl(0_0%_10%)] hover:bg-[hsl(0_0%_14%)] transition-colors px-3 py-2 text-xs flex flex-col gap-1"
+                class="flex w-full flex-col gap-1 rounded-lg border border-border bg-card/50 px-3 py-2 text-start text-xs transition-colors hover:bg-card/80"
                 onClick={() => props.onSelectMessage(r.id)}
               >
                 <div class="flex items-baseline justify-between gap-2 mb-0.5">

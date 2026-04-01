@@ -68,17 +68,17 @@ export const Tooltip: Component<TooltipProps> = (props) => {
               transform,
             }}
           >
-            <div class="relative flex items-center px-3 py-2 rounded-md bg-[hsl(0_0%_14%)] text-white text-sm font-medium whitespace-nowrap shadow-xl">
+            <div class="relative flex items-center whitespace-nowrap rounded-md border border-border bg-popover/95 px-3 py-2 text-sm font-medium text-popover-foreground shadow-2xl shadow-black/40 backdrop-blur-xl">
               {isTop ? (
                 <div
-                  class="absolute left-1/2 top-full -translate-x-1/2 -mt-px w-0 h-0 border-x-[6px] border-x-transparent border-t-[6px] border-t-[hsl(0_0%_14%)]"
+                  class="absolute left-1/2 top-full -mt-px h-0 w-0 -translate-x-1/2 border-x-[6px] border-x-transparent border-t-[6px] border-t-popover"
                 />
               ) : (
                 <div
-                  class={`absolute top-1/2 -translate-y-1/2 w-0 h-0 border-y-[6px] border-y-transparent ${
+                  class={`absolute top-1/2 h-0 w-0 -translate-y-1/2 border-y-[6px] border-y-transparent ${
                     isLeft
-                      ? 'left-full border-l-[6px] border-l-[hsl(0_0%_14%)]'
-                      : 'right-full border-r-[6px] border-r-[hsl(0_0%_14%)]'
+                      ? 'left-full border-l-[6px] border-l-popover'
+                      : 'right-full border-r-[6px] border-r-popover'
                   }`}
                 />
               )}

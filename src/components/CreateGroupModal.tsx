@@ -1,11 +1,12 @@
 import type { Component } from 'solid-js';
 import { createSignal, For, Show, createEffect } from 'solid-js';
+import { Portal } from 'solid-js/web';
 import { useNavigate } from '@solidjs/router';
 import { relationships, RelType, friendDisplayName } from '../stores/relationships';
 import { createGroupPM } from '../api/rooms';
 import { addOrUpdateRoom } from '../stores/rooms';
-import { Input } from './ui/Input';
 import { Button } from './ui/Button';
+import { ResponsiveDialog } from './ui/ResponsiveDialog';
 
 interface CreateGroupModalProps {
   open: boolean;
@@ -14,7 +15,6 @@ interface CreateGroupModalProps {
 
 export const CreateGroupModal: Component<CreateGroupModalProps> = (props) => {
   const navigate = useNavigate();
-  const [name, setName] = createSignal('');
   const [selectedIds, setSelectedIds] = createSignal<Set<string>>(new Set());
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal('');
@@ -33,24 +33,18 @@ export const CreateGroupModal: Component<CreateGroupModalProps> = (props) => {
 
   async function handleSubmit(e: Event) {
     e.preventDefault();
-    const n = name().trim();
     const ids = [...selectedIds()];
     setError('');
-    if (!n) {
-      setError('Group name is required');
-      return;
-    }
     if (ids.length === 0) {
       setError('Select at least one friend');
       return;
     }
     setLoading(true);
     try {
-      const room = await createGroupPM({ name: n, recipient_ids: ids });
+      const room = await createGroupPM({ recipient_ids: ids });
       addOrUpdateRoom(room);
       props.onClose();
-      setName('');
-      setSelectedIds(new Set());
+      setSelectedIds(new Set<string>());
       navigate(`/rooms/${room.id}`);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to create group');
@@ -63,8 +57,7 @@ export const CreateGroupModal: Component<CreateGroupModalProps> = (props) => {
     if (!loading()) {
       props.onClose();
       setError('');
-      setName('');
-      setSelectedIds(new Set());
+      setSelectedIds(new Set<string>());
     }
   }
 
@@ -79,31 +72,17 @@ export const CreateGroupModal: Component<CreateGroupModalProps> = (props) => {
 
   return (
     <Show when={props.open}>
-      <div
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-        data-modal
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="create-group-title"
-        onClick={handleClose}
-      >
-        <div
-          class="w-full max-w-sm rounded-lg bg-card p-6 shadow-lg border border-border mx-4 max-h-[85vh] flex flex-col"
-          onClick={(e) => e.stopPropagation()}
+      <Portal mount={document.body}>
+        <ResponsiveDialog
+          size="sm"
+          zClass="z-[220]"
+          ariaLabelledby="create-group-title"
+          onBackdropClick={() => handleClose()}
+          panelClass="flex min-h-0 w-full flex-col px-6 pt-6 touch-manipulation"
         >
           <h3 id="create-group-title" class="text-lg font-semibold text-foreground mb-1">Create group</h3>
-          <p class="text-sm text-muted-foreground mb-4">Add friends to a new group conversation.</p>
+          <p class="text-sm text-muted-foreground mb-4">Add friends to start a group conversation. The group will be named after its members.</p>
           <form onSubmit={handleSubmit} class="flex flex-col flex-1 min-h-0">
-            <div class="mb-4">
-              <Input
-                type="text"
-                label="Group name"
-                placeholder="e.g. Weekend squad"
-                value={name()}
-                onInput={(e) => { setName(e.currentTarget.value); setError(''); }}
-                disabled={loading()}
-              />
-            </div>
             <div class="mb-4 flex-1 min-h-0 overflow-hidden flex flex-col">
               <label class="text-sm font-medium text-foreground mb-2 block">Add friends</label>
               <div class="overflow-y-auto min-h-0 rounded-md border border-border p-2 space-y-1 max-h-48">
@@ -134,13 +113,13 @@ export const CreateGroupModal: Component<CreateGroupModalProps> = (props) => {
               <Button type="button" variant="outline" class="flex-1" onClick={handleClose} disabled={loading()}>
                 Cancel
               </Button>
-              <Button type="submit" class="flex-1" loading={loading()} disabled={friends().length === 0}>
+              <Button type="submit" class="flex-1" loading={loading()} disabled={selectedIds().size === 0}>
                 Create
               </Button>
             </div>
           </form>
-        </div>
-      </div>
+        </ResponsiveDialog>
+      </Portal>
     </Show>
   );
 };

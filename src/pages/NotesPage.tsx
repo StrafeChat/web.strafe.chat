@@ -5,6 +5,7 @@ import { getNotesRoom } from '../api/rooms';
 import { rooms, setRooms, isNotesRoom } from '../stores/rooms';
 import { setUserPresence } from '../stores/presence';
 import { auth } from '../stores/auth';
+import { appHeaderBar } from '../theme/appChrome';
 
 /** Notes room from store (loadRooms includes it once it exists). */
 function findNotesRoom(): (typeof rooms.rooms)[number] | undefined {
@@ -70,7 +71,7 @@ const NotesPage: Component = () => {
 
   return (
     <div class="flex-1 flex flex-col">
-      <div class="h-12 flex items-center gap-2 px-4 border-b border-border shrink-0">
+      <div class={`flex h-12 shrink-0 items-center gap-2 px-4 ${appHeaderBar}`}>
         <i class="fa-solid fa-note-sticky text-muted-foreground shrink-0" />
         <h1 class="text-base font-semibold text-foreground">Notes</h1>
       </div>

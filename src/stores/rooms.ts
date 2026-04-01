@@ -60,6 +60,11 @@ export function addOrUpdateRoom(room: Room): void {
   });
 }
 
+/** Remove a room from the list (e.g. when user is removed from group). */
+export function removeRoom(roomId: string): void {
+  setRooms('rooms', (list) => list.filter((r) => r.id !== roomId));
+}
+
 /** Hydrate rooms from READY payload (avoids REST round-trip). */
 export function hydrateRoomsFromReady(roomsData: unknown[]): void {
   const list = roomsData as import('../api/rooms').Room[];
@@ -114,6 +119,7 @@ function roomFromPayload(payload: unknown): Room | null {
     ...(d.parent_id != null && { parent_id: String(d.parent_id) }),
     ...(d.name != null && typeof d.name === 'string' && { name: d.name }),
     ...(d.topic != null && typeof d.topic === 'string' && { topic: d.topic }),
+    ...(d.creator_id != null && d.creator_id !== '' && { creator_id: String(d.creator_id) }),
     ...(d.last_message_id != null && { last_message_id: String(d.last_message_id) }),
     ...(d.last_read_message_id != null && { last_read_message_id: String(d.last_read_message_id) }),
     ...(d.mention_count != null && typeof d.mention_count === 'number' && { mention_count: d.mention_count }),
@@ -139,14 +145,18 @@ export function isNotesRoom(room: Room, currentUserId: string): boolean {
   );
 }
 
-/** Display name for a PM: other participant's name, room name, "Notes" for self-PM, or fallback */
+/** Display name: room name, or for groups with no name the list of other members, or for PM the other user, or "Notes" for self-PM */
 export function roomDisplayName(room: Room, currentUserId: string): string {
-  if (room.name) return room.name;
+  if (room.name && room.name.trim()) return room.name;
   if (room.participants?.length) {
-    const other = room.participants.find((p) => p.id !== currentUserId);
-    if (other) return other.display_name || other.username || 'Unknown';
-    // Self-PM (notes room): only participant is current user
-    if (room.participants.length === 1 && room.participants[0].id === currentUserId) {
+    const others = room.participants.filter((p) => p.id !== currentUserId);
+    if (others.length > 1) {
+      return others.map((p) => p.display_name || p.username || 'Unknown').join(', ');
+    }
+    if (others.length === 1) {
+      return others[0]!.display_name || others[0]!.username || 'Unknown';
+    }
+    if (room.participants.length === 1 && room.participants[0]!.id === currentUserId) {
       return 'Notes';
     }
   }

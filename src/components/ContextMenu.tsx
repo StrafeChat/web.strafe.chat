@@ -2,6 +2,7 @@ import type { Component } from 'solid-js';
 import { Show, createEffect } from 'solid-js';
 import { contextMenuState, closeContextMenu } from '../stores/contextMenu';
 import type { ContextMenuItem } from '../stores/contextMenu';
+import { appMenuPopover } from '../theme/appChrome';
 
 export const ContextMenu: Component = () => {
   const state = contextMenuState;
@@ -31,7 +32,7 @@ export const ContextMenu: Component = () => {
       <div
         id="context-menu-portal"
         role="menu"
-        class="fixed z-[100] min-w-[180px] rounded-lg border border-border bg-[hsl(0_0%_10%)] shadow-xl overflow-hidden"
+        class={`fixed z-[100] min-w-[180px] overflow-hidden ${appMenuPopover}`}
         style={{
           left: `${Math.min(state().x, window.innerWidth - 200)}px`,
           top: `${Math.min(state().y, window.innerHeight - 200)}px`,

@@ -12,9 +12,15 @@ const STORE_SESSIONS = 'sessions';
 const STORE_SENT_PLAINTEXTS = 'sent_plaintexts';
 
 let dbPromise: Promise<IDBPDatabase> | null = null;
+let persistenceRequested = false;
 
-function getDB() {
+function getDB(): Promise<IDBPDatabase> {
   if (!dbPromise) {
+    /** Helps Safari / mobile keep IndexedDB across sessions (best-effort). */
+    if (!persistenceRequested && typeof navigator !== 'undefined' && navigator.storage?.persist) {
+      persistenceRequested = true;
+      void navigator.storage.persist().catch(() => {});
+    }
     dbPromise = openDB(DB_NAME, DB_VERSION, {
       upgrade(db, oldVersion, newVersion) {
         if (oldVersion < 3 && db.objectStoreNames.contains(STORE_DEVICE)) {
@@ -31,9 +37,18 @@ function getDB() {
           db.createObjectStore(STORE_SENT_PLAINTEXTS, { keyPath: 'messageId' });
         }
       },
+    }).catch((err) => {
+      dbPromise = null;
+      console.error('[E2EE] IndexedDB open failed:', err);
+      throw err;
     });
   }
   return dbPromise;
+}
+
+/** IndexedDB keys must be stable; API/WS sometimes send numeric ids. */
+function deviceKey(userId: string): string {
+  return String(userId);
 }
 
 /** In-memory cache for current session – avoids races with IndexedDB when loading messages we just sent */
@@ -56,13 +71,22 @@ export async function getSentPlaintext(messageId: string): Promise<string | null
 }
 
 export async function getDeviceIdentity(userId: string): Promise<DeviceIdentity | null> {
+  const key = deviceKey(userId);
   const db = await getDB();
-  return db.get(STORE_DEVICE, userId) ?? null;
+  return db.get(STORE_DEVICE, key) ?? null;
 }
 
 export async function setDeviceIdentity(userId: string, device: DeviceIdentity): Promise<void> {
+  const key = deviceKey(userId);
   const db = await getDB();
-  await db.put(STORE_DEVICE, { ...device, userId });
+  const payload = { ...device, userId: key };
+  await db.put(STORE_DEVICE, payload);
+  const roundtrip = await db.get(STORE_DEVICE, key);
+  if (!roundtrip?.identityKeyPrivate || !roundtrip?.signedPrekeyPrivate) {
+    throw new Error(
+      'E2EE keys did not persist to IndexedDB (check private mode or browser storage limits).'
+    );
+  }
 }
 
 export async function getSession(recipientUserId: string, recipientDeviceId: number): Promise<Session | null> {

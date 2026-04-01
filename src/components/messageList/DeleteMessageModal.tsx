@@ -5,6 +5,7 @@ import type { RoomParticipant } from '../../api/rooms';
 import { formatMessageTimestamp } from '../../lib/utils/datetime';
 import { getMessageBodyText, getSenderDisplay } from './utils';
 import { MessageAvatar } from './MessageAvatar';
+import { ResponsiveDialog } from '../ui/ResponsiveDialog';
 
 export interface DeleteMessageModalProps {
   pending: { roomId: string; msgId: string; message: DecryptedMessage } | null;
@@ -21,18 +22,13 @@ export const DeleteMessageModal: Component<DeleteMessageModalProps> = (props) =>
       const sender = () => getSenderDisplay(msg().sender_id, props.participants, props.currentUserId);
       return (
         <Portal>
-          <div
-            class="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-black/50"
-            onClick={props.onCancel}
-            role="presentation"
+          <ResponsiveDialog
+            zClass="z-[200]"
+            size="md"
+            ariaLabelledby="delete-message-title"
+            onBackdropClick={() => props.onCancel()}
+            panelClass="relative px-5 pt-5 touch-manipulation md:mx-auto"
           >
-            <div
-              class="w-full max-w-md rounded-lg border border-border bg-[hsl(0_0%_10%)] p-5 shadow-xl relative"
-              onClick={(e) => e.stopPropagation()}
-              role="dialog"
-              aria-labelledby="delete-message-title"
-              aria-modal="true"
-            >
               <button
                 type="button"
                 class="absolute top-3 right-3 p-1 rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
@@ -47,7 +43,7 @@ export const DeleteMessageModal: Component<DeleteMessageModalProps> = (props) =>
               <p class="text-sm text-muted-foreground mb-4">
                 Are you sure you want to delete this message?
               </p>
-              <div class="rounded-md border border-border bg-[hsl(0_0%_8%)] p-3 mb-4">
+              <div class="mb-4 rounded-lg border border-border bg-card/50 p-3 backdrop-blur-sm">
                 <div class="flex gap-3">
                   <MessageAvatar name={sender().name} avatar={sender().avatar} />
                   <div class="min-w-0 flex-1">
@@ -85,8 +81,7 @@ export const DeleteMessageModal: Component<DeleteMessageModalProps> = (props) =>
                   Delete
                 </button>
               </div>
-            </div>
-          </div>
+          </ResponsiveDialog>
         </Portal>
       );
     }}

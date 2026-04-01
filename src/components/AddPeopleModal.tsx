@@ -1,8 +1,10 @@
 import type { Component } from 'solid-js';
 import { createSignal, For, Show, createEffect } from 'solid-js';
+import { Portal } from 'solid-js/web';
 import { relationships, RelType, friendDisplayName } from '../stores/relationships';
 import { addRoomParticipant } from '../api/rooms';
 import { Button } from './ui/Button';
+import { ResponsiveDialog } from './ui/ResponsiveDialog';
 
 interface AddPeopleModalProps {
   open: boolean;
@@ -53,17 +55,13 @@ export const AddPeopleModal: Component<AddPeopleModalProps> = (props) => {
 
   return (
     <Show when={props.open}>
-      <div
-        class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-        data-modal
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="add-people-title"
-        onClick={handleClose}
-      >
-        <div
-          class="w-full max-w-sm rounded-lg bg-card p-6 shadow-lg border border-border mx-4 max-h-[85vh] flex flex-col"
-          onClick={(e) => e.stopPropagation()}
+      <Portal mount={document.body}>
+        <ResponsiveDialog
+          size="sm"
+          zClass="z-[220]"
+          ariaLabelledby="add-people-title"
+          onBackdropClick={() => handleClose()}
+          panelClass="flex min-h-0 w-full flex-col px-6 pt-6 touch-manipulation"
         >
           <h3 id="add-people-title" class="text-lg font-semibold text-foreground mb-1">Add people</h3>
           <p class="text-sm text-muted-foreground mb-4">Choose a friend to add to this group.</p>
@@ -101,8 +99,8 @@ export const AddPeopleModal: Component<AddPeopleModalProps> = (props) => {
               </Button>
             </div>
           </div>
-        </div>
-      </div>
+        </ResponsiveDialog>
+      </Portal>
     </Show>
   );
 };

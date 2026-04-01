@@ -8,6 +8,7 @@ import { getMe, toAuthUser } from '../api/users';
 import { setUserPresence } from './presence';
 import { loadRooms, clearRooms, hydrateRoomsFromReady } from './rooms';
 import { loadRelationships, clearRelationships, hydrateRelationshipsFromReady } from './relationships';
+import { loadSpaces, clearSpaces, hydrateSpacesFromReady, hydrateSpaceRoomsFromReady } from './spaces';
 
 export interface AuthState {
   user: { id: string; username: string; discriminator: number; display_name: string } | null;
@@ -40,14 +41,17 @@ export function logout() {
   setAuth({ user: null, sessionId: null });
   clearRooms();
   clearRelationships();
+  clearSpaces();
 }
 
-/** Hydrate auth + rooms + relationships from READY payload. Skips REST. */
+/** Hydrate auth + rooms + relationships + spaces + space_rooms from READY payload. Skips REST. */
 export function hydrateFromReady(payload: {
   user?: { id: string; username: string; discriminator: number | string; display_name: string; presence?: { status: string; custom_status?: string } };
   session_id?: string;
   rooms?: unknown[];
   relationships?: unknown[];
+  spaces?: unknown[];
+  space_rooms?: Record<string, unknown[]>;
 }) {
   if (payload.user) {
     const d =
@@ -77,6 +81,14 @@ export function hydrateFromReady(payload: {
   }
   if (Array.isArray(payload.relationships)) {
     hydrateRelationshipsFromReady(payload.relationships);
+  }
+  if (Array.isArray(payload.spaces)) {
+    hydrateSpacesFromReady(payload.spaces);
+  } else {
+    loadSpaces().catch(() => {});
+  }
+  if (payload.space_rooms && typeof payload.space_rooms === 'object' && !Array.isArray(payload.space_rooms)) {
+    hydrateSpaceRoomsFromReady(payload.space_rooms as Record<string, unknown[]>);
   }
   setAuth({ loading: false, hydrated: true });
 }
@@ -114,7 +126,7 @@ export async function bootstrapFromRest() {
       }
     }
     setAuth({ user: toAuthUser(me), loading: false, hydrated: true });
-    await Promise.all([loadRooms(), loadRelationships()]);
+    await Promise.all([loadRooms(), loadRelationships(), loadSpaces()]);
   } catch {
     localStorage.removeItem('session_token');
     setAuth({ token: null, user: null, loading: false, hydrated: true });

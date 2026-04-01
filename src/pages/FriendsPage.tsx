@@ -1,5 +1,6 @@
 import type { Component } from 'solid-js';
 import { createSignal, For, Show } from 'solid-js';
+import { Portal } from 'solid-js/web';
 import { useNavigate } from '@solidjs/router';
 import { relationships, RelType, friendDisplayName, loadRelationships, removeRelationshipLocally } from '../stores/relationships';
 import { presence, isVisibleStatus } from '../stores/presence';
@@ -10,6 +11,7 @@ import { addOrUpdateRoom } from '../stores/rooms';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { showContextMenu } from '../stores/contextMenu';
+import { ResponsiveDialog } from '../components/ui/ResponsiveDialog';
 
 const FriendsIcon = () => (
   <svg class="size-24 text-muted-foreground/40 mx-auto mb-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
@@ -21,6 +23,10 @@ const FriendsIcon = () => (
 );
 
 type TabId = 'online' | 'all' | 'pending' | 'blocked';
+
+function friendStatusText(rel: { user: { id: string; username: string; discriminator: string; presence?: { custom_status?: string } } }): string | undefined {
+  return presence.byUser[rel.user.id]?.custom_status ?? rel.user.presence?.custom_status;
+}
 
 const TABS: { id: TabId; label: string }[] = [
   { id: 'online', label: 'Online' },
@@ -138,11 +144,22 @@ const FriendsPage: Component = () => {
   const showEmptyState = () => !relationships.loading && !hasTabContent();
 
   return (
-    <div class="flex-1 flex flex-col">
+    <div class="flex min-h-0 flex-1 flex-col bg-background">
       <Show when={showAddModal()}>
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" data-modal>
-          <div class="w-full max-w-sm rounded-lg bg-card p-6 shadow-lg border border-border mx-4">
-            <h3 class="text-lg font-semibold text-foreground mb-1">Add Friend</h3>
+        <Portal mount={document.body}>
+          <ResponsiveDialog
+            size="sm"
+            zClass="z-[220]"
+            ariaLabelledby="add-friend-modal-title"
+            onBackdropClick={() => {
+              setShowAddModal(false);
+              setAddError('');
+              setAddUsername('');
+              setAddDiscriminator('');
+            }}
+            panelClass="px-6 pt-6 touch-manipulation"
+          >
+            <h3 id="add-friend-modal-title" class="mb-1 text-lg font-semibold text-foreground">Add Friend</h3>
             <p class="text-sm text-muted-foreground mb-4">Enter username and discriminator (e.g. 1234).</p>
             <form onSubmit={handleAddFriend} class="space-y-4">
               <Input
@@ -180,10 +197,10 @@ const FriendsPage: Component = () => {
                 </Button>
               </div>
             </form>
-          </div>
-        </div>
+          </ResponsiveDialog>
+        </Portal>
       </Show>
-      <div class="h-12 flex items-center gap-2 px-4 border-b border-border shrink-0">
+      <div class="flex h-12 shrink-0 items-center gap-2 border-b border-border bg-background px-4">
         <i class="fa-solid fa-user-group text-muted-foreground shrink-0" />
         <h1 class="text-base font-semibold text-foreground mr-4">Friends</h1>
         <div class="flex gap-0.5">
@@ -209,7 +226,7 @@ const FriendsPage: Component = () => {
           Add Friend
         </button>
       </div>
-      <div class="flex-1 flex flex-col overflow-y-auto">
+      <div class="flex min-h-0 flex-1 flex-col overflow-y-auto bg-background">
         <Show when={relationships.loading}>
           <div class="flex-1 flex items-center justify-center p-8">
             <span class="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
@@ -294,8 +311,8 @@ const FriendsPage: Component = () => {
                           </div>
                           <div>
                             <div class="font-medium">{friendDisplayName(rel)}</div>
-                            <div class="text-xs text-muted-foreground">
-                              {rel.user.username}#{rel.user.discriminator}
+                            <div class="text-xs text-muted-foreground truncate">
+                              {friendStatusText(rel) || `${rel.user.username}#${rel.user.discriminator}`}
                             </div>
                           </div>
                         </div>
@@ -351,8 +368,8 @@ const FriendsPage: Component = () => {
                           </div>
                           <div>
                             <div class="font-medium">{friendDisplayName(rel)}</div>
-                            <div class="text-xs text-muted-foreground">
-                              {rel.user.username}#{rel.user.discriminator}
+                            <div class="text-xs text-muted-foreground truncate">
+                              {friendStatusText(rel) || `${rel.user.username}#${rel.user.discriminator}`}
                             </div>
                           </div>
                         </div>
@@ -390,8 +407,8 @@ const FriendsPage: Component = () => {
                               </div>
                               <div>
                                 <div class="font-medium">{friendDisplayName(rel)}</div>
-                                <div class="text-xs text-muted-foreground">
-                                  {rel.user.username}#{rel.user.discriminator}
+                                <div class="text-xs text-muted-foreground truncate">
+                                  {friendStatusText(rel) || `${rel.user.username}#${rel.user.discriminator}`}
                                 </div>
                               </div>
                             </div>
@@ -434,8 +451,8 @@ const FriendsPage: Component = () => {
                               </div>
                               <div>
                                 <div class="font-medium">{friendDisplayName(rel)}</div>
-                                <div class="text-xs text-muted-foreground">
-                                  {rel.user.username}#{rel.user.discriminator}
+                                <div class="text-xs text-muted-foreground truncate">
+                                  {friendStatusText(rel) || `${rel.user.username}#${rel.user.discriminator}`}
                                 </div>
                               </div>
                             </div>
@@ -470,8 +487,8 @@ const FriendsPage: Component = () => {
                           </div>
                           <div>
                             <div class="font-medium">{friendDisplayName(rel)}</div>
-                            <div class="text-xs text-muted-foreground">
-                              {rel.user.username}#{rel.user.discriminator}
+                            <div class="text-xs text-muted-foreground truncate">
+                              {friendStatusText(rel) || `${rel.user.username}#${rel.user.discriminator}`}
                             </div>
                           </div>
                         </div>

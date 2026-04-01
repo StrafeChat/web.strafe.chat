@@ -1,7 +1,7 @@
 import type { Component } from 'solid-js';
 import { createSignal, createEffect, createMemo, Show, onMount, onCleanup } from 'solid-js';
 import { useParams, useNavigate } from '@solidjs/router';
-import { roomDisplayName } from '../stores/rooms';
+import { roomDisplayName, addOrUpdateRoom, removeRoom } from '../stores/rooms';
 import { rooms, isNotesRoom } from '../stores/rooms';
 import { auth } from '../stores/auth';
 import {
@@ -13,18 +13,19 @@ import {
   type DecryptedMessage,
 } from '../stores/messages';
 import { typing, typingVersion, removeTyping } from '../stores/typing';
-import { sendTyping, ackRoom, ackRoomKeepalive, createPM } from '../api/rooms';
-import { subscribe, unsubscribe } from '../services/stargate/client';
+import { sendTyping, ackRoom, ackRoomKeepalive, createPM, getRoom, removeRoomParticipant, updateRoom } from '../api/rooms';
+import { subscribe, unsubscribe, onStargateEvent } from '../services/stargate/client';
 import { MessageList } from '../components/MessageList';
 import { MessageSkeleton } from '../components/MessageSkeleton';
 import { AddPeopleModal } from '../components/AddPeopleModal';
-import { RoomHeader, RoomMessageInput, RoomMembersSidebar, RoomSearchPanel, RoomPinnedPanel } from '../components/room';
+import { RoomHeader, RoomMessageInput, RoomMembersSidebar, RoomSearchPanel, RoomPinnedPanel, RenameGroupModal } from '../components/room';
 import { settings, setMessageCompact, setMembersPanelOpen } from '../stores/settings';
 import type { SettingsData } from '../stores/settings';
 import { stargate } from '../stores/stargate';
 import { messageIdGt, readState, setReadState } from '../stores/readState';
 import { setPendingAck, clearPendingAck, getPendingAck } from '../stores/pendingAck';
 import { dismissNewHeader, clearNewHeaderDismissed } from '../stores/newHeaderDismissed';
+import { appContentBand } from '../theme/appChrome';
 import { getMessageBodyText, getSenderDisplay } from '../components/messageList';
 import { formatMessageTimestamp } from '../lib/utils/datetime';
 import { scrollToMessage } from '../lib/utils/messages';
@@ -36,12 +37,14 @@ const RoomPage: Component = () => {
   const params = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const [draft, setDraft] = createSignal('');
-  const [inputRef, setInputRef] = createSignal<HTMLInputElement | undefined>();
+  const [cursorPos, setCursorPos] = createSignal(0);
+  const [inputRef, setInputRef] = createSignal<HTMLTextAreaElement | undefined>();
   const [maxMessageIdWhenEntered, setMaxMessageIdWhenEntered] = createSignal<string | null>(null);
   const [showAddPeople, setShowAddPeople] = createSignal(false);
   const [searchQuery, setSearchQuery] = createSignal('');
   const [searchOpen, setSearchOpen] = createSignal(false);
   const [pinnedOpen, setPinnedOpen] = createSignal(false);
+  const [renameModalOpen, setRenameModalOpen] = createSignal(false);
   const [replyToMessageId, setReplyToMessageId] = createSignal<string | null>(null);
   let lastTypingSent = 0;
   const leaveAckRef = { roomId: '' as string, toAck: '' as string };
@@ -141,12 +144,30 @@ const RoomPage: Component = () => {
   });
 
   function onInput(e: InputEvent) {
-    setDraft((e.target as HTMLInputElement).value);
+    const el = e.target as HTMLTextAreaElement;
+    setDraft(el.value);
+    setCursorPos(el.selectionStart);
     const now = Date.now();
     if (now - lastTypingSent >= TYPING_DEBOUNCE_MS) {
       lastTypingSent = now;
       sendTyping(params.roomId).catch(() => {});
     }
+  }
+
+  function onInsertMention(queryStart: number, cursorEnd: number, userId: string) {
+    const before = draft().slice(0, queryStart);
+    const after = draft().slice(cursorEnd);
+    const insert = `<@${userId}>`;
+    setDraft(before + insert + after);
+    setCursorPos(before.length + insert.length);
+    queueMicrotask(() => {
+      const input = inputRef();
+      if (input) {
+        const pos = before.length + insert.length;
+        input.focus();
+        input.setSelectionRange(pos, pos);
+      }
+    });
   }
   const isLoading = () => messages.loading[params.roomId] ?? false;
   const isSending = () => messages.sending[params.roomId] ?? false;
@@ -183,6 +204,16 @@ const RoomPage: Component = () => {
     if (snowflakes.length === 0) return;
     const max = snowflakes.reduce((a, b) => (messageIdGt(b.id, a.id) ? b : a));
     setMaxMessageIdWhenEntered(max.id);
+  });
+
+  // Ensure participants are loaded for current room (e.g. PMs may not have them in listRooms)
+  createEffect(() => {
+    const roomId = params.roomId;
+    const r = room();
+    if (!roomId || !r) return;
+    const participants = r.participants ?? [];
+    if (participants.length > 0) return;
+    getRoom(roomId).then((full) => addOrUpdateRoom(full)).catch(() => {});
   });
 
   // Subscribe to room when Stargate is ready (WS may not be open on mount)
@@ -295,7 +326,6 @@ const RoomPage: Component = () => {
     return () => window.removeEventListener('beforeunload', onBeforeUnload);
   });
 
-  // Focus message input on keypress when not typing elsewhere (Discord-style)
   onMount(() => {
     function handleKeyDown(e: KeyboardEvent) {
       const target = e.target as Node;
@@ -315,7 +345,11 @@ const RoomPage: Component = () => {
       if (!input || input.disabled) return;
       e.preventDefault();
       input.focus();
-      setDraft((d) => d + key);
+      setDraft((d) => {
+        const next = d + key;
+        queueMicrotask(() => setCursorPos(next.length));
+        return next;
+      });
     }
     document.addEventListener('keydown', handleKeyDown);
     onCleanup(() => document.removeEventListener('keydown', handleKeyDown));
@@ -367,6 +401,34 @@ const RoomPage: Component = () => {
     queueMicrotask(() => inputRef()?.focus());
   }
 
+  async function handleRemoveMember(userId: string) {
+    try {
+      await removeRoomParticipant(params.roomId, userId);
+      const updated = await getRoom(params.roomId);
+      addOrUpdateRoom(updated);
+    } catch (err) {
+      console.error('Remove member failed:', err);
+    }
+  }
+
+  async function handleGroupSettings(opts: { name: string; e2ee_enabled: boolean }) {
+    const updated = await updateRoom(params.roomId, { name: opts.name, e2ee_enabled: opts.e2ee_enabled });
+    addOrUpdateRoom(updated);
+  }
+
+  onMount(() => {
+    const unsub = onStargateEvent((evt) => {
+      if (evt.t !== 'ROOM_LEAVE') return;
+      const payload = (evt.d as { d?: { room_id?: string } })?.d ?? evt.d;
+      const roomId = payload && typeof payload === 'object' && 'room_id' in payload ? String(payload.room_id) : null;
+      if (roomId === params.roomId) {
+        removeRoom(roomId);
+        navigate('/');
+      }
+    });
+    onCleanup(unsub);
+  });
+
   return (
     <div class="flex-1 flex flex-col min-h-0">
       <RoomHeader
@@ -385,6 +447,15 @@ const RoomPage: Component = () => {
         membersPanelOpen={!!(settings as SettingsData).membersPanelOpen}
         onToggleMembers={() => setMembersPanelOpen(!(settings as SettingsData).membersPanelOpen)}
         onAddPeople={() => setShowAddPeople(true)}
+        isCreator={room()?.type === 2 && !!room()?.creator_id && room()?.creator_id !== '0' && room()?.creator_id === auth.user?.id}
+        onOpenSettings={() => setRenameModalOpen(true)}
+      />
+      <RenameGroupModal
+        open={renameModalOpen()}
+        currentName={room()?.name ?? ''}
+        currentE2eeEnabled={room()?.e2ee_enabled}
+        onSave={handleGroupSettings}
+        onClose={() => setRenameModalOpen(false)}
       />
       <AddPeopleModal
         open={showAddPeople()}
@@ -417,6 +488,7 @@ const RoomPage: Component = () => {
                 roomType={room()?.type}
                 roomName={room()?.name}
                 participants={room()?.participants}
+                e2eeEnabled={room()?.e2ee_enabled}
                 loadingOlder={messages.loadingOlder[params.roomId]}
                 hasMoreOlder={messages.hasMoreOlder[params.roomId]}
                 onLoadOlder={(getScroll) => loadOlderMessages(params.roomId, getScroll)}
@@ -431,7 +503,7 @@ const RoomPage: Component = () => {
             }>
               <MessageSkeleton />
             </Show>
-            <div class="border-t border-border">
+            <div>
               <Show when={replyToMessageId()}>
                 {(() => {
                   const targetId = replyToMessageId();
@@ -439,7 +511,7 @@ const RoomPage: Component = () => {
                   const target = list.find((m) => m.id === targetId) as DecryptedMessage | undefined;
                   if (!target) {
                     return (
-                      <div class="px-3 pt-2 pb-1 text-xs text-muted-foreground bg-[hsl(0_0%_8%)] flex items-center justify-between gap-2">
+                      <div class={`flex items-center justify-between gap-2 px-3 pb-1 pt-2 text-xs text-muted-foreground ${appContentBand}`}>
                         <span class="truncate">
                           Replying to message <span class="font-mono text-[10px]">#{targetId}</span>
                         </span>
@@ -462,7 +534,7 @@ const RoomPage: Component = () => {
                   const preview =
                     text.length > 120 ? `${text.slice(0, 117)}…` : text;
                   return (
-                    <div class="px-3 pt-2 pb-1 text-xs bg-[hsl(0_0%_8%)] flex items-start justify-between gap-2 border-b border-border/80">
+                    <div class={`flex items-start justify-between gap-2 px-3 pb-1 pt-2 text-xs ${appContentBand}`}>
                       <div class="min-w-0">
                         <p class="text-[11px] text-muted-foreground mb-0.5">
                           Replying to <span class="text-foreground font-medium">{sender.name}</span>
@@ -498,6 +570,11 @@ const RoomPage: Component = () => {
                 inputRef={setInputRef}
                 typingMessage={typingMessage()}
                 showTyping={typingUserIds().length > 0}
+                participants={room()?.participants}
+                currentUserId={auth.user?.id}
+                cursorPos={cursorPos()}
+                onInsertMention={onInsertMention}
+                onCursorChange={setCursorPos}
               />
             </div>
           </Show>
@@ -520,6 +597,9 @@ const RoomPage: Component = () => {
                   onMessageUser={(userId) => {
                     createPM(userId).then((r) => navigate(`/rooms/${r.id}`)).catch((err) => console.error(err));
                   }}
+                  creatorId={room()?.creator_id && room()!.creator_id !== '0' ? room()!.creator_id : undefined}
+                  roomId={params.roomId}
+                  onRemoveMember={handleRemoveMember}
                 />
               </Show>
             }

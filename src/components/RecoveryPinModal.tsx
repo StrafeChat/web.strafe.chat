@@ -1,12 +1,15 @@
 import type { Component } from 'solid-js';
 import { createSignal, Show } from 'solid-js';
+import { Portal } from 'solid-js/web';
 import { recoveryPin, submitRecoveryPin } from '../stores/recoveryPin';
+import { ResponsiveDialog } from './ui/ResponsiveDialog';
 
 export const RecoveryPinModal: Component = () => {
   const [pin, setPin] = createSignal('');
   const [error, setError] = createSignal('');
 
   const pending = () => recoveryPin.pending;
+  const submitError = () => recoveryPin.lastSubmitError;
 
   function handleSubmit(e: Event) {
     e.preventDefault();
@@ -28,17 +31,23 @@ export const RecoveryPinModal: Component = () => {
 
   return (
     <Show when={pending()}>
-      <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" data-modal>
-        <div class="w-full max-w-sm rounded-lg bg-card p-6 shadow-lg border border-border">
-          <h3 class="text-lg font-semibold text-foreground mb-1">
+      <Portal mount={document.body}>
+        <ResponsiveDialog
+          size="sm"
+          zClass="z-[250]"
+          ariaLabelledby="recovery-pin-title"
+          onBackdropClick={() => handleCancel()}
+          panelClass="px-6 pt-6 touch-manipulation"
+        >
+          <h3 id="recovery-pin-title" class="mb-1 text-lg font-semibold text-foreground">
             {pending()!.mode === 'restore'
               ? 'Restore your messages'
               : 'Set up recovery PIN'}
           </h3>
           <p class="text-sm text-muted-foreground mb-4">
             {pending()!.mode === 'restore'
-              ? 'Enter your recovery PIN to decrypt messages on this device.'
-              : 'Create a 6-digit PIN to access your messages on other devices.'}
+              ? 'Your PIN is not stored on the server — it only unlocks an encrypted backup. Keys are saved in this browser (IndexedDB), not in localStorage.'
+              : 'Create a 6-digit PIN to encrypt a backup of your keys on the server. Keys stay in this browser (IndexedDB).'}
           </p>
           <form onSubmit={handleSubmit} class="space-y-4">
             <div>
@@ -46,7 +55,10 @@ export const RecoveryPinModal: Component = () => {
                 type="password"
                 inputmode="numeric"
                 pattern="[0-9]*"
-                autocomplete="one-time-code"
+                autocomplete="off"
+                autocapitalize="off"
+                autocorrect="off"
+                spellcheck={false}
                 placeholder="6+ digit PIN"
                 class="w-full rounded-lg border border-input bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
                 value={pin()}
@@ -58,6 +70,9 @@ export const RecoveryPinModal: Component = () => {
               />
               {error() && (
                 <p class="mt-1 text-xs text-destructive">{error()}</p>
+              )}
+              {submitError() && (
+                <p class="mt-1 text-xs text-destructive">{submitError()}</p>
               )}
             </div>
             <div class="flex gap-2">
@@ -76,8 +91,8 @@ export const RecoveryPinModal: Component = () => {
               </button>
             </div>
           </form>
-        </div>
-      </div>
+        </ResponsiveDialog>
+      </Portal>
     </Show>
   );
 };

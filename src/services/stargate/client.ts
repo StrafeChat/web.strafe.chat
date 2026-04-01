@@ -5,7 +5,7 @@
 import { Op } from '../../types/stargate';
 import { setStargate, setStargateStatus, setStargateReady, setStargateLastEvent } from '../../stores/stargate';
 
-const DEFAULT_URL = 'ws://localhost:4001/events';
+const DEFAULT_URL = 'ws://192.168.1.115:4001/events';
 
 type EventHandler = (event: { t: string; space_id?: string; room_id?: string; user_id?: string; d: unknown }) => void;
 const eventHandlers = new Set<EventHandler>();
@@ -18,6 +18,8 @@ export interface ReadyPayload {
   session_id?: string;
   rooms?: unknown[];
   relationships?: unknown[];
+  spaces?: unknown[];
+  space_rooms?: Record<string, unknown[]>;
 }
 
 export function onStargateReady(handler: ReadyHandler): () => void {

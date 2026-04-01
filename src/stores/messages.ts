@@ -57,7 +57,7 @@ export const [messages, setMessages] = createStore<MessagesState>({
   scrollToBottomTick: {},
 });
 
-const MESSAGES_PAGE_SIZE = 50;
+const MESSAGES_PAGE_SIZE = 30;
 
 export async function loadMessages(
   roomId: string,
@@ -84,16 +84,25 @@ export async function loadMessages(
     } catch (e) {
       console.warn('ensureDevice failed, decryption may fail:', e);
     }
+    const myDevice = await getDeviceIdentity(currentUserId);
+    const myDeviceId = myDevice?.deviceId;
     const list = await listMessages(roomId, { before, limit: MESSAGES_PAGE_SIZE });
     const decrypted = await Promise.all(
       list.map(async (m): Promise<DecryptedMessage> => {
-        if (m.ciphertext.startsWith(PLAINTEXT_PREFIX)) {
-          return { ...m, plaintext: m.ciphertext.slice(PLAINTEXT_PREFIX.length), notEncrypted: true };
+        if (m.system_type) {
+          return { ...m, plaintext: '' };
         }
-        if (m.ciphertext.startsWith(GROUP_CIPHERTEXT_PREFIX)) {
+        if (m.plaintext != null && m.plaintext !== '') {
+          return { ...m, plaintext: m.plaintext, notEncrypted: true };
+        }
+        const ctext = m.ciphertext ?? '';
+        if (ctext.startsWith(PLAINTEXT_PREFIX)) {
+          return { ...m, plaintext: ctext.slice(PLAINTEXT_PREFIX.length), notEncrypted: true };
+        }
+        if (ctext.startsWith(GROUP_CIPHERTEXT_PREFIX)) {
           try {
             const group = JSON.parse(
-              m.ciphertext.slice(GROUP_CIPHERTEXT_PREFIX.length)
+              ctext.slice(GROUP_CIPHERTEXT_PREFIX.length)
             ) as GroupCipherPayload;
             const isSender = String(m.sender_id) === currentUserId;
             if (isSender) {
@@ -105,7 +114,6 @@ export async function loadMessages(
               }
               return { ...m, plaintext: SENT_PLAINTEXT_PLACEHOLDER };
             }
-            const myDeviceId = (await getDeviceIdentity(currentUserId))?.deviceId;
             const forMeSlots = group.recipients?.filter((r) => r.user_id === currentUserId) ?? [];
             for (const slot of forMeSlots) {
               if (myDeviceId != null && slot.device_id !== myDeviceId) continue;
@@ -134,10 +142,10 @@ export async function loadMessages(
         if (String(m.sender_id) === auth.user?.id) {
           const stored = await getSentPlaintext(m.id);
           if (stored != null) return { ...m, plaintext: stored };
-          if (m.ciphertext.startsWith(DUAL_CIPHERTEXT_PREFIX)) {
+          if (ctext.startsWith(DUAL_CIPHERTEXT_PREFIX)) {
             try {
               const dual = JSON.parse(
-                m.ciphertext.slice(DUAL_CIPHERTEXT_PREFIX.length)
+                ctext.slice(DUAL_CIPHERTEXT_PREFIX.length)
               ) as { s?: string };
               if (dual.s) {
                 const plaintext = await decryptMessage(dual.s, currentUserId);
@@ -149,7 +157,7 @@ export async function loadMessages(
           } else {
             // Notes room: ciphertext is self-encrypted only (no dual wrapper)
             try {
-              const plaintext = await decryptMessage(m.ciphertext, currentUserId);
+              const plaintext = await decryptMessage(ctext, currentUserId);
               return { ...m, plaintext };
             } catch {
               // fall through to placeholder
@@ -158,12 +166,12 @@ export async function loadMessages(
           return { ...m, plaintext: SENT_PLAINTEXT_PLACEHOLDER };
         }
         try {
-          let toDecrypt = m.ciphertext;
-          if (m.ciphertext.startsWith(DUAL_CIPHERTEXT_PREFIX)) {
+          let toDecrypt = ctext;
+          if (ctext.startsWith(DUAL_CIPHERTEXT_PREFIX)) {
             const dual = JSON.parse(
-              m.ciphertext.slice(DUAL_CIPHERTEXT_PREFIX.length)
+              ctext.slice(DUAL_CIPHERTEXT_PREFIX.length)
             ) as { r?: string };
-            toDecrypt = dual.r ?? m.ciphertext;
+            toDecrypt = dual.r ?? ctext;
           }
           const plaintext = await decryptMessage(toDecrypt, currentUserId);
           return { ...m, plaintext };
@@ -240,7 +248,8 @@ export async function sendMessage(
   const otherParticipant = participants.find((p) => p.id !== currentUserId);
   const isNotesRoom = !otherParticipant && participants.length === 1;
   const isGroupRoom = room.type === 2 && participants.length >= 2;
-  if (!otherParticipant && !isNotesRoom && !isGroupRoom) return null;
+  const isSpaceTextRoom = room.type === 3;
+  if (!otherParticipant && !isNotesRoom && !isGroupRoom && !isSpaceTextRoom) return null;
 
   const nonce = createTempId();
   const now = new Date().toISOString();
@@ -263,6 +272,30 @@ export async function sendMessage(
   setMessages('sending', roomId, true);
   try {
     await ensureDevice(currentUserId);
+    const e2eeOff = isGroupRoom && room.e2ee_enabled === false;
+    const isSpaceTextRoom = room.type === 3;
+    if (isSpaceTextRoom || e2eeOff) {
+      const device = await getDeviceIdentity(currentUserId);
+      const msg = await createMessage(roomId, {
+        sender_device_id: device?.deviceId ?? 1,
+        plaintext,
+        ...(replyToId ? { reply_to_id: Number(replyToId) } : {}),
+      });
+      const confirmed: DecryptedMessage = { ...msg, plaintext, notEncrypted: true };
+      let didReplaceInPlace = false;
+      setMessages('byRoom', roomId, (prev) => {
+        const list = prev ?? [];
+        const withoutTemp = list.filter((m) => m.id !== nonce);
+        const existingIdx = withoutTemp.findIndex((m) => m.id === msg.id);
+        didReplaceInPlace = true;
+        if (existingIdx >= 0) {
+          return withoutTemp.map((m, i) => (i === existingIdx ? { ...m, ...confirmed, plaintext } : m));
+        }
+        return sortByCreatedAt([...withoutTemp, confirmed]);
+      });
+      if (!didReplaceInPlace) setMessages('scrollToBottomTick', roomId, (t) => (t ?? 0) + 1);
+      return msg;
+    }
     let ciphertext: string;
     let notEncrypted = false;
 
@@ -372,13 +405,45 @@ export async function addMessageFromEvent(payload: {
   sender_id: string;
   sender_device_id: string;
   ciphertext: string;
+  plaintext?: string;
   reply_to_id?: string;
+  system_type?: string;
+  system_payload?: string;
   created_at: string;
   updated_at: string;
 }) {
   const roomId = payload.room_id;
+  if (payload.system_type) {
+    const msg: DecryptedMessage = {
+      ...payload,
+      plaintext: '',
+    };
+    setMessages('byRoom', roomId, (prev) => {
+      const list = prev ?? [];
+      if (list.some((m) => m.id === msg.id)) return list;
+      return sortByCreatedAt([...list, msg]);
+    });
+    return;
+  }
   removeTyping(roomId, String(payload.sender_id));
   const currentUserId = auth.user?.id;
+  if (payload.plaintext != null && payload.plaintext !== '') {
+    const msg: DecryptedMessage = {
+      ...payload,
+      plaintext: payload.plaintext,
+      notEncrypted: true,
+    };
+    setMessages('byRoom', roomId, (prev) => {
+      const list = prev ?? [];
+      if (list.some((m) => m.id === msg.id)) return list;
+      const isOwn = String(payload.sender_id) === currentUserId;
+      const withoutTemp = isOwn
+        ? list.filter((m) => !(m.pending && String(m.sender_id) === currentUserId && m.plaintext === payload.plaintext))
+        : list;
+      return sortByCreatedAt([...withoutTemp, msg]);
+    });
+    return;
+  }
   if (currentUserId) {
     try {
       await ensureDevice(currentUserId);
@@ -390,7 +455,7 @@ export async function addMessageFromEvent(payload: {
   let decryptError = false;
   let notEncrypted = false;
 
-  if (payload.ciphertext.startsWith(PLAINTEXT_PREFIX)) {
+  if ((payload.ciphertext ?? '').startsWith(PLAINTEXT_PREFIX)) {
     plaintext = payload.ciphertext.slice(PLAINTEXT_PREFIX.length);
     notEncrypted = true;
   } else if (payload.ciphertext.startsWith(GROUP_CIPHERTEXT_PREFIX) && currentUserId) {

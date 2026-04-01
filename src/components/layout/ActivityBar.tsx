@@ -1,4 +1,5 @@
 import type { Component } from 'solid-js';
+import { appActivityRail, appHeaderBar } from '../../theme/appChrome';
 
 const SleepIcon = () => (
   <svg class="size-12 text-muted-foreground/50 mx-auto mb-3" viewBox="0 0 24 24" fill="currentColor">
@@ -8,8 +9,8 @@ const SleepIcon = () => (
 
 export const ActivityBar: Component = () => {
   return (
-    <aside class="w-[240px] shrink-0 flex flex-col bg-[hsl(0_0%_8%)] border-l border-border overflow-hidden hidden lg:flex">
-      <div class="p-3 border-b border-border">
+    <aside class={`hidden w-[240px] shrink-0 flex-col overflow-hidden lg:flex lg:flex-col ${appActivityRail}`}>
+      <div class={`p-3 ${appHeaderBar}`}>
         <h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Active Now</h3>
       </div>
       <div class="flex-1 flex flex-col items-center justify-center p-4 text-center">

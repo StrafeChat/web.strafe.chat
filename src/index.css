@@ -1,6 +1,6 @@
 @import 'tailwindcss';
 
-/* StrafeChat design system – aligned with strafe_chat globals */
+/* Strafe design system – aligned with strafe_chat globals */
 @theme {
   --color-background: hsl(0 0% 6%);
   --color-foreground: hsl(0 0% 95%);
@@ -30,6 +30,9 @@
   --color-border: hsl(0 0% 18%);
   --color-input: hsl(0 0% 18%);
   --color-ring: hsl(118 28% 45%);
+
+  /* Wordmark / marketing (Outfit from Google Fonts in index.html) */
+  --font-brand: 'Outfit', ui-sans-serif, system-ui, sans-serif;
 
   /* Responsive breakpoints (Tailwind defaults) */
   --breakpoint-sm: 640px;
@@ -66,4 +69,83 @@
 
 *::-webkit-scrollbar-corner {
   background: transparent;
+}
+
+/* User settings modal */
+@keyframes settings-overlay-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes settings-overlay-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+@keyframes settings-panel-in {
+  from { opacity: 0; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes settings-panel-out {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0; transform: scale(0.97); }
+}
+.settings-overlay-in { animation: settings-overlay-in 0.2s ease-out forwards; }
+.settings-overlay-out { animation: settings-overlay-out 0.2s ease-out forwards; }
+.settings-panel-in { animation: settings-panel-in 0.22s ease-out forwards; }
+.settings-panel-out { animation: settings-panel-out 0.2s ease-out forwards; }
+
+/* Login/Register background turtle animation */
+@keyframes turtleFloat {
+  0% {
+    transform: translate3d(0px, 0px, 0) rotate(0deg);
+  }
+  50% {
+    transform: translate3d(18px, -42px, 0) rotate(8deg);
+  }
+  100% {
+    transform: translate3d(0px, 0px, 0) rotate(0deg);
+  }
+}
+
+.turtle-bg {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.turtle-emoji {
+  position: absolute;
+  /* Tint turtles with brand primary (landing hero glow uses the same token) */
+  color: color-mix(in srgb, var(--color-primary) 55%, var(--color-muted));
+  filter: drop-shadow(0 12px 20px rgba(0, 0, 0, 0.4));
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.turtle-float {
+  animation-name: turtleFloat;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+  will-change: transform;
+}
+
+/* DatePicker year list — match app scrollbars, avoid “blank” native select look */
+.datepicker-year-scroller {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(0 0% 28% / 0.6) transparent;
+}
+.datepicker-year-scroller::-webkit-scrollbar {
+  width: 6px;
+}
+.datepicker-year-scroller::-webkit-scrollbar-thumb {
+  background: hsl(0 0% 28% / 0.55);
+  border-radius: 9999px;
+}
+
+/* DatePicker: true geometric center + slight optical nudge (digits often sit high in the em box) */
+.datepicker-day-num {
+  line-height: 1;
+  margin: 0;
+  padding: 0;
+  transform: translate(-50%, calc(-50% + 1px));
 }
