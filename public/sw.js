@@ -1,24 +1,28 @@
 /**
- * Strafe service worker — makes the app installable and gives it a basic offline shell.
- * Deliberately conservative: it only ever touches same-origin GETs (the API, gateway and
- * CDN live on other origins and must never be intercepted), navigations and runtime config
- * are network-first so deploys and config changes take effect immediately, and hashed
- * static assets are cache-first. Bump CACHE to force old caches out on the next visit.
+ * Strafe service worker.
+ *
+ * It deliberately does NOT cache application code. Everything hashed under /assets/ is
+ * already immutable-cached by the browser via nginx headers, and index.html / config.js are
+ * served no-cache, so the browser + server handle deploys correctly on their own. A service
+ * worker that also cached the bundle is exactly what makes "every deploy breaks the app until
+ * I clear site data" happen — a stale cached shell or chunk survives a normal reload. So this
+ * worker exists only to keep the app installable (Add to Home Screen needs a fetch handler):
+ * it passes navigations straight to the network with a tiny offline fallback, and leaves
+ * every other request entirely to the browser.
+ *
+ * On activate it deletes every cache from any earlier version of this worker, which heals
+ * clients that were stuck on a previously cached build.
  */
-const CACHE = 'strafe-shell-v1';
-const SHELL = ['/', '/manifest.webmanifest', '/icons/icon-192.png', '/icons/icon-512.png'];
 
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()),
-  );
+self.addEventListener('install', () => {
+  self.skipWaiting();
 });
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k !== CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   );
 });
@@ -27,41 +31,24 @@ self.addEventListener('message', (event) => {
   if (event.data === 'SKIP_WAITING') self.skipWaiting();
 });
 
+const OFFLINE_HTML =
+  '<!doctype html><meta charset="utf-8">' +
+  '<meta name="viewport" content="width=device-width,initial-scale=1"><title>Offline</title>' +
+  '<body style="margin:0;height:100vh;display:grid;place-items:center;background:#101216;color:#e6e6e6;' +
+  'font-family:system-ui,-apple-system,sans-serif">' +
+  '<p style="opacity:.8">You’re offline — reconnect and reload.</p>';
+
 self.addEventListener('fetch', (event) => {
   const req = event.request;
   if (req.method !== 'GET') return;
-  const url = new URL(req.url);
-  if (url.origin !== self.location.origin) return; // never touch API / gateway / CDN
-
-  const isNavigation = req.mode === 'navigate';
-  const isConfig = url.pathname === '/config.js';
-
-  if (isNavigation || isConfig) {
-    // Network-first so a new deploy / config is picked up at once; fall back to cache offline.
+  // Only take over top-level navigations (so we count as a fetch handler and stay
+  // installable). Network-first with a plain offline page — never a cached bundle. Every
+  // other request (assets, config, API, CDN) is left to the browser untouched.
+  if (req.mode === 'navigate') {
     event.respondWith(
-      fetch(req)
-        .then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(isNavigation ? '/' : req, copy));
-          return res;
-        })
-        .catch(() => caches.match(isNavigation ? '/' : req).then((r) => r || Response.error())),
+      fetch(req).catch(
+        () => new Response(OFFLINE_HTML, { headers: { 'Content-Type': 'text/html; charset=utf-8' } }),
+      ),
     );
-    return;
   }
-
-  // Hashed static assets: serve from cache, fall back to network and populate the cache.
-  event.respondWith(
-    caches.match(req).then(
-      (cached) =>
-        cached ||
-        fetch(req).then((res) => {
-          if (res.ok && res.type === 'basic') {
-            const copy = res.clone();
-            caches.open(CACHE).then((c) => c.put(req, copy));
-          }
-          return res;
-        }),
-    ),
-  );
 });

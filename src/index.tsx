@@ -53,13 +53,43 @@ render(
   root!,
 );
 
-// Register the service worker for install-to-home-screen and a basic offline shell.
-// Production only - in dev the cache would fight Vite's HMR, and `import.meta.env.PROD`
-// lets this be tree-shaken out of the dev bundle entirely.
-if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-  window.addEventListener('load', () => {
-    navigator.serviceWorker.register('/sw.js').catch((err) => {
-      console.warn('Service worker registration failed:', err);
+// Deploy resilience (production only; tree-shaken out of dev).
+if (import.meta.env.PROD) {
+  // Service worker: kept only so the app stays installable - it caches no app code (see
+  // public/sw.js), which is what stops a new deploy from breaking the client until site data
+  // is cleared. When a new deploy activates a new worker and claims this page, reload once so
+  // the tab runs the fresh build (guarded so a first install doesn't reload and it can't loop).
+  if ('serviceWorker' in navigator) {
+    const hadController = !!navigator.serviceWorker.controller;
+    let reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (!hadController || reloading) return;
+      reloading = true;
+      window.location.reload();
     });
+    window.addEventListener('load', () => {
+      navigator.serviceWorker.register('/sw.js').catch((err) => {
+        console.warn('Service worker registration failed:', err);
+      });
+    });
+  }
+
+  // A failed dynamic import is almost always a stale tab whose code-split chunk a new deploy
+  // replaced; reload once (rate-limited so it can't loop) to pick up the current build.
+  window.addEventListener('vite:preloadError', () => {
+    let last = 0;
+    try {
+      last = Number(sessionStorage.getItem('sw-preload-reload-at') || 0);
+    } catch {
+      /* private mode */
+    }
+    if (Date.now() - last > 10000) {
+      try {
+        sessionStorage.setItem('sw-preload-reload-at', String(Date.now()));
+      } catch {
+        /* private mode */
+      }
+      window.location.reload();
+    }
   });
 }
