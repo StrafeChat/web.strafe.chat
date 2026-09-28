@@ -1,5 +1,5 @@
 import type { Component } from 'solid-js';
-import { createResource, createSignal, For, Show } from 'solid-js';
+import { createResource, createSignal, ErrorBoundary, For, Show } from 'solid-js';
 import { useSearchParams } from '@solidjs/router';
 import { getAuthorizeInfo, authorize, type OAuthScope } from '../api/developers';
 import { auth } from '../stores/auth';
@@ -100,22 +100,24 @@ const OAuthAuthorizePage: Component = () => {
               </>
             }
           >
-            <Show
-              when={info()}
+            <ErrorBoundary
               fallback={
                 <CardContent class={`${authCardContentClass} min-h-40`}>
-                  <Show
-                    when={info.error}
-                    fallback={<p class="text-center text-sm text-muted-foreground">{t('common.loading')}</p>}
-                  >
-                    <div class="text-center">
-                      <i class="fa-solid fa-triangle-exclamation mb-2 text-2xl text-destructive" aria-hidden="true" />
-                      <p class="text-sm text-foreground">{t('oauth.invalidRequest')}</p>
-                    </div>
-                  </Show>
+                  <div class="text-center">
+                    <i class="fa-solid fa-triangle-exclamation mb-2 text-2xl text-destructive" aria-hidden="true" />
+                    <p class="text-sm text-foreground">{t('oauth.invalidRequest')}</p>
+                  </div>
                 </CardContent>
               }
             >
+              <Show
+                when={info()}
+                fallback={
+                  <CardContent class={`${authCardContentClass} min-h-40`}>
+                    <p class="text-center text-sm text-muted-foreground">{t('common.loading')}</p>
+                  </CardContent>
+                }
+              >
               {(d) => (
                 <>
                   <CardHeader class={authCardHeaderClass}>
@@ -157,7 +159,8 @@ const OAuthAuthorizePage: Component = () => {
                   </CardFooter>
                 </>
               )}
-            </Show>
+              </Show>
+            </ErrorBoundary>
           </Show>
         </Card>
       </div>
