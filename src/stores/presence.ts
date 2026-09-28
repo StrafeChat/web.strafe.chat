@@ -7,6 +7,7 @@
 import { createStore } from 'solid-js/store';
 import { onStargateEvent } from '../services/stargate/client';
 import { updatePresence } from './relationships';
+import { auth } from './auth';
 
 export interface UserPresence {
   status: 'online' | 'idle' | 'dnd' | 'offline' | 'invisible';
@@ -41,17 +42,20 @@ export function initPresenceHandler(): () => void {
     })?.d;
     const userId = payload?.user_id;
     const p = payload?.presence;
+    if (userId == null || !p?.status) return;
 
-    if (userId != null && p?.status) {
-      const valid = ['online', 'idle', 'dnd', 'offline', 'invisible'].includes(p.status);
-      if (valid) {
-        const presence: UserPresence = {
-          status: p.status as UserPresence['status'],
-          custom_status: p.custom_status,
-        };
-        setUserPresence(userId, presence);
-        updatePresence(userId, presence);
-      }
-    }
+    // Space broadcasts carry the "others" view (invisible → offline). Applying that to our
+    // OWN user would wrongly show us offline; our real status arrives on the user channel
+    // (no space_id), so ignore a self update that came in via a space.
+    if (event.space_id && userId === auth.user?.id) return;
+
+    const valid = ['online', 'idle', 'dnd', 'offline', 'invisible'].includes(p.status);
+    if (!valid) return;
+    const presence: UserPresence = {
+      status: p.status as UserPresence['status'],
+      custom_status: p.custom_status,
+    };
+    setUserPresence(userId, presence);
+    updatePresence(userId, presence);
   });
 }

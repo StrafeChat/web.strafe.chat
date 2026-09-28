@@ -99,7 +99,7 @@ export const UserArea: Component = () => {
     const text = customStatusDraft().trim();
     const current = p();
     setUserPresence(userId(), {
-      status: current?.status ?? 'offline',
+      status: current?.status ?? 'online',
       custom_status: text || undefined,
     });
     setCustomStatusDraft('');
