@@ -58,7 +58,7 @@ export function AuthLanguageSwitcher() {
       <div class="relative">
         <button
           type="button"
-          class="group flex min-w-[11.5rem] max-w-[16rem] items-stretch overflow-hidden rounded-2xl border border-border/80 bg-card/85 text-start shadow-lg shadow-black/25 backdrop-blur-md transition-[border-color,box-shadow,background-color] hover:border-border hover:bg-card/95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background hover:cursor-pointer"
+          class="group flex min-w-[11.5rem] max-w-[16rem] items-stretch overflow-hidden rounded-lg border border-border/80 bg-card/85 text-start shadow-lg shadow-black/25 backdrop-blur-md transition-[border-color,box-shadow,background-color] hover:border-border hover:bg-card/95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background hover:cursor-pointer"
           aria-expanded={open()}
           aria-haspopup="listbox"
           aria-labelledby="auth-lang-label"
@@ -92,7 +92,7 @@ export function AuthLanguageSwitcher() {
             id="auth-lang-listbox"
             role="listbox"
             aria-labelledby="auth-lang-label"
-            class="absolute end-0 top-[calc(100%+0.5rem)] z-10 min-w-full overflow-hidden rounded-2xl border border-border/90 bg-card/95 p-0 shadow-xl shadow-black/40 backdrop-blur-xl"
+            class="absolute end-0 top-[calc(100%+0.5rem)] z-10 min-w-full overflow-hidden rounded-lg border border-border/90 bg-card/95 p-0 shadow-xl shadow-black/40 backdrop-blur-xl"
           >
             <For each={LOCALES}>
               {(l) => {
@@ -102,7 +102,7 @@ export function AuthLanguageSwitcher() {
                     type="button"
                     role="option"
                     aria-selected={active()}
-                    class={`flex w-full items-center gap-3 rounded-none px-3 py-2.5 text-start text-sm transition-colors first:rounded-t-2xl last:rounded-b-2xl sm:px-3.5 sm:py-3 hover:cursor-pointer ${
+                    class={`flex w-full items-center gap-3 rounded-none px-3 py-2.5 text-start text-sm transition-colors first:rounded-t-lg last:rounded-b-lg sm:px-3.5 sm:py-3 hover:cursor-pointer ${
                       active()
                         ? 'bg-primary/15 font-semibold text-foreground'
                         : 'text-foreground/90 hover:bg-accent/50 active:bg-accent/70'

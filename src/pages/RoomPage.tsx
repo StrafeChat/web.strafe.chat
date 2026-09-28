@@ -1,5 +1,5 @@
 import type { Component } from 'solid-js';
-import { createSignal, createEffect, createMemo, Show, onMount, onCleanup } from 'solid-js';
+import { createSignal, createEffect, createMemo, Show, onMount, onCleanup, untrack } from 'solid-js';
 import { useParams, useNavigate } from '@solidjs/router';
 import { roomDisplayName, addOrUpdateRoom, removeRoom } from '../stores/rooms';
 import { rooms, isNotesRoom } from '../stores/rooms';
@@ -12,43 +12,92 @@ import {
   sendMessage,
   type DecryptedMessage,
 } from '../stores/messages';
-import { typing, typingVersion, removeTyping } from '../stores/typing';
-import { sendTyping, ackRoom, ackRoomKeepalive, createPM, getRoom, removeRoomParticipant, updateRoom } from '../api/rooms';
+import { getTypingUserIds, removeTyping } from '../stores/typing';
+import { sendTyping, createPM, getRoom, removeRoomParticipant, updateRoom } from '../api/rooms';
 import { subscribe, unsubscribe, onStargateEvent } from '../services/stargate/client';
 import { MessageList } from '../components/MessageList';
 import { MessageSkeleton } from '../components/MessageSkeleton';
 import { AddPeopleModal } from '../components/AddPeopleModal';
-import { RoomHeader, RoomMessageInput, RoomMembersSidebar, RoomSearchPanel, RoomPinnedPanel, RenameGroupModal } from '../components/room';
+import {
+  RoomComposerDock,
+  RoomHeader,
+  RoomMessageInput,
+  RoomMembersSidebar,
+  RoomSearchPanel,
+  RoomPinnedPanel,
+  RenameGroupModal,
+  UnreadBanner,
+} from '../components/room';
 import { settings, setMessageCompact, setMembersPanelOpen } from '../stores/settings';
 import type { SettingsData } from '../stores/settings';
 import { stargate } from '../stores/stargate';
-import { messageIdGt, readState, setReadState } from '../stores/readState';
-import { setPendingAck, clearPendingAck, getPendingAck } from '../stores/pendingAck';
-import { dismissNewHeader, clearNewHeaderDismissed } from '../stores/newHeaderDismissed';
-import { appContentBand } from '../theme/appChrome';
-import { getMessageBodyText, getSenderDisplay } from '../components/messageList';
-import { formatMessageTimestamp } from '../lib/utils/datetime';
+import { messageIdGt, readState, ackRoomOptimistic, getUnreadBannerInfo } from '../stores/readState';
+import { createViewportAck } from '../lib/viewportAck';
+import { dismissNewHeader, clearNewHeaderDismissed, newHeaderDismissed } from '../stores/newHeaderDismissed';
+import { getMessageBodyText, getSenderDisplay, messagePreviewText } from '../components/messageList';
+import { buildMentionCatalog, serializeDraft } from '../lib/utils/mentions';
+import type { ReplyTarget, TypingPerson } from '../components/room';
+import { createComposerAutoFocus } from '../lib/composerFocus';
 import { scrollToMessage } from '../lib/utils/messages';
 import { pinnedMessages } from '../stores/pinnedMessages';
+import { createAttachmentDraft } from '../lib/attachments/draft';
+import { allCustomEmojis } from '../stores/customEmojis';
+import { isRoomMuted, muteRoom, setRoomNotifyMode, unmuteRoom } from '../lib/roomNotify';
+import {
+  isMdViewport,
+  mobileMembersOpen,
+  setMobileMembersAvailable,
+  setMobileMembersOpen,
+} from '../stores/mobileShellLayout';
+import { zLayer } from '../theme/appChrome';
+import { instance } from '../stores/instance';
+import { isConnectedTo, joinVoiceRoom, voice, voiceStatesForRoom } from '../stores/voice';
+import { VoiceStage } from '../components/voice/VoiceStage';
+import { t } from '../i18n';
 
-const TYPING_DEBOUNCE_MS = 5000;
+/** How often we re-announce "still typing" while the user keeps going. Must sit above
+ * the server's 5s per-user rate limit (announcements inside it are dropped) and below
+ * the client's 10s TTL, so a continuous typist never flickers out. */
+const TYPING_PING_MS = 6000;
 
 const RoomPage: Component = () => {
   const params = useParams<{ roomId: string }>();
   const navigate = useNavigate();
   const [draft, setDraft] = createSignal('');
+  const attachmentDraft = createAttachmentDraft();
   const [cursorPos, setCursorPos] = createSignal(0);
+  /** One typed character from the "just start typing" shortcut. */
+  function appendToDraft(char: string) {
+    setDraft((d) => {
+      const next = d + char;
+      queueMicrotask(() => setCursorPos(next.length));
+      return next;
+    });
+  }
+
   const [inputRef, setInputRef] = createSignal<HTMLTextAreaElement | undefined>();
   const [maxMessageIdWhenEntered, setMaxMessageIdWhenEntered] = createSignal<string | null>(null);
+  /** Read cursor as it stood the moment we entered - frozen for the whole visit so the NEW
+   * divider doesn't computationally vanish as the live cursor advances from viewport-ack
+   * while still looking at it (Discord's divider stays put until you leave and come back). */
+  const [lastReadMessageIdWhenEntered, setLastReadMessageIdWhenEntered] = createSignal<string | null>(null);
+  /** Mirrors MessageList's own scroll-position tracking (same signal its "jump to present"
+   * button uses) so the banner only shows once there's unread content actually scrolled out
+   * of view - not for a couple of messages already visible at the bottom of the list. */
+  const [isNearBottom, setIsNearBottom] = createSignal(true);
   const [showAddPeople, setShowAddPeople] = createSignal(false);
-  const [searchQuery, setSearchQuery] = createSignal('');
   const [searchOpen, setSearchOpen] = createSignal(false);
+  /** Raw text in the header search box vs. the query the results panel is showing - typing
+   * doesn't re-run the search until Enter. */
+  const [searchDraft, setSearchDraft] = createSignal('');
+  const [searchQuery, setSearchQuery] = createSignal('');
   const [pinnedOpen, setPinnedOpen] = createSignal(false);
+  /** Measured height of the floating composer; the list pads itself by this much. */
+  const [composerHeight, setComposerHeight] = createSignal(0);
   const [renameModalOpen, setRenameModalOpen] = createSignal(false);
   const [replyToMessageId, setReplyToMessageId] = createSignal<string | null>(null);
+  const viewportAck = createViewportAck(() => params.roomId);
   let lastTypingSent = 0;
-  const leaveAckRef = { roomId: '' as string, toAck: '' as string };
-  let prevRoomIdRef = '';
   const room = () => rooms.rooms.find((r) => r.id === params.roomId);
   const pmOtherUserId = createMemo(() => {
     const r = room();
@@ -57,7 +106,7 @@ const RoomPage: Component = () => {
   });
   const name = () => {
     const r = room();
-    return r && auth.user?.id ? roomDisplayName(r, auth.user.id) : 'Conversation';
+    return r && auth.user?.id ? roomDisplayName(r, auth.user.id) : t('room.conversation');
   };
   const headerIcon = () => {
     const r = room();
@@ -69,34 +118,77 @@ const RoomPage: Component = () => {
   /** Placeholder: "Message @user" for PMs, "Message [room name]" for others */
   const inputPlaceholder = () => {
     const r = room();
-    if (!r || !auth.user?.id) return 'Message...';
+    if (!r || !auth.user?.id) return t('room.messagePlaceholder');
     const displayName = roomDisplayName(r, auth.user.id);
-    return r.type === 1 ? `Message @${displayName}` : `Message ${displayName}`;
+    return r.type === 1 ? t('room.messageUser', { name: displayName }) : t('room.messageRoom', { name: displayName });
   };
   const roomMessages = () => messages.byRoom[params.roomId] ?? [];
   const isGroupRoom = () => room()?.type === 2;
-  const typingUserIds = createMemo(() => {
-    typingVersion();
-    const roomId = params.roomId;
-    if (!roomId) return [];
-    const room = typing.byRoom[roomId];
-    if (!room) return [];
-    const now = Date.now();
-    const exclude = auth.user?.id;
-    return Object.entries(room)
-      .filter(([uid, exp]) => exp > now && uid !== exclude)
-      .map(([uid]) => uid);
-  });
+  /** Calls exist in PMs and group PMs (never in the notes room) when the instance has voice. */
+  const canCall = () => {
+    const r = room();
+    return instance.voiceEnabled && !!r && (r.type === 1 || r.type === 2) && !!auth.user?.id && !isNotesRoom(r, auth.user.id);
+  };
+  const callActive = () => !!voice.calls[params.roomId] || voiceStatesForRoom(params.roomId).length > 0;
+  /** The call view shows while a call runs here or we are connected to it. */
+  const showCallStage = () => canCall() && (callActive() || isConnectedTo(params.roomId));
+  function startCall(video: boolean) {
+    if (isConnectedTo(params.roomId)) return;
+    void joinVoiceRoom(params.roomId, { video }).catch((err) => console.error('Start call failed:', err));
+  }
 
-  const typingMessage = createMemo(() => {
-    const ids = typingUserIds();
-    if (ids.length === 0) return '';
-    if (ids.length === 1) {
-      const p = room()?.participants?.find((x) => x.id === ids[0]);
-      return `${p?.display_name ?? p?.username ?? 'Someone'} is typing...`;
-    }
-    return ids.length === 2 ? '2 people are typing...' : 'Several people are typing...';
+  /** Only a group PM has a member list, so only there does a left swipe open one. */
+  createEffect(() => {
+    setMobileMembersAvailable(isGroupRoom());
   });
+  onCleanup(() => {
+    setMobileMembersAvailable(false);
+    setMobileMembersOpen(false);
+  });
+  const mentionCatalog = createMemo(() =>
+    buildMentionCatalog({ participants: room()?.participants, emojis: allCustomEmojis() })
+  );
+  const replyTarget = createMemo((): ReplyTarget | null => {
+    const id = replyToMessageId();
+    if (!id) return null;
+    const target = roomMessages().find((m) => m.id === id);
+    const sender = target ? getSenderDisplay(target.sender_id, room()?.participants ?? [], auth.user?.id) : null;
+    return {
+      name: sender?.name ?? t('room.replyFallback'),
+      preview: target ? messagePreviewText(getMessageBodyText(target), room()?.participants, auth.user?.id, 120) : '',
+      onJump: target ? () => scrollToMessage(id) : undefined,
+      onCancel: () => setReplyToMessageId(null),
+    };
+  });
+  const unreadBannerInfo = () => {
+    if (newHeaderDismissed.byRoom[params.roomId]) return null;
+    if (isNearBottom()) return null;
+    const uid = auth.user?.id;
+    if (!uid) return null;
+    return getUnreadBannerInfo(
+      roomMessages(),
+      lastReadMessageIdWhenEntered(),
+      maxMessageIdWhenEntered(),
+      uid,
+      messages.hasMoreOlder[params.roomId] ?? false
+    );
+  };
+  function handleMarkAsRead() {
+    const roomId = params.roomId;
+    const list = roomMessages();
+    if (list.length === 0) return;
+    const snowflakes = list.filter((m) => /^\d+$/.test(m.id));
+    if (snowflakes.length === 0) return;
+    const latest = snowflakes.reduce((a, b) => (messageIdGt(b.id, a.id) ? b : a));
+    ackRoomOptimistic(roomId, latest.id);
+    dismissNewHeader(roomId);
+  }
+  const typingUsers = createMemo((): TypingPerson[] =>
+    getTypingUserIds(params.roomId, auth.user?.id).map((uid) => {
+      const s = getSenderDisplay(uid, room()?.participants, auth.user?.id);
+      return { id: uid, name: s.name, avatar: s.avatar };
+    })
+  );
 
   const pinnedIdsForRoom = createMemo(() => {
     const roomId = params.roomId;
@@ -116,48 +208,21 @@ const RoomPage: Component = () => {
     return found;
   });
 
-  const searchResults = createMemo(() => {
-    const q = searchQuery().trim().toLowerCase();
-    if (!q) return [];
-    const list: DecryptedMessage[] = roomMessages();
-    const r = room();
-    const participants = r?.participants ?? [];
-    const currentUserId = auth.user?.id;
-    const matches: {
-      id: string;
-      preview: string;
-      sender: string;
-      createdAt: string;
-    }[] = [];
-    for (const m of list) {
-      const text = getMessageBodyText(m);
-      if (!text.toLowerCase().includes(q)) continue;
-      const sender = getSenderDisplay(m.sender_id, participants, currentUserId);
-      matches.push({
-        id: m.id,
-        preview: text.length > 80 ? `${text.slice(0, 77)}…` : text,
-        sender: sender.name,
-        createdAt: formatMessageTimestamp(new Date(m.created_at)),
-      });
-    }
-    return matches.reverse();
-  });
-
   function onInput(e: InputEvent) {
     const el = e.target as HTMLTextAreaElement;
     setDraft(el.value);
     setCursorPos(el.selectionStart);
     const now = Date.now();
-    if (now - lastTypingSent >= TYPING_DEBOUNCE_MS) {
+    if (now - lastTypingSent >= TYPING_PING_MS) {
       lastTypingSent = now;
       sendTyping(params.roomId).catch(() => {});
     }
   }
 
-  function onInsertMention(queryStart: number, cursorEnd: number, userId: string) {
+  function onInsertMention(queryStart: number, cursorEnd: number, insertText: string) {
     const before = draft().slice(0, queryStart);
     const after = draft().slice(cursorEnd);
-    const insert = `<@${userId}>`;
+    const insert = insertText;
     setDraft(before + insert + after);
     setCursorPos(before.length + insert.length);
     queueMicrotask(() => {
@@ -190,10 +255,37 @@ const RoomPage: Component = () => {
     }
   });
 
-  // Reset maxMessageIdWhenEntered when switching rooms; set when messages first load
+  // Reset maxMessageIdWhenEntered when switching rooms; set when messages first load.
+  // Also snapshot the read cursor as of THIS instant (untracked - a one-time read, not a
+  // subscription) so later reactive advances to the live cursor (from this visit's own
+  // viewport-ack) don't feed back into the divider computation.
+  //
+  // Gated on auth.hydrated (tracked): hydrateFromReady populates rooms/readState and only
+  // THEN flips this true, all synchronously in one call - but on a fresh page load this
+  // effect's first run can land before that WS round trip finishes, while both stores are
+  // still empty. Since the actual capture is untracked, that premature run would freeze the
+  // snapshot at null forever (no unread ever looked read), showing the NEW divider on every
+  // single visit regardless of real read state. Waiting for hydrated lets the effect re-run
+  // once real data exists, instead of only ever seeing the pre-hydration snapshot.
   createEffect(() => {
     const roomId = params.roomId;
+    const isHydrated = auth.hydrated;
     setMaxMessageIdWhenEntered(null);
+    if (!isHydrated) {
+      setLastReadMessageIdWhenEntered(null);
+      return;
+    }
+    untrack(() => {
+      const r = rooms.rooms.find((x) => x.id === roomId);
+      setLastReadMessageIdWhenEntered(readState.byRoom[roomId]?.lastReadMessageId ?? r?.last_read_message_id ?? null);
+    });
+  });
+
+  // Without this, the previous room's scroll position would leak into the new room until
+  // its own first scroll event, letting the banner flash on/off for a beat after switching.
+  createEffect(() => {
+    void params.roomId;
+    setIsNearBottom(true);
   });
   createEffect(() => {
     const roomId = params.roomId;
@@ -221,153 +313,43 @@ const RoomPage: Component = () => {
     const roomId = params.roomId;
     if (stargate.ready && roomId) {
       subscribe(roomId, undefined);
-      return () => unsubscribe(roomId, undefined);
+      onCleanup(() => unsubscribe(roomId, undefined));
     }
   });
 
-  // Focus input when entering room (defer so input is mounted)
-  createEffect(() => {
-    const roomId = params.roomId;
-    const el = inputRef();
-    if (room() && roomId && el) {
-      queueMicrotask(() => el.focus());
-    }
-  });
-
-  // Keep leaveAckRef updated so we can ack on unmount
-  createEffect(() => {
-    const roomId = params.roomId;
-    if (!roomId) {
-      leaveAckRef.roomId = '';
-      leaveAckRef.toAck = '';
-      return;
-    }
-    const r = rooms.rooms.find((x) => x.id === roomId);
-    const lastRead = readState.byRoom[roomId]?.lastReadMessageId ?? r?.last_read_message_id ?? null;
-    const list = messages.byRoom[roomId] ?? [];
-    const snowflakes = list.filter((m) => /^\d+$/.test(m.id));
-    let toAck = '';
-    if (snowflakes.length > 0) {
-      const latest = snowflakes.reduce((a, b) => (messageIdGt(b.id, a.id) ? b : a));
-      if (messageIdGt(latest.id, lastRead ?? '0')) toAck = latest.id;
-    } else if (r?.last_message_id && messageIdGt(r.last_message_id, lastRead ?? '0')) {
-      toAck = r.last_message_id;
-    }
-    leaveAckRef.roomId = roomId;
-    leaveAckRef.toAck = toAck;
-  });
-
-  // When switching to a different room, ack the room we're leaving so unread clears immediately
-  createEffect(() => {
-    const roomId = params.roomId;
-    if (!roomId) {
-      prevRoomIdRef = '';
-      return;
-    }
-    const prevRoomId = prevRoomIdRef;
-    prevRoomIdRef = roomId;
-    if (!prevRoomId || prevRoomId === roomId) return;
-    const r = rooms.rooms.find((x) => x.id === prevRoomId);
-    const lastRead = readState.byRoom[prevRoomId]?.lastReadMessageId ?? r?.last_read_message_id ?? null;
-    const list = messages.byRoom[prevRoomId] ?? [];
-    const snowflakes = list.filter((m) => /^\d+$/.test(m.id));
-    let toAck = '';
-    if (snowflakes.length > 0) {
-      const latest = snowflakes.reduce((a, b) => (messageIdGt(b.id, a.id) ? b : a));
-      if (messageIdGt(latest.id, lastRead ?? '0')) toAck = latest.id;
-    } else if (r?.last_message_id && messageIdGt(r.last_message_id, lastRead ?? '0')) {
-      toAck = r.last_message_id;
-    }
-    clearNewHeaderDismissed(prevRoomId);
-    if (toAck) {
-      setReadState('byRoom', prevRoomId, { lastReadMessageId: toAck, mentionCount: 0 });
-      ackRoom(prevRoomId, toAck).catch(() => {});
-    }
+  createComposerAutoFocus({
+    inputRef,
+    focusKey: () => (room() ? params.roomId : undefined),
+    onType: appendToDraft,
   });
 
   onCleanup(() => {
-    clearPendingAck();
-    if (leaveAckRef.roomId) clearNewHeaderDismissed(leaveAckRef.roomId);
-    if (leaveAckRef.roomId && leaveAckRef.toAck) {
-      setReadState('byRoom', leaveAckRef.roomId, {
-        lastReadMessageId: leaveAckRef.toAck,
-        mentionCount: 0,
-      });
-      ackRoom(leaveAckRef.roomId, leaveAckRef.toAck).catch(() => {});
-    }
-  });
-
-  // Update pending ack for page unload (refresh/close) - keepalive survives teardown
-  createEffect(() => {
-    const roomId = params.roomId;
-    const list = roomMessages();
-    const r = room();
-    if (!roomId || list.length === 0) {
-      clearPendingAck();
-      return;
-    }
-    const snowflakes = list.filter((m) => /^\d+$/.test(m.id));
-    if (snowflakes.length === 0) return;
-    const latest = snowflakes.reduce((a, b) => (messageIdGt(b.id, a.id) ? b : a));
-    const lastRead = readState.byRoom[roomId]?.lastReadMessageId ?? r?.last_read_message_id ?? null;
-    if (messageIdGt(latest.id, lastRead ?? '0')) {
-      setPendingAck(roomId, latest.id);
-    } else {
-      clearPendingAck();
-    }
-  });
-
-  onMount(() => {
-    const onBeforeUnload = () => {
-      const p = getPendingAck();
-      if (p) ackRoomKeepalive(p.roomId, p.messageId);
-    };
-    window.addEventListener('beforeunload', onBeforeUnload);
-    return () => window.removeEventListener('beforeunload', onBeforeUnload);
-  });
-
-  onMount(() => {
-    function handleKeyDown(e: KeyboardEvent) {
-      const target = e.target as Node;
-      if (
-        target instanceof HTMLInputElement ||
-        target instanceof HTMLTextAreaElement ||
-        (target instanceof HTMLElement && target.isContentEditable)
-      ) return;
-      if (target && document.body.contains(target)) {
-        const el = target instanceof HTMLElement ? target : target.parentElement;
-        if (el?.closest('[role="dialog"]') || el?.closest('[data-modal]')) return;
-      }
-      if (e.ctrlKey || e.metaKey || e.altKey) return;
-      const key = e.key;
-      if (key.length !== 1 || key.charCodeAt(0) < 32) return;
-      const input = inputRef();
-      if (!input || input.disabled) return;
-      e.preventDefault();
-      input.focus();
-      setDraft((d) => {
-        const next = d + key;
-        queueMicrotask(() => setCursorPos(next.length));
-        return next;
-      });
-    }
-    document.addEventListener('keydown', handleKeyDown);
-    onCleanup(() => document.removeEventListener('keydown', handleKeyDown));
+    clearNewHeaderDismissed(params.roomId);
   });
 
   async function handleSubmit(e: Event) {
     e.preventDefault();
-    const text = draft().trim();
-    if (!text || isSending()) return;
+    const raw = draft().trim();
+    if ((!raw && attachmentDraft.items().length === 0) || isSending()) return;
+    // @username / :emoji: in the draft become <@id> / <:name:id> (or the Unicode emoji).
+    const text = raw ? serializeDraft(raw, mentionCatalog()) : '';
     if (auth.user?.id) removeTyping(params.roomId, auth.user.id);
+    // Sending ends this typing run; the next keystroke should announce immediately.
+    lastTypingSent = 0;
+    const files = attachmentDraft.take();
+    const replyTo = replyToMessageId() ?? undefined;
+    setDraft('');
+    setReplyToMessageId(null);
     try {
-      await sendMessage(params.roomId, text, replyToMessageId() ?? undefined);
-      setDraft('');
-      setReplyToMessageId(null);
+      await sendMessage(params.roomId, text, replyTo, files);
       inputRef()?.focus();
       dismissNewHeader(params.roomId);
     } catch (err) {
       console.error('Send failed:', err);
+      // Give the user their message back to retry rather than silently losing it.
+      setDraft(raw);
+      attachmentDraft.restore(files);
+      attachmentDraft.setError(err instanceof Error ? err.message : t('room.sendFailed'));
     }
   }
 
@@ -375,13 +357,20 @@ const RoomPage: Component = () => {
     scrollToMessage(messageId);
   }
 
-  function handleOpenSearch() {
+  function handleSearchSubmit(raw: string) {
+    setSearchQuery(raw);
+    if (!raw) {
+      setSearchOpen(false);
+      return;
+    }
     setSearchOpen(true);
     setPinnedOpen(false);
   }
 
   function handleCloseSearch() {
     setSearchOpen(false);
+    setSearchDraft('');
+    setSearchQuery('');
   }
 
   function handleSelectPinnedMessage(messageId: string) {
@@ -435,21 +424,42 @@ const RoomPage: Component = () => {
         headerIcon={headerIcon()}
         name={name()}
         pmOtherUserId={pmOtherUserId()}
+        e2ee={room()?.type === 1 || (room()?.type === 2 && room()?.e2ee_enabled !== false)}
         isGroup={room()?.type === 2}
         messageCompact={!!settings.messageCompact}
         onToggleCompact={() => setMessageCompact(!settings.messageCompact)}
         hasPinned={pinnedMessagesForRoom().length > 0}
         pinnedOpen={pinnedOpen()}
         onTogglePinned={handleTogglePinned}
-        searchQuery={searchQuery()}
-        onSearchChange={setSearchQuery}
-        onSearchFocus={handleOpenSearch}
+        searchQuery={searchDraft()}
+        onSearchQueryChange={setSearchDraft}
+        onSearchSubmit={handleSearchSubmit}
+        searchPeople={room()?.participants}
         membersPanelOpen={!!(settings as SettingsData).membersPanelOpen}
         onToggleMembers={() => setMembersPanelOpen(!(settings as SettingsData).membersPanelOpen)}
         onAddPeople={() => setShowAddPeople(true)}
         isCreator={room()?.type === 2 && !!room()?.creator_id && room()?.creator_id !== '0' && room()?.creator_id === auth.user?.id}
         onOpenSettings={() => setRenameModalOpen(true)}
+        notifyMode={room()?.notify_mode ?? 0}
+        muted={isRoomMuted(room())}
+        onSetNotifyMode={(mode) => void setRoomNotifyMode(params.roomId, mode).catch((err) => console.error('Set notify mode failed:', err))}
+        onMute={(ms) => void muteRoom(params.roomId, ms).catch((err) => console.error('Mute room failed:', err))}
+        onUnmute={() => void unmuteRoom(params.roomId).catch((err) => console.error('Unmute room failed:', err))}
+        onStartCall={canCall() ? startCall : undefined}
+        callActive={callActive()}
       />
+      <Show when={showCallStage()}>
+        <div class="h-[42%] min-h-[240px] shrink-0 border-b border-border">
+          <VoiceStage
+            roomId={params.roomId}
+            participants={room()?.participants ?? []}
+            roomName={name()}
+            kind="call"
+            layout="panel"
+          />
+        </div>
+      </Show>
+      <UnreadBanner info={unreadBannerInfo()} onMarkAsRead={handleMarkAsRead} />
       <RenameGroupModal
         open={renameModalOpen()}
         currentName={room()?.name ?? ''}
@@ -464,7 +474,7 @@ const RoomPage: Component = () => {
         onClose={() => setShowAddPeople(false)}
       />
       <Show when={pinnedOpen()}>
-        <div class="fixed md:absolute top-14 right-4 z-40">
+        <div class={`fixed md:absolute top-14 end-4 ${zLayer.drawer}`}>
           <RoomPinnedPanel
             roomId={params.roomId}
             messages={pinnedMessagesForRoom()}
@@ -473,11 +483,15 @@ const RoomPage: Component = () => {
           />
         </div>
       </Show>
-      <div class="flex-1 flex min-h-0 overflow-hidden">
-        <div class="flex-1 flex flex-col min-h-0 min-w-0">
+      <div class="relative flex-1 flex min-h-0 overflow-hidden">
+        {/* Positioning context for the floating composer; see RoomComposerDock. */}
+        <div
+          class="relative flex-1 flex flex-col min-h-0 min-w-0"
+          style={{ '--composer-height': `${composerHeight()}px` }}
+        >
           <Show when={!room()}>
             <div class="flex-1 flex items-center justify-center p-8 text-muted-foreground">
-              <p>Conversation not found.</p>
+              <p>{t('room.notFound')}</p>
             </div>
           </Show>
           <Show when={room()}>
@@ -489,109 +503,74 @@ const RoomPage: Component = () => {
                 roomName={room()?.name}
                 participants={room()?.participants}
                 e2eeEnabled={room()?.e2ee_enabled}
+                onMessageUser={(userId) => {
+                  createPM(userId)
+                    .then((r) => navigate(`/rooms/${r.id}`))
+                    .catch((err) => console.error(err));
+                }}
                 loadingOlder={messages.loadingOlder[params.roomId]}
                 hasMoreOlder={messages.hasMoreOlder[params.roomId]}
                 onLoadOlder={(getScroll) => loadOlderMessages(params.roomId, getScroll)}
-                lastReadMessageId={
-                  readState.byRoom[params.roomId]?.lastReadMessageId ??
-                  room()?.last_read_message_id ??
-                  null
-                }
+                lastReadMessageId={lastReadMessageIdWhenEntered()}
                 maxMessageIdWhenEntered={maxMessageIdWhenEntered()}
                 onReply={handleReplyToMessage}
+                onBottomVisibleMessageChange={viewportAck.setBottomVisibleMessageId}
+                onNearBottomChange={setIsNearBottom}
               />
             }>
               <MessageSkeleton />
             </Show>
-            <div>
-              <Show when={replyToMessageId()}>
-                {(() => {
-                  const targetId = replyToMessageId();
-                  const list = roomMessages();
-                  const target = list.find((m) => m.id === targetId) as DecryptedMessage | undefined;
-                  if (!target) {
-                    return (
-                      <div class={`flex items-center justify-between gap-2 px-3 pb-1 pt-2 text-xs text-muted-foreground ${appContentBand}`}>
-                        <span class="truncate">
-                          Replying to message <span class="font-mono text-[10px]">#{targetId}</span>
-                        </span>
-                        <button
-                          type="button"
-                          class="text-[11px] text-muted-foreground hover:text-foreground"
-                          onClick={() => setReplyToMessageId(null)}
-                        >
-                          Cancel
-                        </button>
-                      </div>
-                    );
-                  }
-                  const sender = getSenderDisplay(
-                    target.sender_id,
-                    room()?.participants ?? [],
-                    auth.user?.id
-                  );
-                  const text = getMessageBodyText(target);
-                  const preview =
-                    text.length > 120 ? `${text.slice(0, 117)}…` : text;
-                  return (
-                    <div class={`flex items-start justify-between gap-2 px-3 pb-1 pt-2 text-xs ${appContentBand}`}>
-                      <div class="min-w-0">
-                        <p class="text-[11px] text-muted-foreground mb-0.5">
-                          Replying to <span class="text-foreground font-medium">{sender.name}</span>
-                        </p>
-                        <p class="text-[12px] text-muted-foreground truncate">{preview}</p>
-                      </div>
-                      <button
-                        type="button"
-                        class="mt-0.5 text-[11px] text-muted-foreground hover:text-foreground shrink-0"
-                        onClick={() => {
-                          if (targetId) scrollToMessage(targetId);
-                        }}
-                      >
-                        Jump
-                      </button>
-                      <button
-                        type="button"
-                        class="mt-0.5 text-[11px] text-muted-foreground hover:text-foreground shrink-0"
-                        onClick={() => setReplyToMessageId(null)}
-                      >
-                        Cancel
-                      </button>
-                    </div>
-                  );
-                })()}
-              </Show>
-              <RoomMessageInput
-                draft={draft()}
-                onInput={onInput}
-                onSubmit={handleSubmit}
-                placeholder={inputPlaceholder()}
-                disabled={isSending()}
-                inputRef={setInputRef}
-                typingMessage={typingMessage()}
-                showTyping={typingUserIds().length > 0}
-                participants={room()?.participants}
-                currentUserId={auth.user?.id}
-                cursorPos={cursorPos()}
-                onInsertMention={onInsertMention}
-                onCursorChange={setCursorPos}
-              />
-            </div>
+            <RoomComposerDock onHeightChange={setComposerHeight}>
+            <RoomMessageInput
+              draft={draft()}
+              onInput={onInput}
+              onSubmit={handleSubmit}
+              placeholder={inputPlaceholder()}
+              disabled={isSending()}
+              inputRef={setInputRef}
+              typingUsers={typingUsers()}
+              participants={room()?.participants}
+              currentUserId={auth.user?.id}
+              canMentionEveryone={isGroupRoom()}
+              cursorPos={cursorPos()}
+              onInsertMention={onInsertMention}
+              onCursorChange={setCursorPos}
+              mentionCatalog={mentionCatalog()}
+              replyTo={replyTarget()}
+              attachments={attachmentDraft.items()}
+              onAddFiles={(files) => void attachmentDraft.addFiles(files)}
+              onRemoveAttachment={attachmentDraft.remove}
+              attachmentError={attachmentDraft.error()}
+              customEmojis={allCustomEmojis()}
+            />
+            </RoomComposerDock>
           </Show>
         </div>
+        {/* Tapping the chat closes the swiped-in member drawer. */}
+        <Show when={!isMdViewport() && mobileMembersOpen()}>
+          <button
+            type="button"
+            class="absolute inset-0 z-20 bg-black/40 md:hidden"
+            aria-label={t('room.hideMembers')}
+            onClick={() => setMobileMembersOpen(false)}
+          />
+        </Show>
         <Show
           when={
             room() &&
-            (isGroupRoom()
-              ? (settings as SettingsData).membersPanelOpen || searchOpen()
-              : searchOpen())
+            (isMdViewport()
+              ? isGroupRoom()
+                ? (settings as SettingsData).membersPanelOpen || searchOpen()
+                : searchOpen()
+              : isGroupRoom())
           }
         >
           <Show
-            when={searchOpen()}
+            when={isMdViewport() && searchOpen()}
             fallback={
               <Show when={isGroupRoom()}>
                 <RoomMembersSidebar
+                  mobileOpen={mobileMembersOpen()}
                   participants={room()!.participants ?? []}
                   currentUserId={auth.user?.id}
                   onMessageUser={(userId) => {
@@ -605,10 +584,10 @@ const RoomPage: Component = () => {
             }
           >
             <RoomSearchPanel
+              roomId={params.roomId}
               query={searchQuery()}
-              onQueryChange={setSearchQuery}
+              participants={room()?.participants}
               onClose={handleCloseSearch}
-              results={searchResults()}
               onSelectMessage={handleSelectSearchedMessage}
             />
           </Show>

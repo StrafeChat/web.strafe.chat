@@ -1,9 +1,15 @@
 export type { SectionId, SettingsNavItem } from './types.js';
-export { formatDiscriminator, SECTION_TITLES, ACCOUNT_ITEMS, APP_ITEMS } from './types.js';
-export { SettingsSidebar } from './SettingsSidebar';
-export type { SettingsSidebarProps } from './SettingsSidebar';
+export { formatDiscriminator, sectionTitle, sectionDescription, ACCOUNT_ITEMS, APP_ITEMS } from './types.js';
+export { SettingsShell, SettingsNav, settingsNavButtonBase } from './SettingsShell';
+export type { SettingsShellProps, SettingsNavProps, SettingsNavGroup, SettingsNavItemDef } from './SettingsShell';
 export { SettingsPanel } from './SettingsPanel';
 export type { SettingsPanelProps } from './SettingsPanel';
 export { ProfileSettingsPage } from './ProfileSettingsPage';
 export type { ProfileSettingsPageProps } from './ProfileSettingsPage';
 export { AppearanceSettingsPage } from './AppearanceSettingsPage';
+export { LanguageSettingsPage } from './LanguageSettingsPage';
+export { DevicesSettingsPage } from './DevicesSettingsPage';
+export { NotificationsSettingsPage } from './NotificationsSettingsPage';
+export { VoiceVideoSettingsPage } from './VoiceVideoSettingsPage';
+export { AccessibilitySettingsPage } from './AccessibilitySettingsPage';
+export { KeybindsSettingsPage } from './KeybindsSettingsPage';

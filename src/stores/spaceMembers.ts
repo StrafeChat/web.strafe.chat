@@ -1,31 +1,66 @@
 import { createStore } from 'solid-js/store';
-import type { RoomParticipant } from '../api/rooms';
-import { listSpaceMembers } from '../api/spaces';
+import { listSpaceMembers, type SpaceMember } from '../api/spaces';
 import { onStargateEvent } from '../services/stargate/client';
 import { stargateEventInnerRecord } from './spaceSync';
 
+/**
+ * Space member lists, fetched once per space per gateway session and then kept current
+ * by SPACE_MEMBER_ADD / REMOVE / UPDATE events - the same idea as a Discord client's
+ * member cache (Discord goes further and only streams the visible slice of the sidebar;
+ * spaces here are small enough that one list per space is the right trade).
+ *
+ * `loadedAt` is the freshness marker: unset means "never fetched, or stale since the last
+ * reconnect" (see markSpaceMembersStale), so a visit fetches; set means the cached list
+ * is authoritative and a visit costs nothing.
+ */
 export interface SpaceMembersState {
-  bySpaceId: Record<string, RoomParticipant[]>;
+  bySpaceId: Record<string, SpaceMember[]>;
   loading: Record<string, boolean>;
+  loadedAt: Record<string, number>;
 }
 
 export const [spaceMembers, setSpaceMembers] = createStore<SpaceMembersState>({
   bySpaceId: {},
   loading: {},
+  loadedAt: {},
 });
 
-export async function loadSpaceMembers(spaceId: string): Promise<void> {
-  if (!spaceId) return;
-  setSpaceMembers('loading', spaceId, true);
-  try {
-    const list = await listSpaceMembers(spaceId);
-    setSpaceMembers('bySpaceId', spaceId, list);
-  } finally {
-    setSpaceMembers('loading', spaceId, false);
-  }
+const inflight = new Map<string, Promise<void>>();
+
+/** Fetch a space's members unless the cached list is still authoritative. Concurrent
+ * callers share one request. */
+export function ensureSpaceMembers(spaceId: string, opts: { force?: boolean } = {}): Promise<void> {
+  if (!spaceId) return Promise.resolve();
+  if (!opts.force && spaceMembers.loadedAt[spaceId]) return Promise.resolve();
+  const pending = inflight.get(spaceId);
+  if (pending) return pending;
+  const p = (async () => {
+    setSpaceMembers('loading', spaceId, true);
+    try {
+      const list = await listSpaceMembers(spaceId);
+      setSpaceMembers('bySpaceId', spaceId, list);
+      setSpaceMembers('loadedAt', spaceId, Date.now());
+    } finally {
+      setSpaceMembers('loading', spaceId, false);
+      inflight.delete(spaceId);
+    }
+  })();
+  inflight.set(spaceId, p);
+  return p;
 }
 
-export function upsertSpaceMember(spaceId: string, member: RoomParticipant): void {
+/** Unconditional refresh - for explicit user actions whose result must show right away. */
+export function loadSpaceMembers(spaceId: string): Promise<void> {
+  return ensureSpaceMembers(spaceId, { force: true });
+}
+
+/** After a gateway (re)connect nothing that happened while offline was seen; keep the
+ * lists for instant rendering but make the next visit re-fetch them. */
+export function markSpaceMembersStale(): void {
+  setSpaceMembers('loadedAt', {});
+}
+
+export function upsertSpaceMember(spaceId: string, member: SpaceMember): void {
   if (!spaceId || !member.id) return;
   setSpaceMembers('bySpaceId', spaceId, (prev) => {
     const list = prev ?? [];
@@ -46,13 +81,16 @@ function roleIdsFromPayload(d: Record<string, unknown>): string[] | undefined {
 export function initSpaceMembersHandlers(): () => void {
   return onStargateEvent((event) => {
     if (event.t === 'SPACE_ROLE_DELETE') {
+      // Drop the role from every member holding it - no refetch needed.
       const d = stargateEventInnerRecord(event);
       const spaceId =
         (d?.space_id != null ? String(d.space_id) : null) ??
         (event.space_id != null ? String(event.space_id) : null);
-      if (spaceId) {
-        loadSpaceMembers(spaceId).catch(() => {});
-      }
+      const roleId = d?.role_id != null ? String(d.role_id) : null;
+      if (!spaceId || !roleId) return;
+      setSpaceMembers('bySpaceId', spaceId, (prev) =>
+        (prev ?? []).map((m) => (m.roles?.includes(roleId) ? { ...m, roles: m.roles.filter((r) => r !== roleId) } : m))
+      );
       return;
     }
 
@@ -65,7 +103,7 @@ export function initSpaceMembersHandlers(): () => void {
       const id = d.id != null ? String(d.id) : null;
       if (!id) return;
       const roles = roleIdsFromPayload(d);
-      const member: RoomParticipant & { roles?: string[] } = {
+      const member: SpaceMember = {
         id,
         username: typeof d.username === 'string' ? d.username : '',
         discriminator:
@@ -76,13 +114,28 @@ export function initSpaceMembersHandlers(): () => void {
               : undefined,
         display_name: typeof d.display_name === 'string' ? d.display_name : '',
         avatar: typeof d.avatar === 'string' ? d.avatar : undefined,
+        banner: typeof d.banner === 'string' ? d.banner : undefined,
+        bio: typeof d.bio === 'string' ? d.bio : undefined,
+        about_me: typeof d.about_me === 'string' ? d.about_me : undefined,
         presence:
           d.presence && typeof d.presence === 'object'
             ? (d.presence as import('../api/relationships').UserPresence)
             : undefined,
+        joined_at: typeof d.joined_at === 'string' ? d.joined_at : new Date().toISOString(),
         ...(roles ? { roles } : {}),
       };
       upsertSpaceMember(spaceId, member);
+      return;
+    }
+
+    if (event.t === 'SPACE_MEMBER_REMOVE') {
+      const d = stargateEventInnerRecord(event);
+      const spaceId =
+        (d?.space_id != null ? String(d.space_id) : null) ??
+        (event.space_id != null ? String(event.space_id) : null);
+      const uid = d?.user_id != null ? String(d.user_id) : null;
+      if (!spaceId || !uid) return;
+      setSpaceMembers('bySpaceId', spaceId, (prev) => (prev ?? []).filter((m) => m.id !== uid));
       return;
     }
 
@@ -104,4 +157,3 @@ export function initSpaceMembersHandlers(): () => void {
     }
   });
 }
-

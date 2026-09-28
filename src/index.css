@@ -2,34 +2,43 @@
 
 /* Strafe design system – aligned with strafe_chat globals */
 @theme {
-  --color-background: hsl(0 0% 6%);
-  --color-foreground: hsl(0 0% 95%);
+  --color-background: hsl(220 12% 7%);
+  --color-foreground: hsl(210 20% 96%);
 
-  --color-card: hsl(0 0% 9%);
-  --color-card-foreground: hsl(0 0% 95%);
+  --color-card: hsl(220 10% 10%);
+  --color-card-foreground: hsl(210 20% 96%);
 
-  --color-popover: hsl(0 0% 9%);
-  --color-popover-foreground: hsl(0 0% 95%);
+  --color-popover: hsl(220 10% 11%);
+  --color-popover-foreground: hsl(210 20% 96%);
 
-  --color-primary: hsl(118 28% 45%);
-  --color-primary-foreground: hsl(0 0% 0%);
-  --color-primary-hover: hsl(118 28% 40%);
+  /* Brand green — text on primary uses soft white, not black, for readability */
+  --color-primary: hsl(142 32% 46%);
+  --color-primary-foreground: hsl(150 25% 97%);
+  --color-primary-hover: hsl(142 32% 40%);
 
-  --color-secondary: hsl(0 0% 18%);
-  --color-secondary-foreground: hsl(0 0% 95%);
+  --color-secondary: hsl(220 8% 16%);
+  --color-secondary-foreground: hsl(210 18% 94%);
 
-  --color-muted: hsl(0 0% 18%);
-  --color-muted-foreground: hsl(0 0% 75%);
+  --color-muted: hsl(220 8% 16%);
+  --color-muted-foreground: hsl(215 14% 72%);
 
-  --color-accent: hsl(0 0% 18%);
-  --color-accent-foreground: hsl(0 0% 95%);
+  --color-accent: hsl(220 10% 17%);
+  --color-accent-foreground: hsl(210 20% 96%);
 
-  --color-destructive: hsl(0 62% 30%);
-  --color-destructive-foreground: hsl(0 0% 95%);
+  --color-destructive: hsl(0 55% 42%);
+  --color-destructive-foreground: hsl(0 0% 98%);
 
-  --color-border: hsl(0 0% 18%);
-  --color-input: hsl(0 0% 18%);
-  --color-ring: hsl(118 28% 45%);
+  --color-border: hsl(220 8% 20%);
+  --color-input: hsl(220 8% 16%);
+  --color-ring: hsl(142 32% 50%);
+
+  /* Slightly softer corners app-wide */
+  --radius-sm: 0.5rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
+  --radius-xl: 1.125rem;
+  --radius-2xl: 1.375rem;
+  --radius-3xl: 1.75rem;
 
   /* Wordmark / marketing (Outfit from Google Fonts in index.html) */
   --font-brand: 'Outfit', ui-sans-serif, system-ui, sans-serif;
@@ -71,62 +80,92 @@
   background: transparent;
 }
 
-/* User settings modal */
-@keyframes settings-overlay-in {
+/* Message jumped to via a reply reference / pinned panel / search result */
+@keyframes msg-jump-flash {
+  0% { background-color: color-mix(in srgb, var(--color-primary) 22%, transparent); }
+  100% { background-color: transparent; }
+}
+.msg-jump-flash {
+  animation: msg-jump-flash 1.6s ease-out forwards;
+}
+
+/* Appearance setting: transparency effects off -> flat, opaque panels */
+html.no-glass [class*='backdrop-blur'] {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+html.no-glass [class*='bg-card/'] {
+  background-color: var(--color-card) !important;
+}
+html.no-glass [class*='bg-popover/'] {
+  background-color: var(--color-popover) !important;
+}
+
+/* Appearance setting: reduce motion */
+html.reduce-motion *,
+html.reduce-motion *::before,
+html.reduce-motion *::after {
+  animation-duration: 0.001ms !important;
+  animation-iteration-count: 1 !important;
+  transition-duration: 0.001ms !important;
+  scroll-behavior: auto !important;
+}
+
+/* Dialogs (ResponsiveDialog, SettingsShell). The "in" animations deliberately have no
+   fill-mode: a retained `transform: scale(1)` would turn the panel into the containing
+   block for any `position: fixed` descendant (date picker sheet, inline menus). */
+@keyframes dialog-overlay-in {
   from { opacity: 0; }
   to { opacity: 1; }
 }
-@keyframes settings-overlay-out {
+@keyframes dialog-overlay-out {
   from { opacity: 1; }
   to { opacity: 0; }
 }
-@keyframes settings-panel-in {
+@keyframes dialog-panel-in {
   from { opacity: 0; transform: scale(0.97); }
   to { opacity: 1; transform: scale(1); }
 }
-@keyframes settings-panel-out {
+@keyframes dialog-panel-out {
   from { opacity: 1; transform: scale(1); }
   to { opacity: 0; transform: scale(0.97); }
 }
-.settings-overlay-in { animation: settings-overlay-in 0.2s ease-out forwards; }
-.settings-overlay-out { animation: settings-overlay-out 0.2s ease-out forwards; }
-.settings-panel-in { animation: settings-panel-in 0.22s ease-out forwards; }
-.settings-panel-out { animation: settings-panel-out 0.2s ease-out forwards; }
-
-/* Login/Register background turtle animation */
-@keyframes turtleFloat {
-  0% {
-    transform: translate3d(0px, 0px, 0) rotate(0deg);
-  }
-  50% {
-    transform: translate3d(18px, -42px, 0) rotate(8deg);
-  }
-  100% {
-    transform: translate3d(0px, 0px, 0) rotate(0deg);
-  }
+@keyframes dialog-sheet-in {
+  from { opacity: 0; transform: translateY(1rem); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.dialog-overlay-in { animation: dialog-overlay-in 0.2s ease-out; }
+.dialog-overlay-out { animation: dialog-overlay-out 0.2s ease-out forwards; }
+.dialog-panel-in { animation: dialog-panel-in 0.22s ease-out; }
+.dialog-panel-out { animation: dialog-panel-out 0.2s ease-out forwards; }
+/* Bottom sheets slide up instead of scaling in. */
+@media (max-width: 767.98px) {
+  .dialog-panel-in.dialog-sheet { animation-name: dialog-sheet-in; }
 }
 
-.turtle-bg {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  overflow: hidden;
+/* Emoji drawn from an image provider (Twemoji etc.): inline, sized to the text, vertically
+   centred on the x-height like a native glyph would be. Jumbo = an emoji-only message. */
+img.emoji {
+  display: inline-block;
+  width: 1.375em;
+  height: 1.375em;
+  vertical-align: -0.3em;
+  margin: 0 0.04em;
+  object-fit: contain;
 }
-
-.turtle-emoji {
-  position: absolute;
-  /* Tint turtles with brand primary (landing hero glow uses the same token) */
-  color: color-mix(in srgb, var(--color-primary) 55%, var(--color-muted));
-  filter: drop-shadow(0 12px 20px rgba(0, 0, 0, 0.4));
-  user-select: none;
-  -webkit-user-select: none;
+img.emoji.emoji-jumbo,
+.emoji-native.emoji-jumbo {
+  width: 3rem;
+  height: 3rem;
+  vertical-align: middle;
+  margin: 0.125rem 0.1rem;
 }
-
-.turtle-float {
-  animation-name: turtleFloat;
-  animation-timing-function: ease-in-out;
-  animation-iteration-count: infinite;
-  will-change: transform;
+.emoji-native.emoji-jumbo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2.5rem;
+  line-height: 1;
 }
 
 /* DatePicker year list — match app scrollbars, avoid “blank” native select look */
@@ -139,7 +178,7 @@
 }
 .datepicker-year-scroller::-webkit-scrollbar-thumb {
   background: hsl(0 0% 28% / 0.55);
-  border-radius: 9999px;
+  border-radius: 4px;
 }
 
 /* DatePicker: true geometric center + slight optical nudge (digits often sit high in the em box) */
@@ -148,4 +187,10 @@
   margin: 0;
   padding: 0;
   transform: translate(-50%, calc(-50% + 1px));
+}
+
+/* Accessibility: underline every link (settings → Accessibility) */
+html.underline-links a {
+  text-decoration: underline;
+  text-underline-offset: 2px;
 }

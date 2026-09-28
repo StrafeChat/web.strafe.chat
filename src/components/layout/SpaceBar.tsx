@@ -1,6 +1,6 @@
 import type { Component } from 'solid-js';
 import { createSignal, For, Show } from 'solid-js';
-import { A, useLocation, useMatch } from '@solidjs/router';
+import { A, useLocation } from '@solidjs/router';
 import { lastVisited } from '../../stores/lastVisited';
 import { spaces } from '../../stores/spaces';
 import { lastSpaceRoom } from '../../stores/lastSpaceRoom';
@@ -8,10 +8,12 @@ import { Tooltip } from '../ui/Tooltip';
 import { CreateSpaceModal } from '../CreateSpaceModal';
 import { rooms } from '../../stores/rooms';
 import { messages } from '../../stores/messages';
-import { getUnreadCountForDisplay } from '../../stores/readState';
+import { readState, getUnreadCountForDisplay } from '../../stores/readState';
 import { auth } from '../../stores/auth';
 import { appSpaceRail } from '../../theme/appChrome';
-import { isMdViewport, mobileNavFocus } from '../../stores/mobileShellLayout';
+import { showContextMenu } from '../../stores/contextMenu';
+import { ackAllSpaceRooms } from '../../api/spaces';
+import { t } from '../../i18n';
 
 const iconSize = 24;
 
@@ -29,7 +31,7 @@ const PlusIcon = () => (
   </svg>
 );
 
-const Divider = () => <div class="w-8 h-px bg-border rounded-full mx-auto my-1" />;
+const Divider = () => <div class="w-8 h-px bg-border rounded-sm mx-auto my-1" />;
 
 function spaceInitial(space: { name_acronym?: string; name?: string }): string {
   const s = space.name_acronym || space.name || '?';
@@ -43,43 +45,67 @@ interface SpaceIconProps {
   active?: boolean;
   href?: string;
   unreadCount?: number;
+  /** Shown as a distinct red corner badge, taking priority over the plain unread pill - the Discord white-pill-vs-red-badge distinction. */
+  mentionCount?: number;
+  onContextMenu?: (e: MouseEvent) => void;
 }
 
 const SpaceIcon: Component<SpaceIconProps> = (props) => {
   const base =
     'flex items-center justify-center size-12 rounded-[24px] text-foreground font-semibold text-sm transition-all duration-200 hover:rounded-[16px] overflow-hidden';
-  const active = props.active ? 'rounded-[16px]' : '';
-  const hasUnread = (props.unreadCount ?? 0) > 0;
-  const content = props.icon ? (
-    <img src={props.icon} alt="" class="size-full min-w-full min-h-full object-cover" />
-  ) : (
-    <span class="flex items-center justify-center w-full h-full">{props.initial}</span>
+  // Accessors, not consts: this component lives for the whole session inside <For>, so a
+  // one-shot `const hasUnread = ...` froze whatever the counts were at creation. A space
+  // that was unread at page load kept its dot and badge (reading "0") after everything was
+  // read, and one that was clean at load never lit up at all - "indicators won't go away"
+  // and "no indicator appears" were the same bug.
+  const active = () => (props.active ? 'rounded-[16px]' : '');
+  const hasUnread = () => (props.unreadCount ?? 0) > 0;
+  const hasMention = () => (props.mentionCount ?? 0) > 0;
+  const content = (
+    <span class="relative flex items-center justify-center w-full h-full">
+      {props.icon ? (
+        <img src={props.icon} alt="" class="size-full min-w-full min-h-full object-cover" />
+      ) : (
+        <span class="flex items-center justify-center w-full h-full">{props.initial}</span>
+      )}
+      <Show when={hasMention()}>
+        <span class="absolute -top-1 -right-1 min-w-[16px] h-[16px] flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-semibold px-1 ring-2 ring-background">
+          {(props.mentionCount ?? 0) > 99 ? '99+' : props.mentionCount}
+        </span>
+      </Show>
+    </span>
   );
-  const dotClass =
-  hasUnread && !props.active
-    ? 'absolute left-0 top-1/2 -translate-y-1/2 w-1 h-2 rounded-r-full bg-foreground pointer-events-none'
-    : 'absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full bg-foreground opacity-0 transition-opacity duration-200 group-hover:opacity-100 pointer-events-none';
+  const dotClass = () =>
+    hasUnread() && !props.active
+      ? 'absolute left-0 top-1/2 -translate-y-1/2 w-1 h-2 rounded-r-full bg-foreground pointer-events-none'
+      : 'absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full bg-foreground opacity-0 transition-opacity duration-200 group-hover:opacity-100 pointer-events-none';
 
-  if (props.href) {
-    return (
-      <div class="group relative w-full flex items-center justify-center min-h-12">
-        <Show when={props.active} fallback={<div class={dotClass} />}>
-          <div class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-12 rounded-r-full bg-foreground pointer-events-none" />
-        </Show>
-        <A href={props.href} class={`relative ${base} ${active} bg-primary/30 hover:bg-primary/40`}>
-          {content}
-        </A>
-      </div>
-    );
-  }
+  // One tree with a tracked <Show> for the link-vs-button choice, rather than two early
+  // returns: a component body runs once, so `if (props.href) return ...` would pin the
+  // element to whichever branch was taken at mount.
   return (
     <div class="group relative w-full flex items-center justify-center min-h-12">
-      <Show when={props.active} fallback={<div class={dotClass} />}>
+      <Show when={props.active} fallback={<div class={dotClass()} />}>
         <div class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-12 rounded-r-full bg-foreground pointer-events-none" />
       </Show>
-      <button type="button" class={`relative ${base} ${active} bg-primary/30 hover:bg-primary/40`}>
-        {content}
-      </button>
+      <Show
+        when={props.href}
+        fallback={
+          <button type="button" class={`relative ${base} ${active()} bg-primary/30 hover:bg-primary/40`}>
+            {content}
+          </button>
+        }
+      >
+        {(href) => (
+          <A
+            href={href()}
+            class={`relative ${base} ${active()} bg-primary/30 hover:bg-primary/40`}
+            onContextMenu={(e) => props.onContextMenu?.(e)}
+          >
+            {content}
+          </A>
+        )}
+      </Show>
     </div>
   );
 };
@@ -87,9 +113,9 @@ const SpaceIcon: Component<SpaceIconProps> = (props) => {
 export const SpaceBar: Component = () => {
   const [showCreateSpace, setShowCreateSpace] = createSignal(false);
   const location = useLocation();
-  const spaceMatch = useMatch(() => '/spaces/:spaceId');
   const pathname = () => location.pathname;
   const currentUserId = () => auth.user?.id ?? '';
+  const activeRoomId = () => pathname().match(/^\/spaces\/[^/]+\/rooms\/([^/]+)/)?.[1] ?? null;
 
   const homeUnreadCount = () => {
     const uid = currentUserId();
@@ -108,29 +134,92 @@ export const SpaceBar: Component = () => {
   const spaceUnreadCount = (spaceId: string): number => {
     const uid = currentUserId();
     if (!uid) return 0;
-    const roomList = spaces.spaceRoomsBySpaceId[spaceId] ?? [];
+    const fromSpaceMap = spaces.spaceRoomsBySpaceId[spaceId] ?? [];
+    const fromRoomsStore = rooms.rooms.filter((r) => r.space_id === spaceId).map((r) => ({
+      id: r.id,
+      type: r.type,
+      name: r.name ?? '',
+      topic: r.topic,
+      position: r.position ?? 0,
+      parent_id: r.parent_id,
+      last_message_id: r.last_message_id,
+      last_read_message_id: r.last_read_message_id,
+      mention_count: r.mention_count,
+      created_at: r.created_at,
+      updated_at: r.updated_at,
+      space_id: r.space_id,
+    }));
+    const seen = new Set<string>();
+    const roomList = [...fromSpaceMap, ...fromRoomsStore].filter((r) => {
+      if (!r?.id || seen.has(r.id)) return false;
+      seen.add(r.id);
+      return true;
+    });
+    // The channel currently on screen is excluded, same as its own sidebar row: its cursor
+    // is being advanced live by the viewport ack, and counting it here made the space icon
+    // light up for the very channel you were reading during the ~half second before each
+    // ack landed.
+    const viewing = activeRoomId();
     let total = 0;
     for (const r of roomList) {
-      if (r.type === 3) {
+      if (r.type === 3 && r.id !== viewing) {
+        const roomMeta = rooms.rooms.find((x) => x.id === r.id) ?? r;
         const list = messages.byRoom[r.id] ?? [];
-        total += getUnreadCountForDisplay(r.id, r, list, uid);
+        total += getUnreadCountForDisplay(r.id, { ...roomMeta, space_id: roomMeta.space_id ?? spaceId }, list, uid);
       }
     }
     return total;
   };
+
+  /** Sum of the real per-room mention counters (room_mention_counts) across the space's text channels. */
+  const spaceMentionCount = (spaceId: string): number => {
+    if (!currentUserId()) return 0;
+    const roomIds = new Set<string>();
+    for (const r of spaces.spaceRoomsBySpaceId[spaceId] ?? []) {
+      if (r.type === 3) roomIds.add(r.id);
+    }
+    for (const r of rooms.rooms) {
+      if (r.space_id === spaceId && r.type === 3) roomIds.add(r.id);
+    }
+    let total = 0;
+    for (const id of roomIds) {
+      total += readState.byRoom[id]?.mentionCount ?? 0;
+    }
+    return total;
+  };
+
+  function openSpaceMenu(e: MouseEvent, spaceId: string) {
+    const unread = spaceUnreadCount(spaceId) > 0 || spaceMentionCount(spaceId) > 0;
+    showContextMenu(e, [
+      {
+        label: t('contextMenu.markSpaceAsRead'),
+        icon: 'fa-check-double',
+        disabled: !unread,
+        onClick: () => {
+          ackAllSpaceRooms(spaceId).catch((err) => console.error('Mark server as read failed:', err));
+        },
+      },
+      {
+        label: t('contextMenu.copySpaceId'),
+        icon: 'fa-copy',
+        onClick: () => navigator.clipboard.writeText(spaceId),
+      },
+    ]);
+  }
+
   const isHomeAppActive = () => {
     const p = pathname();
     return p === '/' || p === '/friends' || p === '/notes' || p.startsWith('/rooms/');
   };
-  const activeSpaceId = () => spaceMatch()?.params?.spaceId;
+  const activeSpaceId = () => pathname().match(/^\/spaces\/([^/]+)/)?.[1] ?? null;
+  // Always rendered: below md this is the left half of the swipe pager's nav panel, so it
+  // has to stay mounted even while the conversation is on screen.
   return (
     <aside
-      class={`w-[72px] shrink-0 flex-col items-center gap-2 overflow-y-auto py-3 ${appSpaceRail} ${
-        isMdViewport() || mobileNavFocus() === 'rails' ? 'flex' : 'hidden'
-      }`}
+      class={`flex w-[72px] shrink-0 flex-col items-center gap-2 overflow-y-auto py-3 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-3 ${appSpaceRail}`}
     >
       <CreateSpaceModal open={showCreateSpace()} onClose={() => setShowCreateSpace(false)} />
-      <Tooltip label="Private Messages">
+      <Tooltip label={t('nav.privateMessages')}>
         <div class="group relative w-full flex items-center justify-center min-h-12">
           <Show
             when={isHomeAppActive()}
@@ -162,9 +251,9 @@ export const SpaceBar: Component = () => {
       <Divider />
       <For each={spaces.spaces}>
         {(s) => (
-          <Tooltip label={s.name || 'Unnamed'}>
+          <Tooltip label={s.name || t('space.unnamed')}>
             <SpaceIcon
-              name={s.name || 'Unnamed'}
+              name={s.name || t('space.unnamed')}
               initial={spaceInitial(s)}
               icon={s.icon || undefined}
               href={(() => {
@@ -173,12 +262,14 @@ export const SpaceBar: Component = () => {
               })()}
               active={activeSpaceId() === s.id}
               unreadCount={spaceUnreadCount(s.id)}
+              mentionCount={spaceMentionCount(s.id)}
+              onContextMenu={(e) => openSpaceMenu(e, s.id)}
             />
           </Tooltip>
         )}
       </For>
       <Divider />
-      <Tooltip label="Add a space">
+      <Tooltip label={t('space.addSpace')}>
         <div class="group relative w-full flex items-center justify-center min-h-12">
           <div class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full bg-foreground opacity-0 transition-opacity duration-200 group-hover:opacity-100 pointer-events-none" />
           <button

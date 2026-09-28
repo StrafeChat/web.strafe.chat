@@ -1,5 +1,5 @@
 import { createStore } from 'solid-js/store';
-import { listRelationships, type Relationship, type RelationshipUser } from '../api/relationships';
+import { listRelationships, type Relationship, type RelationshipUser, type RelationshipType } from '../api/relationships';
 import { setUserPresence, type UserPresence } from './presence';
 import { onStargateEvent } from '../services/stargate/client';
 
@@ -85,6 +85,14 @@ function disc(d: unknown): string {
   return '0';
 }
 
+const VALID_RELATIONSHIP_TYPES = new Set<number>([0, 1, 2, 3, 4, 5, 6]);
+/** Normalize relationship type from a WS payload; falls back to Friend for out-of-range values. */
+function relType(v: unknown): RelationshipType {
+  return typeof v === 'number' && VALID_RELATIONSHIP_TYPES.has(v)
+    ? (v as RelationshipType)
+    : RelType.Friend;
+}
+
 /** Build RelationshipUser from partial user payload (from RELATIONSHIP_ADD or RELATIONSHIP_REQUEST). */
 function userFromPayload(u: unknown): RelationshipUser | null {
   if (!u || typeof u !== 'object') return null;
@@ -98,6 +106,9 @@ function userFromPayload(u: unknown): RelationshipUser | null {
     discriminator: disc(o.discriminator),
     display_name: (typeof o.display_name === 'string' ? o.display_name : '') || username,
     avatar: typeof o.avatar === 'string' ? o.avatar : undefined,
+    banner: typeof o.banner === 'string' ? o.banner : undefined,
+    bio: typeof o.bio === 'string' ? o.bio : undefined,
+    about_me: typeof o.about_me === 'string' ? o.about_me : undefined,
     presence: (o.presence as UserPresence) ?? undefined,
   };
 }
@@ -105,7 +116,7 @@ function userFromPayload(u: unknown): RelationshipUser | null {
 /** Apply RELATIONSHIP_ADD: add or update relationship. Key by payload user.id (the other party), not payload id (backend sends recipient id). */
 function applyRelationshipAdd(payload: unknown): void {
   const d = payload as Record<string, unknown>;
-  const type = typeof d.type === 'number' ? d.type : 1;
+  const type = relType(d.type);
   const user = userFromPayload(d.user);
   if (!user) return;
   const otherUserId = user.id;

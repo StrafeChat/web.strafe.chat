@@ -6,9 +6,18 @@ export const authPageOuter =
 /** Single max width on sm+; full width on mobile (no card chrome) */
 export const authCardShell = 'flex w-full max-w-full flex-1 flex-col sm:max-w-md sm:flex-none';
 
+/**
+ * Core glass surface — same recipe as login/register cards.
+ * Use for modals, elevated panels, and (with different rounding) app chrome.
+ */
+export const authGlassSurface =
+  'rounded-3xl border border-border bg-card/70 shadow-2xl shadow-black/50 backdrop-blur-xl';
+
+/** Tint + blur without border — sidebars, headers, docks (add borders per layout). */
+export const authGlassTint = 'bg-card/70 backdrop-blur-xl';
+
 /** Glass card on sm+ only; flat full-page on mobile */
-export const authCardClass =
-  'w-full max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:shadow-none max-sm:backdrop-blur-none rounded-3xl border border-border bg-card/70 shadow-2xl shadow-black/50 backdrop-blur-xl';
+export const authCardClass = `w-full ${authGlassSurface} max-sm:rounded-none max-sm:border-0 max-sm:bg-transparent max-sm:shadow-none max-sm:backdrop-blur-none`;
 
 export const authCardHeaderClass = 'text-start space-y-0 max-sm:p-0 max-sm:pb-3 sm:space-y-1.5';
 

@@ -17,6 +17,8 @@ export interface RegisterInput {
   password: string;
   date_of_birth: string;
   discriminator?: number;
+  /** Challenge response; required only by instances that enabled a captcha. */
+  captcha_token?: string;
 }
 
 export interface RegisterResponse {

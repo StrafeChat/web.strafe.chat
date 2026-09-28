@@ -1,9 +1,11 @@
 import type { Component } from 'solid-js';
 import { createSignal, createEffect, Show } from 'solid-js';
-import { Portal } from 'solid-js/web';
 import { createSpaceInvite } from '../api/spaces';
 import { Button } from './ui/Button';
 import { ResponsiveDialog } from './ui/ResponsiveDialog';
+import { FieldError, fieldLabelClass } from './ui/Input';
+import { appDialogActions } from '../theme/appChrome';
+import { t } from '../i18n';
 
 interface InviteSpaceModalProps {
   open: boolean;
@@ -16,9 +18,17 @@ export const InviteSpaceModal: Component<InviteSpaceModalProps> = (props) => {
   const [error, setError] = createSignal('');
   const [code, setCode] = createSignal('');
   const [copied, setCopied] = createSignal(false);
+  // Space id the auto-fetch-on-open has already attempted, success or failure. Without this,
+  // the effect below re-ran every time fetchInvite toggled `loading` (a signal it also reads
+  // to decide whether to fetch) - on a failed attempt `code` never gets set, so the moment
+  // `loading` flipped back to false the guard was satisfied again and it fetched again,
+  // forever. This makes each open (per space) auto-fetch exactly once; retrying after a
+  // failure is an explicit "Generate new link" click, not automatic.
+  const [attemptedFor, setAttemptedFor] = createSignal('');
 
   async function fetchInvite(spaceId: string) {
     if (!spaceId || loading()) return;
+    setAttemptedFor(spaceId);
     setLoading(true);
     setError('');
     try {
@@ -26,7 +36,7 @@ export const InviteSpaceModal: Component<InviteSpaceModalProps> = (props) => {
       setCode(inv.code ?? '');
       setCopied(false);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create invite');
+      setError(err instanceof Error ? err.message : t('invite.failed'));
     } finally {
       setLoading(false);
     }
@@ -38,20 +48,16 @@ export const InviteSpaceModal: Component<InviteSpaceModalProps> = (props) => {
     setCode('');
     setError('');
     setCopied(false);
+    setAttemptedFor('');
   }
 
   createEffect(() => {
     if (!props.open) return;
     const sid = props.spaceId;
-    // When opened, lazily fetch an invite only if we don't already have one.
-    if (sid && !code() && !loading()) {
+    // When opened, fetch an invite once per space - not gated on `loading` (see attemptedFor).
+    if (sid && !code() && attemptedFor() !== sid) {
       fetchInvite(sid);
     }
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') handleClose();
-    };
-    window.addEventListener('keydown', onKeyDown);
-    return () => window.removeEventListener('keydown', onKeyDown);
   });
 
   function inviteDisplay(): string {
@@ -80,48 +86,45 @@ export const InviteSpaceModal: Component<InviteSpaceModalProps> = (props) => {
 
   return (
     <Show when={props.open}>
-      <Portal mount={document.body}>
-        <ResponsiveDialog
-          size="md"
-          zClass="z-[220]"
-          ariaLabelledby="invite-space-title"
-          onBackdropClick={() => handleClose()}
-          panelClass="flex w-full flex-col gap-4 px-6 pt-6 touch-manipulation"
-        >
-          <h2 id="invite-space-title" class="text-lg font-semibold text-foreground">
-            Invite people to this space
-          </h2>
-          <p class="text-sm text-muted-foreground">
-            Share this invite link with others so they can join your space.
-          </p>
-          <div class="flex flex-col gap-2">
-            <label class="text-sm font-medium text-foreground">Invite link</label>
+      <ResponsiveDialog
+        size="md"
+        onClose={handleClose}
+        dismissible={!loading()}
+        title={t('space.invitePeople')}
+        description={t('invite.description')}
+      >
+        <div class="flex flex-col gap-1.5">
+          <label class={fieldLabelClass}>{t('invite.link')}</label>
+          <div class="flex items-stretch gap-2">
             <div
-              class="min-h-10 w-full rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-foreground break-all font-mono"
+              class="flex min-h-10 min-w-0 flex-1 items-center break-all rounded-lg border border-input bg-muted/40 px-3 py-2 font-mono text-sm text-foreground"
               aria-live="polite"
+              dir="ltr"
             >
-              {loading() ? 'Creating invite…' : inviteDisplay() || 'Invite link will appear here'}
+              <Show when={!loading()} fallback={<span class="text-muted-foreground">{t('invite.creating')}</span>}>
+                <Show when={inviteDisplay()} fallback={<span class="text-muted-foreground">{t('invite.noLink')}</span>}>
+                  {inviteDisplay()}
+                </Show>
+              </Show>
             </div>
-          </div>
-          <Show when={error()}>
-            <p class="text-sm text-destructive">{error()}</p>
-          </Show>
-          <div class="flex justify-between gap-2 pt-2">
-            <Button type="button" variant="outline" onClick={handleRegenerate} disabled={loading()}>
-              {loading() ? 'Creating…' : 'Generate new link'}
+            <Button type="button" class="shrink-0" onClick={handleCopy} disabled={loading() || !code()} data-autofocus>
+              <i class={`fa-solid ${copied() ? 'fa-check' : 'fa-copy'} text-xs`} aria-hidden="true" />
+              {copied() ? t('common.copied') : t('common.copy')}
             </Button>
-            <div class="flex gap-2">
-              <Button type="button" variant="outline" onClick={handleCopy} disabled={loading()}>
-                {copied() ? 'Copied!' : 'Copy link'}
-              </Button>
-              <Button type="button" onClick={handleClose}>
-                Close
-              </Button>
-            </div>
           </div>
-        </ResponsiveDialog>
-      </Portal>
+          <p class="text-xs text-muted-foreground">{t('invite.anyoneCanJoin')}</p>
+        </div>
+        <FieldError message={error() || undefined} />
+        <div class={`${appDialogActions} mt-2 items-center`}>
+          <Button type="button" variant="ghost" class="me-auto" onClick={handleRegenerate} disabled={loading()}>
+            <i class="fa-solid fa-rotate text-xs" aria-hidden="true" />
+            {t('invite.regenerate')}
+          </Button>
+          <Button type="button" variant="outline" onClick={handleClose}>
+            {t('common.done')}
+          </Button>
+        </div>
+      </ResponsiveDialog>
     </Show>
   );
 };
-

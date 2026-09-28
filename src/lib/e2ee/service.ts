@@ -1,245 +1,217 @@
-/**
- * E2EE service – device registration, session management, encrypt/decrypt
- *
- * Signal protocol (X3DH-style) with encrypted key backup for cross-device recovery.
- * - X25519 identity + signed prekey per device
- * - Session key derived via ECDH(our identity private, their signed prekey)
- * - AES-256-GCM for message encryption
- * - Key backup encrypted with recovery PIN (Signal Secure Value Recovery style)
- */
-
-import * as crypto from './crypto';
-import * as store from './store';
-import * as backup from './backup';
-import type { DeviceIdentity, Session } from './types';
+import type { OlmMachine } from '@matrix-org/matrix-sdk-crypto-wasm';
+import { getMachine, getCurrentDeviceId } from './machine';
+import { processOutgoingRequests, receiveToDeviceMessages, drainPendingToDevice, noteOneTimeKeyCounts } from './transport';
+import { ensureRoomKeyShared, encryptForRoom, decryptForRoom, invalidateRoomSession, type RoomEventMeta } from './rooms';
+import { listOwnDevices, uploadKeys, type DeviceInfo } from '../../api/devices';
 import {
-  registerDevice,
-  getPrekeyBundle,
-  getKeyBackup,
-  setKeyBackup,
-} from '../../api/devices';
-import { promptRecoveryPin, setRecoveryPin } from '../../stores/recoveryPin';
-import { E2eeUnavailableError } from './subtle';
+  PLAINTEXT_PREFIX,
+  MEGOLM_CIPHERTEXT_PREFIX,
+  OLM_CIPHERTEXT_PREFIX,
+  LEGACY_DUAL_CIPHERTEXT_PREFIX,
+  LEGACY_GROUP_CIPHERTEXT_PREFIX,
+  toMatrixUserId,
+} from './constants';
 
-const DEFAULT_DEVICE_ID = 1;
+export { getOwnFingerprint, getPeerDevices, markDeviceVerified, clearDeviceVerification } from './safety';
+export type { DeviceSafetyInfo } from './safety';
+
+// Key backup: asymmetric, opened only by the user's recovery code. See keyBackup.ts.
+export {
+  prepareKeyBackup,
+  commitKeyBackup,
+  syncKeyBackup,
+  restoreKeyBackup,
+  resetKeyBackup,
+  getBackupStatus,
+  startBackupSync,
+  scheduleBackupSync,
+  stopBackupSync,
+  NoBackupError,
+  RecoveryCodeMismatchError,
+} from './keyBackup';
+export type { BackupStatus, PreparedKeyBackup } from './keyBackup';
+export {
+  hasLegacyPinBackup,
+  importLegacyPinBackup,
+  deleteLegacyPinBackup,
+  LegacyPinMismatchError,
+  LegacyBackupUnreadableError,
+  NoLegacyBackupError,
+} from './legacyBackup';
 
 /**
- * Serialize ensureDevice per user. Without this, StargateProvider + loadMessages + realtime
- * handlers can run ensureDevice in parallel: each sees no IndexedDB row, each calls
- * promptRecoveryPin(), and later calls overwrite recoveryPin.pending — leaving promises
- * unresolved and PIN / restore broken (common on mobile when everything loads at once).
+ * How often ensureDevice re-checks the server's copy of this device and polls for
+ * to-device messages that arrived while offline. Live traffic reaches the engine through
+ * TO_DEVICE gateway events, so these two requests only matter after a gap - they used to
+ * run on every channel open, two extra round trips per navigation for nothing.
  */
-const ensureDeviceInflight = new Map<string, Promise<DeviceIdentity>>();
+const DEVICE_SYNC_INTERVAL_MS = 60_000;
+let lastDeviceSyncAt = 0;
 
-export async function ensureDevice(userId: string): Promise<DeviceIdentity> {
-  const uid = String(userId);
-  const existing = ensureDeviceInflight.get(uid);
-  if (existing) return existing;
-
-  const done = ensureDeviceOnce(uid).finally(() => {
-    if (ensureDeviceInflight.get(uid) === done) {
-      ensureDeviceInflight.delete(uid);
-    }
-  });
-  ensureDeviceInflight.set(uid, done);
-  return done;
-}
-
-function isPersistFailure(e: unknown): boolean {
-  return e instanceof Error && e.message.includes('did not persist to IndexedDB');
-}
-
-async function ensureDeviceOnce(userId: string): Promise<DeviceIdentity> {
-  try {
-    return await loadOrCreateDevice(userId);
-  } catch (e) {
-    if (e instanceof E2eeUnavailableError) {
-      setRecoveryPin('e2eeEnvironmentError', e.message);
-    }
-    throw e;
+/**
+ * Ensure this user's device/OlmMachine exists and has flushed any pending outgoing
+ * requests (initial key upload on a brand-new device, replenishment on an existing one).
+ * Cheap to call before every send or decrypt: the server-side checks are throttled.
+ */
+export async function ensureDevice(userId: string): Promise<OlmMachine> {
+  const machine = await getMachine(userId);
+  await processOutgoingRequests(machine);
+  const deviceId = getCurrentDeviceId();
+  if (deviceId && Date.now() - lastDeviceSyncAt > DEVICE_SYNC_INTERVAL_MS) {
+    lastDeviceSyncAt = Date.now();
+    await ensureServerHasDeviceKeys(machine, userId, deviceId);
+    await drainPendingToDevice(machine, deviceId);
   }
+  return machine;
 }
 
-async function loadOrCreateDevice(userId: string): Promise<DeviceIdentity> {
-  let device = await store.getDeviceIdentity(userId);
-  if (device) return device;
+/** Force the next ensureDevice to sync with the server again - called when the gateway
+ * (re)connects, since anything sent to this device while it was offline has not been seen. */
+export async function resyncDevice(userId: string): Promise<void> {
+  lastDeviceSyncAt = 0;
+  await ensureDevice(userId);
+}
 
-  // Try restore from backup (new device / new session)
-  try {
-    const backupRes = await getKeyBackup();
-    if (backupRes.exists && backupRes.encrypted_backup && backupRes.salt) {
-      const enc = backupRes.encrypted_backup;
-      const salt = backupRes.salt;
-      let restoreAttempt = 0;
-      // Retry PIN on decrypt failure (wrong PIN) without treating it as a fatal error.
-      for (;;) {
-        const pin = await promptRecoveryPin('restore', {
-          retainSubmitError: restoreAttempt > 0,
-        });
-        restoreAttempt += 1;
-        try {
-          device = await backup.decryptFromBackup(enc, salt, pin);
-          setRecoveryPin('lastSubmitError', null);
-          break;
-        } catch (decErr) {
-          if (decErr instanceof E2eeUnavailableError) {
-            throw decErr;
-          }
-          console.warn('Backup decrypt failed:', decErr);
-          setRecoveryPin(
-            'lastSubmitError',
-            'That PIN did not unlock your backup. Try again or check Caps Lock / keyboard layout.'
-          );
-        }
-      }
-      if (!device.identityKeyPublic || !device.signedPrekeyPublic) {
-        const bundle = await getPrekeyBundle(userId, String(device.deviceId));
-        if (bundle) {
-          device.identityKeyPublic = bundle.identity_key;
-          device.signedPrekeyPublic = bundle.signed_prekey;
-        }
-      }
-      try {
-        await store.setDeviceIdentity(userId, device);
-      } catch (persistErr) {
-        if (isPersistFailure(persistErr)) throw persistErr;
-        throw persistErr;
-      }
-      return device;
-    }
-  } catch (e) {
-    if (e instanceof E2eeUnavailableError) throw e;
-    if (e instanceof Error && e.message.includes('cancelled')) throw e;
-    if (e instanceof Error && e.message.includes('Recovery PIN required'))
-      throw e;
-    if (isPersistFailure(e)) {
-      console.error('E2EE device keys could not be saved:', e);
-      throw e;
-    }
-    console.warn('Backup restore failed:', e);
-    throw new Error('Invalid recovery PIN. Please try again.');
-  }
+/** Matrix canonical JSON: sorted keys, no whitespace - what signatures are computed over. */
+function canonicalJson(value: unknown): string {
+  if (value === null || typeof value !== 'object') return JSON.stringify(value);
+  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
+  const obj = value as Record<string, unknown>;
+  return `{${Object.keys(obj)
+    .sort()
+    .map((k) => `${JSON.stringify(k)}:${canonicalJson(obj[k])}`)
+    .join(',')}}`;
+}
 
-  // Create new device
-  const [identityKeyPair, signedPrekeyPair] = await Promise.all([
-    crypto.generateKeyPair(),
-    crypto.generateKeyPair(),
-  ]);
-
-  const regBytes = new Uint8Array(2);
-  globalThis.crypto.getRandomValues(regBytes);
-  const registrationId = regBytes[0]! * 256 + regBytes[1]!;
-  device = {
-    deviceId: DEFAULT_DEVICE_ID,
-    identityKeyPublic: identityKeyPair.publicKey,
-    identityKeyPrivate: identityKeyPair.privateKey,
-    signedPrekeyPublic: signedPrekeyPair.publicKey,
-    signedPrekeyPrivate: signedPrekeyPair.privateKey,
-    signedPrekeyId: 1,
-    registrationId: registrationId % 16384,
-    createdAt: Date.now(),
+/**
+ * Rebuild this device's signed device-keys claim (the `device_keys` object of a Matrix
+ * /keys/upload) from the account the engine holds. The engine only produces this once, at
+ * account creation, and then treats the keys as uploaded for good.
+ */
+async function buildDeviceKeys(machine: OlmMachine, userId: string, deviceId: string): Promise<Record<string, unknown>> {
+  const claim: Record<string, unknown> = {
+    algorithms: ['m.olm.v1.curve25519-aes-sha2', 'm.megolm.v1.aes-sha2'],
+    device_id: deviceId,
+    keys: {
+      [`curve25519:${deviceId}`]: machine.identityKeys.curve25519.toBase64(),
+      [`ed25519:${deviceId}`]: machine.identityKeys.ed25519.toBase64(),
+    },
+    user_id: toMatrixUserId(userId),
   };
+  const signatures = await machine.sign(canonicalJson(claim));
+  return { ...claim, signatures: JSON.parse(signatures.asJSON()) };
+}
 
-  await registerDevice({
-    device_id: device.deviceId,
-    identity_key: device.identityKeyPublic,
-    signed_prekey: device.signedPrekeyPublic,
-    signed_prekey_signature: device.signedPrekeyPublic.slice(0, 64) || 'x',
-    signed_prekey_id: device.signedPrekeyId,
-    registration_id: device.registrationId,
-    one_time_prekeys: [],
-  });
-  await store.setDeviceIdentity(userId, device);
+/** Unconditionally (re-)upload this device's signed key claim, whatever the server thinks it
+ * already has. The engine produces the claim once at account creation and then treats the
+ * keys as uploaded for good, so re-publishing has to be driven from here. */
+export async function republishDeviceKeys(machine: OlmMachine, userId: string, deviceId: string): Promise<void> {
+  const keys = await buildDeviceKeys(machine, userId, deviceId);
+  const res = await uploadKeys(deviceId, { device_keys: keys });
+  noteOneTimeKeyCounts(res.one_time_key_counts ?? {});
+  // The pool of one-time keys may be gone too; let the engine top it up on its next turn.
+  await processOutgoingRequests(machine);
+}
 
-  // Create backup so messages work on other devices (Signal-compliant)
+/**
+ * The server keeps this device's signed key claim so peers can encrypt to it. If the server
+ * lost it (a table restored from backup, a dropped table) nobody can reach this device and
+ * the engine would never notice - it considers the keys uploaded. Re-publish; the existing
+ * Olm/Megolm sessions in the local store stay valid because the identity keys are unchanged.
+ */
+export async function ensureServerHasDeviceKeys(machine: OlmMachine, userId: string, deviceId: string): Promise<void> {
+  let devices: DeviceInfo[];
   try {
-    const pin = await promptRecoveryPin('create');
-    const { encryptedBackup, salt } = await backup.encryptForBackup(
-      device,
-      pin
-    );
-    await setKeyBackup(encryptedBackup, salt);
+    devices = await listOwnDevices();
   } catch (e) {
-    if (e instanceof E2eeUnavailableError) throw e;
-    if (e instanceof Error && e.message.includes('cancelled')) {
-      // User skipped – device works but no cross-device recovery
-    } else {
-      console.warn('Backup create failed:', e);
-    }
+    console.warn('[e2ee] could not verify server-side device keys', e);
+    return;
   }
-
-  return device;
+  const mine = devices.find((d) => d.device_id === deviceId);
+  if (mine?.has_keys) return;
+  console.warn('[e2ee] server has no keys for device', deviceId, mine ? '(row present)' : '(row missing)', '- re-uploading');
+  await republishDeviceKeys(machine, userId, deviceId);
 }
 
-/** Get or create a session with a recipient device. Always fetches fresh prekey bundle to avoid
- * stale sessions when the recipient re-registers (cleared storage, new browser). Cached sessions
- * can cause OperationError on decrypt because sender would encrypt with old key. */
-export async function getOrCreateSession(
-  currentUserId: string,
-  recipientUserId: string,
-  recipientDeviceId: number
-): Promise<Session> {
-  const device = await store.getDeviceIdentity(currentUserId);
-  if (!device) throw new Error('Device not initialized');
-
-  const bundle = await getPrekeyBundle(recipientUserId, String(recipientDeviceId));
-  if (!bundle) throw new Error('No prekey bundle for recipient');
-
-  const encryptionKey = await crypto.deriveSessionKey(
-    device.identityKeyPrivate,
-    bundle.signed_prekey
-  );
-
-  const session: Session = {
-    recipientUserId,
-    recipientDeviceId,
-    encryptionKey,
-    createdAt: Date.now(),
-  };
-  await store.setSession(session);
-  return session;
-}
-
-/** Encrypt a message for a recipient. Caller must have a session (getOrCreateSession first). */
+/**
+ * Encrypt plaintext for a room (PM, group PM, or an E2EE-enabled space channel - all the
+ * same Megolm path; a PM is just a 2-member room). memberUserIds must include the
+ * current user themselves, so the app's own other devices - and this device's own later
+ * re-reads of its sent messages - can decrypt too, replacing the old design's separate
+ * "encrypt once for the recipient, once for myself" duplication.
+ */
 export async function encryptMessage(
+  userId: string,
+  roomId: string,
+  memberUserIds: string[],
   plaintext: string,
-  currentUserId: string,
-  recipientUserId: string,
-  recipientDeviceId: number
+  extra?: Record<string, unknown>
 ): Promise<string> {
-  const device = await store.getDeviceIdentity(currentUserId);
-  const session = await store.getSession(recipientUserId, recipientDeviceId);
-  if (!device || !session) throw new Error('No session with recipient');
-  return crypto.encryptWithHeader(
-    plaintext,
-    device.identityKeyPublic,
-    session.encryptionKey
+  const machine = await getMachine(userId);
+  await ensureRoomKeyShared(machine, roomId, memberUserIds);
+  return encryptForRoom(machine, roomId, plaintext, extra);
+}
+
+export interface DecryptedResult {
+  plaintext: string;
+  /** True if this used the old (pre-ratchet) scheme - never produced going forward, kept only for reading history. */
+  legacy: boolean;
+  /** True if we don't have the room key yet (e.g. the to-device share hasn't arrived) - caller should show a placeholder, not an error. */
+  pending: boolean;
+  /** Everything else that was inside the encrypted content (e.g. `attachments`). */
+  content?: Record<string, unknown>;
+}
+
+/** Decrypt a message, dispatching on its wire-format prefix. `meta` supplies the sender/
+ * event-id/timestamp decryptForRoom needs to rebuild the Matrix event envelope Megolm
+ * decryption expects - see rooms.ts. Legacy (pre-rewrite) ciphertext formats are handled
+ * by the caller via isLegacyCiphertext(); this function only understands the current
+ * Megolm format (and the plaintext passthrough prefix). */
+export async function decryptMessage(userId: string, roomId: string, ciphertext: string, meta: RoomEventMeta): Promise<DecryptedResult> {
+  if (ciphertext.startsWith(PLAINTEXT_PREFIX)) {
+    return { plaintext: ciphertext.slice(PLAINTEXT_PREFIX.length), legacy: false, pending: false };
+  }
+  if (ciphertext.startsWith(MEGOLM_CIPHERTEXT_PREFIX)) {
+    const machine = await getMachine(userId);
+    const inner = ciphertext.slice(MEGOLM_CIPHERTEXT_PREFIX.length);
+    try {
+      const result = await decryptForRoom(machine, roomId, inner, meta);
+      return { plaintext: result.plaintext, legacy: false, pending: false, content: result.content };
+    } catch (e) {
+      console.warn('[e2ee] decrypt pending/failed for event', meta.eventId, e);
+      return { plaintext: '', legacy: false, pending: true };
+    }
+  }
+  throw new Error('unrecognized ciphertext format');
+}
+
+/** Force the next send in this room to establish a fresh Megolm session, shared only
+ * with its current members. Call when a SESSION_ROTATE gateway event arrives. */
+export async function rotateRoomSession(userId: string, roomId: string): Promise<void> {
+  const machine = await getMachine(userId);
+  await invalidateRoomSession(machine, roomId);
+}
+
+export function isLegacyCiphertext(ciphertext: string): boolean {
+  return (
+    ciphertext.startsWith(LEGACY_DUAL_CIPHERTEXT_PREFIX) ||
+    ciphertext.startsWith(LEGACY_GROUP_CIPHERTEXT_PREFIX) ||
+    // Very old messages predate any prefix at all and are raw base64 ciphertext from the
+    // original static-ECDH scheme - anything that doesn't match a known current prefix
+    // and isn't valid JSON-after-prefix falls back to the legacy decrypt path too.
+    (!ciphertext.startsWith(PLAINTEXT_PREFIX) &&
+      !ciphertext.startsWith(MEGOLM_CIPHERTEXT_PREFIX) &&
+      !ciphertext.startsWith(OLM_CIPHERTEXT_PREFIX))
   );
 }
 
-/** Encrypt a message for our own device (enables decryption on other devices/sessions). */
-export async function encryptMessageForSelf(
-  plaintext: string,
-  currentUserId: string
-): Promise<string> {
-  await getOrCreateSession(currentUserId, currentUserId, DEFAULT_DEVICE_ID);
-  return encryptMessage(
-    plaintext,
-    currentUserId,
-    currentUserId,
-    DEFAULT_DEVICE_ID
-  );
-}
-
-/** Decrypt a message from a sender. Uses our signed prekey to derive their session. */
-export async function decryptMessage(ciphertext: string, currentUserId: string): Promise<string> {
-  const device = await store.getDeviceIdentity(currentUserId);
-  if (!device) throw new Error('Device not initialized');
-  const normalized = (ciphertext ?? '').trim().replace(/\s/g, '');
-  if (!normalized) throw new Error('Empty ciphertext');
-  return crypto.decryptWithHeader(
-    normalized,
-    device.signedPrekeyPrivate,
-    device.identityKeyPrivate
-  );
+/** Feed a live to-device push (from the gateway) into the machine. */
+export async function handleIncomingToDevice(
+  userId: string,
+  message: { id: string; type: string; sender_user_id: string; sender_device_id: string; sender_fid?: string; content: unknown }
+): Promise<void> {
+  const machine = await getMachine(userId);
+  const deviceId = getCurrentDeviceId();
+  if (!deviceId) return;
+  await receiveToDeviceMessages(machine, deviceId, [message]);
 }

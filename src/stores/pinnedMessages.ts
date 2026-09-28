@@ -30,7 +30,7 @@ function persist(state: PinnedMessagesState) {
   try {
     window.localStorage.setItem('pinnedMessages', JSON.stringify(state));
   } catch {
-    
+    // localStorage unavailable (private mode / quota): pins still work for this session.
   }
 }
 

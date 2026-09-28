@@ -3,6 +3,13 @@ import { listRooms, type Room, type RoomParticipant } from '../api/rooms';
 import { setUserPresence } from './presence';
 import { setReadStateFromRoom, setReadState } from './readState';
 import { onStargateEvent } from '../services/stargate/client';
+import { registerRoomIdentity, registerUserIdentity } from './federationIds';
+
+/** Feed the E2EE identity registry from a room and its participants. */
+function registerIdentities(room: Room): void {
+  registerRoomIdentity(room);
+  for (const p of room.participants ?? []) registerUserIdentity(p);
+}
 
 export interface RoomsState {
   rooms: Room[];
@@ -21,12 +28,13 @@ export async function loadRooms(): Promise<void> {
   try {
     const list = await listRooms();
     for (const room of list) {
+      registerIdentities(room);
       for (const p of room.participants ?? []) {
         if (p.presence?.status) {
           setUserPresence(p.id, p.presence);
         }
       }
-      setReadStateFromRoom(room.id, room);
+      setReadStateFromRoom(room.id, room, { authoritative: true });
     }
     setRooms({ rooms: list, loading: false, hydrated: true });
   } catch {
@@ -47,15 +55,40 @@ export function updateRoomLastMessage(roomId: string, messageId: string) {
   );
 }
 
-/** Add or update a single room (e.g. after creating a PM). Idempotent. */
+/** Patch this room's own mute/notify-mode fields (PM/group PM rooms only - see
+ * patchSpaceRoomNotifySettings in stores/spaces.ts for space channels). */
+export function patchRoomNotifySettings(
+  roomId: string,
+  patch: { muted?: boolean; muted_until?: string | null; notify_mode?: number }
+): void {
+  setRooms('rooms', (list) =>
+    list.map((r) =>
+      r.id !== roomId
+        ? r
+        : {
+            ...r,
+            ...(patch.muted !== undefined ? { muted: patch.muted } : {}),
+            ...(patch.muted_until !== undefined ? { muted_until: patch.muted_until ?? undefined } : {}),
+            ...(patch.notify_mode !== undefined ? { notify_mode: patch.notify_mode } : {}),
+          }
+    )
+  );
+}
+
+/** Add or update a single room (e.g. after creating a PM). Idempotent. Read state is
+ * merged, never overwritten - see setReadStateFromRoom. Fields the incoming object does
+ * not carry are kept from the stored room: a ROOM_UPDATE for a rename says nothing about
+ * `e2ee_enabled`, and replacing the room wholesale used to drop it - after which a group
+ * with E2EE off was treated as E2EE on and every send was rejected by the server. */
 export function addOrUpdateRoom(room: Room): void {
+  registerIdentities(room);
   for (const p of room.participants ?? []) {
     if (p.presence?.status) setUserPresence(p.id, p.presence);
   }
   setReadStateFromRoom(room.id, room);
   setRooms('rooms', (list) => {
     const idx = list.findIndex((r) => r.id === room.id);
-    if (idx >= 0) return list.map((r, i) => (i === idx ? room : r));
+    if (idx >= 0) return list.map((r, i) => (i === idx ? { ...r, ...room } : r));
     return [...list, room];
   });
 }
@@ -69,12 +102,13 @@ export function removeRoom(roomId: string): void {
 export function hydrateRoomsFromReady(roomsData: unknown[]): void {
   const list = roomsData as import('../api/rooms').Room[];
   for (const room of list) {
+    registerIdentities(room);
     for (const p of room.participants ?? []) {
       if (p.presence?.status) {
         setUserPresence(p.id, p.presence);
       }
     }
-    setReadStateFromRoom(room.id, room);
+    setReadStateFromRoom(room.id, room, { authoritative: true });
   }
   setRooms({ rooms: list, loading: false, hydrated: true });
 }
@@ -107,19 +141,28 @@ function roomFromPayload(payload: unknown): Room | null {
         discriminator: typeof p.discriminator === 'number' ? p.discriminator : undefined,
         avatar: typeof p.avatar === 'string' ? p.avatar : undefined,
         presence: p.presence as RoomParticipant['presence'],
+        ...(typeof p.home_domain === 'string' ? { home_domain: p.home_domain } : {}),
+        ...(p.origin_id != null ? { origin_id: String(p.origin_id) } : {}),
       }))
     : undefined;
+  const fed = d.federation as { origin_domain?: unknown; origin_id?: unknown } | undefined;
+  const federation =
+    fed && typeof fed.origin_domain === 'string' && fed.origin_id != null
+      ? { origin_domain: fed.origin_domain, origin_id: String(fed.origin_id) }
+      : undefined;
   return {
     id,
     type,
     recipients,
     participants,
+    ...(federation ? { federation } : {}),
     created_at,
     ...(d.space_id != null && { space_id: String(d.space_id) }),
     ...(d.parent_id != null && { parent_id: String(d.parent_id) }),
     ...(d.name != null && typeof d.name === 'string' && { name: d.name }),
     ...(d.topic != null && typeof d.topic === 'string' && { topic: d.topic }),
     ...(d.creator_id != null && d.creator_id !== '' && { creator_id: String(d.creator_id) }),
+    ...(typeof d.e2ee_enabled === 'boolean' && { e2ee_enabled: d.e2ee_enabled }),
     ...(d.last_message_id != null && { last_message_id: String(d.last_message_id) }),
     ...(d.last_read_message_id != null && { last_read_message_id: String(d.last_read_message_id) }),
     ...(d.mention_count != null && typeof d.mention_count === 'number' && { mention_count: d.mention_count }),

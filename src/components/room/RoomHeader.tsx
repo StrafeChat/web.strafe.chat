@@ -1,22 +1,36 @@
 import type { Component } from 'solid-js';
 import { Show } from 'solid-js';
 import { PresenceDot } from '../PresenceDot';
-import { appHeaderBar } from '../../theme/appChrome';
+import { appPageHeader, appPageTitle } from '../../theme/appChrome';
 import { MobileRailsOpenButton } from '../layout/MobileRailsOpenButton';
+import { IconButton } from '../ui/IconButton';
+import { Tooltip } from '../ui/Tooltip';
+import { RoomNotifyMenu } from './RoomNotifyMenu';
+import { MessageSearchBox } from './MessageSearchBox';
+import type { SearchChannel, SearchIdentity } from '../../lib/messageSearch';
+import { t } from '../../i18n';
 
 export interface RoomHeaderProps {
   headerIcon: string;
   name: string;
   pmOtherUserId: string | undefined;
+  /** Show the end-to-end-encrypted badge next to the name. */
+  e2ee?: boolean;
   isGroup: boolean;
   messageCompact: boolean;
   onToggleCompact: () => void;
   hasPinned: boolean;
   pinnedOpen: boolean;
   onTogglePinned: () => void;
+  /** Search box state - the header owns the input, the results live in RoomSearchPanel. */
   searchQuery: string;
-  onSearchChange: (value: string) => void;
-  onSearchFocus: () => void;
+  onSearchQueryChange: (value: string) => void;
+  onSearchSubmit: (raw: string) => void;
+  searchPeople?: SearchIdentity[];
+  /** Space channels, so the box can offer `in:`. Omitted for PMs. */
+  searchChannels?: SearchChannel[];
+  /** Show the members toggle. Defaults to isGroup (group PMs); space channels pass true. */
+  showMembersToggle?: boolean;
   membersPanelOpen: boolean;
   onToggleMembers: () => void;
   onAddPeople: () => void;
@@ -24,94 +38,94 @@ export interface RoomHeaderProps {
   isCreator?: boolean;
   /** Opens group settings modal (name, E2EE). Shown as cog next to add people when isCreator. */
   onOpenSettings?: () => void;
+  notifyMode: number;
+  muted: boolean;
+  onSetNotifyMode: (mode: number) => void;
+  onMute: (durationMs: number | null) => void;
+  onUnmute: () => void;
+  /** PMs and group PMs: start (or join) a call from the header. Omitted when voice is
+   * off on this instance or the room cannot hold a call. */
+  onStartCall?: (video: boolean) => void;
+  /** A call is already running in this room (buttons read "join"). */
+  callActive?: boolean;
 }
 
 export const RoomHeader: Component<RoomHeaderProps> = (props) => (
-  <div class={`flex h-12 shrink-0 items-center justify-between px-4 ${appHeaderBar}`}>
+  <div class={`${appPageHeader} justify-between gap-3`}>
     <div class="flex min-w-0 items-center gap-2">
       <MobileRailsOpenButton />
-      <i class={`fa-solid ${props.headerIcon} shrink-0 text-muted-foreground`} />
-      <h1 class="text-base font-semibold text-foreground truncate">{props.name}</h1>
+      <i class={`fa-solid ${props.headerIcon} shrink-0 text-muted-foreground`} aria-hidden="true" />
+      <h1 class={`truncate ${appPageTitle}`}>{props.name}</h1>
       <Show when={props.pmOtherUserId}>
-        {(uid) => <PresenceDot userId={uid()} class="size-2 shrink-0 mt-0.5" />}
+        {(uid) => <PresenceDot userId={uid()} class="mt-0.5 size-2 shrink-0" />}
+      </Show>
+      <Show when={props.e2ee}>
+        <Tooltip label={t('room.e2eeBadge')} inline side="top">
+          <span
+            class="flex size-5 shrink-0 cursor-default items-center justify-center rounded-md bg-primary/15 text-primary"
+            aria-label={t('room.e2eeBadge')}
+          >
+            <i class="fa-solid fa-lock text-[10px]" aria-hidden="true" />
+          </span>
+        </Tooltip>
       </Show>
     </div>
-    <div class="flex items-center gap-2 shrink-0">
-      <button
-        type="button"
-        class={`size-8 inline-flex items-center justify-center rounded transition-colors ${
-          props.pinnedOpen
-            ? 'bg-accent text-accent-foreground'
-            : props.hasPinned
-              ? 'text-muted-foreground hover:text-foreground hover:bg-accent'
-              : 'text-muted-foreground/60 hover:text-foreground hover:bg-accent'
-        }`}
-        title={props.hasPinned ? 'Pinned messages' : 'No pinned messages yet'}
+    <div class="flex shrink-0 items-center gap-1">
+      <Show when={props.onStartCall}>
+        {(start) => (
+          <>
+            <IconButton
+              icon="fa-solid fa-phone"
+              label={props.callActive ? t('voice.joinCall') : t('room.callVoice')}
+              tone={props.callActive ? 'default' : 'default'}
+              class={props.callActive ? 'text-emerald-500 hover:text-emerald-400' : ''}
+              onClick={() => start()(false)}
+            />
+            <IconButton
+              icon="fa-solid fa-video"
+              label={props.callActive ? t('voice.joinWithVideo') : t('room.callVideo')}
+              class={props.callActive ? 'text-emerald-500 hover:text-emerald-400' : ''}
+              onClick={() => start()(true)}
+            />
+          </>
+        )}
+      </Show>
+      <RoomNotifyMenu
+        notifyMode={props.notifyMode}
+        muted={props.muted}
+        onSetNotifyMode={props.onSetNotifyMode}
+        onMute={props.onMute}
+        onUnmute={props.onUnmute}
+      />
+      <IconButton
+        icon="fa-solid fa-thumbtack"
+        label={t('room.pinned')}
+        title={props.hasPinned ? t('room.pinned') : t('room.noPinned')}
+        active={props.pinnedOpen}
+        tone={props.hasPinned ? 'default' : 'subtle'}
         onClick={props.onTogglePinned}
-        aria-label="Pinned messages"
-        aria-pressed={props.pinnedOpen}
-      >
-        <i class="fa-solid fa-thumbtack text-sm" />
-      </button>
-      <Show when={props.isGroup}>
-        <button
-          type="button"
-          class={`size-8 inline-flex items-center justify-center rounded transition-colors ${
-            props.membersPanelOpen
-              ? 'bg-accent text-accent-foreground'
-              : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-          }`}
-          title={props.membersPanelOpen ? 'Hide members' : 'Show members'}
+      />
+      <Show when={props.showMembersToggle ?? props.isGroup}>
+        <IconButton
+          icon="fa-solid fa-user-group"
+          label={props.membersPanelOpen ? t('room.hideMembers') : t('room.showMembers')}
+          active={props.membersPanelOpen}
           onClick={props.onToggleMembers}
-          aria-label={props.membersPanelOpen ? 'Hide members' : 'Show members'}
-          aria-pressed={props.membersPanelOpen}
-        >
-          <i class="fa-solid fa-user-group text-sm" />
-        </button>
-        <button
-          type="button"
-          class="size-8 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-          title="Add people"
-          onClick={props.onAddPeople}
-          aria-label="Add people"
-        >
-          <i class="fa-solid fa-user-plus text-sm" />
-        </button>
+        />
+      </Show>
+      <Show when={props.isGroup}>
+        <IconButton icon="fa-solid fa-user-plus" label={t('room.addPeople')} onClick={props.onAddPeople} />
         <Show when={props.isCreator && props.onOpenSettings}>
-          <button
-            type="button"
-            class="size-8 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-            title="Group settings"
-            onClick={() => props.onOpenSettings?.()}
-            aria-label="Group settings"
-          >
-            <i class="fa-solid fa-gear text-sm" />
-          </button>
+          <IconButton icon="fa-solid fa-gear" label={t('common.settings')} onClick={() => props.onOpenSettings?.()} />
         </Show>
       </Show>
-      <div class="hidden sm:flex items-center gap-2">
-        <div class="relative">
-          <span class="pointer-events-none absolute inset-y-0 left-2 flex items-center text-[11px] text-muted-foreground">
-            <i class="fa-solid fa-magnifying-glass" />
-          </span>
-          <input
-            type="search"
-            value={props.searchQuery}
-            onInput={(e) => props.onSearchChange(e.currentTarget.value)}
-            onFocus={props.onSearchFocus}
-            placeholder="Search messages"
-            class="w-44 md:w-56 h-8 rounded-md border border-input bg-background pl-7 pr-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-          />
-        </div>
-      </div>
-      {/* <button
-        type="button"
-        onClick={props.onToggleCompact}
-        class="min-h-8 text-xs text-muted-foreground hover:text-foreground px-2.5 py-1.5 rounded inline-flex items-center"
-        title={props.messageCompact ? 'Switch to normal' : 'Switch to compact'}
-      >
-        {props.messageCompact ? 'Normal' : 'Compact'}
-      </button> */}
+      <MessageSearchBox
+        value={props.searchQuery}
+        onValueChange={props.onSearchQueryChange}
+        onSubmit={props.onSearchSubmit}
+        people={props.searchPeople}
+        channels={props.searchChannels}
+      />
     </div>
   </div>
 );

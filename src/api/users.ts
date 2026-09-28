@@ -1,4 +1,5 @@
-import { api } from './client';
+import { api, getApiUrl } from './client';
+import { ApiError } from './ApiError';
 import type { User } from '../types/api';
 
 export interface MeResponse {
@@ -36,12 +37,65 @@ export function patchMe(input: PatchMeInput) {
   return api<MeResponse>('/users/@me', { method: 'PATCH', json: input });
 }
 
-export function toAuthUser(me: MeResponse): Pick<User, 'id' | 'username' | 'discriminator' | 'display_name'> {
+export function toAuthUser(
+  me: MeResponse,
+): Pick<User, 'id' | 'username' | 'discriminator' | 'display_name'> & {
+  avatar?: string;
+  banner?: string;
+  bio?: string;
+  about_me?: string;
+} {
   const d = parseInt(me.discriminator, 10);
   return {
     id: me.id,
     username: me.username,
     discriminator: isNaN(d) ? 0 : d,
     display_name: me.display_name,
+    ...(me.avatar ? { avatar: me.avatar } : {}),
+    ...(me.banner ? { banner: me.banner } : {}),
+    ...(typeof me.bio === 'string' ? { bio: me.bio } : {}),
+    ...(typeof me.about_me === 'string' ? { about_me: me.about_me } : {}),
   };
+}
+
+/** Multipart avatar upload; Nebula URL is returned as avatar on the user object. */
+export async function uploadAvatar(file: File): Promise<MeResponse> {
+  const form = new FormData();
+  form.append('file', file);
+  const token = getToken();
+  const headers: HeadersInit = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${getApiUrl()}/users/@me/avatar`, {
+    method: 'POST',
+    body: form,
+    headers,
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new ApiError(err.error ?? `HTTP ${res.status}`, res.status);
+  }
+  return res.json() as Promise<MeResponse>;
+}
+
+/** Multipart banner upload; Nebula URL is returned as banner on the user object. */
+export async function uploadBanner(file: File): Promise<MeResponse> {
+  const form = new FormData();
+  form.append('file', file);
+  const token = getToken();
+  const headers: HeadersInit = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${getApiUrl()}/users/@me/banner`, {
+    method: 'POST',
+    body: form,
+    headers,
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new ApiError(err.error ?? `HTTP ${res.status}`, res.status);
+  }
+  return res.json() as Promise<MeResponse>;
+}
+
+function getToken(): string | null {
+  return localStorage.getItem('session_token');
 }

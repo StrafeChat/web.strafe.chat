@@ -2,9 +2,11 @@ export {
   getMessageBodyText,
   isEdited,
   getSenderDisplay,
+  type SenderDisplay,
   isSystemMessage,
   formatSystemMessageText,
-  DECRYPT_ERROR_PLACEHOLDER,
+  messagePreviewText,
+  decryptErrorPlaceholder,
   LOADING_PLACEHOLDER,
 } from './utils';
 export { MessageAvatar } from './MessageAvatar';
@@ -12,3 +14,5 @@ export { DeleteMessageModal } from './DeleteMessageModal';
 export { MessageListIntro } from './MessageListIntro';
 export { LoadOlderBlock } from './LoadOlderBlock';
 export { MessageBody } from './MessageBody';
+export { ReplyReference } from './ReplyReference';
+export { MessageReactions } from './MessageReactions';

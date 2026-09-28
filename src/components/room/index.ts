@@ -1,6 +1,11 @@
 export { RoomHeader } from './RoomHeader';
 export { RoomMessageInput } from './RoomMessageInput';
+export { RoomComposerDock } from './RoomComposerDock';
+export type { ReplyTarget } from './RoomMessageInput';
 export { RoomMembersSidebar } from './RoomMembersSidebar';
 export { RoomSearchPanel } from './RoomSearchPanel';
 export { RoomPinnedPanel } from './RoomPinnedPanel';
 export { RenameGroupModal } from './RenameGroupModal';
+export { UnreadBanner } from './UnreadBanner';
+export { TypingIndicator } from './TypingIndicator';
+export type { TypingPerson } from './TypingIndicator';

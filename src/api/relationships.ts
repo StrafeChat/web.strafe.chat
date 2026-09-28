@@ -1,4 +1,7 @@
 import { api } from './client';
+import type { UserPresence } from '../stores/presence';
+
+export type { UserPresence };
 
 export type RelationshipType =
   | 0  // none
@@ -9,17 +12,15 @@ export type RelationshipType =
   | 5  // implicit
   | 6; // suggestion
 
-export interface UserPresence {
-  status: 'online' | 'idle' | 'dnd' | 'offline';
-  custom_status?: string;
-}
-
 export interface RelationshipUser {
   id: string;
   username: string;
   discriminator: string;
   display_name: string;
   avatar?: string;
+  banner?: string;
+  bio?: string;
+  about_me?: string;
   presence?: UserPresence;
 }
 

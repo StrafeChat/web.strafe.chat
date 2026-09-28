@@ -1,6 +1,7 @@
 import { onMount } from 'solid-js';
 import { Show } from 'solid-js';
-import { Router, Route, Navigate, useLocation } from '@solidjs/router';
+import { Router, Route, Navigate, A } from '@solidjs/router';
+import { authGlassSurface } from '../components/auth/authLayout';
 import Login from '../pages/Login';
 import Register from '../pages/Register';
 import Main from '../pages/Main';
@@ -11,12 +12,14 @@ import SpacePage from '../pages/SpacePage';
 import RoomPage from '../pages/RoomPage';
 import InvitePage from '../pages/InvitePage';
 import { StargateProvider } from '../components/StargateProvider';
-import { RecoveryPinModal } from '../components/RecoveryPinModal';
+import { RecoveryModal } from '../components/RecoveryModal';
 import { E2eeEnvironmentModal } from '../components/E2eeEnvironmentModal';
 import { ExternalLinkModal } from '../components/ExternalLinkModal';
 import { UserSettingsModal } from '../components/UserSettingsModal';
+import { SafetyNumberModal } from '../components/SafetyNumberModal';
+import { ConfirmDialog } from '../components/ConfirmDialog';
 import { auth, hydrateAuth } from '../stores/auth';
-import { AuthTurtleBackground } from '../components/auth/AuthTurtleBackground';
+import { AppBackground } from '../components/auth/AppBackground';
 
 function LoadingScreen() {
   return (
@@ -30,14 +33,20 @@ function LoadingScreen() {
 }
 
 function NotFound() {
+  // `relative z-10`: the app background is a fixed z-0 layer, so an unpositioned page
+  // would paint underneath it and appear blank.
   return (
-    <div class="min-h-screen bg-background text-foreground flex items-center justify-center p-4">
-      <div class="text-center">
-        <h1 class="text-2xl font-bold">404</h1>
-        <p class="text-muted-foreground mt-2">Page not found</p>
-        <a href="/" class="text-primary mt-4 inline-block underline">
+    <div class="relative z-10 flex min-h-dvh items-center justify-center p-4 text-foreground">
+      <div class={`w-full max-w-sm p-8 text-center ${authGlassSurface}`}>
+        <p class="font-brand text-5xl font-extrabold tracking-tight text-primary">404</p>
+        <h1 class="mt-2 text-lg font-semibold text-foreground">Page not found</h1>
+        <p class="mt-1 text-sm text-muted-foreground">That link doesn't go anywhere.</p>
+        <A
+          href="/"
+          class="mt-6 inline-flex h-10 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary-hover"
+        >
           Go home
-        </a>
+        </A>
       </div>
     </div>
   );
@@ -45,25 +54,30 @@ function NotFound() {
 
 function RootLayout(props: { children?: import('solid-js').JSX.Element }) {
   onMount(() => hydrateAuth());
-  const location = useLocation();
-  const isAuthRoute = () => location.pathname === '/login' || location.pathname === '/register';
   return (
     <StargateProvider>
       <Show when={auth.hydrated} fallback={<LoadingScreen />}>
-        <AuthTurtleBackground show={isAuthRoute()} />
+        <AppBackground />
         {props.children}
-        <RecoveryPinModal />
+        <RecoveryModal />
         <E2eeEnvironmentModal />
         <ExternalLinkModal />
         <UserSettingsModal />
+        <SafetyNumberModal />
+        <ConfirmDialog />
       </Show>
     </StargateProvider>
   );
 }
 
+// A tracked <Show>, not an early return - see ProtectedRoute for why: an `if` here ran once
+// at mount, so signing out (or a session expiring) never sent the user back to /login.
 function Home(props: { children?: import('solid-js').JSX.Element }) {
-  if (!auth.token) return <Navigate href="/login" />;
-  return <Main>{props.children}</Main>;
+  return (
+    <Show when={auth.token} fallback={<Navigate href="/login" />}>
+      <Main>{props.children}</Main>
+    </Show>
+  );
 }
 
 export function AppRouter() {

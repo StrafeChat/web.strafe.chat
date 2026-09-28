@@ -1,22 +1,44 @@
 import { createStore } from 'solid-js/store';
-import { listMessages, createMessage, editMessage as editMessageApi, type Message } from '../api/messages';
-import { listDevices } from '../api/devices';
 import {
-  ensureDevice,
-  getOrCreateSession,
-  encryptMessage,
-  encryptMessageForSelf,
-  decryptMessage,
-} from '../lib/e2ee';
-import { PLAINTEXT_PREFIX, DUAL_CIPHERTEXT_PREFIX, GROUP_CIPHERTEXT_PREFIX } from '../lib/e2ee/constants';
-import type { GroupCipherPayload } from '../lib/e2ee/types';
-import { getDeviceIdentity, setSentPlaintext, getSentPlaintext } from '../lib/e2ee/store';
+  listMessages,
+  createMessage,
+  editMessage as editMessageApi,
+  uploadAttachment,
+  addReaction as addReactionApi,
+  removeReaction as removeReactionApi,
+  type Attachment,
+  type Message,
+  type CreateMessageInput,
+  type MessageReaction,
+} from '../api/messages';
+import { ensureDevice, encryptMessage } from '../lib/e2ee';
+import { getCurrentDeviceId } from '../lib/e2ee/machine';
+import { encryptAttachment } from '../lib/attachments/crypto';
+import {
+  encryptedMetaFromView,
+  viewFromEncryptedMeta,
+  type AttachmentView,
+  type EncryptedAttachmentMeta,
+} from '../lib/attachments/types';
+import type { PendingAttachment } from '../lib/attachments/draft';
+import {
+  preferResolved,
+  resolveMemberUserIds,
+  resolvePlaintext,
+  roomE2EEOff,
+  viewFromServerAttachment,
+  type ResolvedFields,
+} from '../lib/messageWireFormat';
 import { removeTyping } from './typing';
+
+/** Re-exported: search builds display messages from raw server rows too. */
+export { viewFromServerAttachment };
 import { auth } from './auth';
 import { rooms, updateRoomLastMessage } from './rooms';
+import { updateSpaceRoomLastMessage } from './spaces';
 import { onStargateEvent } from '../services/stargate/client';
-
-const SENT_PLAINTEXT_PLACEHOLDER = '[Your message]';
+import { maybeNotifyMessage } from '../lib/notifications';
+import { setReadState, extractMentionedUserIds, extractMentionedRoleIds, mentionsEveryone } from './readState';
 
 /** Sort messages by created_at ascending (oldest first) */
 function sortByCreatedAt<T extends { created_at: string }>(list: T[]): T[] {
@@ -30,13 +52,23 @@ function createTempId(): string {
   return `temp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-export interface DecryptedMessage extends Message {
+export interface DecryptedMessage extends Omit<Message, 'attachments'> {
   plaintext?: string;
+  /** Attachments in display form. In E2EE rooms these came out of the decrypted body and
+   * carry the per-file key; the server-side copy only knows id/url/size for those. */
+  attachments?: AttachmentView[];
   decryptError?: boolean;
-  /** True when message was sent without E2EE (recipient had no devices) */
+  /** True when the Megolm room key for this message hasn't arrived yet - a "waiting for
+   * key" state, not an error; it resolves itself once the to-device share is processed. */
+  decryptPending?: boolean;
+  /** True when the message predates the current engine (old static-key scheme) and can no
+   * longer be decrypted - that engine's key material was deleted along with it. */
+  legacyUndecryptable?: boolean;
+  /** True when message was sent without E2EE (room has E2EE disabled) */
   notEncrypted?: boolean;
   /** True when message is optimistic (not yet confirmed by server) */
   pending?: boolean;
+  reactions?: MessageReaction[];
 }
 
 export interface MessagesState {
@@ -58,6 +90,51 @@ export const [messages, setMessages] = createStore<MessagesState>({
 });
 
 const MESSAGES_PAGE_SIZE = 30;
+
+function setTempAttachmentProgress(roomId: string, tempId: string, localId: string, progress: number) {
+  setMessages('byRoom', roomId, (prev) =>
+    (prev ?? []).map((m) =>
+      m.id !== tempId
+        ? m
+        : { ...m, attachments: (m.attachments ?? []).map((a) => (a.id === localId ? { ...a, progress } : a)) }
+    )
+  );
+}
+
+/**
+ * Re-attempt decryption for every message still waiting on a room key. Megolm keys arrive
+ * as to-device messages, and a MESSAGE_CREATE can easily be processed before the
+ * to-device share that unlocks it (they're published back-to-back by the sender), so
+ * without this a message that raced its own key would sit at "waiting" until a reload.
+ * Called after each batch of to-device messages is fed into the engine.
+ */
+export async function retryPendingDecrypts(): Promise<void> {
+  const currentUserId = auth.user?.id;
+  if (!currentUserId) return;
+  for (const [roomId, list] of Object.entries(messages.byRoom)) {
+    const waiting = list.filter((m) => m.decryptPending && !m.system_type && !m.id.startsWith('temp-'));
+    if (waiting.length === 0) continue;
+    const resolved = await Promise.all(
+      waiting.map(async (m) => {
+        // Not the stored object: its `plaintext` is the placeholder, which resolvePlaintext
+        // would otherwise take for server-stored plaintext.
+        const fields = await resolvePlaintext(currentUserId, {
+          id: m.id,
+          room_id: m.room_id,
+          sender_id: m.sender_id,
+          ciphertext: m.ciphertext,
+          created_at: m.created_at,
+        });
+        return [m.id, fields] as const;
+      })
+    );
+    const changed = new Map(resolved.filter(([, f]) => !f.decryptPending));
+    if (changed.size === 0) continue;
+    setMessages('byRoom', roomId, (prev) =>
+      (prev ?? []).map((m) => (changed.has(m.id) ? { ...m, ...changed.get(m.id)! } : m))
+    );
+  }
+}
 
 export async function loadMessages(
   roomId: string,
@@ -84,101 +161,14 @@ export async function loadMessages(
     } catch (e) {
       console.warn('ensureDevice failed, decryption may fail:', e);
     }
-    const myDevice = await getDeviceIdentity(currentUserId);
-    const myDeviceId = myDevice?.deviceId;
     const list = await listMessages(roomId, { before, limit: MESSAGES_PAGE_SIZE });
     const decrypted = await Promise.all(
       list.map(async (m): Promise<DecryptedMessage> => {
         if (m.system_type) {
-          return { ...m, plaintext: '' };
+          return { ...m, plaintext: '', attachments: [] };
         }
-        if (m.plaintext != null && m.plaintext !== '') {
-          return { ...m, plaintext: m.plaintext, notEncrypted: true };
-        }
-        const ctext = m.ciphertext ?? '';
-        if (ctext.startsWith(PLAINTEXT_PREFIX)) {
-          return { ...m, plaintext: ctext.slice(PLAINTEXT_PREFIX.length), notEncrypted: true };
-        }
-        if (ctext.startsWith(GROUP_CIPHERTEXT_PREFIX)) {
-          try {
-            const group = JSON.parse(
-              ctext.slice(GROUP_CIPHERTEXT_PREFIX.length)
-            ) as GroupCipherPayload;
-            const isSender = String(m.sender_id) === currentUserId;
-            if (isSender) {
-              const stored = await getSentPlaintext(m.id);
-              if (stored != null) return { ...m, plaintext: stored };
-              if (group.s) {
-                const plaintext = await decryptMessage(group.s, currentUserId);
-                return { ...m, plaintext };
-              }
-              return { ...m, plaintext: SENT_PLAINTEXT_PLACEHOLDER };
-            }
-            const forMeSlots = group.recipients?.filter((r) => r.user_id === currentUserId) ?? [];
-            for (const slot of forMeSlots) {
-              if (myDeviceId != null && slot.device_id !== myDeviceId) continue;
-              try {
-                const plaintext = await decryptMessage(slot.ciphertext, currentUserId);
-                return { ...m, plaintext };
-              } catch {
-                continue;
-              }
-            }
-            for (const slot of forMeSlots) {
-              if (myDeviceId != null && slot.device_id === myDeviceId) continue;
-              try {
-                const plaintext = await decryptMessage(slot.ciphertext, currentUserId);
-                return { ...m, plaintext };
-              } catch {
-                continue;
-              }
-            }
-            return { ...m, decryptError: true };
-          } catch (e) {
-            console.error('[E2EE] Group decrypt failed for message', m.id, e);
-            return { ...m, decryptError: true };
-          }
-        }
-        if (String(m.sender_id) === auth.user?.id) {
-          const stored = await getSentPlaintext(m.id);
-          if (stored != null) return { ...m, plaintext: stored };
-          if (ctext.startsWith(DUAL_CIPHERTEXT_PREFIX)) {
-            try {
-              const dual = JSON.parse(
-                ctext.slice(DUAL_CIPHERTEXT_PREFIX.length)
-              ) as { s?: string };
-              if (dual.s) {
-                const plaintext = await decryptMessage(dual.s, currentUserId);
-                return { ...m, plaintext };
-              }
-            } catch {
-              // fall through to placeholder
-            }
-          } else {
-            // Notes room: ciphertext is self-encrypted only (no dual wrapper)
-            try {
-              const plaintext = await decryptMessage(ctext, currentUserId);
-              return { ...m, plaintext };
-            } catch {
-              // fall through to placeholder
-            }
-          }
-          return { ...m, plaintext: SENT_PLAINTEXT_PLACEHOLDER };
-        }
-        try {
-          let toDecrypt = ctext;
-          if (ctext.startsWith(DUAL_CIPHERTEXT_PREFIX)) {
-            const dual = JSON.parse(
-              ctext.slice(DUAL_CIPHERTEXT_PREFIX.length)
-            ) as { r?: string };
-            toDecrypt = dual.r ?? ctext;
-          }
-          const plaintext = await decryptMessage(toDecrypt, currentUserId);
-          return { ...m, plaintext };
-        } catch (e) {
-          console.error('[E2EE] Decrypt failed for message', m.id, 'from', m.sender_id, e);
-          return { ...m, decryptError: true };
-        }
+        const resolved = await resolvePlaintext(currentUserId, m);
+        return { ...m, ...resolved };
       })
     );
     const container = getScrollContainer?.();
@@ -238,11 +228,13 @@ export async function loadOlderMessages(
 export async function sendMessage(
   roomId: string,
   plaintext: string,
-  replyToId?: string
+  replyToId?: string,
+  pendingAttachments: PendingAttachment[] = []
 ): Promise<Message | null> {
   const room = rooms.rooms.find((r) => r.id === roomId);
   const currentUserId = auth.user?.id;
   if (!room || !currentUserId) return null;
+  if (!plaintext && pendingAttachments.length === 0) return null;
 
   const participants = room.participants ?? [];
   const otherParticipant = participants.find((p) => p.id !== currentUserId);
@@ -253,6 +245,19 @@ export async function sendMessage(
 
   const nonce = createTempId();
   const now = new Date().toISOString();
+  // Optimistic previews straight from the local files, with a progress bar per upload.
+  const tempAttachments: AttachmentView[] = pendingAttachments.map((p) => ({
+    id: p.localId,
+    url: p.previewUrl ?? '',
+    filename: p.file.name || 'file',
+    contentType: p.file.type || 'application/octet-stream',
+    size: p.file.size,
+    width: p.width,
+    height: p.height,
+    previewUrl: p.previewUrl,
+    uploading: true,
+    progress: 0,
+  }));
   const tempMsg: DecryptedMessage = {
     id: nonce,
     room_id: roomId,
@@ -264,6 +269,7 @@ export async function sendMessage(
     plaintext,
     pending: true,
     reply_to_id: replyToId,
+    attachments: tempAttachments,
   };
 
   setMessages('byRoom', roomId, (prev) => sortByCreatedAt([...(prev ?? []), tempMsg]));
@@ -272,95 +278,78 @@ export async function sendMessage(
   setMessages('sending', roomId, true);
   try {
     await ensureDevice(currentUserId);
-    const e2eeOff = isGroupRoom && room.e2ee_enabled === false;
-    const isSpaceTextRoom = room.type === 3;
-    if (isSpaceTextRoom || e2eeOff) {
-      const device = await getDeviceIdentity(currentUserId);
-      const msg = await createMessage(roomId, {
-        sender_device_id: device?.deviceId ?? 1,
-        plaintext,
-        ...(replyToId ? { reply_to_id: Number(replyToId) } : {}),
-      });
-      const confirmed: DecryptedMessage = { ...msg, plaintext, notEncrypted: true };
-      let didReplaceInPlace = false;
-      setMessages('byRoom', roomId, (prev) => {
-        const list = prev ?? [];
-        const withoutTemp = list.filter((m) => m.id !== nonce);
-        const existingIdx = withoutTemp.findIndex((m) => m.id === msg.id);
-        didReplaceInPlace = true;
-        if (existingIdx >= 0) {
-          return withoutTemp.map((m, i) => (i === existingIdx ? { ...m, ...confirmed, plaintext } : m));
-        }
-        return sortByCreatedAt([...withoutTemp, confirmed]);
-      });
-      if (!didReplaceInPlace) setMessages('scrollToBottomTick', roomId, (t) => (t ?? 0) + 1);
-      return msg;
-    }
-    let ciphertext: string;
-    let notEncrypted = false;
+    const deviceId = getCurrentDeviceId();
+    if (!deviceId) throw new Error('E2EE device not initialized');
+    const e2eeOff = roomE2EEOff(room, isGroupRoom, isSpaceTextRoom);
 
-    if (isGroupRoom) {
-      const others = participants.filter((p) => p.id !== currentUserId);
-      const recipients: GroupCipherPayload['recipients'] = [];
-      for (const p of others) {
-        try {
-          const devices = await listDevices(p.id);
-          for (const d of devices) {
-            const deviceId = d.device_id;
-            await getOrCreateSession(currentUserId, p.id, deviceId);
-            const c = await encryptMessage(plaintext, currentUserId, p.id, deviceId);
-            recipients.push({ user_id: p.id, device_id: deviceId, ciphertext: c });
-          }
-        } catch (e) {
-          console.warn('[E2EE] Group: could not encrypt for', p.id, e);
-        }
-      }
-      const senderCipher = await encryptMessageForSelf(plaintext, currentUserId);
-      if (recipients.length === 0) {
-        ciphertext = PLAINTEXT_PREFIX + plaintext;
-        notEncrypted = true;
-      } else {
-        ciphertext =
-          GROUP_CIPHERTEXT_PREFIX +
-          JSON.stringify({ s: senderCipher, recipients });
-      }
-    } else {
-      const recipientId = otherParticipant?.id ?? currentUserId;
-      const devices = await listDevices(recipientId);
-      const deviceId = devices[0]?.device_id;
+    // Never Number() either id: snowflakes are > 2^53, so a numeric id arrives at the
+    // server rounded to the nearest 8 (every reply used to point at a message that
+    // doesn't exist, and every message recorded a sender device that doesn't either).
+    const input: CreateMessageInput = {
+      sender_device_id: deviceId,
+      ...(replyToId ? { reply_to_id: replyToId } : {}),
+    };
 
-      if (deviceId != null) {
-        await getOrCreateSession(currentUserId, recipientId, deviceId);
-        if (isNotesRoom) {
-          ciphertext = await encryptMessageForSelf(plaintext, currentUserId);
+    // Uploads go first so the message can reference them by id. Plaintext rooms upload
+    // the file as-is and the server records name/type/dimensions. E2EE rooms upload an
+    // AES-GCM ciphertext blob the server can't interpret; the metadata and key travel
+    // inside the Megolm-encrypted body below, so only people who can read the message can
+    // open the file.
+    const sentAttachments: AttachmentView[] = [];
+    const encryptedMetas: EncryptedAttachmentMeta[] = [];
+    if (pendingAttachments.length > 0) {
+      input.attachments = [];
+      for (const p of pendingAttachments) {
+        const onProgress = (fraction: number) => setTempAttachmentProgress(roomId, nonce, p.localId, fraction);
+        if (e2eeOff) {
+          const a = await uploadAttachment(roomId, p.file, {
+            filename: p.file.name,
+            width: p.width,
+            height: p.height,
+            onProgress,
+          });
+          sentAttachments.push({ ...viewFromServerAttachment(a), previewUrl: p.previewUrl });
+          input.attachments.push(a.id);
         } else {
-          const recipientCipher = await encryptMessage(
-            plaintext,
-            currentUserId,
-            recipientId,
-            deviceId
-          );
-          const senderCipher = await encryptMessageForSelf(plaintext, currentUserId);
-          ciphertext =
-            DUAL_CIPHERTEXT_PREFIX +
-            JSON.stringify({ r: recipientCipher, s: senderCipher });
+          const { blob, material } = await encryptAttachment(p.file);
+          const a = await uploadAttachment(roomId, blob, { encrypted: true, onProgress });
+          const meta: EncryptedAttachmentMeta = {
+            id: a.id,
+            url: a.url,
+            filename: p.file.name || 'file',
+            content_type: p.file.type || 'application/octet-stream',
+            size: p.file.size,
+            width: p.width,
+            height: p.height,
+            key: material.key,
+            iv: material.iv,
+          };
+          encryptedMetas.push(meta);
+          sentAttachments.push({ ...viewFromEncryptedMeta(meta), previewUrl: p.previewUrl });
+          input.attachments.push(a.id);
         }
-      } else {
-        ciphertext = PLAINTEXT_PREFIX + plaintext;
-        notEncrypted = true;
       }
     }
 
-    const device = await getDeviceIdentity(currentUserId);
-    const msg = await createMessage(roomId, {
-      sender_device_id: device?.deviceId ?? 1,
-      ciphertext,
-      ...(replyToId ? { reply_to_id: Number(replyToId) } : {}),
-    });
+    if (e2eeOff) {
+      if (plaintext) input.plaintext = plaintext;
+    } else {
+      const memberUserIds = await resolveMemberUserIds(currentUserId, room, participants, isSpaceTextRoom);
+      input.ciphertext = await encryptMessage(
+        currentUserId,
+        roomId,
+        memberUserIds,
+        plaintext,
+        encryptedMetas.length > 0 ? { attachments: encryptedMetas } : undefined
+      );
+      input.mentions = extractMentionedUserIds(plaintext);
+      input.mention_roles = extractMentionedRoleIds(plaintext);
+      input.mention_everyone = mentionsEveryone(plaintext);
+    }
 
-    await setSentPlaintext(msg.id, plaintext);
+    const msg = await createMessage(roomId, input);
 
-    const confirmed: DecryptedMessage = { ...msg, plaintext, notEncrypted };
+    const confirmed: DecryptedMessage = { ...msg, plaintext, notEncrypted: e2eeOff, attachments: sentAttachments };
     let didReplaceInPlace = false;
     setMessages('byRoom', roomId, (prev) => {
       const list = prev ?? [];
@@ -409,6 +398,7 @@ export async function addMessageFromEvent(payload: {
   reply_to_id?: string;
   system_type?: string;
   system_payload?: string;
+  attachments?: Attachment[];
   created_at: string;
   updated_at: string;
 }) {
@@ -417,33 +407,22 @@ export async function addMessageFromEvent(payload: {
     const msg: DecryptedMessage = {
       ...payload,
       plaintext: '',
+      attachments: [],
     };
+    let didAppend = false;
     setMessages('byRoom', roomId, (prev) => {
       const list = prev ?? [];
       if (list.some((m) => m.id === msg.id)) return list;
+      didAppend = true;
       return sortByCreatedAt([...list, msg]);
     });
+    if (didAppend) {
+      setMessages('scrollToBottomTick', roomId, (t) => (t ?? 0) + 1);
+    }
     return;
   }
   removeTyping(roomId, String(payload.sender_id));
   const currentUserId = auth.user?.id;
-  if (payload.plaintext != null && payload.plaintext !== '') {
-    const msg: DecryptedMessage = {
-      ...payload,
-      plaintext: payload.plaintext,
-      notEncrypted: true,
-    };
-    setMessages('byRoom', roomId, (prev) => {
-      const list = prev ?? [];
-      if (list.some((m) => m.id === msg.id)) return list;
-      const isOwn = String(payload.sender_id) === currentUserId;
-      const withoutTemp = isOwn
-        ? list.filter((m) => !(m.pending && String(m.sender_id) === currentUserId && m.plaintext === payload.plaintext))
-        : list;
-      return sortByCreatedAt([...withoutTemp, msg]);
-    });
-    return;
-  }
   if (currentUserId) {
     try {
       await ensureDevice(currentUserId);
@@ -451,104 +430,11 @@ export async function addMessageFromEvent(payload: {
       // fall through; decrypt will fail and we'll set decryptError
     }
   }
-  let plaintext: string | undefined;
-  let decryptError = false;
-  let notEncrypted = false;
+  const resolved: ResolvedFields = currentUserId
+    ? await resolvePlaintext(currentUserId, payload)
+    : { plaintext: '', decryptError: true, attachments: [] };
 
-  if ((payload.ciphertext ?? '').startsWith(PLAINTEXT_PREFIX)) {
-    plaintext = payload.ciphertext.slice(PLAINTEXT_PREFIX.length);
-    notEncrypted = true;
-  } else if (payload.ciphertext.startsWith(GROUP_CIPHERTEXT_PREFIX) && currentUserId) {
-    try {
-      const group = JSON.parse(
-        payload.ciphertext.slice(GROUP_CIPHERTEXT_PREFIX.length)
-      ) as GroupCipherPayload;
-      const isSender = String(payload.sender_id) === currentUserId;
-      if (isSender) {
-        const stored = await getSentPlaintext(payload.id);
-        if (stored != null) plaintext = stored;
-        else if (group.s) plaintext = await decryptMessage(group.s, currentUserId);
-        else plaintext = SENT_PLAINTEXT_PLACEHOLDER;
-      } else {
-        const myDeviceId = (await getDeviceIdentity(currentUserId))?.deviceId;
-        const forMeSlots = group.recipients?.filter((r) => r.user_id === currentUserId) ?? [];
-        for (const slot of forMeSlots) {
-          if (myDeviceId != null && slot.device_id !== myDeviceId) continue;
-          try {
-            plaintext = await decryptMessage(slot.ciphertext, currentUserId);
-            break;
-          } catch {
-            continue;
-          }
-        }
-        if (plaintext == null) {
-          for (const slot of forMeSlots) {
-            if (myDeviceId != null && slot.device_id === myDeviceId) continue;
-            try {
-              plaintext = await decryptMessage(slot.ciphertext, currentUserId);
-              break;
-            } catch {
-              continue;
-            }
-          }
-        }
-        if (plaintext == null) decryptError = true;
-      }
-    } catch (e) {
-      console.error('[E2EE] Group decrypt failed for real-time message', payload.id, e);
-      decryptError = true;
-    }
-  } else if (String(payload.sender_id) !== currentUserId && currentUserId) {
-    try {
-      let toDecrypt = payload.ciphertext;
-      if (payload.ciphertext.startsWith(DUAL_CIPHERTEXT_PREFIX)) {
-        const dual = JSON.parse(
-          payload.ciphertext.slice(DUAL_CIPHERTEXT_PREFIX.length)
-        ) as { r?: string };
-        toDecrypt = dual.r ?? payload.ciphertext;
-      }
-      plaintext = await decryptMessage(toDecrypt, currentUserId);
-    } catch (e) {
-      console.error('[E2EE] Decrypt failed for real-time message', payload.id, 'from', payload.sender_id, e);
-      decryptError = true;
-    }
-  } else {
-    const stored = await getSentPlaintext(payload.id);
-    if (stored != null) {
-      plaintext = stored;
-    } else if (
-      currentUserId &&
-      payload.ciphertext.startsWith(DUAL_CIPHERTEXT_PREFIX)
-    ) {
-      try {
-        const dual = JSON.parse(
-          payload.ciphertext.slice(DUAL_CIPHERTEXT_PREFIX.length)
-        ) as { s?: string };
-        if (dual.s) {
-          plaintext = await decryptMessage(dual.s, currentUserId);
-        } else {
-          plaintext = SENT_PLAINTEXT_PLACEHOLDER;
-        }
-      } catch {
-        plaintext = SENT_PLAINTEXT_PLACEHOLDER;
-      }
-    } else if (currentUserId && !payload.ciphertext.startsWith(PLAINTEXT_PREFIX) && !payload.ciphertext.startsWith(GROUP_CIPHERTEXT_PREFIX)) {
-      // Notes room: ciphertext is self-encrypted only
-      try {
-        plaintext = await decryptMessage(payload.ciphertext, currentUserId);
-      } catch {
-        plaintext = SENT_PLAINTEXT_PLACEHOLDER;
-      }
-    } else {
-      plaintext = SENT_PLAINTEXT_PLACEHOLDER;
-    }
-  }
-  const msg: DecryptedMessage = {
-    ...payload,
-    plaintext: plaintext ?? SENT_PLAINTEXT_PLACEHOLDER,
-    decryptError: decryptError || undefined,
-    notEncrypted,
-  };
+  const msg: DecryptedMessage = { ...payload, ...resolved };
   let didReplaceInPlace = false;
   setMessages('byRoom', roomId, (prev) => {
     const list = prev ?? [];
@@ -556,27 +442,14 @@ export async function addMessageFromEvent(payload: {
     if (existingIdx >= 0) {
       didReplaceInPlace = true;
       const existing = list[existingIdx]!;
-      return list.map((m, i) =>
-        i === existingIdx
-          ? {
-              ...existing,
-              ...msg,
-              plaintext:
-                msg.plaintext && msg.plaintext !== SENT_PLAINTEXT_PLACEHOLDER ? msg.plaintext : existing.plaintext,
-            }
-          : m
-      );
+      return list.map((m, i) => (i === existingIdx ? { ...existing, ...payload, ...preferResolved(existing, resolved) } : m));
     }
     const isOwn = String(payload.sender_id) === currentUserId;
-    const tempIdx =
-      isOwn && plaintext
-        ? list.findIndex(
-            (m) =>
-              m.pending &&
-              m.sender_id === payload.sender_id &&
-              m.plaintext === plaintext
-          )
-        : -1;
+    const tempIdx = isOwn
+      ? list.findIndex(
+          (m) => m.pending && String(m.sender_id) === currentUserId && m.plaintext === resolved.plaintext
+        )
+      : -1;
     if (tempIdx >= 0) {
       didReplaceInPlace = true;
       const merged = [...list];
@@ -597,90 +470,23 @@ export async function updateMessageFromEvent(payload: {
   sender_id: string;
   sender_device_id: string;
   ciphertext: string;
+  plaintext?: string;
   reply_to_id?: string;
+  attachments?: Attachment[];
   created_at: string;
   updated_at: string;
 }) {
   const roomId = payload.room_id;
   const currentUserId = auth.user?.id;
   if (!currentUserId) return;
-  let plaintext: string | undefined;
-  let decryptError = false;
-  let notEncrypted = false;
-
-  if (payload.ciphertext.startsWith(PLAINTEXT_PREFIX)) {
-    plaintext = payload.ciphertext.slice(PLAINTEXT_PREFIX.length);
-    notEncrypted = true;
-  } else if (payload.ciphertext.startsWith(GROUP_CIPHERTEXT_PREFIX) && currentUserId) {
-    try {
-      const group = JSON.parse(
-        payload.ciphertext.slice(GROUP_CIPHERTEXT_PREFIX.length)
-      ) as GroupCipherPayload;
-      const isSender = String(payload.sender_id) === currentUserId;
-      if (isSender) {
-        const stored = await getSentPlaintext(payload.id);
-        if (stored != null) plaintext = stored;
-        else if (group.s) plaintext = await decryptMessage(group.s, currentUserId);
-        else plaintext = SENT_PLAINTEXT_PLACEHOLDER;
-      } else {
-        const myDeviceId = (await getDeviceIdentity(currentUserId))?.deviceId;
-        const forMeSlots = group.recipients?.filter((r) => r.user_id === currentUserId) ?? [];
-        for (const slot of forMeSlots) {
-          if (myDeviceId != null && slot.device_id !== myDeviceId) continue;
-          try {
-            plaintext = await decryptMessage(slot.ciphertext, currentUserId);
-            break;
-          } catch {
-            continue;
-          }
-        }
-        if (plaintext == null) decryptError = true;
-      }
-    } catch {
-      decryptError = true;
-    }
-  } else if (String(payload.sender_id) !== currentUserId && currentUserId) {
-    try {
-      let toDecrypt = payload.ciphertext;
-      if (payload.ciphertext.startsWith(DUAL_CIPHERTEXT_PREFIX)) {
-        const dual = JSON.parse(
-          payload.ciphertext.slice(DUAL_CIPHERTEXT_PREFIX.length)
-        ) as { r?: string };
-        toDecrypt = dual.r ?? payload.ciphertext;
-      }
-      plaintext = await decryptMessage(toDecrypt, currentUserId);
-    } catch {
-      decryptError = true;
-    }
-  } else {
-    const stored = await getSentPlaintext(payload.id);
-    if (stored != null) plaintext = stored;
-    else if (currentUserId && payload.ciphertext.startsWith(DUAL_CIPHERTEXT_PREFIX)) {
-      try {
-        const dual = JSON.parse(
-          payload.ciphertext.slice(DUAL_CIPHERTEXT_PREFIX.length)
-        ) as { s?: string };
-        plaintext = dual.s ? await decryptMessage(dual.s, currentUserId) : SENT_PLAINTEXT_PLACEHOLDER;
-      } catch {
-        plaintext = SENT_PLAINTEXT_PLACEHOLDER;
-      }
-    } else {
-      plaintext = SENT_PLAINTEXT_PLACEHOLDER;
-    }
-  }
+  const resolved = await resolvePlaintext(currentUserId, payload);
 
   setMessages('byRoom', roomId, (prev) => {
     const list = prev ?? [];
     const idx = list.findIndex((m) => m.id === payload.id);
     if (idx < 0) return prev;
     const existing = list[idx]!;
-    const updated: DecryptedMessage = {
-      ...existing,
-      ...payload,
-      plaintext: plaintext ?? SENT_PLAINTEXT_PLACEHOLDER,
-      decryptError: decryptError || undefined,
-      notEncrypted,
-    };
+    const updated: DecryptedMessage = { ...existing, ...payload, ...resolved };
     return list.map((m, i) => (i === idx ? updated : m));
   });
 }
@@ -688,6 +494,66 @@ export async function updateMessageFromEvent(payload: {
 /** Remove a message from local store (Stargate MESSAGE_DELETE) */
 export function removeMessageFromEvent(roomId: string, messageId: string) {
   setMessages('byRoom', roomId, (prev) => (prev ?? []).filter((m) => m.id !== messageId));
+}
+
+/**
+ * Apply one reaction delta (one user added/removed one emoji) to a message's aggregated
+ * summary in place. Only used for events about *other* users - the current user's own
+ * add/remove goes through toggleReaction below, which applies its own optimistic delta and
+ * then reconciles from the REST response's authoritative summary; applying this same delta
+ * again from that action's own MESSAGE_REACTION_ADD/REMOVE echo would double-count it.
+ */
+function patchReaction(roomId: string, messageId: string, emoji: string, userId: string, added: boolean) {
+  const currentUserId = auth.user?.id;
+  setMessages('byRoom', roomId, (prev) => {
+    const list = prev ?? [];
+    const idx = list.findIndex((m) => m.id === messageId);
+    if (idx < 0) return prev;
+    const msg = list[idx]!;
+    const reactions = msg.reactions ?? [];
+    const ri = reactions.findIndex((r) => r.emoji === emoji);
+    let next: MessageReaction[];
+    if (added) {
+      next =
+        ri >= 0
+          ? reactions.map((r, i) => (i === ri ? { ...r, count: r.count + 1, me: r.me || userId === currentUserId } : r))
+          : [...reactions, { emoji, count: 1, me: userId === currentUserId }];
+    } else {
+      if (ri < 0) return prev;
+      const r = reactions[ri]!;
+      const count = r.count - 1;
+      next =
+        count <= 0
+          ? reactions.filter((_, i) => i !== ri)
+          : reactions.map((rr, i) => (i === ri ? { ...rr, count, me: userId === currentUserId ? false : rr.me } : rr));
+    }
+    return list.map((m, i) => (i === idx ? { ...m, reactions: next } : m));
+  });
+}
+
+/**
+ * Toggle the current user's own reaction: applies an optimistic delta immediately, calls
+ * the API, then replaces the message's reaction summary with the authoritative one the
+ * response carries. Reverts the optimistic delta if the request fails.
+ */
+export async function toggleReaction(roomId: string, messageId: string, emoji: string, currentlyMine: boolean): Promise<void> {
+  const currentUserId = auth.user?.id;
+  if (!currentUserId) return;
+  patchReaction(roomId, messageId, emoji, currentUserId, !currentlyMine);
+  try {
+    const res = currentlyMine
+      ? await removeReactionApi(roomId, messageId, emoji)
+      : await addReactionApi(roomId, messageId, emoji);
+    setMessages('byRoom', roomId, (prev) => {
+      const list = prev ?? [];
+      const idx = list.findIndex((m) => m.id === messageId);
+      if (idx < 0) return prev;
+      return list.map((m, i) => (i === idx ? { ...m, reactions: res.reactions } : m));
+    });
+  } catch (err) {
+    patchReaction(roomId, messageId, emoji, currentUserId, currentlyMine);
+    throw err;
+  }
 }
 
 /** Edit a message: encrypt, PATCH, update local store. Realtime MESSAGE_UPDATE will also update others. */
@@ -704,69 +570,37 @@ export async function editMessage(
   const otherParticipant = participants.find((p) => p.id !== currentUserId);
   const isNotesRoom = !otherParticipant && participants.length === 1;
   const isGroupRoom = room.type === 2 && participants.length >= 2;
-  if (!otherParticipant && !isNotesRoom && !isGroupRoom) return null;
+  const isSpaceTextRoom = room.type === 3;
+  if (!otherParticipant && !isNotesRoom && !isGroupRoom && !isSpaceTextRoom) return null;
 
   try {
     await ensureDevice(currentUserId);
-    let ciphertext: string;
-    let notEncrypted = false;
+    const e2eeOff = roomE2EEOff(room, isGroupRoom, isSpaceTextRoom);
+    const existing = messages.byRoom[roomId]?.find((m) => m.id === msgId);
+    // An E2EE edit re-encrypts the whole body, so the attachment metadata/keys that live
+    // in it have to be carried over or every other reader would lose the files.
+    const encryptedMetas = (existing?.attachments ?? [])
+      .map(encryptedMetaFromView)
+      .filter((m): m is EncryptedAttachmentMeta => m != null);
 
-    if (isGroupRoom) {
-      const others = participants.filter((p) => p.id !== currentUserId);
-      const recipients: GroupCipherPayload['recipients'] = [];
-      for (const p of others) {
-        try {
-          const devices = await listDevices(p.id);
-          for (const d of devices) {
-            const deviceId = d.device_id;
-            await getOrCreateSession(currentUserId, p.id, deviceId);
-            const c = await encryptMessage(newPlaintext, currentUserId, p.id, deviceId);
-            recipients.push({ user_id: p.id, device_id: deviceId, ciphertext: c });
-          }
-        } catch (e) {
-          console.warn('[E2EE] Group edit: could not encrypt for', p.id, e);
-        }
-      }
-      const senderCipher = await encryptMessageForSelf(newPlaintext, currentUserId);
-      if (recipients.length === 0) {
-        ciphertext = PLAINTEXT_PREFIX + newPlaintext;
-        notEncrypted = true;
-      } else {
-        ciphertext =
-          GROUP_CIPHERTEXT_PREFIX +
-          JSON.stringify({ s: senderCipher, recipients });
-      }
-    } else {
-      const recipientId = otherParticipant?.id ?? currentUserId;
-      const devices = await listDevices(recipientId);
-      const deviceId = devices[0]?.device_id;
-
-      if (deviceId != null) {
-        await getOrCreateSession(currentUserId, recipientId, deviceId);
-        if (isNotesRoom) {
-          ciphertext = await encryptMessageForSelf(newPlaintext, currentUserId);
-        } else {
-          const recipientCipher = await encryptMessage(
-            newPlaintext,
+    const msg = e2eeOff
+      ? await editMessageApi(roomId, msgId, { plaintext: newPlaintext })
+      : await editMessageApi(roomId, msgId, {
+          ciphertext: await encryptMessage(
             currentUserId,
-            recipientId,
-            deviceId
-          );
-          const senderCipher = await encryptMessageForSelf(newPlaintext, currentUserId);
-          ciphertext =
-            DUAL_CIPHERTEXT_PREFIX +
-            JSON.stringify({ r: recipientCipher, s: senderCipher });
-        }
-      } else {
-        ciphertext = PLAINTEXT_PREFIX + newPlaintext;
-        notEncrypted = true;
-      }
-    }
+            roomId,
+            await resolveMemberUserIds(currentUserId, room, participants, isSpaceTextRoom),
+            newPlaintext,
+            encryptedMetas.length > 0 ? { attachments: encryptedMetas } : undefined
+          ),
+        });
 
-    const msg = await editMessageApi(roomId, msgId, ciphertext);
-    await setSentPlaintext(msg.id, newPlaintext);
-
-    const updated: DecryptedMessage = { ...msg, plaintext: newPlaintext, notEncrypted };
+    const updated: DecryptedMessage = {
+      ...msg,
+      plaintext: newPlaintext,
+      notEncrypted: e2eeOff,
+      attachments: existing?.attachments ?? (msg.attachments ?? []).filter((a) => !a.encrypted).map(viewFromServerAttachment),
+    };
     setMessages('byRoom', roomId, (prev) => {
       const list = prev ?? [];
       const idx = list.findIndex((m) => m.id === msgId);
@@ -780,32 +614,77 @@ export async function editMessage(
   }
 }
 
+/**
+ * Bump the local mention badge when an incoming message pings the current user - the
+ * server already incremented room_mention_counts (so a reload/other device sees it
+ * regardless), this just makes the sidebar react immediately without waiting for one.
+ * Mirrors the server's own notify-set rule (messages.Service.resolveMentionNotifySet):
+ * direct mention OR @everyone/@here, never for your own messages.
+ */
+function applyIncomingMentionSignal(roomId: string, data: Record<string, unknown>) {
+  const currentUserId = auth.user?.id;
+  if (!currentUserId) return;
+  const senderId = data.sender_id != null ? String(data.sender_id) : '';
+  if (senderId === currentUserId) return;
+  const mentions = Array.isArray(data.mentions) ? (data.mentions as unknown[]).map(String) : [];
+  const everyone = data.mention_everyone === true;
+  if (!everyone && !mentions.includes(currentUserId)) return;
+  setReadState('byRoom', roomId, (prev) => ({
+    lastReadMessageId: prev?.lastReadMessageId ?? null,
+    mentionCount: (prev?.mentionCount ?? 0) + 1,
+  }));
+}
+
 /** Register Stargate event handlers. Call once on app init. */
 export function initStargateMessageHandler() {
   return onStargateEvent((evt) => {
     if (evt.t === 'MESSAGE_CREATE') {
       const payload = (evt.d as Record<string, unknown>)?.d ?? evt.d;
       const data = payload as Record<string, unknown>;
-      const roomId = data?.room_id ?? (evt as { room_id?: string }).room_id;
-      if (data && typeof roomId === 'string') {
-        addMessageFromEvent({ ...data, room_id: roomId } as Parameters<typeof addMessageFromEvent>[0]);
-        const msgId = data?.id;
-        if (typeof msgId === 'string') updateRoomLastMessage(roomId, msgId);
+      const rawRoomId = data?.room_id ?? (evt as { room_id?: string | number }).room_id;
+      const roomId = rawRoomId != null ? String(rawRoomId) : '';
+      if (data && roomId) {
+        const rawMsgId = data?.id;
+        const msgId = rawMsgId != null ? String(rawMsgId) : '';
+        // Notify once the message (and, in E2EE rooms, its plaintext) is in the store.
+        void addMessageFromEvent({ ...data, room_id: roomId } as Parameters<typeof addMessageFromEvent>[0]).then(() => {
+          if (msgId) maybeNotifyMessage(roomId, msgId);
+        });
+        applyIncomingMentionSignal(roomId, data);
+        if (msgId) {
+          updateRoomLastMessage(roomId, msgId);
+          updateSpaceRoomLastMessage(roomId, msgId);
+        }
       }
     } else if (evt.t === 'MESSAGE_UPDATE') {
       const payload = (evt.d as Record<string, unknown>)?.d ?? evt.d;
       const data = payload as Record<string, unknown>;
-      const roomId = data?.room_id ?? (evt as { room_id?: string }).room_id;
-      if (data && typeof roomId === 'string') {
+      const rawRoomId = data?.room_id ?? (evt as { room_id?: string | number }).room_id;
+      const roomId = rawRoomId != null ? String(rawRoomId) : '';
+      if (data && roomId) {
         updateMessageFromEvent({ ...data, room_id: roomId } as Parameters<typeof updateMessageFromEvent>[0]);
       }
     } else if (evt.t === 'MESSAGE_DELETE') {
       const payload = (evt.d as Record<string, unknown>)?.d ?? evt.d;
       const data = payload as Record<string, unknown>;
-      const roomId = data?.room_id ?? (evt as { room_id?: string }).room_id;
-      const messageId = data?.message_id ?? (data as { id?: string }).id;
-      if (typeof roomId === 'string' && typeof messageId === 'string') {
+      const rawRoomId = data?.room_id ?? (evt as { room_id?: string | number }).room_id;
+      const roomId = rawRoomId != null ? String(rawRoomId) : '';
+      const rawMessageId = data?.message_id ?? (data as { id?: string | number }).id;
+      const messageId = rawMessageId != null ? String(rawMessageId) : '';
+      if (roomId && messageId) {
         removeMessageFromEvent(roomId, messageId);
+      }
+    } else if (evt.t === 'MESSAGE_REACTION_ADD' || evt.t === 'MESSAGE_REACTION_REMOVE') {
+      const payload = (evt.d as Record<string, unknown>)?.d ?? evt.d;
+      const data = payload as Record<string, unknown>;
+      const roomId = data?.room_id != null ? String(data.room_id) : '';
+      const messageId = data?.message_id != null ? String(data.message_id) : '';
+      const userId = data?.user_id != null ? String(data.user_id) : '';
+      const emoji = typeof data?.emoji === 'string' ? data.emoji : '';
+      // Our own reactions are already applied (optimistically, then reconciled) by
+      // toggleReaction - applying this echo too would double-count them.
+      if (roomId && messageId && userId && emoji && userId !== auth.user?.id) {
+        patchReaction(roomId, messageId, emoji, userId, evt.t === 'MESSAGE_REACTION_ADD');
       }
     }
   });

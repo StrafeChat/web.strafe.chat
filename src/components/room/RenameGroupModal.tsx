@@ -1,9 +1,11 @@
 import type { Component } from 'solid-js';
 import { createSignal, createEffect, Show } from 'solid-js';
-import { Portal } from 'solid-js/web';
 import { Input } from '../ui/Input';
 import { Button } from '../ui/Button';
+import { Checkbox } from '../ui/Checkbox';
 import { ResponsiveDialog } from '../ui/ResponsiveDialog';
+import { appDialogActions } from '../../theme/appChrome';
+import { t } from '../../i18n';
 
 export interface RenameGroupModalProps {
   open: boolean;
@@ -32,13 +34,13 @@ export const RenameGroupModal: Component<RenameGroupModalProps> = (props) => {
     const n = name().trim();
     setError('');
     if (!n) {
-      setError('Name is required');
+      setError(t('room.groupSettings.nameRequired'));
       return;
     }
     setLoading(true);
     Promise.resolve(props.onSave({ name: n, e2ee_enabled: e2eeEnabled() }))
       .then(() => props.onClose())
-      .catch((err) => setError(err instanceof Error ? err.message : 'Failed to save'))
+      .catch((err) => setError(err instanceof Error ? err.message : t('common.saveFailed')))
       .finally(() => setLoading(false));
   }
 
@@ -53,48 +55,44 @@ export const RenameGroupModal: Component<RenameGroupModalProps> = (props) => {
 
   return (
     <Show when={props.open}>
-      <Portal mount={document.body}>
-        <ResponsiveDialog
-          size="sm"
-          zClass="z-[220]"
-          ariaLabelledby="rename-group-title"
-          onBackdropClick={() => handleClose()}
-          panelClass="px-6 pt-6 touch-manipulation"
-        >
-          <h2 id="rename-group-title" class="text-lg font-semibold text-foreground mb-1">Group settings</h2>
-          <p class="text-sm text-muted-foreground mb-4">Edit the group name and whether messages are end-to-end encrypted.</p>
-          <form onSubmit={handleSubmit} class="space-y-4">
-            <Input
-              type="text"
-              label="Group name"
-              placeholder="e.g. Weekend squad"
-              value={name()}
-              onInput={(e) => { setName(e.currentTarget.value); setError(''); }}
-              disabled={loading()}
-            />
-            <label class="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={e2eeEnabled()}
-                onInput={(e) => setE2eeEnabled((e.target as HTMLInputElement).checked)}
-                disabled={loading()}
-                class="rounded border-border"
-              />
-              <span class="text-sm text-foreground">End-to-end encryption</span>
-            </label>
-            <p class="text-xs text-muted-foreground">When off, messages are stored in plaintext in our servers.</p>
-            {error() && <p class="text-xs text-destructive">{error()}</p>}
-            <div class="flex gap-2">
-              <Button type="button" variant="outline" class="flex-1" onClick={handleClose} disabled={loading()}>
-                Cancel
-              </Button>
-              <Button type="submit" class="flex-1" loading={loading()} disabled={!name().trim()}>
-                Save
-              </Button>
-            </div>
-          </form>
-        </ResponsiveDialog>
-      </Portal>
+      <ResponsiveDialog
+        size="sm"
+        onClose={handleClose}
+        dismissible={!loading()}
+        title={t('room.groupSettings.title')}
+        description={t('room.groupSettings.description')}
+      >
+        <form onSubmit={handleSubmit} class="space-y-4">
+          <Input
+            type="text"
+            label={t('room.groupSettings.name')}
+            placeholder={t('room.groupSettings.namePlaceholder')}
+            value={name()}
+            onInput={(e) => {
+              setName(e.currentTarget.value);
+              setError('');
+            }}
+            disabled={loading()}
+            error={error() || undefined}
+            autofocus
+          />
+          <Checkbox
+            checked={e2eeEnabled()}
+            onChange={setE2eeEnabled}
+            disabled={loading()}
+            label={t('room.groupSettings.e2ee')}
+            description={t('room.groupSettings.e2eeDescription')}
+          />
+          <div class={appDialogActions}>
+            <Button type="button" variant="outline" onClick={handleClose} disabled={loading()}>
+              {t('common.cancel')}
+            </Button>
+            <Button type="submit" loading={loading()} disabled={!name().trim()}>
+              {t('common.save')}
+            </Button>
+          </div>
+        </form>
+      </ResponsiveDialog>
     </Show>
   );
 };

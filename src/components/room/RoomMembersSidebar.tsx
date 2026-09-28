@@ -3,10 +3,15 @@ import { For, Show, createMemo } from 'solid-js';
 import type { RoomParticipant } from '../../api/rooms';
 import type { SpaceRole } from '../../api/spaces';
 import { PresenceDot } from '../PresenceDot';
+import { MessageAvatar } from '../messageList/MessageAvatar';
 import { presence } from '../../stores/presence';
 import { showContextMenu } from '../../stores/contextMenu';
-import { appActivityRail } from '../../theme/appChrome';
-import { highestHoistedRole, spaceRoleColorHex } from '../../lib/spacePermissions';
+import { appActivityRail, appSectionLabel } from '../../theme/appChrome';
+import { highestHoistedRole, memberHighestRolePosition, spaceRoleColorHex } from '../../lib/spacePermissions';
+import { openUserProfileFromParticipant } from '../../stores/userProfilePopover';
+import { isRemoteUser } from '../../stores/instance';
+import { IconButton } from '../ui/IconButton';
+import { t } from '../../i18n';
 
 export interface RoomMembersSidebarProps {
   participants: RoomParticipant[];
@@ -25,6 +30,22 @@ export interface RoomMembersSidebarProps {
   showMembersHeader?: boolean;
   /** Accessible name for the sidebar (e.g. "Space members" vs "Group members"). */
   listAriaLabel?: string;
+  /** Space channel: allow role edits from member profile popover when true. */
+  spaceId?: string;
+  spaceOwnerId?: string;
+  canManageMemberRoles?: boolean;
+  onSpaceMemberRolesUpdated?: () => void;
+  /** Space context: Kick Members / Ban Members permission and the viewer's own highest
+   * role position (Number.MAX_SAFE_INTEGER for the owner, who has no ceiling). A row's
+   * kick/ban action only shows when the target's highest role is below this. */
+  canKickMembers?: boolean;
+  canBanMembers?: boolean;
+  viewerHighestRolePosition?: number;
+  onKickMember?: (userId: string) => void;
+  onBanMember?: (userId: string) => void;
+  /** Below md the member list is an overlay drawer swiped in from the right edge; this is
+   * whether it is currently out. Ignored from md up, where it is a static column. */
+  mobileOpen?: boolean;
 }
 
 function getMemberRoleIds(p: RoomParticipant): string[] | undefined {
@@ -72,7 +93,7 @@ function buildSpaceOnlineSections(
   const ungrouped = groupMap.get('__none__');
   if (ungrouped?.length) {
     ungrouped.sort(sortByDisplayName);
-    sections.push({ label: 'Online', members: ungrouped });
+    sections.push({ label: t('presence.online'), members: ungrouped });
   }
 
   return sections;
@@ -90,10 +111,14 @@ type Partitioned =
       offline: RoomParticipant[];
     };
 
+const SectionLabel: Component<{ label: string; count: number }> = (props) => (
+  <p class={`px-2 ${appSectionLabel}`}>{t('room.members.section', { label: props.label, count: props.count })}</p>
+);
+
 export const RoomMembersSidebar: Component<RoomMembersSidebarProps> = (props) => {
   const isCreator = () => props.creatorId != null && props.currentUserId === props.creatorId;
   const showHeader = () => props.showMembersHeader !== false;
-  const listAriaLabel = () => props.listAriaLabel ?? 'Group members';
+  const listAriaLabel = () => props.listAriaLabel ?? t('room.members.groupAria');
 
   const partitioned = createMemo((): Partitioned => {
     const list = props.participants;
@@ -131,37 +156,42 @@ export const RoomMembersSidebar: Component<RoomMembersSidebarProps> = (props) =>
       : ([] as { label: string; members: RoomParticipant[] }[]);
   });
 
+  const rowProps = () => ({
+    currentUserId: props.currentUserId,
+    creatorId: props.creatorId,
+    onMessageUser: props.onMessageUser,
+    onRemoveMember: props.onRemoveMember,
+    isCreator: isCreator(),
+    spaceRoles: props.spaceRoles,
+    spaceId: props.spaceId,
+    spaceOwnerId: props.spaceOwnerId,
+    canManageMemberRoles: props.canManageMemberRoles,
+    onSpaceMemberRolesUpdated: props.onSpaceMemberRolesUpdated,
+    canKickMembers: props.canKickMembers,
+    canBanMembers: props.canBanMembers,
+    viewerHighestRolePosition: props.viewerHighestRolePosition,
+    onKickMember: props.onKickMember,
+    onBanMember: props.onBanMember,
+  });
+
   return (
     <aside
-      class={`hidden w-60 shrink-0 flex-col overflow-hidden md:flex md:flex-col ${appActivityRail}`}
+      class={`absolute inset-y-0 end-0 z-30 flex w-[78vw] max-w-xs flex-col overflow-hidden shadow-2xl shadow-black/40 transition-transform duration-[280ms] ease-out md:static md:z-auto md:w-60 md:max-w-none md:shrink-0 md:translate-x-0 md:shadow-none ${
+        props.mobileOpen ? 'translate-x-0' : 'translate-x-full'
+      } ${appActivityRail}`}
       aria-label={listAriaLabel()}
     >
       <Show when={showHeader()}>
-        <div class="px-3 pt-4 shrink-0">
-          <h2 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
-            Members — {props.participants.length}
-          </h2>
+        <div class="shrink-0 px-4 pt-4">
+          <h2 class={appSectionLabel}>{t('room.members.section', { label: t('room.members.title'), count: props.participants.length })}</h2>
         </div>
       </Show>
-      <div class={`flex-1 overflow-y-auto min-h-0 p-2 space-y-4 ${showHeader() ? '' : 'pt-3'}`}>
+      <div class={`min-h-0 flex-1 space-y-4 overflow-y-auto p-2 ${showHeader() ? 'pt-3' : 'pt-3'}`}>
         <Show when={partitioned().kind === 'simple'}>
           <Show when={simpleOnline().length > 0}>
-            <div class="space-y-1">
-              <p class="px-2 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-                Online — {simpleOnline().length}
-              </p>
-              <For each={simpleOnline()}>
-                {(p) => (
-                  <MemberRow
-                    p={p}
-                    currentUserId={props.currentUserId}
-                    creatorId={props.creatorId}
-                    onMessageUser={props.onMessageUser}
-                    onRemoveMember={props.onRemoveMember}
-                    isCreator={isCreator()}
-                  />
-                )}
-              </For>
+            <div class="space-y-0.5">
+              <SectionLabel label={t('presence.online')} count={simpleOnline().length} />
+              <For each={simpleOnline()}>{(p) => <MemberRow p={p} {...rowProps()} />}</For>
             </div>
           </Show>
         </Show>
@@ -169,46 +199,18 @@ export const RoomMembersSidebar: Component<RoomMembersSidebarProps> = (props) =>
         <Show when={partitioned().kind === 'space'}>
           <For each={spaceOnlineSections()}>
             {(sec) => (
-              <div class="space-y-1">
-                <p class="px-2 text-[11px] font-semibold text-muted-foreground tracking-wide">
-                  {sec.label} — {sec.members.length}
-                </p>
-                <For each={sec.members}>
-                  {(p) => (
-                    <MemberRow
-                      p={p}
-                      currentUserId={props.currentUserId}
-                      creatorId={props.creatorId}
-                      onMessageUser={props.onMessageUser}
-                      onRemoveMember={props.onRemoveMember}
-                      isCreator={isCreator()}
-                      spaceRoles={props.spaceRoles}
-                      colorNameFromHoistedRole
-                    />
-                  )}
-                </For>
+              <div class="space-y-0.5">
+                <SectionLabel label={sec.label} count={sec.members.length} />
+                <For each={sec.members}>{(p) => <MemberRow p={p} {...rowProps()} colorNameFromHoistedRole />}</For>
               </div>
             )}
           </For>
         </Show>
 
         <Show when={partitioned().offline.length > 0}>
-          <div class="space-y-1">
-            <p class="px-2 text-[11px] font-semibold text-muted-foreground tracking-wide">
-              Offline — {partitioned().offline.length}
-            </p>
-            <For each={partitioned().offline}>
-              {(p) => (
-                <MemberRow
-                  p={p}
-                  currentUserId={props.currentUserId}
-                  creatorId={props.creatorId}
-                  onMessageUser={props.onMessageUser}
-                  onRemoveMember={props.onRemoveMember}
-                  isCreator={isCreator()}
-                />
-              )}
-            </For>
+          <div class="space-y-0.5">
+            <SectionLabel label={t('presence.offline')} count={partitioned().offline.length} />
+            <For each={partitioned().offline}>{(p) => <MemberRow p={p} {...rowProps()} dim />}</For>
           </div>
         </Show>
       </div>
@@ -226,10 +228,33 @@ const MemberRow: Component<{
   /** When set with spaceRoles, tint display name with highest hoisted role color (Discord-style). */
   spaceRoles?: SpaceRole[];
   colorNameFromHoistedRole?: boolean;
+  /** Offline rows render slightly faded, like Discord. */
+  dim?: boolean;
+  spaceId?: string;
+  spaceOwnerId?: string;
+  canManageMemberRoles?: boolean;
+  onSpaceMemberRolesUpdated?: () => void;
+  canKickMembers?: boolean;
+  canBanMembers?: boolean;
+  viewerHighestRolePosition?: number;
+  onKickMember?: (userId: string) => void;
+  onBanMember?: (userId: string) => void;
 }> = (props) => {
-  const displayName = () => props.p.display_name || props.p.username || 'Unknown';
+  const displayName = () => props.p.display_name || props.p.username || t('common.unknown');
   const statusText = () => presence.byUser[props.p.id]?.custom_status ?? props.p.presence?.custom_status;
   const isSelf = () => props.p.id === props.currentUserId;
+  const isSpaceOwnerTarget = () => props.spaceOwnerId != null && props.p.id === props.spaceOwnerId;
+  /** Discord-style hierarchy: can only kick/ban a member whose highest role is below ours. */
+  const outranksTarget = createMemo(() => {
+    const targetHighest = memberHighestRolePosition(undefined, props.spaceRoles, {
+      roles: getMemberRoleIds(props.p),
+    });
+    return targetHighest < (props.viewerHighestRolePosition ?? -1);
+  });
+  const canKick = () =>
+    props.spaceId != null && props.canKickMembers === true && !isSelf() && !isSpaceOwnerTarget() && outranksTarget();
+  const canBan = () =>
+    props.spaceId != null && props.canBanMembers === true && !isSelf() && !isSpaceOwnerTarget() && outranksTarget();
 
   const nameColorHex = createMemo(() => {
     if (!props.colorNameFromHoistedRole || !props.spaceRoles?.length) return undefined;
@@ -237,11 +262,40 @@ const MemberRow: Component<{
     return hr ? spaceRoleColorHex(hr.color) : undefined;
   });
 
-  const subline = () => statusText() || `@${props.p.username}`;
+  const subline = () =>
+    statusText() || (isRemoteUser(props.p) ? `@${props.p.username}@${props.p.home_domain}` : `@${props.p.username}`);
+
+  function openProfile(e: MouseEvent) {
+    e.stopPropagation();
+    const roles = props.spaceRoles;
+    const sid = props.spaceId;
+    const spaceRoleContext =
+      sid != null && roles != null && roles.length > 0
+        ? {
+            spaceId: sid,
+            spaceOwnerId: props.spaceOwnerId ?? '',
+            subjectRoleIds: [...(getMemberRoleIds(props.p) ?? [])],
+            spaceRoles: roles,
+            canManageMemberRoles: props.canManageMemberRoles === true,
+            viewerHighestPosition: props.viewerHighestRolePosition,
+            onMemberRolesUpdated: props.onSpaceMemberRolesUpdated,
+          }
+        : null;
+    openUserProfileFromParticipant({
+      participant: props.p,
+      anchor: e.currentTarget as HTMLElement,
+      currentUserId: props.currentUserId,
+      onMessageUser: props.onMessageUser,
+      spaceRoles: props.spaceRoles,
+      spaceRoleContext,
+    });
+  }
 
   return (
     <div
-      class="group/member flex items-center gap-3 px-2 py-1.5 rounded-md hover:bg-muted/30 transition-colors cursor-context-menu"
+      class={`group/member flex items-center gap-1 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent/50 ${
+        props.dim ? 'opacity-60 hover:opacity-100' : ''
+      }`}
       onContextMenu={(e) => {
         const tag =
           props.p.discriminator != null
@@ -251,24 +305,44 @@ const MemberRow: Component<{
           ...(!isSelf()
             ? [
                 {
-                  label: 'Message',
+                  label: t('friends.actions.message'),
                   icon: 'fa-message' as const,
                   onClick: () => props.onMessageUser(props.p.id),
                 },
               ]
             : []),
           {
-            label: 'Copy username',
+            label: t('userArea.copyUsername'),
             icon: 'fa-copy' as const,
             onClick: () => navigator.clipboard.writeText(tag),
           },
           ...(props.isCreator && !isSelf() && props.onRemoveMember
             ? [
                 {
-                  label: 'Remove from group',
+                  label: t('room.members.removeFromGroup'),
                   icon: 'fa-user-minus' as const,
                   danger: true as const,
                   onClick: () => props.onRemoveMember?.(props.p.id),
+                },
+              ]
+            : []),
+          ...(canKick() && props.onKickMember
+            ? [
+                {
+                  label: t('room.members.kick'),
+                  icon: 'fa-user-minus' as const,
+                  danger: true as const,
+                  onClick: () => props.onKickMember?.(props.p.id),
+                },
+              ]
+            : []),
+          ...(canBan() && props.onBanMember
+            ? [
+                {
+                  label: t('room.members.ban'),
+                  icon: 'fa-gavel' as const,
+                  danger: true as const,
+                  onClick: () => props.onBanMember?.(props.p.id),
                 },
               ]
             : []),
@@ -276,43 +350,47 @@ const MemberRow: Component<{
         if (items.length) showContextMenu(e, items);
       }}
     >
-      <div class="relative shrink-0">
-        <div class="size-8 rounded-full bg-muted flex items-center justify-center text-[13px] font-medium">
-          {displayName()[0].toUpperCase()}
-        </div>
-        <span class="absolute bottom-[-1px] right-[-1px]">
-          <PresenceDot userId={props.p.id} class="size-3.5" />
-        </span>
-      </div>
-      <div class="min-w-0 flex-1">
-        <p class="text-[15px] leading-tight font-medium truncate flex items-center gap-1.5">
-          <span
-            class="truncate"
-            style={nameColorHex() ? { color: nameColorHex()! } : undefined}
-            classList={{ 'text-foreground': !nameColorHex() }}
-          >
-            {displayName()}
+      <button
+        type="button"
+        class="flex min-w-0 flex-1 cursor-pointer items-center gap-3 rounded-md border-0 bg-transparent p-0 text-start outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+        onClick={openProfile}
+      >
+        <div class="relative shrink-0">
+          <MessageAvatar name={displayName()} avatar={props.p.avatar} class="size-8 text-[13px]" />
+          <span class="absolute -bottom-px -end-px">
+            <PresenceDot userId={props.p.id} class="size-3.5" />
           </span>
-          {props.creatorId != null && props.p.id === props.creatorId && (
-            <i class="fa-solid fa-crown text-amber-400 text-[10px] shrink-0" title="Group owner" aria-hidden="true" />
-          )}
-        </p>
-        <p class="text-[12px] leading-snug text-muted-foreground/90 truncate mt-0.5">{subline()}</p>
-      </div>
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="flex items-center gap-1.5 truncate text-sm font-medium leading-tight">
+            <span
+              class="truncate"
+              style={nameColorHex() ? { color: nameColorHex()! } : undefined}
+              classList={{ 'text-foreground': !nameColorHex() }}
+            >
+              {displayName()}
+            </span>
+            {props.creatorId != null && props.p.id === props.creatorId && (
+              <i class="fa-solid fa-crown shrink-0 text-[10px] text-amber-400" title={t('room.members.owner')} aria-hidden="true" />
+            )}
+          </p>
+          <p class="mt-0.5 truncate text-xs leading-snug text-muted-foreground">{subline()}</p>
+        </div>
+      </button>
       {props.isCreator && !isSelf() && props.onRemoveMember && (
-        <button
-          type="button"
-          class="size-8 shrink-0 rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 opacity-0 group-hover/member:opacity-100 transition-opacity inline-flex items-center justify-center"
-          title="Remove from group"
+        <IconButton
+          size="sm"
+          tone="danger"
+          icon="fa-solid fa-user-minus"
+          label={t('room.members.removeNamed', { name: displayName() })}
+          title={t('room.members.removeFromGroup')}
+          class="opacity-0 transition-opacity focus-visible:opacity-100 group-hover/member:opacity-100"
           onClick={(e) => {
             e.preventDefault();
             e.stopPropagation();
             props.onRemoveMember?.(props.p.id);
           }}
-          aria-label={`Remove ${displayName()} from group`}
-        >
-          <i class="fa-solid fa-user-minus text-xs" />
-        </button>
+        />
       )}
     </div>
   );

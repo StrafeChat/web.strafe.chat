@@ -5,6 +5,17 @@ const STORAGE_KEY = 'strafe_settings';
 export type SettingsData = {
   messageCompact: boolean;
   membersPanelOpen: boolean;
+  /** Reopen the last visited page when the app starts on "/". */
+  restoreLastVisited: boolean;
+  /** Browser spellcheck in the message composer. */
+  spellcheck: boolean;
+};
+
+const DEFAULTS: SettingsData = {
+  messageCompact: false,
+  membersPanelOpen: false,
+  restoreLastVisited: false,
+  spellcheck: true,
 };
 
 function loadSettings(): SettingsData {
@@ -13,14 +24,16 @@ function loadSettings(): SettingsData {
     if (raw) {
       const parsed = JSON.parse(raw) as Partial<SettingsData>;
       return {
-        messageCompact: parsed.messageCompact ?? false,
-        membersPanelOpen: parsed.membersPanelOpen ?? false,
+        messageCompact: parsed.messageCompact ?? DEFAULTS.messageCompact,
+        membersPanelOpen: parsed.membersPanelOpen ?? DEFAULTS.membersPanelOpen,
+        restoreLastVisited: parsed.restoreLastVisited ?? DEFAULTS.restoreLastVisited,
+        spellcheck: parsed.spellcheck ?? DEFAULTS.spellcheck,
       };
     }
   } catch {
     // ignore
   }
-  return { messageCompact: false, membersPanelOpen: false };
+  return { ...DEFAULTS };
 }
 
 export const [settings, setSettings] = createStore<SettingsData>(loadSettings());
@@ -44,4 +57,14 @@ export function setMessageCompact(compact: boolean) {
 export function setMembersPanelOpen(open: boolean) {
   setSettings('membersPanelOpen', open);
   persistSettings({ membersPanelOpen: open });
+}
+
+export function setRestoreLastVisited(on: boolean) {
+  setSettings('restoreLastVisited', on);
+  persistSettings({ restoreLastVisited: on });
+}
+
+export function setSpellcheck(on: boolean) {
+  setSettings('spellcheck', on);
+  persistSettings({ spellcheck: on });
 }

@@ -1,13 +1,15 @@
 import type { Component } from 'solid-js';
-import { createEffect, createMemo, createSignal, For, Show, onCleanup } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, Show, onCleanup, onMount } from 'solid-js';
 import type { DecryptedMessage } from '../stores/messages';
-import { messages, setMessages, editMessage as editMessageInStore } from '../stores/messages';
+import { messages, setMessages, editMessage as editMessageInStore, toggleReaction } from '../stores/messages';
 import type { RoomParticipant } from '../api/rooms';
+import type { SpaceRole } from '../api/spaces';
 import { auth } from '../stores/auth';
 import { settings } from '../stores/settings';
 import { messageIdGt } from '../stores/readState';
 import { newHeaderDismissed } from '../stores/newHeaderDismissed';
-import { formatMessageTimestamp, formatDateHeader } from '../lib/utils/datetime';
+import { formatMessageTimestamp, formatDateHeader, formatTimeOfDay } from '../lib/utils/datetime';
+import { t } from '../i18n';
 import { showContextMenu } from '../stores/contextMenu';
 import { deleteMessage as deleteMessageApi } from '../api/messages';
 import { Tooltip } from './ui/Tooltip';
@@ -22,16 +24,40 @@ import {
   DeleteMessageModal,
   MessageListIntro,
   LoadOlderBlock,
+  ReplyReference,
+  MessageReactions,
 } from './messageList';
-import { appFloatPanel } from '../theme/appChrome';
+import { appFloatToolbar } from '../theme/appChrome';
+import { MessageAttachments } from './messageList/MessageAttachments';
+import { EmojiPicker, type EmojiPick } from './emoji/EmojiPicker';
+import { IconButton } from './ui/IconButton';
+import { Button } from './ui/Button';
+import { Textarea } from './ui/Textarea';
 import { isMessagePinned, pinMessage, unpinMessage } from '../stores/pinnedMessages';
-import { scrollToMessage } from '../lib/utils/messages';
+import { openUserProfilePopover } from '../stores/userProfilePopover';
+import { roleNamesForMember, spaceJoinedLabel } from '../lib/userProfilePopoverHelpers';
+import { viewerRoleCeiling } from '../lib/spacePermissions';
 
 const MESSAGE_GROUP_THRESHOLD_MS = 5 * 60 * 1000;
-const SCROLL_NEAR_BOTTOM_THRESHOLD = 150;
+/** Treat as “at bottom” if within this many px. */
+const BOTTOM_THRESHOLD_PX = 24;
 const SCROLL_LOAD_OLDER_THRESHOLD = 100;
+const USER_SCROLL_IDLE_MS = 120;
 const SCROLL_TO_BOTTOM_DELAY_MS = 100;
 const IO_OBSERVE_DELAY_MS = 0;
+const ACK_VISIBILITY_DEBOUNCE_MS = 450;
+
+/**
+ * Room ids whose initial "land on first unread" scroll has already happened this session.
+ * Deliberately not `scrollToBottomTick === 1`: that tick also bumps for messages arriving
+ * over the socket while the room isn't even open (StargateProvider subscribes to every room
+ * up front - see stores/messages.ts addMessageFromEvent), so a room that received several
+ * background messages before you ever opened it would already be past tick 1 on first
+ * view, making the old check skip straight to the bottom instead of landing on the unread
+ * boundary. This set tracks "have we shown this room's content at all yet" directly,
+ * independent of how many background ticks happened first.
+ */
+const roomsWithInitialScrollDone = new Set<string>();
 
 export interface MessageListProps {
   messages: DecryptedMessage[];
@@ -51,21 +77,57 @@ export interface MessageListProps {
   maxMessageIdWhenEntered?: string | null;
   /** Called when user chooses to reply to a specific message. */
   onReply?: (message: DecryptedMessage) => void;
+  /** When false, Reply is omitted from the context menu (e.g. no send permission). Default true. */
+  canReply?: boolean;
+  /** When false, Pin message is omitted. Default true (DMs / non-space rooms). */
+  canManageMessages?: boolean;
+  /** When false, adding a new reaction is disabled (existing reactions still show, and the
+   * viewer can still remove their own). Default true (DMs / non-space rooms). */
+  canReact?: boolean;
   /** When false, room messages are plaintext (no E2EE). Show one banner and hide per-message "Not encrypted". */
   e2eeEnabled?: boolean;
   /** Reports near-bottom state for parent read/ack logic. */
   onNearBottomChange?: (nearBottom: boolean) => void;
   /** Exposes scroll container element to parent. */
   onScrollContainer?: (el: HTMLDivElement | undefined) => void;
+  /** Bottom-most visible message id (debounced), for viewport ACK. */
+  onBottomVisibleMessageChange?: (messageId: string | null) => void;
+  /** Space text channels: show role chips and join date in author profile popover. */
+  spaceRoles?: SpaceRole[];
+  /** When set with spaceRoles, profile popover can include space role editing if allowed. */
+  spaceId?: string;
+  spaceOwnerId?: string;
+  canManageMemberRoles?: boolean;
+  onSpaceMemberRolesUpdated?: () => void;
+  /** Open DM with user (profile popover). */
+  onMessageUser?: (userId: string) => void;
 }
 
 export const MessageList: Component<MessageListProps> = (props) => {
   const listRef = createSignal<HTMLDivElement>();
   const sentinelRef = createSignal<HTMLDivElement>();
   const isNearBottom = createSignal(true);
+  /** True shortly after the user moves the scroll viewport (don’t auto-scroll over them). */
+  const [isUserScrolling, setIsUserScrolling] = createSignal(false);
+  /** Set while MessageList scrolls itself so `onScroll` does not flip user-scrolling state. */
+  const programmaticScrollRef = { current: false };
   const [editingMessageId, setEditingMessageId] = createSignal<string | null>(null);
   const [editDraft, setEditDraft] = createSignal('');
   const [pendingDelete, setPendingDelete] = createSignal<{ roomId: string; msgId: string; message: DecryptedMessage } | null>(null);
+  const [reactionPickerFor, setReactionPickerFor] = createSignal<string | null>(null);
+
+  function emojiKeyFromPick(pick: EmojiPick): string {
+    return pick.custom ? `custom:${pick.custom.id}` : pick.unicode!;
+  }
+
+  function pickReaction(msg: DecryptedMessage, pick: EmojiPick) {
+    const roomId = props.roomId;
+    if (!roomId) return;
+    const emoji = emojiKeyFromPick(pick);
+    const mine = msg.reactions?.find((r) => r.emoji === emoji)?.me ?? false;
+    toggleReaction(roomId, msg.id, emoji, mine).catch((err) => console.error('Toggle reaction failed:', err));
+    setReactionPickerFor(null);
+  }
 
   function doDelete(roomId: string, msgId: string) {
     deleteMessageApi(roomId, msgId)
@@ -81,6 +143,105 @@ export const MessageList: Component<MessageListProps> = (props) => {
   const getScrollContainer = () => listRef[0]?.();
   const currentUserId = () => auth.user?.id;
   const compact = () => (props.compact !== undefined ? props.compact : settings.messageCompact);
+  const canReact = () => props.canReact !== false;
+
+  let publishTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Report the bottom-most message with any part on screen - the viewport-ack cursor. */
+  function publishBottomVisible() {
+    const el = listRef[0]?.();
+    if (!el) return;
+    const containerRect = el.getBoundingClientRect();
+    const nodes = Array.from(el.querySelectorAll<HTMLElement>('[data-msg-id]'));
+    let bestId: string | null = null;
+    let bestBottom = -Infinity;
+    for (const node of nodes) {
+      const id = node.getAttribute('data-msg-id');
+      if (!id || !/^\d+$/.test(id)) continue;
+      const rect = node.getBoundingClientRect();
+      const visibleTop = Math.max(rect.top, containerRect.top);
+      const visibleBottom = Math.min(rect.bottom, containerRect.bottom);
+      if (visibleBottom <= visibleTop) continue;
+      if (visibleBottom > bestBottom) {
+        bestBottom = visibleBottom;
+        bestId = id;
+      }
+    }
+    props.onBottomVisibleMessageChange?.(bestId);
+  }
+  function queuePublishBottomVisible() {
+    if (publishTimer) clearTimeout(publishTimer);
+    publishTimer = setTimeout(publishBottomVisible, ACK_VISIBILITY_DEBOUNCE_MS);
+  }
+  onCleanup(() => {
+    if (publishTimer) clearTimeout(publishTimer);
+  });
+
+  // Re-measure whenever the list content changes or the tab comes back into view. Scroll
+  // events alone aren't enough: a short list that never scrolls, or a message arriving
+  // while you're already sitting at the bottom, never fires one - so the ack cursor stayed
+  // on the previous message while you looked straight at the new one.
+  createEffect(() => {
+    void props.messages.length;
+    void props.roomId;
+    queuePublishBottomVisible();
+  });
+  onMount(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') queuePublishBottomVisible();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    window.addEventListener('focus', onVisible);
+    onCleanup(() => {
+      document.removeEventListener('visibilitychange', onVisible);
+      window.removeEventListener('focus', onVisible);
+    });
+  });
+
+  function openAuthorProfile(msg: DecryptedMessage, anchor: HTMLElement) {
+    openProfileForUser(msg.sender_id, anchor);
+  }
+
+  /** Profile card for any user id in this room - message authors and @mention pills alike. */
+  function openProfileForUser(userId: string, anchor: HTMLElement) {
+    const uid = currentUserId();
+    const s = getSenderDisplay(userId, props.participants, uid);
+    const p = props.participants?.find((x) => x.id === userId);
+    const roleIds = p ? (p as { roles?: string[] }).roles : undefined;
+    const spaceRoleContext =
+      props.spaceId &&
+      props.spaceRoles != null &&
+      props.spaceRoles.length > 0
+        ? {
+            spaceId: props.spaceId,
+            spaceOwnerId: props.spaceOwnerId ?? '',
+            subjectRoleIds: [...((p as { roles?: string[] } | undefined)?.roles ?? [])],
+            spaceRoles: props.spaceRoles,
+            canManageMemberRoles: props.canManageMemberRoles === true,
+            viewerHighestPosition: viewerRoleCeiling(props.spaceOwnerId, uid, props.spaceRoles, props.participants),
+            onMemberRolesUpdated: props.onSpaceMemberRolesUpdated,
+          }
+        : null;
+
+    openUserProfilePopover({
+      anchor,
+      subject: {
+        userId: s.userId,
+        displayName: s.name,
+        username: s.username || t('common.unknown').toLowerCase(),
+        discriminator: s.discriminator ?? 0,
+        avatar: s.avatar,
+        banner: s.banner,
+        aboutMe: s.aboutMe,
+        bio: s.bio,
+        homeDomain: (p as { home_domain?: string } | undefined)?.home_domain,
+        spaceRoleNames: roleNamesForMember(roleIds, props.spaceRoles),
+        joinedAtLabel: p ? spaceJoinedLabel(p) : undefined,
+      },
+      currentUserId: uid,
+      onMessageUser: props.onMessageUser,
+      spaceRoleContext,
+    });
+  }
 
   /** Index of first unread that existed when we entered and NEW header not dismissed. */
   const firstUnreadIndex = () => {
@@ -103,10 +264,20 @@ export const MessageList: Component<MessageListProps> = (props) => {
     const roomId = props.roomId;
     const onLoad = props.onLoadOlder;
     if (!el || !roomId || !onLoad) return;
+    let userScrollIdleTimer: ReturnType<typeof setTimeout> | null = null;
     const onScroll = () => {
+      if (!programmaticScrollRef.current) {
+        setIsUserScrolling(true);
+        if (userScrollIdleTimer) clearTimeout(userScrollIdleTimer);
+        userScrollIdleTimer = setTimeout(() => {
+          userScrollIdleTimer = null;
+          setIsUserScrolling(false);
+        }, USER_SCROLL_IDLE_MS);
+      }
+
       const { scrollTop, clientHeight, scrollHeight } = el;
       const near =
-        scrollHeight - scrollTop - clientHeight < SCROLL_NEAR_BOTTOM_THRESHOLD;
+        scrollHeight - scrollTop - clientHeight <= BOTTOM_THRESHOLD_PX;
       isNearBottom[1](near);
       props.onNearBottomChange?.(near);
       const hasMore = messages.hasMoreOlder[roomId] ?? true;
@@ -119,28 +290,60 @@ export const MessageList: Component<MessageListProps> = (props) => {
       ) {
         onLoad(getScrollContainer);
       }
+      queuePublishBottomVisible();
     };
     el.addEventListener('scroll', onScroll, { passive: true });
     props.onScrollContainer?.(el);
+    queuePublishBottomVisible();
     onCleanup(() => el.removeEventListener('scroll', onScroll));
     onCleanup(() => props.onScrollContainer?.(undefined));
+    onCleanup(() => {
+      if (userScrollIdleTimer) clearTimeout(userScrollIdleTimer);
+    });
   });
 
-  // Scroll to bottom when new messages arrive – only if user was near bottom (else they’re reading history)
+  // Scroll to bottom when new messages arrive – only if at bottom and user isn’t actively scrolling.
+  // The FIRST time this room's content is actually shown this session, land on the
+  // first-unread divider instead of always dropping straight to the bottom past it. Every
+  // later run (new message arrives, own message sent, etc.) keeps plain scroll-to-bottom.
+  // Deliberately keyed off roomsWithInitialScrollDone, not scrollToBottomTick === 1: the tick
+  // also bumps for messages received while this room isn't even open, so a room that racked
+  // up a backlog in the background would already be past tick 1 by the time it's first
+  // opened, and the old check would skip straight to the bottom past all of it.
   createEffect(() => {
     const roomId = props.roomId;
     const tick = roomId ? messages.scrollToBottomTick[roomId] ?? 0 : 0;
     const el = listRef[0]?.();
     const nearBottom = isNearBottom[0]();
+    const userSc = isUserScrolling();
     if (!el || !roomId || tick === 0) return;
-    const scrollToBottom = () => { el.scrollTop = el.scrollHeight; };
-    if (!nearBottom) return;
-    scrollToBottom();
-    const rafId = requestAnimationFrame(scrollToBottom);
-    const timeoutId = setTimeout(scrollToBottom, SCROLL_TO_BOTTOM_DELAY_MS);
+    if (!nearBottom || userSc) return;
+    const isInitialView = !roomsWithInitialScrollDone.has(roomId);
+    if (isInitialView) roomsWithInitialScrollDone.add(roomId);
+    const unreadIdx = isInitialView ? firstUnreadIndex() : -1;
+    const scrollToTarget = () => {
+      const target = unreadIdx !== -1 ? props.messages[unreadIdx] : undefined;
+      const node = target ? el.querySelector<HTMLElement>(`[data-msg-id="${target.id}"]`) : null;
+      if (node) {
+        const relativeTop = node.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
+        el.scrollTo({ top: Math.max(0, relativeTop - 96), behavior: 'auto' });
+      } else {
+        el.scrollTo({ top: el.scrollHeight, behavior: 'auto' });
+      }
+    };
+    programmaticScrollRef.current = true;
+    scrollToTarget();
+    const rafId = requestAnimationFrame(scrollToTarget);
+    const timeoutId = setTimeout(() => {
+      scrollToTarget();
+      requestAnimationFrame(() => {
+        programmaticScrollRef.current = false;
+      });
+    }, SCROLL_TO_BOTTOM_DELAY_MS);
     onCleanup(() => {
       cancelAnimationFrame(rafId);
       clearTimeout(timeoutId);
+      programmaticScrollRef.current = false;
     });
   });
 
@@ -220,20 +423,28 @@ export const MessageList: Component<MessageListProps> = (props) => {
     currentUserId() &&
     props.participants[0]?.id === currentUserId();
 
+  /** Body is a decrypt-state placeholder ("waiting for key", legacy scheme, failure), not
+   * real content - rendered muted/italic so it reads as a status line, not a message. */
+  const isPlaceholderBody = (m: DecryptedMessage) => !!(m.decryptPending || m.decryptError || m.legacyUndecryptable);
+
   /** Indices for E2EE/plaintext section headers (single pass). */
   const e2eeHeaderIndices = createMemo(() => {
     const list = props.messages;
     let firstPlaintext = -1;
     let firstE2EEAfterPlaintext = -1;
     let seenPlaintext = false;
+    let seenEncrypted = false;
     for (let i = 0; i < list.length; i++) {
       const m = list[i]!;
-      if (m.id.startsWith('temp-')) continue;
+      if (m.id.startsWith('temp-') || m.system_type) continue;
       if (m.notEncrypted === true) {
-        if (firstPlaintext < 0) firstPlaintext = i;
+        // "No longer encrypted" only makes sense after encrypted history - a room that
+        // was never encrypted shouldn't announce a change on its very first message.
+        if (firstPlaintext < 0 && seenEncrypted) firstPlaintext = i;
         seenPlaintext = true;
         continue;
       }
+      seenEncrypted = true;
       if (seenPlaintext && firstE2EEAfterPlaintext < 0) firstE2EEAfterPlaintext = i;
     }
     return { firstPlaintext, firstE2EEAfterPlaintext };
@@ -242,18 +453,28 @@ export const MessageList: Component<MessageListProps> = (props) => {
   const firstPlaintextMessageIndex = () => e2eeHeaderIndices().firstPlaintext;
   const firstE2EEMessageIndex = () => e2eeHeaderIndices().firstE2EEAfterPlaintext;
 
+  function scrollToPresent() {
+    const el = listRef[0]?.();
+    if (!el) return;
+    el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
+  }
+
   return (
     <>
+    <div class="relative flex-1 min-h-0">
     <div
       ref={(el) => listRef[1](el)}
-      class="flex-1 min-h-0 overflow-y-auto overflow-x-hidden"
+      class="absolute inset-0 overflow-y-auto overflow-x-hidden"
     >
-      <div class="flex flex-col p-4 gap-2 min-h-full justify-end">
+      {/* Bottom padding tracks the floating composer (see RoomComposerDock) so the
+          newest message clears it; 0 when the page doesn't dock a composer at all. */}
+      <div class="flex flex-col p-4 gap-2 min-h-full justify-end pb-[calc(var(--composer-height,0px)+0.75rem)]">
         <MessageListIntro
           roomType={props.roomType}
           roomName={props.roomName}
           pmOther={pmOther()}
           isNotes={!!isNotes()}
+          e2eeEnabled={props.e2eeEnabled}
         />
         <LoadOlderBlock
           hasMessages={props.messages.length > 0}
@@ -281,7 +502,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                   <div class="flex items-center gap-3 py-2">
                     <div class="flex-1 h-px bg-primary/60" />
                     <span class="text-xs font-semibold text-primary shrink-0 uppercase tracking-wide">
-                      New messages · {formatDateHeader(new Date(msg.created_at))}
+                      {t('messages.newMessages')} · {formatDateHeader(new Date(msg.created_at))}
                     </span>
                     <div class="flex-1 h-px bg-primary/60" />
                   </div>
@@ -289,7 +510,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                 <Show when={showUnreadHeader() && !showDateHeader()}>
                   <div class="flex items-center gap-3 py-2">
                     <div class="flex-1 h-px bg-primary/60" />
-                    <span class="text-xs font-semibold text-primary shrink-0 uppercase tracking-wide">New messages</span>
+                    <span class="text-xs font-semibold text-primary shrink-0 uppercase tracking-wide">{t('messages.newMessages')}</span>
                     <div class="flex-1 h-px bg-primary/60" />
                   </div>
                 </Show>
@@ -307,7 +528,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                     <div class="flex-1 h-px bg-border" />
                     <span class="text-xs text-muted-foreground shrink-0 flex items-center gap-1.5">
                       <i class="fa-solid fa-lock-open text-[10px]" />
-                      Messages are no longer end-to-end encrypted
+                      {t('messages.noLongerEncrypted')}
                     </span>
                     <div class="flex-1 h-px bg-border" />
                   </div>
@@ -317,7 +538,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                     <div class="flex-1 h-px bg-border" />
                     <span class="text-xs text-muted-foreground shrink-0 flex items-center gap-1.5">
                       <i class="fa-solid fa-lock text-[10px]" />
-                      Messages are now end-to-end encrypted
+                      {t('messages.nowEncrypted')}
                     </span>
                     <div class="flex-1 h-px bg-border" />
                   </div>
@@ -327,7 +548,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                   fallback={(
                 <div
                   data-msg-id={msg.id}
-                  class={`flex gap-3 -mx-2 px-2 rounded group relative transition-colors md:hover:bg-muted/50 ${
+                  class={`flex gap-3 -mx-2 px-2 rounded-md group relative transition-colors md:hover:bg-muted/40 ${
                     compact() ? 'py-0.5' : 'py-0.5'
                   } ${
                     showHeader() ? (prev() ? 'mt-3' : '') : compact() ? '-mt-0.5' : '-mt-1'
@@ -338,29 +559,38 @@ export const MessageList: Component<MessageListProps> = (props) => {
                     const isOwn = msg.sender_id === currentUserId();
                     const pinned = isMessagePinned(props.roomId, msg.id);
                     showContextMenu(e, [
+                      ...(props.roomId && canReact()
+                        ? [
+                            {
+                              label: t('messages.actions.addReaction'),
+                              icon: 'fa-face-smile',
+                              onClick: () => setReactionPickerFor(msg.id),
+                            },
+                          ]
+                        : []),
                       {
-                        label: 'Copy Text',
+                        label: t('messages.actions.copyText'),
                         icon: 'fa-copy',
                         onClick: () => navigator.clipboard.writeText(bodyText),
                       },
                       {
-                        label: 'Copy Message ID',
+                        label: t('messages.actions.copyId'),
                         icon: 'fa-hashtag',
                         onClick: () => navigator.clipboard.writeText(msg.id),
                       },
-                      ...(props.onReply
+                      ...(props.onReply && props.canReply !== false
                         ? [
                             {
-                              label: 'Reply',
+                              label: t('messages.actions.reply'),
                               icon: 'fa-reply',
                               onClick: () => props.onReply?.(msg),
                             },
                           ]
                         : []),
-                      ...(props.roomId
+                      ...(props.roomId && props.canManageMessages !== false
                         ? [
                             {
-                              label: pinned ? 'Unpin message' : 'Pin message',
+                              label: pinned ? t('messages.actions.unpin') : t('messages.actions.pin'),
                               icon: 'fa-thumbtack',
                               onClick: () =>
                                 pinned
@@ -372,7 +602,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                       ...(isOwn && roomId
                         ? [
                             {
-                              label: 'Edit Message',
+                              label: t('messages.actions.edit'),
                               icon: 'fa-pencil',
                               onClick: () => {
                                 setEditDraft(getMessageBodyText(msg));
@@ -380,7 +610,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                               },
                             },
                             {
-                              label: 'Delete message',
+                              label: t('messages.actions.delete'),
                               icon: 'fa-trash',
                               danger: true,
                               onClick: (e?: MouseEvent) => {
@@ -397,32 +627,71 @@ export const MessageList: Component<MessageListProps> = (props) => {
                   }}
                 >
                 <Show when={!compact()}>
-                  <div class="relative w-10 flex justify-center">
+                  <div class="relative flex w-10 shrink-0 flex-col items-center">
+                    {/* Reply spine: from the middle of the reply line, down into the avatar. */}
+                    <Show when={msg.reply_to_id}>
+                      <div
+                        class="pointer-events-none absolute left-1/2 top-[10px] h-[14px] w-[calc(50%+12px)] rounded-tl-lg border-l-2 border-t-2 border-border/70"
+                        aria-hidden="true"
+                      />
+                    </Show>
                     <Show
                       when={showHeader()}
-                      fallback={<div class="w-10 h-4 shrink-0" />}
+                      fallback={
+                        <span class="w-10 select-none text-center text-[10px] leading-5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+                          {formatTimeOfDay(new Date(msg.created_at))}
+                        </span>
+                      }
                     >
-                      <MessageAvatar name={sender().name} avatar={sender().avatar} />
-                    </Show>
-                    <Show when={msg.reply_to_id}>
-                      <div class="absolute top-full mt-0.5 w-px h-4 bg-border/70" />
+                      <div
+                        role="button"
+                        tabIndex={0}
+                        class={`cursor-pointer rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                          msg.reply_to_id ? 'mt-6' : ''
+                        }`}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openAuthorProfile(msg, e.currentTarget);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            openAuthorProfile(msg, e.currentTarget);
+                          }
+                        }}
+                      >
+                        <MessageAvatar name={sender().name} avatar={sender().avatar} />
+                      </div>
                     </Show>
                   </div>
                 </Show>
                 <div class="flex-1 min-w-0">
                   <Show when={editingMessageId() === msg.id}>
-                    <div class="space-y-2">
-                      <textarea
+                    <div class="space-y-2 py-1">
+                      <Textarea
                         value={editDraft()}
                         onInput={(e) => setEditDraft(e.currentTarget.value)}
-                        class="w-full min-h-[72px] rounded-md border border-border bg-background px-3 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring resize-y"
-                        placeholder="Edit message..."
+                        onKeyDown={(e) => {
+                          if (e.key === 'Escape') {
+                            e.preventDefault();
+                            setEditingMessageId(null);
+                          } else if (e.key === 'Enter' && !e.shiftKey) {
+                            e.preventDefault();
+                            const roomId = props.roomId!;
+                            const text = editDraft().trim();
+                            if (text) {
+                              editMessageInStore(roomId, msg.id, text).then(() => setEditingMessageId(null)).catch((err) => console.error('Edit failed:', err));
+                            }
+                          }
+                        }}
+                        class="min-h-[72px]"
+                        placeholder={t('messages.editPlaceholder')}
                         autofocus
                       />
                       <div class="flex items-center gap-2">
-                        <button
-                          type="button"
-                          class="px-3 py-1.5 rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary-hover transition-colors"
+                        <Button
+                          size="sm"
                           onClick={() => {
                             const roomId = props.roomId!;
                             const text = editDraft().trim();
@@ -431,91 +700,65 @@ export const MessageList: Component<MessageListProps> = (props) => {
                             }
                           }}
                         >
-                          Save
-                        </button>
-                        <button
-                          type="button"
-                          class="px-3 py-1.5 rounded-md text-sm font-medium border border-border text-foreground hover:bg-accent transition-colors"
-                          onClick={() => setEditingMessageId(null)}
-                        >
-                          Cancel
-                        </button>
+                          {t('common.save')}
+                        </Button>
+                        <Button size="sm" variant="outline" onClick={() => setEditingMessageId(null)}>
+                          {t('common.cancel')}
+                        </Button>
+                        <span class="text-[11px] text-muted-foreground">{t('messages.editHint')}</span>
                       </div>
                     </div>
                   </Show>
                   <Show when={editingMessageId() !== msg.id}>
                   <Show when={msg.reply_to_id}>
-                    {(() => {
-                      const replied =
-                        props.messages.find((m) => m.id === msg.reply_to_id) ??
-                        undefined;
-                      if (!replied) {
-                        return (
-                          <button
-                            type="button"
-                            class="mb-0.5 max-w-full text-left flex items-center gap-2 text-[11px] text-muted-foreground hover:text-foreground/90"
-                            onClick={() => scrollToMessage(msg.reply_to_id!)}
-                          >
-                            <span class="truncate">
-                              Replying to message{' '}
-                              <span class="font-mono text-[10px]">
-                                #{msg.reply_to_id}
-                              </span>
-                            </span>
-                          </button>
-                        );
-                      }
-                      const repliedSender = getSenderDisplay(
-                        replied.sender_id,
-                        props.participants,
-                        currentUserId()
-                      );
-                      const repliedText = getMessageBodyText(replied);
-                      const preview =
-                        repliedText.length > 80
-                          ? `${repliedText.slice(0, 77)}…`
-                          : repliedText;
-                      const initial =
-                        repliedSender.name?.[0]?.toUpperCase() ?? '?';
-                      return (
-                        <button
-                          type="button"
-                          class="mb-0.5 max-w-full text-left flex items-center gap-2 text-[11px] text-muted-foreground hover:text-foreground/90"
-                          onClick={() => scrollToMessage(msg.reply_to_id!)}
-                        >
-                          <div class="shrink-0">
-                            <div class="size-5 rounded-full bg-muted flex items-center justify-center text-[10px] font-medium text-foreground">
-                              {initial}
-                            </div>
-                          </div>
-                          <div class="flex-1 min-w-0 flex items-center gap-1">
-                            <span class="text-[11px] text-foreground font-medium truncate">
-                              {repliedSender.name}
-                            </span>
-                            <span class="text-[11px] text-muted-foreground truncate">
-                              {preview}
-                            </span>
-                          </div>
-                        </button>
-                      );
-                    })()}
+                    {(replyToId) => (
+                      <ReplyReference
+                        replyToId={replyToId()}
+                        messages={props.messages}
+                        participants={props.participants}
+                        currentUserId={currentUserId()}
+                        compact={compact()}
+                      />
+                    )}
                   </Show>
                   <Show when={compact()}>
                     <div class="flex items-baseline gap-x-2 gap-y-0.5 flex-wrap">
-                      <span class="text-sm font-semibold text-foreground shrink-0">{sender().name}</span>
+                      <span
+                        role="button"
+                        tabIndex={0}
+                        class="text-sm font-semibold text-foreground shrink-0 cursor-pointer rounded px-0.5 -mx-0.5 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openAuthorProfile(msg, e.currentTarget);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            openAuthorProfile(msg, e.currentTarget);
+                          }
+                        }}
+                      >
+                        {sender().name}
+                      </span>
                       <span class="text-[11px] text-muted-foreground shrink-0">
                         {formatMessageTimestamp(new Date(msg.created_at))}
                       </span>
                       <span class="text-muted-foreground/70 shrink-0">·</span>
                       <span
                         class={`text-sm break-words flex-1 min-w-0 transition-colors duration-200 ${
-                          msg.pending ? 'text-muted-foreground/60' : 'text-muted-foreground'
-                        }`}
+                          msg.pending ? 'text-muted-foreground/70' : 'text-foreground/90'
+                        } ${isPlaceholderBody(msg) ? 'italic text-muted-foreground' : ''}`}
                       >
-                        <MessageBody text={getMessageBodyText(msg)} participants={props.participants} />
+                        <MessageBody
+                          text={getMessageBodyText(msg)}
+                          participants={props.participants}
+                          spaceRoles={props.spaceRoles}
+                          onMentionClick={openProfileForUser}
+                        />
                         <Show when={isEdited(msg)}>
-                          <Tooltip label={`Edited ${formatMessageTimestamp(new Date(msg.updated_at!))}`} inline side="top">
-                            <span class="text-[10px] text-muted-foreground/80 ml-1 cursor-default">(edited)</span>
+                          <Tooltip label={t('messages.editedAt', { time: formatMessageTimestamp(new Date(msg.updated_at!)) })} inline side="top">
+                            <span class="text-[10px] text-muted-foreground/80 ms-1 cursor-default">{t('messages.edited')}</span>
                           </Tooltip>
                         </Show>
                       </span>
@@ -523,54 +766,118 @@ export const MessageList: Component<MessageListProps> = (props) => {
                         <span class="text-[10px] text-amber-500/90 shrink-0">Not encrypted</span>
                       </Show> */}
                     </div>
+                    <Show when={msg.attachments?.length}>
+                      <MessageAttachments attachments={msg.attachments!} />
+                    </Show>
+                    <Show when={msg.reactions?.length}>
+                      <MessageReactions
+                        roomId={props.roomId!}
+                        messageId={msg.id}
+                        reactions={msg.reactions!}
+                        canReact={canReact()}
+                        onToggle={(emoji, mine) => toggleReaction(props.roomId!, msg.id, emoji, mine).catch((err) => console.error('Toggle reaction failed:', err))}
+                      />
+                    </Show>
                   </Show>
                   <Show when={!compact()}>
                     <Show when={showHeader()}>
                       <div class="flex items-baseline gap-2 flex-wrap mb-0.5">
-                        <span class="text-sm font-semibold text-foreground shrink-0 truncate">{sender().name}</span>
+                        <span
+                          role="button"
+                          tabIndex={0}
+                          class="text-sm font-semibold text-foreground shrink-0 truncate cursor-pointer rounded px-0.5 -mx-0.5 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            openAuthorProfile(msg, e.currentTarget);
+                          }}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              e.stopPropagation();
+                              openAuthorProfile(msg, e.currentTarget);
+                            }
+                          }}
+                        >
+                          {sender().name}
+                        </span>
                         <span class="text-[13px] text-muted-foreground shrink-0">
                           {formatMessageTimestamp(new Date(msg.created_at))}
                         </span>
                       </div>
                     </Show>
                     <div
-                      class={`text-sm break-words transition-colors duration-200 ${
-                        msg.pending ? 'text-muted-foreground/60' : 'text-muted-foreground'
-                      }`}
+                      class={`text-sm leading-relaxed break-words transition-colors duration-200 ${
+                        msg.pending ? 'text-muted-foreground/70' : 'text-foreground/90'
+                      } ${isPlaceholderBody(msg) ? 'italic text-muted-foreground' : ''}`}
                     >
-                      <MessageBody text={getMessageBodyText(msg)} participants={props.participants} />
+                      <MessageBody
+                        text={getMessageBodyText(msg)}
+                        participants={props.participants}
+                        spaceRoles={props.spaceRoles}
+                        onMentionClick={openProfileForUser}
+                      />
                       <Show when={isEdited(msg)}>
-                        <Tooltip label={`Edited ${formatMessageTimestamp(new Date(msg.updated_at!))}`} inline side="top">
-                          <span class="text-[9px] text-muted-foreground/80 ml-1 cursor-default">(edited)</span>
+                        <Tooltip label={t('messages.editedAt', { time: formatMessageTimestamp(new Date(msg.updated_at!)) })} inline side="top">
+                          <span class="text-[9px] text-muted-foreground/80 ms-1 cursor-default">{t('messages.edited')}</span>
                         </Tooltip>
                       </Show>
                       {/* <Show when={msg.notEncrypted && !msg.pending && props.e2eeEnabled !== false}>
                         <span class="text-[10px] text-amber-500/90">Not encrypted</span>
                       </Show> */}
                     </div>
+                    <Show when={msg.attachments?.length}>
+                      <MessageAttachments attachments={msg.attachments!} />
+                    </Show>
+                    <Show when={msg.reactions?.length}>
+                      <MessageReactions
+                        roomId={props.roomId!}
+                        messageId={msg.id}
+                        reactions={msg.reactions!}
+                        canReact={canReact()}
+                        onToggle={(emoji, mine) => toggleReaction(props.roomId!, msg.id, emoji, mine).catch((err) => console.error('Toggle reaction failed:', err))}
+                      />
+                    </Show>
                   </Show>
                   </Show>
                 </div>
-                <div class={`absolute right-2 top-0 hidden shrink-0 -translate-y-1/2 items-center gap-0.5 px-1 py-0.5 opacity-0 transition-opacity group-hover:opacity-100 md:flex ${appFloatPanel}`}>
-                  <Show when={props.onReply}>
-                    <Tooltip label="Reply" inline side="top">
-                      <button
-                        type="button"
-                        class="size-8 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                <div class={`absolute end-2 top-0 hidden shrink-0 -translate-y-1/2 items-center gap-0.5 p-0.5 opacity-0 transition-opacity group-hover:opacity-100 group-focus-within:opacity-100 md:flex ${appFloatToolbar}`}>
+                  <Show when={props.roomId && canReact()}>
+                    <Tooltip label={t('messages.actions.addReaction')} inline side="top">
+                      <IconButton
+                        size="sm"
+                        icon="fa-solid fa-face-smile"
+                        label={t('messages.actions.addReaction')}
+                        title=""
+                        active={reactionPickerFor() === msg.id}
+                        onClick={(e) => {
+                          e.preventDefault();
+                          setReactionPickerFor((v) => (v === msg.id ? null : msg.id));
+                        }}
+                      />
+                    </Tooltip>
+                  </Show>
+                  <Show when={props.onReply && props.canReply !== false}>
+                    <Tooltip label={t('messages.actions.reply')} inline side="top">
+                      <IconButton
+                        size="sm"
+                        icon="fa-solid fa-reply"
+                        label={t('messages.actions.reply')}
+                        title=""
                         onClick={(e) => {
                           e.preventDefault();
                           props.onReply?.(msg);
                         }}
-                      >
-                        <i class="fa-solid fa-reply text-xs" />
-                      </button>
+                      />
                     </Tooltip>
                   </Show>
-                  <Show when={props.roomId}>
-                    <Tooltip label={isMessagePinned(props.roomId, msg.id) ? 'Unpin message' : 'Pin message'} inline side="top">
-                      <button
-                        type="button"
-                        class="size-8 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                  <Show when={props.roomId && props.canManageMessages !== false}>
+                    <Tooltip label={isMessagePinned(props.roomId, msg.id) ? t('messages.actions.unpin') : t('messages.actions.pin')} inline side="top">
+                      <IconButton
+                        size="sm"
+                        icon="fa-solid fa-thumbtack"
+                        label={isMessagePinned(props.roomId, msg.id) ? t('messages.actions.unpin') : t('messages.actions.pin')}
+                        title=""
+                        active={isMessagePinned(props.roomId, msg.id)}
                         onClick={(e) => {
                           e.preventDefault();
                           if (!props.roomId) return;
@@ -580,53 +887,54 @@ export const MessageList: Component<MessageListProps> = (props) => {
                             pinMessage(props.roomId, msg.id);
                           }
                         }}
-                      >
-                        <i class="fa-solid fa-thumbtack text-xs" />
-                      </button>
+                      />
                     </Tooltip>
                   </Show>
-                  <Tooltip label="Copy Text" inline side="top">
-                    <button
-                      type="button"
-                      class="size-8 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                  <Tooltip label={t('messages.actions.copyText')} inline side="top">
+                    <IconButton
+                      size="sm"
+                      icon="fa-solid fa-copy"
+                      label={t('messages.actions.copyText')}
+                      title=""
                       onClick={(e) => {
                         e.preventDefault();
                         navigator.clipboard.writeText(getMessageBodyText(msg));
                       }}
-                    >
-                      <i class="fa-solid fa-copy text-xs" />
-                    </button>
+                    />
                   </Tooltip>
-                  <Tooltip label="Copy Message ID" inline side="top">
-                    <button
-                      type="button"
-                      class="size-8 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                  <Tooltip label={t('messages.actions.copyId')} inline side="top">
+                    <IconButton
+                      size="sm"
+                      icon="fa-solid fa-hashtag"
+                      label={t('messages.actions.copyId')}
+                      title=""
                       onClick={(e) => {
                         e.preventDefault();
                         navigator.clipboard.writeText(msg.id);
                       }}
-                    >
-                      <i class="fa-solid fa-hashtag text-xs" />
-                    </button>
+                    />
                   </Tooltip>
                   <Show when={msg.sender_id === currentUserId() && props.roomId}>
-                    <Tooltip label="Edit Message" inline side="top">
-                      <button
-                        type="button"
-                        class="size-8 inline-flex items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors"
+                    <Tooltip label={t('messages.actions.edit')} inline side="top">
+                      <IconButton
+                        size="sm"
+                        icon="fa-solid fa-pencil"
+                        label={t('messages.actions.edit')}
+                        title=""
                         onClick={(e) => {
                           e.preventDefault();
                           setEditDraft(getMessageBodyText(msg));
                           setEditingMessageId(msg.id);
                         }}
-                      >
-                        <i class="fa-solid fa-pencil text-xs" />
-                      </button>
+                      />
                     </Tooltip>
-                    <Tooltip label="Delete Message" inline side="top">
-                      <button
-                        type="button"
-                        class="size-8 inline-flex items-center justify-center rounded text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-colors"
+                    <Tooltip label={t('messages.actions.delete')} inline side="top">
+                      <IconButton
+                        size="sm"
+                        tone="danger"
+                        icon="fa-solid fa-trash"
+                        label={t('messages.actions.delete')}
+                        title=""
                         onClick={(e) => {
                           e.preventDefault();
                           const roomId = props.roomId!;
@@ -636,12 +944,15 @@ export const MessageList: Component<MessageListProps> = (props) => {
                             setPendingDelete({ roomId, msgId: msg.id, message: msg });
                           }
                         }}
-                      >
-                        <i class="fa-solid fa-trash text-xs" />
-                      </button>
+                      />
                     </Tooltip>
                   </Show>
                 </div>
+                <Show when={reactionPickerFor() === msg.id}>
+                  <div class="absolute end-2 top-8 z-30">
+                    <EmojiPicker onClose={() => setReactionPickerFor(null)} onPick={(pick) => pickReaction(msg, pick)} />
+                  </div>
+                </Show>
               </div>
                 )}
               >
@@ -660,6 +971,18 @@ export const MessageList: Component<MessageListProps> = (props) => {
           }}
         </For>
       </div>
+    </div>
+    <Show when={!isNearBottom[0]()}>
+      <button
+        type="button"
+        onClick={scrollToPresent}
+        title={t('messages.jumpToPresent')}
+        aria-label={t('messages.jumpToPresent')}
+        class="absolute end-4 z-10 flex size-9 items-center justify-center rounded-full border border-border bg-card/85 text-foreground shadow-lg shadow-black/30 backdrop-blur-xl transition-colors hover:bg-accent bottom-[calc(var(--composer-height,0px)+1rem)]"
+      >
+        <i class="fa-solid fa-arrow-down text-xs" aria-hidden="true" />
+      </button>
+    </Show>
     </div>
 
     <DeleteMessageModal

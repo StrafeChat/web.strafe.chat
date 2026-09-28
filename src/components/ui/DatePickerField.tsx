@@ -1,7 +1,8 @@
 import type { Component } from 'solid-js';
 import { Show, createEffect, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
 import { useReactiveTranslate } from '../../i18n';
-import { appModalBackdrop } from '../../theme/appChrome';
+import { appModalBackdrop, zLayer } from '../../theme/appChrome';
+import { FieldError, fieldLabelClass, inputBaseClass, inputErrorClass } from './Input';
 
 export interface DatePickerFieldProps {
   id?: string;
@@ -386,7 +387,7 @@ export const DatePickerField: Component<DatePickerFieldProps> = (props) => {
           <div class="flex min-w-0 flex-1 items-center justify-center gap-1">
             <button
               type="button"
-              class="max-w-[min(58%,11rem)] cursor-pointer truncate rounded-xl border border-transparent bg-muted/30 px-3 py-2 text-sm font-semibold tabular-nums text-foreground transition-colors duration-150 hover:border-border hover:bg-muted/60 active:bg-muted/80"
+              class="max-w-[min(58%,11rem)] cursor-pointer truncate rounded-lg border border-transparent bg-muted/30 px-3 py-2 text-sm font-semibold tabular-nums text-foreground transition-colors duration-150 hover:border-border hover:bg-muted/60 active:bg-muted/80"
               onClick={() => setPickMode('months')}
               title={t('datepicker.chooseMonth')}
             >
@@ -394,7 +395,7 @@ export const DatePickerField: Component<DatePickerFieldProps> = (props) => {
             </button>
             <button
               type="button"
-              class="cursor-pointer rounded-xl border border-transparent bg-muted/30 px-3 py-2 text-sm font-semibold tabular-nums text-foreground transition-colors duration-150 hover:border-border hover:bg-muted/60 active:bg-muted/80"
+              class="cursor-pointer rounded-lg border border-transparent bg-muted/30 px-3 py-2 text-sm font-semibold tabular-nums text-foreground transition-colors duration-150 hover:border-border hover:bg-muted/60 active:bg-muted/80"
               onClick={() => setPickMode('years')}
               title={t('datepicker.chooseYear')}
             >
@@ -458,7 +459,7 @@ export const DatePickerField: Component<DatePickerFieldProps> = (props) => {
   return (
     <div class={`w-full space-y-1.5 relative ${props.class ?? ''}`} ref={(el) => (rootEl = el)}>
       {props.label ? (
-        <label for={fieldId} class="text-sm font-medium text-foreground">
+        <label for={fieldId} class={fieldLabelClass}>
           {props.label}
           {props.required ? <span class="text-destructive"> *</span> : null}
         </label>
@@ -469,13 +470,9 @@ export const DatePickerField: Component<DatePickerFieldProps> = (props) => {
         id={fieldId}
         disabled={props.disabled}
         onClick={() => !props.disabled && setOpen(!open())}
-        class={`
-          box-border flex h-10 min-h-10 w-full cursor-pointer items-center justify-between gap-2 rounded-xl border border-input bg-background px-3 py-2 text-start text-sm text-foreground
-          transition-colors duration-150 hover:bg-accent/40 hover:border-border
-          focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0
-          disabled:pointer-events-none disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-input disabled:hover:bg-background
-          ${props.error ? 'border-destructive' : ''}
-        `}
+        class={`${inputBaseClass} h-10 min-h-10 cursor-pointer items-center justify-between gap-2 px-3 py-2 text-start hover:border-border hover:bg-accent/40 disabled:pointer-events-none ${
+          props.error ? inputErrorClass : ''
+        }`}
         aria-haspopup="dialog"
         aria-expanded={open()}
       >
@@ -490,19 +487,14 @@ export const DatePickerField: Component<DatePickerFieldProps> = (props) => {
         </span>
       </button>
 
-      {props.error ? (
-        <div class="flex gap-1.5 text-xs text-destructive" role="alert">
-          <i class="fa-solid fa-circle-exclamation mt-0.5 shrink-0 text-destructive" aria-hidden="true" />
-          <span>{props.error}</span>
-        </div>
-      ) : null}
+      <FieldError message={props.error} />
 
       <Show when={open()}>
         <Show
           when={isNarrow()}
           fallback={
             <div
-              class="absolute left-0 right-0 top-full z-50 mt-1 w-full overflow-hidden rounded-xl border border-border bg-popover p-3 shadow-2xl shadow-black/40"
+              class="absolute left-0 right-0 top-full z-20 mt-1 w-full overflow-hidden rounded-2xl border border-border bg-popover/95 p-3 shadow-2xl shadow-black/40 backdrop-blur-xl"
               role="dialog"
               aria-label={t('datepicker.chooseDate')}
             >
@@ -512,17 +504,17 @@ export const DatePickerField: Component<DatePickerFieldProps> = (props) => {
         >
           <>
             <div
-              class={`fixed inset-0 z-[199] ${appModalBackdrop}`}
+              class={`fixed inset-0 ${zLayer.popover} ${appModalBackdrop}`}
               onClick={() => setOpen(false)}
               aria-hidden="true"
             />
             <div
-              class="fixed inset-x-0 bottom-0 z-[200] flex max-h-[min(92dvh,38rem)] flex-col overflow-hidden rounded-t-3xl border border-border bg-popover pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_40px_-6px_rgba(0,0,0,0.55)]"
+              class={`fixed inset-x-0 bottom-0 ${zLayer.popover} flex max-h-[min(92dvh,38rem)] flex-col overflow-hidden rounded-t-3xl border border-border bg-popover pb-[max(0.75rem,env(safe-area-inset-bottom))] shadow-[0_-8px_40px_-6px_rgba(0,0,0,0.55)]`}
               role="dialog"
               aria-modal="true"
               aria-label={t('datepicker.chooseDate')}
             >
-              <div class="mx-auto mt-2.5 h-1 w-11 shrink-0 rounded-full bg-muted-foreground/30" aria-hidden />
+              <div class="mx-auto mt-2.5 h-1 w-11 shrink-0 rounded-sm bg-muted-foreground/30" aria-hidden />
               <div class="flex shrink-0 items-center justify-between gap-2 border-b border-border/70 px-4 py-2.5">
                 <span class="text-base font-semibold text-foreground">{t('datepicker.chooseDate')}</span>
                 <button

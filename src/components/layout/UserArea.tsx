@@ -5,23 +5,35 @@ import { auth } from '../../stores/auth';
 import { presence, setUserPresence, type UserPresence } from '../../stores/presence';
 import { PresenceDot } from '../PresenceDot';
 import { patchMe } from '../../api/users';
+import { MessageAvatar } from '../messageList/MessageAvatar';
 import { openUserSettings } from '../../stores/userSettingsModal';
-import { appMenuPopover, appUserDock } from '../../theme/appChrome';
+import { appMenuPopover, appUserDock, zLayer } from '../../theme/appChrome';
+import { IconButton } from '../ui/IconButton';
+import { Button } from '../ui/Button';
+import { inputBaseClass } from '../ui/Input';
+import { instance } from '../../stores/instance';
+import { toggleDeafen, toggleMute, voice } from '../../stores/voice';
+import { t } from '../../i18n';
 
-const STATUS_OPTIONS: { id: UserPresence['status']; label: string; color: string }[] = [
-  { id: 'online', label: 'Online', color: 'bg-green-500' },
-  { id: 'idle', label: 'Idle', color: 'bg-yellow-500' },
-  { id: 'dnd', label: 'Do Not Disturb', color: 'bg-red-500' },
-  { id: 'invisible', label: 'Invisible', color: 'bg-muted-foreground/50' },
+const STATUS_OPTIONS: { id: UserPresence['status']; labelKey: string; color: string }[] = [
+  { id: 'online', labelKey: 'presence.online', color: 'bg-primary' },
+  { id: 'idle', labelKey: 'presence.idle', color: 'bg-yellow-500' },
+  { id: 'dnd', labelKey: 'presence.dnd', color: 'bg-red-500' },
+  { id: 'invisible', labelKey: 'presence.invisible', color: 'bg-muted-foreground/50' },
 ];
 
-const STATUS_LABELS: Record<string, string> = {
-  online: 'Online',
-  idle: 'Idle',
-  dnd: 'Do Not Disturb',
-  invisible: 'Invisible',
-  offline: 'Invisible',
-};
+/** Label for a presence status; an offline self reads as "Invisible" (that is what it means for you). */
+function statusLabel(status: string | undefined): string {
+  switch (status) {
+    case 'online':
+    case 'idle':
+    case 'dnd':
+    case 'invisible':
+      return t(`presence.${status}`);
+    default:
+      return t('presence.invisible');
+  }
+}
 
 function formatDiscriminator(d: number): string {
   return String(d).padStart(4, '0');
@@ -47,12 +59,10 @@ export const UserArea: Component = () => {
   const statusText = () => {
     const pres = p();
     if (pres?.custom_status) return pres.custom_status;
-    const status = pres?.status ?? 'offline';
-    return STATUS_LABELS[status] ?? 'Offline';
+    return statusLabel(pres?.status);
   };
 
-  const subtitleText = () =>
-    isHovering() ? `${username()}#${discriminatorStr()}` : statusText();
+  const subtitleText = () => (isHovering() ? `${username()}#${discriminatorStr()}` : statusText());
 
   function handleDocumentClick(e: MouseEvent) {
     const target = e.target as Node;
@@ -117,178 +127,231 @@ export const UserArea: Component = () => {
     }
   });
 
+  createEffect(() => {
+    if (!popoverOpen()) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setPopoverOpen(false);
+        setStatusMenuOpen(false);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    onCleanup(() => window.removeEventListener('keydown', onKey));
+  });
+
   onMount(() => {
     document.addEventListener('click', handleDocumentClick);
     onCleanup(() => document.removeEventListener('click', handleDocumentClick));
   });
 
+  const currentStatusColor = () =>
+    STATUS_OPTIONS.find((s) => s.id === (p()?.status ?? 'offline'))?.color ?? 'bg-muted-foreground/50';
+
   return (
     <>
-    <div
-      ref={(el) => { areaEl = el; }}
-      class={`relative flex items-center gap-1 px-2 py-2.5 ${appUserDock}`}
-    >
       <div
-        id="user-area-trigger"
-        role="button"
-        tabIndex={0}
-        class="flex items-center gap-2 flex-1 min-w-0 rounded-md hover:bg-accent/50 transition-colors cursor-pointer"
-        onMouseEnter={() => setIsHovering(true)}
-        onMouseLeave={() => setIsHovering(false)}
-        onClick={() => setPopoverOpen((o) => !o)}
-        onKeyDown={(e) => e.key === 'Enter' && setPopoverOpen((o) => !o)}
-      >
-        <div class="relative shrink-0 p-0.5">
-          <div class="size-8 rounded-full bg-primary flex items-center justify-center text-primary-foreground text-xs font-medium">
-            {displayName()[0]?.toUpperCase() ?? '?'}
-          </div>
-          <span class="absolute bottom-[.5px] right-[.5px]">
-            <PresenceDot userId={userId()} class="size-3.25" />
-          </span>
-        </div>
-        <div class="flex-1 min-w-0 text-left">
-          <div class="text-xs font-medium text-foreground truncate">{displayName()}</div>
-          <div class="text-[11px] text-muted-foreground truncate leading-tight">
-            {subtitleText()}
-          </div>
-        </div>
-      </div>
-      <button
-        type="button"
-        class="size-8 inline-flex items-center justify-center rounded-md text-muted-foreground hover:text-foreground hover:bg-accent transition-colors shrink-0"
-        title="Settings"
-        aria-label="Settings"
-        onClick={() => {
-          setPopoverOpen(false);
-          openUserSettings();
+        ref={(el) => {
+          areaEl = el;
         }}
+        class={`relative flex items-center gap-1 px-2 py-2 ${appUserDock}`}
       >
-        <i class="fa-solid fa-gear text-xs" />
-      </button>
-    </div>
+        <div
+          id="user-area-trigger"
+          role="button"
+          tabIndex={0}
+          aria-haspopup="dialog"
+          aria-expanded={popoverOpen()}
+          class={`flex min-w-0 flex-1 cursor-pointer items-center gap-2 rounded-lg py-1 pl-1 pr-2 transition-colors hover:bg-accent/50 ${
+            popoverOpen() ? 'bg-accent/50' : ''
+          }`}
+          onMouseEnter={() => setIsHovering(true)}
+          onMouseLeave={() => setIsHovering(false)}
+          onClick={() => setPopoverOpen((o) => !o)}
+          onKeyDown={(e) => e.key === 'Enter' && setPopoverOpen((o) => !o)}
+        >
+          <div class="relative shrink-0">
+            <MessageAvatar name={displayName()} avatar={auth.user?.avatar} class="size-8 text-[13px]" />
+            <span class="absolute -bottom-px -right-px">
+              <PresenceDot userId={userId()} class="size-3.25" />
+            </span>
+          </div>
+          <div class="min-w-0 flex-1 text-left">
+            <div class="truncate text-xs font-semibold text-foreground">{displayName()}</div>
+            <div class="truncate text-[11px] leading-tight text-muted-foreground">{subtitleText()}</div>
+          </div>
+        </div>
+        {/* Mute / deafen sit here permanently, as on Discord, so they are one click away
+            whether or not a call is up; they also set the state a later join starts with. */}
+        <Show when={instance.voiceEnabled}>
+          <IconButton
+            icon={`fa-solid ${voice.session.selfMute || voice.session.selfDeaf ? 'fa-microphone-slash' : 'fa-microphone'}`}
+            label={voice.session.selfMute || voice.session.selfDeaf ? t('voice.unmute') : t('voice.mute')}
+            class={voice.session.selfMute || voice.session.selfDeaf ? 'text-destructive hover:text-destructive' : ''}
+            aria-pressed={voice.session.selfMute || voice.session.selfDeaf}
+            onClick={toggleMute}
+          />
+          <IconButton
+            icon={`fa-solid ${voice.session.selfDeaf ? 'fa-volume-xmark' : 'fa-headphones'}`}
+            label={voice.session.selfDeaf ? t('voice.undeafen') : t('voice.deafen')}
+            class={voice.session.selfDeaf ? 'text-destructive hover:text-destructive' : ''}
+            aria-pressed={voice.session.selfDeaf}
+            onClick={toggleDeafen}
+          />
+        </Show>
+        <IconButton
+          icon="fa-solid fa-gear"
+          label={t('common.settings')}
+          onClick={() => {
+            setPopoverOpen(false);
+            openUserSettings();
+          }}
+        />
+      </div>
 
       <Show when={popoverOpen() && popoverPos()}>
         {(pos) => (
-        <Portal>
-        <div
-          id="user-popover"
-          data-modal
-          class={`fixed z-50 max-h-[85vh] w-[300px] overflow-y-auto overflow-x-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${appMenuPopover}`}
-          style={{
-            left: `${pos().left}px`,
-            bottom: `${pos().bottom}px`,
-          }}
-        >
-          {/* Banner */}
-          <div class="h-14 rounded-t-xl bg-primary/30" />
-
-          {/* Avatar + name */}
-          <div class="px-5 -mt-10 pb-4">
-            <div class="relative inline-block">
-              <div class="size-20 rounded-full border-4 border-card bg-primary flex items-center justify-center text-2xl font-semibold text-primary-foreground">
-                {displayName()[0]?.toUpperCase() ?? '?'}
-              </div>
-              <span class="absolute bottom-1 right-1">
-                <PresenceDot userId={userId()} class="size-5" />
-              </span>
-            </div>
-            <h3 class="mt-3 text-lg font-semibold text-foreground">{displayName()}</h3>
-            <button
-              type="button"
-              onClick={copyDiscriminator}
-              class="flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground mt-0.5"
-            >
-              {username()}#{discriminatorStr()}
-              <i class="fa-regular fa-copy text-[10px]" />
-            </button>
-          </div>
-
-          {/* Set custom status */}
-          <div class="px-5 pb-4">
-            <button
-              type="button"
-              onClick={() => document.getElementById('custom-status-input')?.focus()}
-              class="flex items-center gap-2 w-full text-left text-sm text-muted-foreground hover:text-foreground rounded py-1.5"
-            >
-              <i class="fa-regular fa-face-smile" />
-              {p()?.custom_status ? (
-                <span class="truncate">{p()!.custom_status}</span>
-              ) : (
-                <span>Set a custom status</span>
-              )}
-            </button>
-            <input
-              id="custom-status-input"
-              type="text"
-              placeholder="Set a custom status"
-              maxlength={128}
-              class="mt-2 w-full rounded-lg border border-input bg-background px-3 py-2.5 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-              value={customStatusDraft()}
-              onInput={(e) => setCustomStatusDraft(e.currentTarget.value)}
-              onKeyDown={(e) => e.key === 'Enter' && setCustomStatus()}
-              onBlur={() => {
-                const draft = customStatusDraft().trim();
-                if (draft !== (p()?.custom_status ?? '')) setCustomStatus();
+          <Portal>
+            <div
+              id="user-popover"
+              data-modal
+              role="dialog"
+              aria-label={t('userArea.dialogLabel')}
+              class={`fixed ${zLayer.popover} max-h-[85vh] w-[300px] overflow-x-hidden overflow-y-auto [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden ${appMenuPopover}`}
+              style={{
+                left: `${pos().left}px`,
+                bottom: `${pos().bottom}px`,
               }}
-            />
-          </div>
-
-          {/* Menu items */}
-          <div class="border-t border-border py-2">
-            <button
-              type="button"
-              class="relative flex items-center gap-3 w-full px-5 py-3 text-sm text-foreground hover:bg-accent/50 transition-colors"
-              onClick={() => setStatusMenuOpen((o) => !o)}
             >
-              <span
-                class={`size-2.5 rounded-full shrink-0 ${
-                  STATUS_OPTIONS.find((s) => s.id === (p()?.status ?? 'offline'))?.color ?? 'bg-muted-foreground/50'
-                }`}
+              {/* Banner */}
+              <div
+                class="h-16 rounded-t-3xl bg-gradient-to-br from-primary/50 via-primary/25 to-primary/10 bg-cover bg-center"
+                style={
+                  auth.user?.banner
+                    ? { 'background-image': `url(${auth.user.banner})` }
+                    : {
+                        'background-image': 'radial-gradient(circle, rgba(255,255,255,0.14) 1px, transparent 1px)',
+                        'background-size': '14px 14px',
+                      }
+                }
               />
-              {STATUS_LABELS[p()?.status ?? 'offline'] ?? 'Offline'}
-              <i class="fa-solid fa-chevron-right ml-auto text-xs text-muted-foreground" />
-            </button>
 
-            <Show when={statusMenuOpen()}>
-              <div class="border-y border-border bg-card/40 px-5 py-3 backdrop-blur-sm">
-                <For each={STATUS_OPTIONS}>
-                  {(opt) => (
-                    <button
-                      type="button"
-                      class="flex items-center gap-3 w-full py-2.5 text-sm text-foreground hover:bg-accent/50 rounded px-3 -mx-3 transition-colors"
-                      onClick={() => setStatus(opt.id)}
-                      disabled={saving()}
-                    >
-                      <span class={`size-2.5 rounded-full shrink-0 ${opt.color}`} />
-                      {opt.label}
-                    </button>
-                  )}
-                </For>
+              {/* Avatar + name */}
+              <div class="-mt-10 px-5 pb-3">
+                <div class="relative inline-block">
+                  <MessageAvatar
+                    name={displayName()}
+                    avatar={auth.user?.avatar}
+                    class="size-20 border-4 border-popover bg-primary text-2xl font-semibold text-primary-foreground shadow-lg shadow-black/30"
+                  />
+                  <span class="absolute bottom-0.5 right-0.5">
+                    <PresenceDot userId={userId()} class="size-5" borderClass="border-popover" />
+                  </span>
+                </div>
+                <h3 class="mt-2.5 text-lg font-semibold leading-tight text-foreground">{displayName()}</h3>
+                <button
+                  type="button"
+                  onClick={copyDiscriminator}
+                  class="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
+                  title={t('userArea.copyUsername')}
+                >
+                  {username()}#{discriminatorStr()}
+                  <i class="fa-regular fa-copy text-[10px]" aria-hidden="true" />
+                </button>
               </div>
-            </Show>
 
-            <button
-              type="button"
-              class="flex items-center gap-3 w-full px-5 py-3 text-sm text-foreground hover:bg-accent/50 transition-colors"
-              onClick={copyUserId}
-            >
-              <i class="fa-regular fa-id-card text-muted-foreground w-4" />
-              Copy User ID
-            </button>
-          </div>
+              {/* Custom status */}
+              <div class="px-5 pb-4">
+                <label for="custom-status-input" class="sr-only">
+                  {t('userArea.customStatus')}
+                </label>
+                <div class="relative">
+                  <i
+                    class="fa-regular fa-face-smile pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <input
+                    id="custom-status-input"
+                    type="text"
+                    placeholder={t('userArea.setCustomStatus')}
+                    maxlength={128}
+                    class={`${inputBaseClass} h-10 pl-9 pr-3`}
+                    value={customStatusDraft()}
+                    onInput={(e) => setCustomStatusDraft(e.currentTarget.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && setCustomStatus()}
+                    onBlur={() => {
+                      const draft = customStatusDraft().trim();
+                      if (draft !== (p()?.custom_status ?? '')) setCustomStatus();
+                    }}
+                  />
+                </div>
+              </div>
 
-          {/* Edit Profile */}
-          <div class="p-4 border-t border-border">
-            <button
-              type="button"
-              class="flex items-center justify-center gap-2.5 w-full py-3 rounded-lg bg-primary text-primary-foreground text-sm font-medium hover:bg-primary-hover transition-colors"
-            >
-              <i class="fa-solid fa-pen" />
-              Edit Profile
-            </button>
-          </div>
-        </div>
-        </Portal>
+              {/* Menu items */}
+              <div class="border-t border-border/70 px-2 py-2">
+                <button
+                  type="button"
+                  aria-expanded={statusMenuOpen()}
+                  class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-foreground transition-colors hover:bg-accent/60"
+                  onClick={() => setStatusMenuOpen((o) => !o)}
+                >
+                  <span class={`size-2.5 shrink-0 rounded-full ${currentStatusColor()}`} />
+                  {statusLabel(p()?.status)}
+                  <i
+                    class={`fa-solid fa-chevron-right ml-auto text-xs text-muted-foreground transition-transform ${
+                      statusMenuOpen() ? 'rotate-90' : ''
+                    }`}
+                    aria-hidden="true"
+                  />
+                </button>
+
+                <Show when={statusMenuOpen()}>
+                  <div class="my-1 space-y-0.5 rounded-xl bg-muted/25 p-1">
+                    <For each={STATUS_OPTIONS}>
+                      {(opt) => (
+                        <button
+                          type="button"
+                          class={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-foreground transition-colors hover:bg-accent/60 disabled:opacity-50 ${
+                            (p()?.status ?? 'offline') === opt.id ? 'bg-accent/40' : ''
+                          }`}
+                          onClick={() => setStatus(opt.id)}
+                          disabled={saving()}
+                        >
+                          <span class={`size-2.5 shrink-0 rounded-full ${opt.color}`} />
+                          {t(opt.labelKey)}
+                          <Show when={(p()?.status ?? 'offline') === opt.id}>
+                            <i class="fa-solid fa-check ml-auto text-xs text-primary" aria-hidden="true" />
+                          </Show>
+                        </button>
+                      )}
+                    </For>
+                  </div>
+                </Show>
+
+                <button
+                  type="button"
+                  class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-foreground transition-colors hover:bg-accent/60"
+                  onClick={copyUserId}
+                >
+                  <i class="fa-regular fa-id-card w-4 text-center text-muted-foreground" aria-hidden="true" />
+                  {t('userArea.copyUserId')}
+                </button>
+              </div>
+
+              {/* Edit Profile */}
+              <div class="border-t border-border/70 p-3">
+                <Button
+                  class="w-full"
+                  onClick={() => {
+                    setPopoverOpen(false);
+                    openUserSettings('account');
+                  }}
+                >
+                  <i class="fa-solid fa-pen text-xs" aria-hidden="true" />
+                  {t('userArea.editProfile')}
+                </Button>
+              </div>
+            </div>
+          </Portal>
         )}
       </Show>
     </>

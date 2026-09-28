@@ -8,6 +8,7 @@ export interface User {
   discriminator: number;
   display_name: string;
   avatar?: string;
+  banner?: string;
   bots?: string[];
   relationships?: string[];
 }

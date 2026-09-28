@@ -1,4 +1,4 @@
-import { createSignal, Show } from 'solid-js';
+import { createSignal, onMount, Show } from 'solid-js';
 import { useNavigate, A } from '@solidjs/router';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -15,6 +15,8 @@ import {
 } from '../components/auth/authLayout';
 import { AuthBrandMark } from '../components/auth/AuthBrandMark';
 import { FormApiErrors } from '../components/auth/FormApiErrors';
+import { CaptchaWidget } from '../components/auth/CaptchaWidget';
+import { instance, loadInstanceInfo } from '../stores/instance';
 import { AuthLanguageSwitcher, useReactiveTranslate } from '../i18n';
 import { translateCaughtApiError } from '../lib/formatApiError';
 
@@ -55,6 +57,13 @@ export default function Register() {
   const [passwordErr, setPasswordErr] = createSignal('');
 
   const [loading, setLoading] = createSignal(false);
+
+  // Registration challenge, when this instance runs one.
+  const [captchaToken, setCaptchaToken] = createSignal('');
+  const [captchaBroken, setCaptchaBroken] = createSignal(false);
+  let resetCaptcha: (() => void) | null = null;
+  const captchaRequired = () => instance.captcha.enabled;
+  onMount(() => void loadInstanceInfo());
 
   function clearStep1Errors() {
     setEmailErr('');
@@ -130,6 +139,11 @@ export default function Register() {
       ok = false;
     }
 
+    if (captchaRequired() && !captchaToken()) {
+      setErrorLines([captchaBroken() ? t('auth.register.captchaUnavailable') : t('auth.register.captchaRequired')]);
+      ok = false;
+    }
+
     if (!ok) return;
 
     setLoading(true);
@@ -140,10 +154,14 @@ export default function Register() {
         username: uVal,
         password: pVal,
         date_of_birth: dateOfBirthRFC3339,
+        ...(captchaToken() ? { captcha_token: captchaToken() } : {}),
       });
       navigate('/login?registered=1', { replace: true });
     } catch (err) {
       setErrorLines(translateCaughtApiError(err, t));
+      // A token is single-use: whatever went wrong, the old one can't be replayed, so
+      // re-arm the widget instead of leaving a dead token in the form.
+      resetCaptcha?.();
     } finally {
       setLoading(false);
     }
@@ -171,7 +189,6 @@ export default function Register() {
                   onInput={(e) => setEmail(e.currentTarget.value)}
                   autocomplete="email"
                   disabled={loading()}
-                  class="rounded-xl"
                   required
                   error={emailErr()}
                 />
@@ -181,12 +198,11 @@ export default function Register() {
                   onChange={setDateOfBirth}
                   disabled={loading()}
                   required
-                  class="rounded-xl"
                   error={dobErr()}
                 />
               </CardContent>
               <CardFooter class={authCardFooterClass}>
-                <Button type="submit" class="w-full rounded-full font-semibold" loading={loading()}>
+                <Button type="submit" class="w-full font-semibold" loading={loading()}>
                   {t('auth.register.next')}
                 </Button>
                 <A
@@ -213,7 +229,6 @@ export default function Register() {
                   }}
                   autocomplete="username"
                   disabled={loading()}
-                  class="rounded-xl"
                   required
                   error={usernameErr()}
                 />
@@ -228,20 +243,40 @@ export default function Register() {
                   }}
                   autocomplete="new-password"
                   disabled={loading()}
-                  class="rounded-xl"
                   required
                   error={passwordErr()}
                 />
+                <Show when={captchaRequired()}>
+                  <CaptchaWidget
+                    provider={instance.captcha.provider}
+                    siteKey={instance.captcha.siteKey}
+                    apiUrl={instance.captcha.apiUrl}
+                    onToken={(token) => {
+                      setCaptchaToken(token);
+                      if (token) setErrorLines([]);
+                    }}
+                    onReady={(reset) => (resetCaptcha = reset)}
+                    onLoadError={() => {
+                      setCaptchaBroken(true);
+                      setErrorLines([t('auth.register.captchaUnavailable')]);
+                    }}
+                  />
+                </Show>
                 <FormApiErrors messages={errorLines()} id="register-api-errors" />
               </CardContent>
               <CardFooter class={authCardFooterClass}>
-                <Button type="submit" class="w-full rounded-full font-semibold" loading={loading()}>
+                <Button
+                  type="submit"
+                  class="w-full font-semibold"
+                  loading={loading()}
+                  disabled={captchaRequired() && !captchaToken()}
+                >
                   {t('auth.register.createAccount')}
                 </Button>
                 <Button
                   type="button"
                   variant="outline"
-                  class="w-full rounded-full"
+                  class="w-full"
                   disabled={loading()}
                   onClick={goStep1}
                 >

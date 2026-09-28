@@ -1,4 +1,5 @@
-import { api } from './client';
+import { api, getApiUrl } from './client';
+import { ApiError } from './ApiError';
 import type { RoomParticipant } from './rooms';
 
 export interface Space {
@@ -24,9 +25,16 @@ export interface Space {
   preferred_locale: string;
   public_updates_room_id?: string;
   max_video_room_users: number;
+  /** Server widget: public member/online counts (+ an invite when widget_room_id is set). */
+  widget_enabled?: boolean;
+  widget_room_id?: string;
   created_at: string;
   updated_at: string;
   everyone_role_id?: string;
+  /** Every role in the space, sorted by position. Present on member-facing payloads (READY,
+   * GET /spaces, GET /spaces/:id, join) so permissions can be evaluated locally; kept
+   * current by SPACE_ROLE_* gateway events. Absent only on the public invite preview. */
+  roles?: SpaceRole[];
 }
 
 export interface CreateSpaceInput {
@@ -41,6 +49,30 @@ export function listSpaces() {
 
 export function getSpace(id: string) {
   return api<Space>(`/spaces/${id}`);
+}
+
+/** Room ids are strings; an empty string clears the setting. */
+export interface PatchSpaceInput {
+  name?: string;
+  description?: string;
+  system_room_id?: string;
+  system_room_flags?: number;
+  default_message_notifications?: number;
+  afk_room_id?: string;
+  afk_timeout?: number;
+  widget_enabled?: boolean;
+  widget_room_id?: string;
+}
+
+/** spaces.system_room_flags bits - set = that notice is suppressed. */
+export const SYSTEM_FLAG_SUPPRESS_JOIN = 1;
+export const SYSTEM_FLAG_SUPPRESS_LEAVE = 2;
+
+/** Accepted afk_timeout values (seconds). */
+export const AFK_TIMEOUTS = [60, 300, 900, 1800, 3600] as const;
+
+export function patchSpace(spaceId: string, body: PatchSpaceInput) {
+  return api<Space>(`/spaces/${spaceId}`, { method: 'PATCH', json: body });
 }
 
 export function createSpace(input: CreateSpaceInput) {
@@ -60,16 +92,66 @@ export interface SpaceRoom {
   type: number; // 3 = text, 4 = voice, 5 = section
   name: string;
   topic?: string;
+  slowmode_seconds?: number;
   position: number;
   space_id?: string;
   parent_id?: string;
   last_message_id?: string;
+  last_read_message_id?: string;
+  mention_count?: number;
+  /** This user's own per-room notification settings - never visible to anyone else. */
+  muted?: boolean;
+  muted_until?: string;
+  /** 0 = follow the global default for this room type, 1 = all, 2 = mentions only, 3 = none. */
+  notify_mode?: number;
+  /** Text rooms only. Off by default for spaces; when on, messages are Megolm-encrypted
+   * client-side and the server only ever stores ciphertext. */
+  e2ee_enabled?: boolean;
+  /** Voice rooms only: connection cap (0 = unlimited) and audio bitrate in bits per
+   * second (0 = the 64 kbps default). */
+  user_limit?: number;
+  bitrate?: number;
+  /** Per-room permission overrides, carried on the room like Discord's
+   * `permission_overwrites` on a channel. Always present on READY / GET /spaces/:id/rooms
+   * (empty arrays when there are none) and kept current by SPACE_ROOM_*OVERRIDE_* events,
+   * so opening a channel never has to fetch them. */
+  permission_overrides?: SpaceRoomOverride[];
+  user_overrides?: SpaceRoomUserOverride[];
   created_at: string;
   updated_at?: string;
 }
 
 export function getSpaceRooms(spaceId: string) {
   return api<SpaceRoom[]>(`/spaces/${spaceId}/rooms`);
+}
+
+export function createSpaceRoom(
+  spaceId: string,
+  body: { name: string; type: number; parent_id?: string; e2ee_enabled?: boolean; user_limit?: number; bitrate?: number }
+) {
+  return api<SpaceRoom>(`/spaces/${spaceId}/rooms`, { method: 'POST', json: body });
+}
+
+export function reorderSpaceRooms(
+  spaceId: string,
+  body: {
+    scope: 'sections' | 'channels';
+    parent_section_id?: string | null;
+    room_ids: string[];
+  }
+) {
+  return api<void>(`/spaces/${spaceId}/rooms/reorder`, { method: 'POST', json: body });
+}
+
+export function moveSpaceChannel(
+  spaceId: string,
+  body: {
+    channel_id: string;
+    parent_section_id?: string | null;
+    before_room_id?: string | null;
+  }
+) {
+  return api<void>(`/spaces/${spaceId}/rooms/move`, { method: 'POST', json: body });
 }
 
 /** Member in a space – mirrors RoomParticipant with optional metadata. */
@@ -98,19 +180,211 @@ export interface SpaceRoomOverride {
   updated_at: string;
 }
 
+export interface SpaceRoomUserOverride {
+  user_id: string;
+  allow: number;
+  deny: number;
+  created_at: string;
+  updated_at: string;
+}
+
+/** Compact public profile embedded in moderation payloads (invites, bans, audit log). */
+export interface UserSummary {
+  id: string;
+  username: string;
+  discriminator: number;
+  display_name: string;
+  avatar?: string;
+}
+
 export interface SpaceInvite {
   code: string;
   space_id: string;
   inviter_id: string;
+  inviter?: UserSummary;
+  /** 0 = unlimited */
+  max_uses: number;
+  current_uses: number;
+  /** Absent = never expires */
+  expires_at?: string;
   created_at: string;
+}
+
+export interface CreateInviteInput {
+  /** 0 = never expires (max 30 days) */
+  max_age_seconds?: number;
+  /** 0 = unlimited (max 1000) */
+  max_uses?: number;
+}
+
+export function listSpaceInvites(spaceId: string) {
+  return api<SpaceInvite[]>(`/spaces/${spaceId}/invites`);
+}
+
+export function deleteSpaceInvite(spaceId: string, code: string) {
+  return api<void>(`/spaces/${spaceId}/invites/${encodeURIComponent(code)}`, { method: 'DELETE' });
+}
+
+export type AuditActionType =
+  | 'space_update'
+  | 'room_create'
+  | 'room_update'
+  | 'room_delete'
+  | 'role_create'
+  | 'role_update'
+  | 'role_delete'
+  | 'member_kick'
+  | 'member_ban_add'
+  | 'member_ban_remove'
+  | 'member_roles_update'
+  | 'invite_create'
+  | 'invite_delete'
+  | 'emoji_create'
+  | 'emoji_update'
+  | 'emoji_delete'
+  | 'override_update'
+  | 'override_delete'
+  | 'member_voice_mute'
+  | 'member_voice_deafen'
+  | 'member_voice_move'
+  | 'member_voice_disconnect';
+
+export const AUDIT_ACTION_TYPES: AuditActionType[] = [
+  'space_update',
+  'room_create',
+  'room_update',
+  'room_delete',
+  'role_create',
+  'role_update',
+  'role_delete',
+  'member_kick',
+  'member_ban_add',
+  'member_ban_remove',
+  'member_roles_update',
+  'invite_create',
+  'invite_delete',
+  'emoji_create',
+  'emoji_update',
+  'emoji_delete',
+  'override_update',
+  'override_delete',
+  'member_voice_mute',
+  'member_voice_deafen',
+  'member_voice_move',
+  'member_voice_disconnect',
+];
+
+export interface AuditLogEntry {
+  id: string;
+  action_type: AuditActionType | string;
+  /** Actor */
+  user_id: string;
+  /** Depends on the action: user id, role id, room id, invite code, emoji id, "room:role:id" */
+  target_id: string;
+  changes?: Record<string, { old?: unknown; new?: unknown }>;
+  reason?: string;
+  created_at: string;
+}
+
+export interface AuditLogPage {
+  entries: AuditLogEntry[];
+  users: Record<string, UserSummary>;
+}
+
+export function listSpaceAuditLog(spaceId: string, opts: { before?: string; limit?: number; action?: string } = {}) {
+  const q = new URLSearchParams();
+  if (opts.before) q.set('before', opts.before);
+  if (opts.limit) q.set('limit', String(opts.limit));
+  if (opts.action) q.set('action', opts.action);
+  const qs = q.toString();
+  return api<AuditLogPage>(`/spaces/${spaceId}/audit-log${qs ? `?${qs}` : ''}`);
+}
+
+/** Public widget document (no auth). Rejects when the widget is disabled. */
+export interface SpaceWidget {
+  id: string;
+  name: string;
+  icon: string;
+  description: string;
+  member_count: number;
+  presence_count: number;
+  instant_invite: string | null;
+  invite_room_name?: string;
+}
+
+export function spaceWidgetUrl(spaceId: string): string {
+  return `${getApiUrl()}/spaces/${spaceId}/widget.json`;
+}
+
+export function getSpaceWidget(spaceId: string): Promise<SpaceWidget> {
+  return fetch(spaceWidgetUrl(spaceId)).then((res) => {
+    if (!res.ok) throw new ApiError(`HTTP ${res.status}`, res.status);
+    return res.json() as Promise<SpaceWidget>;
+  });
 }
 
 export function listSpaceMembers(spaceId: string) {
   return api<SpaceMember[]>(`/spaces/${spaceId}/members`);
 }
 
-export function createSpaceInvite(spaceId: string) {
-  return api<SpaceInvite>(`/spaces/${spaceId}/invites`, { method: 'POST' });
+/** Remove a member; they can rejoin with a new invite. Requires Kick Members (or owner). */
+export function kickSpaceMember(spaceId: string, userId: string) {
+  return api<void>(`/spaces/${spaceId}/members/${userId}`, { method: 'DELETE' });
+}
+
+export interface SpaceBan {
+  user_id: string;
+  user?: UserSummary;
+  reason?: string;
+  banned_by: string;
+  banned_by_user?: UserSummary;
+  created_at: string;
+}
+
+/** Remove a member and block them from rejoining until unbanned. Requires Ban Members (or owner). */
+export function banSpaceMember(spaceId: string, userId: string, reason?: string) {
+  return api<void>(`/spaces/${spaceId}/bans/${userId}`, {
+    method: 'POST',
+    ...(reason ? { json: { reason } } : {}),
+  });
+}
+
+export function unbanSpaceMember(spaceId: string, userId: string) {
+  return api<void>(`/spaces/${spaceId}/bans/${userId}`, { method: 'DELETE' });
+}
+
+export function listSpaceBans(spaceId: string) {
+  return api<SpaceBan[]>(`/spaces/${spaceId}/bans`);
+}
+
+/** Leave a space. The owner must transfer ownership or delete the space instead. */
+export function leaveSpace(spaceId: string) {
+  return api<void>(`/spaces/${spaceId}/leave`, { method: 'POST' });
+}
+
+/**
+ * Hand the space to another member. Owner only - an Administrator can neither give the
+ * space away nor take it. The previous owner stays a member.
+ */
+export function transferSpaceOwnership(spaceId: string, userId: string) {
+  return api<Space>(`/spaces/${spaceId}/transfer-ownership`, { method: 'POST', json: { user_id: userId } });
+}
+
+/**
+ * Delete a space and everything in it. Owner only and irreversible; `name` must be the
+ * space's own name, which the server checks too rather than trusting the dialog.
+ */
+export function deleteSpace(spaceId: string, name: string) {
+  return api<void>(`/spaces/${spaceId}`, { method: 'DELETE', json: { name } });
+}
+
+/** Mark every text/voice room in the space read - Discord's per-server "Mark As Read". */
+export function ackAllSpaceRooms(spaceId: string) {
+  return api<void>(`/spaces/${spaceId}/ack-all`, { method: 'POST' });
+}
+
+export function createSpaceInvite(spaceId: string, opts?: CreateInviteInput) {
+  return api<SpaceInvite>(`/spaces/${spaceId}/invites`, { method: 'POST', ...(opts ? { json: opts } : {}) });
 }
 
 /** Public invite preview (no auth). */
@@ -120,8 +394,7 @@ export interface InvitePreview {
 }
 
 export function getInvitePreview(code: string): Promise<InvitePreview> {
-  const API_URL = import.meta.env.VITE_API_URL ?? 'http://localhost:4000';
-  return fetch(`${API_URL}/spaces/invites/${encodeURIComponent(code)}`)
+  return fetch(`${getApiUrl()}/spaces/invites/${encodeURIComponent(code)}`)
     .then((res) => {
       if (!res.ok) {
         return res.json().then((body: { error?: string }) => {
@@ -134,6 +407,29 @@ export function getInvitePreview(code: string): Promise<InvitePreview> {
 
 export function joinSpaceByInvite(code: string) {
   return api<Space>(`/spaces/invites/${code}/join`, { method: 'POST' });
+}
+
+function getSessionToken(): string | null {
+  return localStorage.getItem('session_token');
+}
+
+/** Multipart upload; Nebula URL is returned on the space as `icon`. Requires Manage space (or owner). */
+export async function uploadSpaceIcon(spaceId: string, file: File): Promise<Space> {
+  const form = new FormData();
+  form.append('file', file);
+  const token = getSessionToken();
+  const headers: HeadersInit = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${getApiUrl()}/spaces/${spaceId}/icon`, {
+    method: 'POST',
+    body: form,
+    headers,
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new ApiError(err.error ?? `HTTP ${res.status}`, res.status);
+  }
+  return res.json() as Promise<Space>;
 }
 
 export function listSpaceRoles(spaceId: string) {
@@ -191,4 +487,37 @@ export function putRoomPermissionOverride(
 
 export function deleteRoomPermissionOverride(spaceId: string, roomId: string, roleId: string) {
   return api<void>(`/spaces/${spaceId}/rooms/${roomId}/overrides/${roleId}`, { method: 'DELETE' });
+}
+
+export function listRoomUserPermissionOverrides(spaceId: string, roomId: string) {
+  return api<SpaceRoomUserOverride[]>(`/spaces/${spaceId}/rooms/${roomId}/overrides/users`);
+}
+
+export function putRoomUserPermissionOverride(
+  spaceId: string,
+  roomId: string,
+  userId: string,
+  body: { allow: number; deny: number }
+) {
+  return api<void>(`/spaces/${spaceId}/rooms/${roomId}/overrides/users/${userId}`, {
+    method: 'PUT',
+    json: body,
+  });
+}
+
+export function deleteRoomUserPermissionOverride(spaceId: string, roomId: string, userId: string) {
+  return api<void>(`/spaces/${spaceId}/rooms/${roomId}/overrides/users/${userId}`, { method: 'DELETE' });
+}
+
+/** Partial update: only the fields present are written. */
+export function patchSpaceRoom(
+  spaceId: string,
+  roomId: string,
+  body: { name?: string; topic?: string; slowmode_seconds?: number; e2ee_enabled?: boolean; user_limit?: number; bitrate?: number }
+) {
+  return api<void>(`/spaces/${spaceId}/rooms/${roomId}`, { method: 'PATCH', json: body });
+}
+
+export function deleteSpaceRoom(spaceId: string, roomId: string) {
+  return api<void>(`/spaces/${spaceId}/rooms/${roomId}`, { method: 'DELETE' });
 }

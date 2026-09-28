@@ -1,30 +1,20 @@
-/** E2EE session for encrypting messages to a recipient device */
-export interface Session {
-  recipientUserId: string;
-  recipientDeviceId: number;
-  /** Base64-encoded AES key derived from ECDH */
-  encryptionKey: string;
-  createdAt: number;
+/**
+ * Legacy wire types, kept only so old message history (encrypted under the previous
+ * static-key scheme) stays decryptable. New messages never produce these - see
+ * constants.ts for the prefix-based format discriminator and rooms.ts for the current
+ * Olm/Megolm encrypt/decrypt path. The old `Session`/`DeviceIdentity` types are gone
+ * entirely: the new engine (OlmMachine) owns its own account/session state internally
+ * (see machine.ts), so there's nothing app-level left to model for that.
+ */
+
+/** Legacy 1:1 PM payload: r = recipient's copy, s = sender's own copy. */
+export interface LegacyDualCipherPayload {
+  r?: string;
+  s?: string;
 }
 
-/** Group message payload: s = sender self-encrypt; recipients = per (user_id, device_id) ciphertext */
-export interface GroupCipherPayload {
+/** Legacy group PM payload: s = sender self-encrypt; recipients = per (user_id, device_id) ciphertext. */
+export interface LegacyGroupCipherPayload {
   s?: string;
   recipients?: Array<{ user_id: string; device_id: number; ciphertext: string }>;
-}
-
-/** Device identity – stored in IndexedDB, never leaves device */
-export interface DeviceIdentity {
-  deviceId: number;
-  /** Base64 X25519 public (uploaded to server) */
-  identityKeyPublic: string;
-  /** Base64 X25519 private (local only) */
-  identityKeyPrivate: string;
-  /** Base64 X25519 public (uploaded to server) */
-  signedPrekeyPublic: string;
-  /** Base64 X25519 private (local only, for receiving) */
-  signedPrekeyPrivate: string;
-  signedPrekeyId: number;
-  registrationId: number;
-  createdAt: number;
 }

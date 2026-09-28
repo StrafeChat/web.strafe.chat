@@ -11,7 +11,9 @@ function getInitial(): string {
   try {
     const s = localStorage.getItem(KEY);
     if (s && qualifies(s)) return s;
-  } catch {}
+  } catch {
+    // localStorage unavailable (private mode / quota): the last-visited hint is a convenience.
+  }
   return '/';
 }
 
@@ -24,6 +26,8 @@ export const lastVisited = {
     setPath(pathname);
     try {
       localStorage.setItem(KEY, pathname);
-    } catch {}
+    } catch {
+      // localStorage unavailable: nothing to restore.
+    }
   },
 };

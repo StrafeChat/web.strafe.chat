@@ -1,37 +1,47 @@
-/**
- * E2EE constants – Signal Protocol (X3DH) aligned
- *
- * Reference: https://signal.org/docs/specifications/x3dh/
- *
- * Implementation status:
- * ✓ X25519 identity key + signed prekey per device
- * ✓ DH(IK_A, SPK_B) session key derivation (simplified X3DH)
- * ✓ HKDF-SHA256 for key expansion (Signal uses similar)
- * ✓ AES-256-GCM for message encryption (96-bit IV, 128-bit tag)
- * ✓ Sender identity in ciphertext header for recipient key derivation
- * ○ Ed25519 signed prekey signature (placeholder until implemented)
- * ○ One-time prekeys (table exists, not yet used)
- * ○ Double Ratchet for session evolution (future)
- */
+// Wire-format prefixes for message.ciphertext, discriminating which scheme encrypted a
+// given message. New prefixes for the real Olm/Megolm engine; the old ones stay as
+// read-only legacy support so existing history stays readable (see stores/messages.ts) -
+// there's no way to re-encrypt old messages into the new format (that needs the old
+// scheme's session key, which by design a real ratchet doesn't let you reconstruct).
+import { localUserIdFor, roomFederatedId, userFederatedId } from '../../stores/federationIds';
 
-/** Protocol version for documentation; do not change HKDF constants – breaks existing messages */
-export const PROTOCOL_VERSION = 1;
+export const PLAINTEXT_PREFIX = 'PLAIN:';
+export const LEGACY_DUAL_CIPHERTEXT_PREFIX = 'DUAL:';
+export const LEGACY_GROUP_CIPHERTEXT_PREFIX = 'GROUP:';
+export const OLM_CIPHERTEXT_PREFIX = 'OLM1:';
+export const MEGOLM_CIPHERTEXT_PREFIX = 'MEGOLM1:';
 
-/** Prefix for messages sent without E2EE when recipient has no devices */
-export const PLAINTEXT_PREFIX = 'PLAINTEXT:';
+// The crypto engine needs Matrix-shaped identifiers (@user:server, !room:server). Before
+// federation these used a synthetic server name; with federation on, users are named by
+// their *home* instance (@origin_id:home_domain) and rooms by the instance that created
+// them, so every participating instance agrees on the same strings - which is what lets
+// Olm sessions and Megolm room keys work across instances. stores/federationIds.ts
+// holds the local-id → federated-id mapping; these are thin wrappers over it.
+export function toMatrixUserId(userId: string): string {
+  return userFederatedId(userId);
+}
 
-/** Prefix for dual ciphertext: encrypted for both recipient and sender (cross-device). */
-export const DUAL_CIPHERTEXT_PREFIX = 'DUAL:';
+export function fromMatrixUserId(matrixUserId: string): string {
+  return localUserIdFor(matrixUserId);
+}
 
-/** Prefix for group ciphertext: encrypted for sender (s) and each recipient (recipients[].ciphertext). */
-export const GROUP_CIPHERTEXT_PREFIX = 'GROUP:';
+export function toMatrixRoomId(roomId: string): string {
+  return roomFederatedId(roomId);
+}
 
-/** HKDF salt – fixed; changing breaks all existing encrypted messages */
-export const HKDF_SALT = new TextEncoder().encode('StrafeChat-E2EE-Salt');
+export function fromMatrixRoomId(matrixRoomId: string): string {
+  const m = /^!([^:]+):/.exec(matrixRoomId);
+  return m ? m[1]! : matrixRoomId;
+}
 
-/** HKDF info – binds derived key to protocol/usage */
-export const HKDF_INFO = new TextEncoder().encode('StrafeChat-E2EE-v1');
+// Event type used for our own message content inside encryptRoomEvent/decryptRoomEvent -
+// arbitrary string we control, analogous to Matrix's "m.room.message".
+export const CHAT_EVENT_TYPE = 'chat.strafe.message';
 
-export const X25519_KEY_LENGTH = 32;
-export const IV_LENGTH = 12; // 96 bits – NIST recommendation for AES-GCM
-export const TAG_LENGTH = 128; // bits – AES-GCM authentication tag
+// To-device event types.
+export const TO_DEVICE_ROOM_KEY_REQUEST = 'chat.strafe.room_key_request';
+export const TO_DEVICE_REVOCATION = 'chat.strafe.device_revoked';
+// A participant's media key for an end-to-end encrypted call. Olm-encrypted to each
+// peer device like a room key, so the server (and the SFU carrying the media) never
+// sees it - see lib/e2ee/callKeys.ts.
+export const TO_DEVICE_CALL_KEY = 'chat.strafe.call_key';

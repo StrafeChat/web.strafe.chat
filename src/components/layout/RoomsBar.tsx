@@ -2,27 +2,32 @@ import type { Component } from 'solid-js';
 import { createSignal, For, Show } from 'solid-js';
 import { A, useLocation, useMatch } from '@solidjs/router';
 import { UserArea } from './UserArea';
+import { VoiceDock } from '../voice/VoiceDock';
 import { CreateGroupModal } from '../CreateGroupModal';
 import { rooms, roomDisplayName, isNotesRoom, sortRoomsByLastMessage } from '../../stores/rooms';
 import { auth } from '../../stores/auth';
 import { presence } from '../../stores/presence';
-import { lastVisited } from '../../stores/lastVisited';
-import { getUnreadCountForDisplay, setReadState } from '../../stores/readState';
+import { getUnreadCountForDisplay, ackRoomOptimistic } from '../../stores/readState';
 import { messages } from '../../stores/messages';
 import { PresenceDot } from '../PresenceDot';
+import { MessageAvatar } from '../messageList/MessageAvatar';
 import { showContextMenu } from '../../stores/contextMenu';
-import { ackRoom, removeRoomParticipant } from '../../api/rooms';
+import { removeRoomParticipant } from '../../api/rooms';
 import { removeRoom } from '../../stores/rooms';
 import { useNavigate } from '@solidjs/router';
-import { appChannelRail, appHeaderBar } from '../../theme/appChrome';
-import { isMdViewport, mobileNavFocus } from '../../stores/mobileShellLayout';
-
-const PlusIcon = () => (
-  <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-    <line x1="12" y1="5" x2="12" y2="19" />
-    <line x1="5" y1="12" x2="19" y2="12" />
-  </svg>
-);
+import {
+  appChannelRail,
+  appPageHeader,
+  appPageTitle,
+  appListRow,
+  appListRowActive,
+  appListRowIdle,
+  appSectionLabel,
+} from '../../theme/appChrome';
+import { isMdViewport } from '../../stores/mobileShellLayout';
+import { isRoomMuted, muteRoom, unmuteRoom } from '../../lib/roomNotify';
+import { IconButton } from '../ui/IconButton';
+import { t } from '../../i18n';
 
 interface PaneButtonProps {
   href: string;
@@ -32,16 +37,11 @@ interface PaneButtonProps {
 }
 
 const PaneButton: Component<PaneButtonProps> = (props) => (
-  <A
-    href={props.href}
-    class={`flex min-w-0 w-full items-center gap-3 rounded-md px-2 py-2 text-start text-foreground transition-colors hover:bg-accent hover:text-accent-foreground ${
-      props.active ? 'bg-primary/15 text-foreground ring-1 ring-inset ring-primary/20' : ''
-    }`}
-  >
-    <div class="size-8 shrink-0 rounded-full bg-muted flex items-center justify-center">
-      <i class={`fa-solid ${props.icon} text-sm`} />
+  <A href={props.href} class={`${appListRow} ${props.active ? appListRowActive : appListRowIdle}`}>
+    <div class="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted">
+      <i class={`fa-solid ${props.icon} text-sm`} aria-hidden="true" />
     </div>
-    <span class="text-sm font-medium truncate min-w-0">{props.label}</span>
+    <span class="min-w-0 truncate text-sm font-medium">{props.label}</span>
   </A>
 );
 
@@ -59,73 +59,72 @@ interface ConvItemProps {
   isGroup?: boolean;
   /** Unread count (0 = no badge) */
   unreadCount?: number;
+  muted?: boolean;
   /** Right-click context menu */
   onContextMenu?: (e: MouseEvent) => void;
 }
 
 const ConvItem: Component<ConvItemProps> = (props) => {
-  const base =
-    'flex min-w-0 w-full items-center gap-3 rounded-md px-2 py-2 text-start text-foreground transition-colors hover:bg-accent hover:text-accent-foreground';
+  const base = `${appListRow} ${appListRowIdle}`;
   const content = (
     <>
       <div class="relative shrink-0">
         <Show
           when={props.isGroup}
-          fallback={
-            props.avatar ? (
-              <img
-                src={props.avatar}
-                alt=""
-                class="size-8 rounded-full object-cover"
-              />
-            ) : (
-              <div class="size-8 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
-                {props.name[0].toUpperCase()}
-              </div>
-            )
-          }
+          fallback={<MessageAvatar name={props.name} avatar={props.avatar ?? undefined} class="size-8 text-[13px]" />}
         >
-          <div class="size-8 rounded-full bg-muted flex items-center justify-center">
-            <i class="fa-solid fa-user-group text-sm text-muted-foreground" />
+          <div class="flex size-8 items-center justify-center rounded-full bg-muted">
+            <i class="fa-solid fa-user-group text-sm text-muted-foreground" aria-hidden="true" />
           </div>
         </Show>
         <Show when={props.presenceUserId}>
-          <span class="absolute bottom-[-1px] right-[-1px]">
+          <span class="absolute -bottom-px -right-px">
             <PresenceDot userId={props.presenceUserId!} class="size-3.25" />
           </span>
         </Show>
       </div>
-      <div class="min-w-0 flex-1 flex flex-col justify-center py-0.5">
-        <span class="text-sm font-medium truncate block">{props.name}</span>
+      <div class="flex min-w-0 flex-1 flex-col justify-center py-0.5">
+        <span
+          class={`flex items-center gap-1.5 truncate text-sm ${
+            (props.unreadCount ?? 0) > 0 && !props.muted ? 'font-semibold text-foreground' : 'font-medium'
+          }`}
+        >
+          <span class="min-w-0 truncate">{props.name}</span>
+          <Show when={props.muted}>
+            <i class="fa-solid fa-bell-slash shrink-0 text-[10px] text-muted-foreground/70" aria-hidden="true" />
+          </Show>
+        </span>
         <Show when={props.subtitle}>
-          <span class="text-xs text-muted-foreground truncate block">{props.subtitle}</span>
+          <span class="block truncate text-xs text-muted-foreground">{props.subtitle}</span>
         </Show>
       </div>
-      <Show when={(props.unreadCount ?? 0) > 0}>
-        <span class="shrink-0 min-w-[18px] h-[18px] flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-semibold px-1.5">
+      <Show when={(props.unreadCount ?? 0) > 0 && !props.muted}>
+        <span class="flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-semibold text-primary-foreground">
           {(props.unreadCount ?? 0) > 99 ? '99+' : props.unreadCount}
         </span>
       </Show>
+      <Show when={(props.unreadCount ?? 0) > 0 && props.muted}>
+        <span class="size-2 shrink-0 rounded-full bg-muted-foreground/50" aria-hidden="true" />
+      </Show>
     </>
   );
-  const contextMenu = props.onContextMenu;
-  if (props.href) {
-    return (
-      <A
-        href={props.href}
-        end
-        class={base}
-        activeClass="bg-primary/15 text-foreground ring-1 ring-inset ring-primary/20"
-        onContextMenu={contextMenu}
-      >
-        {content}
-      </A>
-    );
-  }
+  // A tracked <Show> rather than `if (props.href) return ...`: a component body runs once,
+  // so an early return there would pin the element to whichever branch was taken at mount.
   return (
-    <button type="button" class={base} onContextMenu={contextMenu}>
-      {content}
-    </button>
+    <Show
+      when={props.href}
+      fallback={
+        <button type="button" class={base} onContextMenu={(e) => props.onContextMenu?.(e)}>
+          {content}
+        </button>
+      }
+    >
+      {(href) => (
+        <A href={href()} end class={base} activeClass={appListRowActive} onContextMenu={(e) => props.onContextMenu?.(e)}>
+          {content}
+        </A>
+      )}
+    </Show>
   );
 };
 
@@ -166,51 +165,38 @@ export const RoomsBar: Component = () => {
 
   return (
     <aside
-      class={`w-[240px] shrink-0 flex-col overflow-hidden ${appChannelRail} ${
-        isMdViewport() || mobileNavFocus() === 'rails' ? 'flex' : 'hidden'
-      }`}
+      class={`flex w-[calc(100vw-72px)] shrink-0 flex-col overflow-hidden pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:w-[240px] md:pb-0 ${appChannelRail}`}
     >
-      <div class="flex-1 flex flex-col min-h-0 overflow-hidden w-full">
+      <div class="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
         {/* Match RoomHeader / SpaceRoomsBar: h-12 + border-b separates header from content */}
-        <div class={`flex h-12 shrink-0 items-center px-3 ${appHeaderBar}`}>
-          <h1 class="text-base font-semibold text-foreground truncate">Private Messages</h1>
+        <div class={`${appPageHeader}`}>
+          <h1 class={`truncate ${appPageTitle}`}>{t('nav.privateMessages')}</h1>
         </div>
-        <div class="px-3 py-2 shrink-0">
+        <div class="shrink-0 px-3 py-2">
           <div class="flex flex-col gap-0.5">
-            <PaneButton href="/" active={pathname() === '/'} icon="fa-house" label="Home" />
-            <PaneButton href="/friends" active={pathname() === '/friends'} icon="fa-user-group" label="Friends" />
-            <PaneButton href="/notes" active={isNotesActive()} icon="fa-note-sticky" label="Notes" />
+            <PaneButton href="/" active={pathname() === '/'} icon="fa-house" label={t('nav.home')} />
+            <PaneButton href="/friends" active={pathname() === '/friends'} icon="fa-user-group" label={t('nav.friends')} />
+            <PaneButton href="/notes" active={isNotesActive()} icon="fa-note-sticky" label={t('nav.notes')} />
           </div>
         </div>
-        <div class="flex-1 flex flex-col min-h-0 overflow-hidden py-2 px-3">
-          <div class="flex items-center justify-between mb-2">
-            <h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider truncate">
-              Conversations
-            </h3>
-            <button
-              type="button"
-              class="size-8 inline-flex items-center justify-center rounded shrink-0 text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              title="New group"
-              onClick={() => setShowCreateGroup(true)}
-            >
-              <PlusIcon />
-            </button>
+        <div class="flex min-h-0 flex-1 flex-col overflow-hidden px-3 py-2">
+          <div class="mb-1 flex items-center justify-between ps-2">
+            <h3 class={`truncate ${appSectionLabel}`}>{t('nav.conversations')}</h3>
+            <IconButton size="sm" icon="fa-solid fa-plus" label={t('nav.newGroup')} onClick={() => setShowCreateGroup(true)} />
           </div>
           <CreateGroupModal open={showCreateGroup()} onClose={() => setShowCreateGroup(false)} />
-          <div class="flex-1 overflow-y-auto min-h-0 space-y-0.5">
+          <div class="min-h-0 flex-1 space-y-0.5 overflow-y-auto">
             <Show when={rooms.loading}>
-              <div class="py-2 text-xs text-muted-foreground">Loading...</div>
+              <div class="px-2 py-2 text-xs text-muted-foreground">{t('common.loading')}</div>
             </Show>
             <Show when={!rooms.loading && conversationRooms().length === 0}>
-              <div class="py-2 text-xs text-muted-foreground">No conversations yet</div>
+              <div class="px-2 py-2 text-xs text-muted-foreground">{t('nav.noConversations')}</div>
             </Show>
             <For each={conversationRooms()}>
               {(room) => {
-                const otherParticipant = () =>
-                  room.participants?.find((p) => p.id !== currentUserId());
+                const otherParticipant = () => room.participants?.find((p) => p.id !== currentUserId());
                 const isGroup = () => room.type === 2;
-                const avatar = () =>
-                  isGroup() ? null : otherParticipant()?.avatar;
+                const avatar = () => (isGroup() ? null : otherParticipant()?.avatar);
                 const roomMsgList = () => messages.byRoom[room.id] ?? [];
                 const unreadCount = () => {
                   if (activeRoomId() === room.id) return 0;
@@ -221,9 +207,7 @@ export const RoomsBar: Component = () => {
                   const list = roomMsgList();
                   const snowflakes = list.filter((m) => /^\d+$/.test(m.id));
                   if (snowflakes.length === 0) return room.last_message_id ?? null;
-                  const latest = snowflakes.reduce((a, b) =>
-                    BigInt(b.id) > BigInt(a.id) ? b : a
-                  );
+                  const latest = snowflakes.reduce((a, b) => (BigInt(b.id) > BigInt(a.id) ? b : a));
                   return latest.id;
                 };
                 const subtitle = () => {
@@ -241,32 +225,39 @@ export const RoomsBar: Component = () => {
                     avatar={avatar()}
                     isGroup={isGroup()}
                     unreadCount={unreadCount()}
+                    muted={isRoomMuted(room)}
                     onContextMenu={(e) => {
                       const msgId = lastMsgId();
                       showContextMenu(e, [
                         ...(msgId && unreadCount() > 0
-                          ? [{
-                              label: 'Mark as read',
-                              icon: 'fa-check-double',
-                              onClick: () => {
-                                setReadState('byRoom', room.id, {
-                                  lastReadMessageId: msgId,
-                                  mentionCount: 0,
-                                });
-                                ackRoom(room.id, msgId).catch(() => {});
+                          ? [
+                              {
+                                label: t('contextMenu.markAsRead'),
+                                icon: 'fa-check-double',
+                                onClick: () => ackRoomOptimistic(room.id, msgId),
                               },
-                            }]
-                          : []),
-                        ...(isGroup()
-                          ? [{
-                              label: 'Leave group',
-                              icon: 'fa-right-from-bracket',
-                              danger: true,
-                              onClick: () => handleLeaveGroup(room.id),
-                            }]
+                            ]
                           : []),
                         {
-                          label: 'Copy room ID',
+                          label: isRoomMuted(room) ? t('contextMenu.unmute') : t('contextMenu.mute'),
+                          icon: isRoomMuted(room) ? 'fa-bell' : 'fa-bell-slash',
+                          onClick: () =>
+                            void (isRoomMuted(room) ? unmuteRoom(room.id) : muteRoom(room.id, null)).catch((err) =>
+                              console.error('Toggle mute failed:', err)
+                            ),
+                        },
+                        ...(isGroup()
+                          ? [
+                              {
+                                label: t('contextMenu.leaveGroup'),
+                                icon: 'fa-right-from-bracket',
+                                danger: true,
+                                onClick: () => handleLeaveGroup(room.id),
+                              },
+                            ]
+                          : []),
+                        {
+                          label: t('contextMenu.copyRoomId'),
                           icon: 'fa-copy',
                           onClick: () => navigator.clipboard.writeText(room.id),
                         },
@@ -279,7 +270,11 @@ export const RoomsBar: Component = () => {
           </div>
         </div>
       </div>
-      <UserArea />
+      {/* The mobile You tab replaces this dock, so it is desktop-only below md. */}
+      <Show when={isMdViewport()}>
+        <VoiceDock variant="rail" />
+        <UserArea />
+      </Show>
     </aside>
   );
 };

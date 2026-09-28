@@ -4,11 +4,38 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta name="theme-color" content="#000000" />
+    <!--
+      Content Security Policy. Set here rather than by a server so it applies identically in
+      development, from the nginx image on its own, and behind Caddy. The point is script-src:
+      the client renders user-authored Markdown (bios) into innerHTML after sanitising, and a
+      policy that permits no inline or third-party script turns any sanitiser gap from
+      code execution into a blocked request.
+
+        script-src   this origin, the wasm crypto engine ('wasm-unsafe-eval' is what lets
+                     WebAssembly instantiate; it does not enable eval()), and Turnstile.
+        connect-src  any http(s)/ws(s) host. The API, gateway and CDN origins are chosen per
+                     deployment and only known at runtime (config.js / VITE_*), and a dev
+                     setup routinely points them at a LAN address so a phone can join in -
+                     which no CSP host expression can describe. Restricting this would only
+                     break real setups while the sanitiser-bypass case it is meant to
+                     contain still has img-src and every other route out; the protection
+                     that matters here is script-src.
+        img/media    this origin, data/blob (canvas previews, decrypted attachments), and
+                     any http(s) host (the instance's CDN, federated instances' CDNs, the
+                     emoji image sets) for the same reason as connect-src.
+        style/font   this origin plus Google Fonts; 'unsafe-inline' for style because the
+                     framework sets inline style attributes.
+        frame-src    Turnstile only. object-src none, base-uri self, form-action self.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://challenges.cloudflare.com; connect-src 'self' https: wss: http: ws:; img-src 'self' data: blob: https: http:; media-src 'self' data: blob: https: http:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; frame-src https://challenges.cloudflare.com; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self';"
+    />
     <title>Strafe</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Outfit:wght@500;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap"
       rel="stylesheet"
     />
   </head>
@@ -16,6 +43,7 @@
     <noscript>You need to enable JavaScript to run this app.</noscript>
     <div id="root"></div>
 
+    <script src="/config.js"></script>
     <script src="/src/index.tsx" type="module"></script>
   </body>
 </html>

@@ -1,18 +1,57 @@
 import type { Component } from 'solid-js';
-import { For } from 'solid-js';
+import { For, Show, createMemo } from 'solid-js';
+import { useNavigate } from '@solidjs/router';
 import { parseMessageContent } from '../../lib/utils/markdown';
+import { Emoji } from '../emoji/Emoji';
+import { CustomEmoji } from '../emoji/CustomEmoji';
+import { extractSpaceInviteCodeFromUrl } from '../../lib/utils/spaceInviteLink';
+import { SpaceInviteLinkEmbed } from '../SpaceInviteLinkEmbed';
 import { isExternalLink, requestOpenExternalLink } from '../../stores/externalLink';
+import { spaces } from '../../stores/spaces';
 import type { RoomParticipant } from '../../api/rooms';
+import type { SpaceRole } from '../../api/spaces';
+import { spaceRoleColorHex } from '../../lib/spacePermissions';
+import { t } from '../../i18n';
 
 export interface MessageBodyProps {
   text: string;
   class?: string;
   /** Used to resolve <@userId> mentions to display names */
   participants?: RoomParticipant[];
+  /** Used to resolve <@&roleId> mentions to role names/colors. Only relevant in space text channels. */
+  spaceRoles?: SpaceRole[];
+  /** When provided, user mentions become clickable (opens that user's profile card). */
+  onMentionClick?: (userId: string, anchor: HTMLElement) => void;
 }
 
+const pillBase = 'rounded px-1 py-0.5 font-medium';
+const brandPill = `${pillBase} bg-primary/20 text-primary`;
+const brandPillClickable = `${brandPill} cursor-pointer transition-colors hover:bg-primary/35 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring`;
+
+/** Find a space text channel by id across every space the user is in. */
+function findChannel(roomId: string): { spaceId: string; name: string } | null {
+  for (const [spaceId, list] of Object.entries(spaces.spaceRoomsBySpaceId)) {
+    const r = list.find((x) => x.id === roomId);
+    if (r) return { spaceId, name: r.name || 'unnamed' };
+  }
+  return null;
+}
+
+/** Discord-style "jumbo" emoji: a message that is nothing but a few emoji renders them big. */
+const JUMBO_MAX = 10;
+
 export const MessageBody: Component<MessageBodyProps> = (props) => {
-  const segments = () => parseMessageContent(props.text);
+  const navigate = useNavigate();
+  const segments = createMemo(() => parseMessageContent(props.text));
+  const jumbo = createMemo(() => {
+    let count = 0;
+    for (const s of segments()) {
+      if (s.type === 'emoji' || s.type === 'customEmoji') count++;
+      else if (s.type === 'text' && s.content.trim() === '') continue;
+      else return false;
+    }
+    return count > 0 && count <= JUMBO_MAX;
+  });
 
   return (
     <div class={props.class}>
@@ -20,6 +59,12 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
         {(seg) => {
           if (seg.type === 'text') {
             return <span class="whitespace-pre-wrap">{seg.content}</span>;
+          }
+          if (seg.type === 'emoji') {
+            return <Emoji emoji={seg.emoji} jumbo={jumbo()} />;
+          }
+          if (seg.type === 'customEmoji') {
+            return <CustomEmoji id={seg.id} name={seg.name} jumbo={jumbo()} />;
           }
           if (seg.type === 'bold') {
             return <strong class="font-semibold">{seg.content}</strong>;
@@ -43,6 +88,28 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
           }
           if (seg.type === 'link') {
             const href = seg.href;
+            const inviteCode = extractSpaceInviteCodeFromUrl(href);
+            if (inviteCode) {
+              return (
+                <div class="block max-w-full my-1.5 space-y-1.5">
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="text-primary underline underline-offset-2 break-all hover:text-primary/90 cursor-pointer"
+                    onClick={(e) => {
+                      if (!isExternalLink(href)) return;
+                      if (e.shiftKey) return;
+                      e.preventDefault();
+                      requestOpenExternalLink(href);
+                    }}
+                  >
+                    {seg.text}
+                  </a>
+                  <SpaceInviteLinkEmbed code={inviteCode} />
+                </div>
+              );
+            }
             return (
               <a
                 href={href}
@@ -61,26 +128,83 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
             );
           }
           if (seg.type === 'mention') {
-            let display: string;
-            if ('userId' in seg && seg.userId && props.participants?.length) {
-              const p = props.participants.find((x) => x.id === seg.userId);
-              display = p?.display_name || p?.username || 'Unknown';
-            } else if ('username' in seg && seg.username && props.participants?.length) {
-              const name = seg.username;
-              const p = props.participants.find(
-                (x) =>
-                  (x.display_name && x.display_name.toLowerCase() === name.toLowerCase()) ||
-                  (x.username && x.username.toLowerCase() === name.toLowerCase())
-              );
-              display = p ? (p.display_name || p.username || name) : name;
-            } else {
-              display = 'username' in seg ? seg.username : 'Unknown';
-            }
+            // Accessor, not a one-shot lookup: participants often finish loading after the
+            // message has rendered (a fresh MESSAGE_CREATE beats the member list), and a
+            // plain const here rendered "@Unknown" permanently for that message.
+            const display = () => {
+              const p = props.participants?.find((x) => x.id === seg.userId);
+              return p?.display_name || p?.username || t('common.unknown');
+            };
             return (
-              <span class="rounded bg-primary/20 px-1 py-0.5 font-medium text-primary">
-                @{display}
-              </span>
+              <Show when={props.onMentionClick} fallback={<span class={brandPill}>@{display()}</span>}>
+                <button
+                  type="button"
+                  class={brandPillClickable}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    props.onMentionClick?.(seg.userId, e.currentTarget);
+                  }}
+                >
+                  @{display()}
+                </button>
+              </Show>
             );
+          }
+          if (seg.type === 'roleMention') {
+            const role = () => props.spaceRoles?.find((r) => r.id === seg.roleId);
+            return (
+              <Show
+                when={role()}
+                fallback={
+                  // Role no longer exists (deleted) or this context has no role data (e.g.
+                  // a PM rendering old space-channel content) - plain text rather than a
+                  // mention pill pointing at nothing.
+                  <span class="whitespace-pre-wrap">{`<@&${seg.roleId}>`}</span>
+                }
+              >
+                {(r) => (
+                  <span
+                    class={`inline-flex items-center gap-1 ${pillBase}`}
+                    style={{
+                      'background-color': `${spaceRoleColorHex(r().color)}26`,
+                      color: spaceRoleColorHex(r().color),
+                    }}
+                  >
+                    @{r().name}
+                  </span>
+                )}
+              </Show>
+            );
+          }
+          if (seg.type === 'channelMention') {
+            const channel = () => findChannel(seg.roomId);
+            return (
+              <Show
+                when={channel()}
+                fallback={
+                  <span class={`${pillBase} bg-muted text-muted-foreground`} title={t('messages.roomUnavailable')}>
+                    #unknown
+                  </span>
+                }
+              >
+                {(ch) => (
+                  <button
+                    type="button"
+                    class={brandPillClickable}
+                    title={t('messages.goToRoom', { name: ch().name })}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      navigate(`/spaces/${ch().spaceId}/rooms/${seg.roomId}`);
+                    }}
+                  >
+                    #{ch().name}
+                  </button>
+                )}
+              </Show>
+            );
+          }
+          if (seg.type === 'everyone') {
+            return <span class={brandPill}>{seg.text}</span>;
           }
           return null;
         }}

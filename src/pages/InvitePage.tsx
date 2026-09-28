@@ -1,11 +1,27 @@
 import type { Component } from 'solid-js';
 import { createSignal, createResource, Show } from 'solid-js';
 import { useParams, useNavigate, A } from '@solidjs/router';
-import { getInvitePreview, joinSpaceByInvite, type InvitePreview } from '../api/spaces';
+import { getInvitePreview, joinSpaceByInvite } from '../api/spaces';
 import { auth } from '../stores/auth';
-import { spaces } from '../stores/spaces';
+import { spaces, addOrUpdateSpace } from '../stores/spaces';
 import { Button } from '../components/ui/Button';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/Card';
+import {
+  authCardClass,
+  authCardContentClass,
+  authCardFooterClass,
+  authCardHeaderClass,
+  authCardShell,
+  authPageOuter,
+} from '../components/auth/authLayout';
+import { AuthBrandMark } from '../components/auth/AuthBrandMark';
+import { FormApiErrors } from '../components/auth/FormApiErrors';
+import { t } from '../i18n';
 
+/**
+ * Public invite landing page. Uses the auth-page layout so it sits above the fixed app
+ * background (a non-positioned wrapper paints *under* that layer) and matches Login/Register.
+ */
 const InvitePage: Component = () => {
   const params = useParams<{ code: string }>();
   const navigate = useNavigate();
@@ -22,114 +38,122 @@ const InvitePage: Component = () => {
     setJoining(true);
     try {
       const space = await joinSpaceByInvite(c);
+      addOrUpdateSpace(space);
       navigate(`/spaces/${space.id}`);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to join space');
+      setError(err instanceof Error ? err.message : t('invite.joinFailed'));
     } finally {
       setJoining(false);
     }
   }
 
+  const invalid = () => preview.state === 'errored' || (preview.state === 'ready' && !preview());
+
   return (
-    <div class="min-h-screen bg-background text-foreground flex items-center justify-center p-4">
-      <div class="w-full max-w-md border border-border rounded-lg overflow-hidden bg-card">
-        <Show
-          when={preview.state === 'ready' && preview()}
-          fallback={
-            <div class="p-6 flex flex-col gap-4">
-              <Show when={preview.state === 'pending'}>
-                <p class="text-sm text-muted-foreground">Loading invite…</p>
-              </Show>
-              <Show when={preview.state === 'errored' || (preview.state === 'ready' && !preview())}>
-                <h1 class="text-lg font-semibold">Invalid or expired invite</h1>
-                <p class="text-sm text-muted-foreground">
-                  This invite link may be invalid or have expired. Ask for a new link.
-                </p>
-                <A href="/" class="text-primary text-sm underline">
-                  Go home
-                </A>
-              </Show>
-            </div>
-          }
-        >
-          {(data) => {
-            const d = data();
-            return (
-              <div class="flex flex-col">
-                <div class="p-6 flex flex-col gap-4">
-                  <div class="flex items-center gap-3">
-                    <div
-                      class="size-14 rounded-xl bg-primary/20 flex items-center justify-center text-2xl font-bold text-primary shrink-0"
-                      aria-hidden
-                    >
-                      {d.space.name_acronym || d.space.name?.slice(0, 2).toUpperCase() || '?'}
-                    </div>
-                    <div class="min-w-0">
-                      <h1 class="text-lg font-semibold truncate">{d.space.name}</h1>
-                      <Show when={d.inviter?.display_name}>
-                        <p class="text-sm text-muted-foreground">
-                          Invited by {d.inviter!.display_name}
-                        </p>
-                      </Show>
-                    </div>
-                  </div>
-                  <Show when={d.space.description}>
-                    <p class="text-sm text-muted-foreground line-clamp-3">
-                      {d.space.description}
-                    </p>
-                  </Show>
-                  <Show when={error()}>
-                    <p class="text-sm text-destructive">{error()}</p>
-                  </Show>
-                </div>
-                <div class="p-4 pt-4 flex flex-col gap-2 border-t border-border">
-                  <Show
-                    when={auth.token}
-                    fallback={
-                      <div class="flex flex-col gap-2">
-                        <p class="text-sm text-muted-foreground">Log in to join this space.</p>
-                        <A href={`/login?redirect=${encodeURIComponent('/invite/' + code())}`}>
-                          <Button class="w-full">Log in</Button>
-                        </A>
-                        <A href="/register" class="text-center text-sm text-muted-foreground hover:text-foreground">
-                          Create an account
-                        </A>
-                      </div>
-                    }
-                  >
-                    {(() => {
-                      const isMember = spaces.spaces.some((s) => s.id === d.space.id);
-                      if (isMember) {
-                        return (
-                          <div class="flex flex-col gap-2">
-                            <p class="text-sm text-muted-foreground">
-                              You&apos;re already a member of this space.
-                            </p>
-                            <Button
-                              class="w-full"
-                              onClick={() => navigate(`/spaces/${d.space.id}`)}
-                            >
-                              Open space
-                            </Button>
-                          </div>
-                        );
-                      }
-                      return (
-                        <Button
-                          class="w-full"
-                          onClick={handleJoin}
-                          disabled={joining()}
-                        >
-                          {joining() ? 'Joining\u2026' : 'Join space'}
-                        </Button>
-                      );
-                    })()}
-                  </Show>
-                </div>
+    <div class={authPageOuter}>
+      <AuthBrandMark />
+      <div class={authCardShell}>
+        <Card class={authCardClass}>
+          <Show when={preview.state === 'pending'}>
+            <CardContent class="flex items-center justify-center gap-3 py-12">
+              <span class="size-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+              <span class="text-sm text-muted-foreground">{t('invite.loading')}</span>
+            </CardContent>
+          </Show>
+
+          <Show when={invalid()}>
+            <CardHeader class={authCardHeaderClass}>
+              <div class="mb-3 flex size-14 items-center justify-center rounded-2xl bg-muted/40 text-muted-foreground">
+                <i class="fa-solid fa-link-slash text-2xl" aria-hidden="true" />
               </div>
-            );
-          }}
-        </Show>
+              <CardTitle class="text-2xl font-bold tracking-tight text-foreground">{t('invite.invalidTitle')}</CardTitle>
+              <CardDescription class="mt-2 text-base leading-relaxed">{t('invite.invalidBody')}</CardDescription>
+            </CardHeader>
+            <CardFooter class={authCardFooterClass}>
+              <Button variant="outline" class="w-full" onClick={() => navigate('/')}>
+                {t('invite.goHome')}
+              </Button>
+            </CardFooter>
+          </Show>
+
+          <Show when={preview.state === 'ready' && preview()}>
+            {(data) => {
+              const d = data();
+              const isMember = () => spaces.spaces.some((s) => s.id === d.space.id);
+              return (
+                <>
+                  <CardHeader class={authCardHeaderClass}>
+                    <p class="mb-3 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      {t('invite.youAreInvited')}
+                    </p>
+                    <div class="flex items-center gap-4">
+                      <div class="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-border bg-primary/20 text-2xl font-bold text-primary">
+                        <Show
+                          when={d.space.icon}
+                          fallback={<span aria-hidden>{d.space.name_acronym || d.space.name?.slice(0, 2).toUpperCase() || '?'}</span>}
+                        >
+                          <img src={d.space.icon!} alt="" class="size-full object-cover" />
+                        </Show>
+                      </div>
+                      <div class="min-w-0">
+                        <CardTitle class="truncate text-2xl font-bold tracking-tight text-foreground">
+                          {d.space.name}
+                        </CardTitle>
+                        <Show when={d.inviter?.display_name}>
+                          <CardDescription class="mt-1">{t('invite.invitedBy', { name: d.inviter!.display_name })}</CardDescription>
+                        </Show>
+                      </div>
+                    </div>
+                  </CardHeader>
+                  <CardContent class={authCardContentClass}>
+                    <Show when={d.space.description}>
+                      <p class="line-clamp-3 text-sm leading-relaxed text-muted-foreground">{d.space.description}</p>
+                    </Show>
+                    <Show when={error()}>
+                      <FormApiErrors messages={[error()]} />
+                    </Show>
+                  </CardContent>
+                  <CardFooter class={authCardFooterClass}>
+                    <Show
+                      when={auth.token}
+                      fallback={
+                        <>
+                          <p class="text-sm text-muted-foreground">{t('invite.logInToJoin')}</p>
+                          <Button
+                            class="w-full font-semibold"
+                            onClick={() => navigate(`/login?redirect=${encodeURIComponent('/invite/' + code())}`)}
+                          >
+                            {t('invite.logIn')}
+                          </Button>
+                          <A
+                            href="/register"
+                            class="rounded-sm text-start text-xs text-muted-foreground underline underline-offset-4 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            {t('auth.login.registerLink')}
+                          </A>
+                        </>
+                      }
+                    >
+                      <Show
+                        when={isMember()}
+                        fallback={
+                          <Button class="w-full font-semibold" onClick={handleJoin} loading={joining()}>
+                            {t('invite.joinNamed', { name: d.space.name })}
+                          </Button>
+                        }
+                      >
+                        <p class="text-sm text-muted-foreground">{t('invite.alreadyMember')}</p>
+                        <Button class="w-full font-semibold" onClick={() => navigate(`/spaces/${d.space.id}`)}>
+                          {t('invite.openSpace')}
+                        </Button>
+                      </Show>
+                    </Show>
+                  </CardFooter>
+                </>
+              );
+            }}
+          </Show>
+        </Card>
       </div>
     </div>
   );

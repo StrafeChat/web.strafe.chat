@@ -1,39 +1,72 @@
-import type { Component } from 'solid-js';
+import type { Component, JSX } from 'solid-js';
 import { createSignal, For, Show } from 'solid-js';
-import { Portal } from 'solid-js/web';
 import { useNavigate } from '@solidjs/router';
-import { relationships, RelType, friendDisplayName, loadRelationships, removeRelationshipLocally } from '../stores/relationships';
+import {
+  relationships,
+  RelType,
+  friendDisplayName,
+  loadRelationships,
+  removeRelationshipLocally,
+} from '../stores/relationships';
+import type { Relationship } from '../api/relationships';
 import { presence, isVisibleStatus } from '../stores/presence';
 import { PresenceDot } from '../components/PresenceDot';
+import { MessageAvatar } from '../components/messageList/MessageAvatar';
 import { sendFriendRequest, putRelationship, removeRelationship } from '../api/relationships';
-import { createPM } from '../api/rooms';
+import { createPM, createPMByHandle } from '../api/rooms';
 import { addOrUpdateRoom } from '../stores/rooms';
+import { instance } from '../stores/instance';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
+import { Tabs } from '../components/ui/Tabs';
+import { EmptyState } from '../components/ui/EmptyState';
 import { showContextMenu } from '../stores/contextMenu';
 import { ResponsiveDialog } from '../components/ui/ResponsiveDialog';
-
-const FriendsIcon = () => (
-  <svg class="size-24 text-muted-foreground/40 mx-auto mb-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-    <circle cx="9" cy="7" r="4" />
-    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-  </svg>
-);
+import { appDialogActions, appPageHeader, appPageTitle, appSectionLabel } from '../theme/appChrome';
+import { t } from '../i18n';
 
 type TabId = 'online' | 'all' | 'pending' | 'blocked';
 
-function friendStatusText(rel: { user: { id: string; username: string; discriminator: string; presence?: { custom_status?: string } } }): string | undefined {
+function friendStatusText(rel: Relationship): string | undefined {
   return presence.byUser[rel.user.id]?.custom_status ?? rel.user.presence?.custom_status;
 }
 
-const TABS: { id: TabId; label: string }[] = [
-  { id: 'online', label: 'Online' },
-  { id: 'all', label: 'All' },
-  { id: 'pending', label: 'Pending' },
-  { id: 'blocked', label: 'Blocked' },
-];
+function userTag(rel: Relationship): string {
+  return `${rel.user.username}#${rel.user.discriminator}`;
+}
+
+const TAB_IDS: TabId[] = ['online', 'all', 'pending', 'blocked'];
+
+/** One person row - the same shape in every tab, only the trailing actions differ. */
+const FriendRow: Component<{
+  rel: Relationship;
+  showPresence?: boolean;
+  /** Dim the avatar (blocked / outgoing). */
+  muted?: boolean;
+  actions: JSX.Element;
+  onContextMenu?: (e: MouseEvent) => void;
+}> = (props) => (
+  <div
+    class="flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/40"
+    onContextMenu={(e) => props.onContextMenu?.(e)}
+  >
+    <div class="flex min-w-0 items-center gap-3">
+      <div class={`relative shrink-0 ${props.muted ? 'opacity-70' : ''}`}>
+        <MessageAvatar name={friendDisplayName(props.rel)} avatar={props.rel.user.avatar} class="size-10 text-sm" />
+        <Show when={props.showPresence}>
+          <span class="absolute -bottom-px -end-px">
+            <PresenceDot userId={props.rel.user.id} class="size-4" />
+          </span>
+        </Show>
+      </div>
+      <div class="min-w-0">
+        <div class="truncate text-sm font-medium text-foreground">{friendDisplayName(props.rel)}</div>
+        <div class="truncate text-xs text-muted-foreground">{friendStatusText(props.rel) || userTag(props.rel)}</div>
+      </div>
+    </div>
+    <div class="flex shrink-0 gap-2">{props.actions}</div>
+  </div>
+);
 
 const FriendsPage: Component = () => {
   const navigate = useNavigate();
@@ -46,42 +79,68 @@ const FriendsPage: Component = () => {
   const [actionLoading, setActionLoading] = createSignal<string | null>(null);
   const [messageLoading, setMessageLoading] = createSignal<string | null>(null);
 
+  function closeAddModal() {
+    setShowAddModal(false);
+    setAddError('');
+    setAddUsername('');
+    setAddDiscriminator('');
+  }
+
   async function handleAddFriend(e: Event) {
     e.preventDefault();
-    const username = addUsername().trim();
+    const rawUsername = addUsername().trim();
     const discriminator = addDiscriminator().trim().replace(/^#/, '');
     setAddError('');
+    // "name@other.instance" (or a full name#0001@other.instance): friend requests don't
+    // cross instances, so open a direct message with them instead.
+    if (rawUsername.includes('@')) {
+      const handle = rawUsername.includes('#') ? rawUsername : rawUsername.replace('@', `#${discriminator}@`);
+      if (!/#\d{1,4}@/.test(handle)) {
+        setAddError(t('friends.errors.handleFormat'));
+        return;
+      }
+      setAddLoading(true);
+      try {
+        const room = await createPMByHandle(handle);
+        addOrUpdateRoom(room);
+        closeAddModal();
+        navigate(`/rooms/${room.id}`);
+      } catch (err) {
+        setAddError(err instanceof Error ? err.message : t('friends.errors.unreachable'));
+      } finally {
+        setAddLoading(false);
+      }
+      return;
+    }
+    const username = rawUsername;
     if (!username || !discriminator) {
-      setAddError('Username and discriminator are required');
+      setAddError(t('friends.errors.required'));
       return;
     }
     setAddLoading(true);
     try {
       await sendFriendRequest({ username, discriminator });
       await loadRelationships();
-      setShowAddModal(false);
-      setAddUsername('');
-      setAddDiscriminator('');
+      closeAddModal();
     } catch (err) {
-      setAddError(err instanceof Error ? err.message : 'Failed to send request');
+      setAddError(err instanceof Error ? err.message : t('friends.errors.sendFailed'));
     } finally {
       setAddLoading(false);
     }
   }
 
-  async function handleAccept(rel: { user: { id: string } }) {
+  async function handleAccept(rel: Relationship) {
     const id = rel.user.id;
     setActionLoading(id);
     try {
       await putRelationship(id);
       // RELATIONSHIP_ADD event will update the list
-    } catch {
+    } finally {
       setActionLoading(null);
     }
-    setActionLoading(null);
   }
 
-  async function handleDecline(rel: { user: { id: string } }) {
+  async function handleRemove(rel: Relationship) {
     const id = rel.user.id;
     setActionLoading(id);
     try {
@@ -92,18 +151,7 @@ const FriendsPage: Component = () => {
     }
   }
 
-  async function handleCancelRequest(rel: { user: { id: string } }) {
-    const id = rel.user.id;
-    setActionLoading(id);
-    try {
-      await removeRelationship(id);
-      removeRelationshipLocally(id);
-    } finally {
-      setActionLoading(null);
-    }
-  }
-
-  async function handleMessage(rel: { user: { id: string } }) {
+  async function handleMessage(rel: Relationship) {
     const userId = rel.user.id;
     setMessageLoading(userId);
     try {
@@ -123,9 +171,7 @@ const FriendsPage: Component = () => {
   const blocked = () => relationships.relationships.filter((r) => r.type === RelType.Blocked);
   const onlineFriends = () =>
     friends().filter(
-      (r) =>
-        isVisibleStatus(presence.byUser[r.user.id]?.status) ||
-        isVisibleStatus(r.user.presence?.status)
+      (r) => isVisibleStatus(presence.byUser[r.user.id]?.status) || isVisibleStatus(r.user.presence?.status)
     );
 
   const hasAny = () =>
@@ -133,201 +179,180 @@ const FriendsPage: Component = () => {
 
   const hasTabContent = () => {
     switch (tab()) {
-      case 'online': return onlineFriends().length > 0;
-      case 'all': return friends().length > 0;
-      case 'pending': return incoming().length > 0 || outgoing().length > 0;
-      case 'blocked': return blocked().length > 0;
-      default: return false;
+      case 'online':
+        return onlineFriends().length > 0;
+      case 'all':
+        return friends().length > 0;
+      case 'pending':
+        return incoming().length > 0 || outgoing().length > 0;
+      case 'blocked':
+        return blocked().length > 0;
+      default:
+        return false;
     }
   };
 
   const showEmptyState = () => !relationships.loading && !hasTabContent();
 
+  const pendingCount = () => incoming().length;
+
+  const tabItems = () =>
+    TAB_IDS.map((id) => ({
+      id,
+      label: id === 'pending' && pendingCount() > 0 ? t('friends.tabs.pendingCount', { count: pendingCount() }) : t(`friends.tabs.${id}`),
+    }));
+
+  function friendMenu(rel: Relationship) {
+    return (e: MouseEvent) =>
+      showContextMenu(e, [
+        { label: t('friends.actions.message'), icon: 'fa-message', onClick: () => handleMessage(rel) },
+        { label: t('userArea.copyUsername'), icon: 'fa-copy', onClick: () => navigator.clipboard.writeText(userTag(rel)) },
+        {
+          label: t('friends.actions.removeFriend'),
+          icon: 'fa-user-minus',
+          danger: true,
+          onClick: () => handleRemove(rel).catch(() => {}),
+        },
+      ]);
+  }
+
+  const messageAction = (rel: Relationship) => (
+    <Button
+      size="sm"
+      variant="outline"
+      onClick={() => handleMessage(rel)}
+      disabled={messageLoading() === rel.user.id}
+      loading={messageLoading() === rel.user.id}
+    >
+      {t('friends.actions.message')}
+    </Button>
+  );
+
+  const addFriendButton = (size: 'sm' | 'md' = 'md') => (
+    <Button size={size} class="shrink-0 whitespace-nowrap" onClick={() => setShowAddModal(true)}>
+      <i class="fa-solid fa-user-plus text-xs" aria-hidden="true" />
+      {t('friends.addFriend')}
+    </Button>
+  );
+
   return (
-    <div class="flex min-h-0 flex-1 flex-col bg-background">
+    <div class="flex min-h-0 flex-1 flex-col bg-transparent">
       <Show when={showAddModal()}>
-        <Portal mount={document.body}>
           <ResponsiveDialog
             size="sm"
-            zClass="z-[220]"
-            ariaLabelledby="add-friend-modal-title"
-            onBackdropClick={() => {
-              setShowAddModal(false);
-              setAddError('');
-              setAddUsername('');
-              setAddDiscriminator('');
-            }}
-            panelClass="px-6 pt-6 touch-manipulation"
+            onClose={closeAddModal}
+            dismissible={!addLoading()}
+            title={t('friends.addFriend')}
+            description={
+              <>
+                {t('friends.addHelp')} <span class="font-mono text-foreground">turtle#1234</span>.
+                <Show when={instance.federationEnabled}>
+                  {' '}
+                  {t('friends.addHelpFederated')} <span class="font-mono text-foreground">turtle#1234@their.instance</span>{' '}
+                  {t('friends.addHelpFederatedAfter')}
+                </Show>
+              </>
+            }
           >
-            <h3 id="add-friend-modal-title" class="mb-1 text-lg font-semibold text-foreground">Add Friend</h3>
-            <p class="text-sm text-muted-foreground mb-4">Enter username and discriminator (e.g. 1234).</p>
             <form onSubmit={handleAddFriend} class="space-y-4">
-              <Input
-                type="text"
-                label="Username"
-                placeholder="username"
-                value={addUsername()}
-                onInput={(e) => { setAddUsername(e.currentTarget.value); setAddError(''); }}
-                disabled={addLoading()}
-                autocomplete="username"
-              />
-              <Input
-                type="text"
-                label="Discriminator"
-                placeholder="1234"
-                value={addDiscriminator()}
-                onInput={(e) => { setAddDiscriminator(e.currentTarget.value); setAddError(''); }}
-                disabled={addLoading()}
-              />
-              {addError() && (
-                <p class="text-xs text-destructive">{addError()}</p>
-              )}
-              <div class="flex gap-2">
-                <Button
-                  type="button"
-                  class="flex-1"
-                  variant="outline"
-                  onClick={() => { setShowAddModal(false); setAddError(''); setAddUsername(''); setAddDiscriminator(''); }}
+              <div class="grid grid-cols-[1fr_6.5rem] gap-2">
+                <Input
+                  type="text"
+                  label={t('friends.username')}
+                  placeholder={t('friends.usernamePlaceholder')}
+                  value={addUsername()}
+                  onInput={(e) => {
+                    setAddUsername(e.currentTarget.value);
+                    setAddError('');
+                  }}
                   disabled={addLoading()}
-                >
-                  Cancel
+                  autocomplete="off"
+                  autofocus
+                />
+                <Input
+                  type="text"
+                  label={t('friends.tag')}
+                  placeholder="#1234"
+                  inputmode="numeric"
+                  value={addDiscriminator()}
+                  onInput={(e) => {
+                    setAddDiscriminator(e.currentTarget.value);
+                    setAddError('');
+                  }}
+                  disabled={addLoading()}
+                  error={addError() || undefined}
+                  class="font-mono"
+                />
+              </div>
+              <div class={appDialogActions}>
+                <Button type="button" variant="outline" onClick={closeAddModal} disabled={addLoading()}>
+                  {t('common.cancel')}
                 </Button>
-                <Button type="submit" class="flex-1" loading={addLoading()}>
-                  Send Request
+                <Button
+                  type="submit"
+                  loading={addLoading()}
+                  disabled={!addUsername().trim() || (!addDiscriminator().trim() && !/#\d{1,4}@/.test(addUsername()))}
+                >
+                  {t('friends.sendRequest')}
                 </Button>
               </div>
             </form>
           </ResponsiveDialog>
-        </Portal>
       </Show>
-      <div class="flex h-12 shrink-0 items-center gap-2 border-b border-border bg-background px-4">
-        <i class="fa-solid fa-user-group text-muted-foreground shrink-0" />
-        <h1 class="text-base font-semibold text-foreground mr-4">Friends</h1>
-        <div class="flex gap-0.5">
-          {TABS.map((t) => (
-            <button
-              type="button"
-              class={`px-3 py-1.5 rounded text-sm font-medium transition-colors ${
-                tab() === t.id
-                  ? 'bg-accent text-accent-foreground'
-                  : 'text-muted-foreground hover:text-foreground hover:bg-accent/50'
-              }`}
-              onClick={() => setTab(t.id)}
-            >
-              {t.label}
-            </button>
-          ))}
+      <div class={`${appPageHeader} gap-3`}>
+        <div class="flex min-w-0 items-center gap-2">
+          <i class="fa-solid fa-user-group shrink-0 text-muted-foreground" aria-hidden="true" />
+          <h1 class={appPageTitle}>{t('nav.friends')}</h1>
         </div>
-        <button
-          type="button"
-          class="ml-auto px-3 py-1.5 rounded text-sm font-medium bg-primary text-primary-foreground hover:bg-primary-hover transition-colors"
-          onClick={() => setShowAddModal(true)}
-        >
-          Add Friend
-        </button>
+        <Tabs<TabId>
+          size="sm"
+          aria-label={t('friends.listAria')}
+          value={tab()}
+          onChange={(v) => setTab(v)}
+          items={tabItems()}
+          class="ms-1"
+        />
+        <div class="ms-auto shrink-0">{addFriendButton('sm')}</div>
       </div>
-      <div class="flex min-h-0 flex-1 flex-col overflow-y-auto bg-background">
+      <div class="flex min-h-0 flex-1 flex-col overflow-y-auto bg-transparent">
         <Show when={relationships.loading}>
-          <div class="flex-1 flex items-center justify-center p-8">
+          <div class="flex flex-1 items-center justify-center p-8">
             <span class="size-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
           </div>
         </Show>
         <Show when={!relationships.loading && !hasAny()}>
-          <div class="flex-1 flex flex-col items-center justify-center p-8 text-center">
-            <FriendsIcon />
-            <h2 class="text-2xl font-semibold text-foreground mb-2">Add friends to get started</h2>
-            <p class="text-muted-foreground max-w-md mb-6">
-              Search for friends by username and discriminator.
-            </p>
-            <button
-              type="button"
-              class="px-6 py-3 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary-hover transition-colors"
-              onClick={() => setShowAddModal(true)}
-            >
-              Add Friend
-            </button>
-          </div>
+          <EmptyState
+            size="page"
+            icon="fa-solid fa-user-group"
+            title={t('friends.empty.noneTitle')}
+            body={t('friends.empty.noneBody')}
+            action={addFriendButton()}
+          />
         </Show>
         <Show when={!relationships.loading && hasAny() && showEmptyState()}>
-          <div class="flex-1 flex flex-col items-center justify-center p-8 text-center">
-            <FriendsIcon />
-            <h2 class="text-xl font-semibold text-foreground mb-2">
-              {tab() === 'online' && 'No friends online'}
-              {tab() === 'all' && 'No friends yet'}
-              {tab() === 'pending' && 'No pending requests'}
-              {tab() === 'blocked' && 'No blocked users'}
-            </h2>
-            <p class="text-muted-foreground max-w-md mb-6">
-              {tab() === 'online' && 'When friends are online, they\'ll appear here.'}
-              {tab() === 'all' && 'Add friends to get started.'}
-              {tab() === 'pending' && 'Friend requests will show up here.'}
-              {tab() === 'blocked' && 'Blocked users will appear here.'}
-            </p>
-            {tab() !== 'online' && tab() !== 'blocked' && (
-              <button
-                type="button"
-                class="px-6 py-3 rounded-lg bg-primary text-primary-foreground font-medium hover:bg-primary-hover transition-colors"
-                onClick={() => setShowAddModal(true)}
-              >
-                Add Friend
-              </button>
-            )}
-          </div>
+          <EmptyState
+            size="page"
+            icon={
+              tab() === 'blocked'
+                ? 'fa-solid fa-ban'
+                : tab() === 'pending'
+                  ? 'fa-solid fa-envelope-open'
+                  : 'fa-solid fa-user-group'
+            }
+            title={t(`friends.empty.${tab()}Title`)}
+            body={t(`friends.empty.${tab()}Body`)}
+            action={tab() !== 'online' && tab() !== 'blocked' ? addFriendButton() : undefined}
+          />
         </Show>
         <Show when={!relationships.loading && hasAny() && !showEmptyState()}>
-          <div class="p-4 space-y-6">
+          <div class="mx-auto w-full max-w-3xl space-y-6 p-4">
             <Show when={tab() === 'online'}>
               <section>
-                <h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                  Online — {onlineFriends().length}
-                </h3>
-                <div class="space-y-1">
+                <h3 class={`mb-2 px-3 ${appSectionLabel}`}>{t('friends.sections.online', { count: onlineFriends().length })}</h3>
+                <div class="space-y-0.5">
                   <For each={onlineFriends()}>
                     {(rel) => (
-                      <div
-                        class="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors cursor-context-menu"
-                        onContextMenu={(e) => {
-                          const tag = `${rel.user.username}#${rel.user.discriminator}`;
-                          showContextMenu(e, [
-                            { label: 'Message', icon: 'fa-message', onClick: () => handleMessage(rel) },
-                            { label: 'Copy username', icon: 'fa-copy', onClick: () => navigator.clipboard.writeText(tag) },
-                            {
-                              label: 'Remove friend',
-                              icon: 'fa-user-minus',
-                              danger: true,
-                              onClick: () => removeRelationship(rel.user.id).then(() => removeRelationshipLocally(rel.user.id)).catch(() => {}),
-                            },
-                          ]);
-                        }}
-                      >
-                        <div class="flex items-center gap-3">
-                          <div class="relative shrink-0">
-                            <div class="size-10 rounded-full bg-primary/30 flex items-center justify-center text-sm font-medium">
-                              {friendDisplayName(rel)[0].toUpperCase()}
-                            </div>
-                            <span class="absolute bottom-[-1px] right-[-1px]">
-                              <PresenceDot userId={rel.user.id} class="size-4" />
-                            </span>
-                          </div>
-                          <div>
-                            <div class="font-medium">{friendDisplayName(rel)}</div>
-                            <div class="text-xs text-muted-foreground truncate">
-                              {friendStatusText(rel) || `${rel.user.username}#${rel.user.discriminator}`}
-                            </div>
-                          </div>
-                        </div>
-                        <div class="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleMessage(rel)}
-                            disabled={messageLoading() === rel.user.id}
-                            loading={messageLoading() === rel.user.id}
-                          >
-                            Message
-                          </Button>
-                        </div>
-                      </div>
+                      <FriendRow rel={rel} showPresence actions={messageAction(rel)} onContextMenu={friendMenu(rel)} />
                     )}
                   </For>
                 </div>
@@ -335,102 +360,47 @@ const FriendsPage: Component = () => {
             </Show>
             <Show when={tab() === 'all' && friends().length > 0}>
               <section>
-                <h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                  All — {friends().length}
-                </h3>
-                <div class="space-y-1">
+                <h3 class={`mb-2 px-3 ${appSectionLabel}`}>{t('friends.sections.all', { count: friends().length })}</h3>
+                <div class="space-y-0.5">
                   <For each={friends()}>
                     {(rel) => (
-                      <div
-                        class="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors cursor-context-menu"
-                        onContextMenu={(e) => {
-                          const tag = `${rel.user.username}#${rel.user.discriminator}`;
-                          showContextMenu(e, [
-                            { label: 'Message', icon: 'fa-message', onClick: () => handleMessage(rel) },
-                            { label: 'Copy username', icon: 'fa-copy', onClick: () => navigator.clipboard.writeText(tag) },
-                            {
-                              label: 'Remove friend',
-                              icon: 'fa-user-minus',
-                              danger: true,
-                              onClick: () => removeRelationship(rel.user.id).then(() => removeRelationshipLocally(rel.user.id)).catch(() => {}),
-                            },
-                          ]);
-                        }}
-                      >
-                        <div class="flex items-center gap-3">
-                          <div class="relative">
-                            <div class="size-10 rounded-full bg-primary/30 flex items-center justify-center text-sm font-medium">
-                              {friendDisplayName(rel)[0].toUpperCase()}
-                            </div>
-                              <span class="absolute bottom-[-1px] right-[-1px]">
-                                <PresenceDot userId={rel.user.id} class="size-4" />
-                              </span>
-                          </div>
-                          <div>
-                            <div class="font-medium">{friendDisplayName(rel)}</div>
-                            <div class="text-xs text-muted-foreground truncate">
-                              {friendStatusText(rel) || `${rel.user.username}#${rel.user.discriminator}`}
-                            </div>
-                          </div>
-                        </div>
-                        <div class="flex gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => handleMessage(rel)}
-                            disabled={messageLoading() === rel.user.id}
-                            loading={messageLoading() === rel.user.id}
-                          >
-                            Message
-                          </Button>
-                        </div>
-                      </div>
+                      <FriendRow rel={rel} showPresence actions={messageAction(rel)} onContextMenu={friendMenu(rel)} />
                     )}
                   </For>
                 </div>
               </section>
             </Show>
             <Show when={tab() === 'pending' && (incoming().length > 0 || outgoing().length > 0)}>
-              <div class="space-y-4">
+              <div class="space-y-6">
                 <Show when={incoming().length > 0}>
                   <section>
-                    <h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                      Incoming — {incoming().length}
-                    </h3>
-                    <div class="space-y-1">
+                    <h3 class={`mb-2 px-3 ${appSectionLabel}`}>{t('friends.sections.incoming', { count: incoming().length })}</h3>
+                    <div class="space-y-0.5">
                       <For each={incoming()}>
                         {(rel) => (
-                          <div class="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-                            <div class="flex items-center gap-3">
-                              <div class="size-10 rounded-full bg-primary/30 flex items-center justify-center text-sm font-medium">
-                                {friendDisplayName(rel)[0].toUpperCase()}
-                              </div>
-                              <div>
-                                <div class="font-medium">{friendDisplayName(rel)}</div>
-                                <div class="text-xs text-muted-foreground truncate">
-                                  {friendStatusText(rel) || `${rel.user.username}#${rel.user.discriminator}`}
-                                </div>
-                              </div>
-                            </div>
-                            <div class="flex gap-2">
-                              <Button
-                                size="sm"
-                                onClick={() => handleAccept(rel)}
-                                disabled={actionLoading() === rel.user.id}
-                                loading={actionLoading() === rel.user.id}
-                              >
-                                Accept
-                              </Button>
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                onClick={() => handleDecline(rel)}
-                                disabled={actionLoading() === rel.user.id}
-                              >
-                                Decline
-                              </Button>
-                            </div>
-                          </div>
+                          <FriendRow
+                            rel={rel}
+                            actions={
+                              <>
+                                <Button
+                                  size="sm"
+                                  onClick={() => handleAccept(rel)}
+                                  disabled={actionLoading() === rel.user.id}
+                                  loading={actionLoading() === rel.user.id}
+                                >
+                                  {t('friends.actions.accept')}
+                                </Button>
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleRemove(rel)}
+                                  disabled={actionLoading() === rel.user.id}
+                                >
+                                  {t('friends.actions.decline')}
+                                </Button>
+                              </>
+                            }
+                          />
                         )}
                       </For>
                     </div>
@@ -438,33 +408,25 @@ const FriendsPage: Component = () => {
                 </Show>
                 <Show when={outgoing().length > 0}>
                   <section>
-                    <h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                      Sent — {outgoing().length}
-                    </h3>
-                    <div class="space-y-1">
+                    <h3 class={`mb-2 px-3 ${appSectionLabel}`}>{t('friends.sections.sent', { count: outgoing().length })}</h3>
+                    <div class="space-y-0.5">
                       <For each={outgoing()}>
                         {(rel) => (
-                          <div class="flex items-center justify-between p-3 rounded-lg bg-muted/20">
-                            <div class="flex items-center gap-3">
-                              <div class="size-10 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
-                                {friendDisplayName(rel)[0].toUpperCase()}
-                              </div>
-                              <div>
-                                <div class="font-medium">{friendDisplayName(rel)}</div>
-                                <div class="text-xs text-muted-foreground truncate">
-                                  {friendStatusText(rel) || `${rel.user.username}#${rel.user.discriminator}`}
-                                </div>
-                              </div>
-                            </div>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => handleCancelRequest(rel)}
-                              disabled={actionLoading() === rel.user.id}
-                            >
-                              Cancel
-                            </Button>
-                          </div>
+                          <FriendRow
+                            rel={rel}
+                            muted
+                            actions={
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleRemove(rel)}
+                                disabled={actionLoading() === rel.user.id}
+                                loading={actionLoading() === rel.user.id}
+                              >
+                                {t('common.cancel')}
+                              </Button>
+                            }
+                          />
                         )}
                       </For>
                     </div>
@@ -474,26 +436,25 @@ const FriendsPage: Component = () => {
             </Show>
             <Show when={tab() === 'blocked' && blocked().length > 0}>
               <section>
-                <h3 class="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2">
-                  Blocked — {blocked().length}
-                </h3>
-                <div class="space-y-1">
+                <h3 class={`mb-2 px-3 ${appSectionLabel}`}>{t('friends.sections.blocked', { count: blocked().length })}</h3>
+                <div class="space-y-0.5">
                   <For each={blocked()}>
                     {(rel) => (
-                      <div class="flex items-center justify-between p-3 rounded-lg hover:bg-muted/30 transition-colors">
-                        <div class="flex items-center gap-3">
-                          <div class="size-10 rounded-full bg-muted flex items-center justify-center text-sm font-medium">
-                            {friendDisplayName(rel)[0].toUpperCase()}
-                          </div>
-                          <div>
-                            <div class="font-medium">{friendDisplayName(rel)}</div>
-                            <div class="text-xs text-muted-foreground truncate">
-                              {friendStatusText(rel) || `${rel.user.username}#${rel.user.discriminator}`}
-                            </div>
-                          </div>
-                        </div>
-                        {/* TODO: Unblock button */}
-                      </div>
+                      <FriendRow
+                        rel={rel}
+                        muted
+                        actions={
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => handleRemove(rel)}
+                            disabled={actionLoading() === rel.user.id}
+                            loading={actionLoading() === rel.user.id}
+                          >
+                            {t('friends.actions.unblock')}
+                          </Button>
+                        }
+                      />
                     )}
                   </For>
                 </div>

@@ -77,7 +77,6 @@ export default function Login() {
                 }}
                 autocomplete="email"
                 disabled={loading()}
-                class="rounded-xl"
               />
               <Input
                 type="password"
@@ -90,12 +89,11 @@ export default function Login() {
                 }}
                 autocomplete="current-password"
                 disabled={loading()}
-                class="rounded-xl"
               />
               <FormApiErrors messages={errorLines()} id="login-api-errors" />
             </CardContent>
             <CardFooter class={authCardFooterClass}>
-              <Button type="submit" class="w-full rounded-full font-semibold" loading={loading()}>
+              <Button type="submit" class="w-full font-semibold" loading={loading()}>
                 {t('auth.login.submit')}
               </Button>
               <A

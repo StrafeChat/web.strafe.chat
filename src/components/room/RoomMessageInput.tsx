@@ -1,6 +1,31 @@
 import type { Component } from 'solid-js';
-import { createMemo, createSignal, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, Show, onMount } from 'solid-js';
 import type { RoomParticipant } from '../../api/rooms';
+import type { SpaceRole, SpaceRoom } from '../../api/spaces';
+import type { CustomEmoji } from '../../api/emojis';
+import { spaceRoleColorHex } from '../../lib/spacePermissions';
+import { EMPTY_CATALOG, tokenizeDraft, type MentionCatalog } from '../../lib/utils/mentions';
+import { emojiCatalogIfLoaded, loadEmojiCatalog, searchEmoji, withSkinTone, type EmojiCatalog } from '../../lib/emoji/data';
+import type { PendingAttachment } from '../../lib/attachments/draft';
+import { attachmentKind, fileIcon, formatFileSize } from '../../lib/attachments/format';
+import { appearance } from '../../stores/appearance';
+import { settings } from '../../stores/settings';
+import { appMenuItem, appMenuPanel } from '../../theme/appChrome';
+import { IconButton } from '../ui/IconButton';
+import { MessageAvatar } from '../messageList/MessageAvatar';
+import { Emoji } from '../emoji/Emoji';
+import { EmojiPicker } from '../emoji/EmojiPicker';
+import { TypingIndicator, type TypingPerson } from './TypingIndicator';
+import { t } from '../../i18n';
+
+export interface ReplyTarget {
+  /** Author of the message being replied to. */
+  name: string;
+  /** One-line preview of that message ('' when unavailable). */
+  preview: string;
+  onJump?: () => void;
+  onCancel: () => void;
+}
 
 export interface RoomMessageInputProps {
   draft: string;
@@ -9,60 +34,213 @@ export interface RoomMessageInputProps {
   placeholder: string;
   disabled: boolean;
   inputRef: (el: HTMLTextAreaElement | undefined) => void;
-  typingMessage: string;
-  showTyping: boolean;
+  /** Who is currently typing here, oldest first. The indicator stacks their avatars. */
+  typingUsers?: TypingPerson[];
   /** Room participants for @mention dropdown (excluding current user if provided) */
   participants?: RoomParticipant[];
+  /** Space channels only: roles offered in the @mention dropdown. */
+  spaceRoles?: SpaceRole[];
+  /** Space channels only: text channels offered in the #channel dropdown. */
+  spaceRooms?: SpaceRoom[];
+  /** Whether @everyone/@here should be offered - space channels gate this on
+   * PermMentionEveryone; group PMs (no permission system) can pass true unconditionally;
+   * 1:1 PMs should omit/leave false since mass-notifying one other person is meaningless. */
+  canMentionEveryone?: boolean;
   currentUserId?: string;
   /** Current selection start in the input (for mention trigger detection) */
   cursorPos?: number;
-  /** Called when user selects a mention: insert <@userId> from queryStart to cursorEnd */
-  onInsertMention?: (queryStart: number, cursorEnd: number, userId: string) => void;
+  /** Called when user selects a completion: replace [queryStart, cursorEnd) with insertText. */
+  onInsertMention?: (queryStart: number, cursorEnd: number, insertText: string) => void;
   /** Optional: sync cursor position when user moves caret without typing (arrows, click) */
   onCursorChange?: (pos: number) => void;
+  /** When set, the textarea is hidden and this message is shown (e.g. missing send permission). */
+  noSendMessage?: string;
+  /** Resolves @names / #channels / :emoji: in the draft for the styled overlay. */
+  mentionCatalog?: MentionCatalog;
+  /** Shown as a strip attached to the top of the box while replying. */
+  replyTo?: ReplyTarget | null;
+  /** Files queued to go with the next message. */
+  attachments?: PendingAttachment[];
+  /** Enables the attach button, drag-and-drop and paste-to-attach. */
+  onAddFiles?: (files: File[]) => void;
+  onRemoveAttachment?: (localId: string) => void;
+  /** Validation message from the attachment queue (too large, too many…). */
+  attachmentError?: string;
+  /** Custom emoji offered by the picker and the :name: completion. */
+  customEmojis?: CustomEmoji[];
 }
 
 function participantDisplayName(p: RoomParticipant): string {
-  return p.display_name || p.username || 'Unknown';
+  return p.display_name || p.username || t('common.unknown');
+}
+
+type Candidate =
+  | { kind: 'user'; key: string; label: string; sublabel: string; insertText: string; participant: RoomParticipant }
+  | { kind: 'role'; key: string; label: string; colorHex: string; insertText: string }
+  | { kind: 'channel'; key: string; label: string; insertText: string }
+  | { kind: 'special'; key: string; label: string; sublabel: string; insertText: string }
+  | { kind: 'emoji'; key: string; label: string; sublabel: string; insertText: string; unicode?: string; custom?: CustomEmoji };
+
+const EVERYONE_ROLE_NAME = '@everyone';
+const ROOM_TYPE_TEXT = 3;
+const SPECIALS: Array<{ token: 'everyone' | 'here'; sublabelKey: string }> = [
+  { token: 'everyone', sublabelKey: 'composer.mentionEveryone' },
+  { token: 'here', sublabelKey: 'composer.mentionHere' },
+];
+
+/** Composer grows with its content up to this height, then scrolls (Discord-style). */
+const COMPOSER_MAX_HEIGHT_PX = 200;
+
+/** Typography shared by the textarea and its mirror so they stay glyph-aligned. The
+ * horizontal padding leaves room for the attach (left) and emoji (right) buttons. */
+const composerTextClass = 'pl-11 pr-11 py-3 text-sm leading-5';
+
+function isWordChar(c: string | undefined): boolean {
+  return c != null && /[\p{L}\p{N}_]/u.test(c);
 }
 
 export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
   const [selectedIndex, setSelectedIndex] = createSignal(0);
+  const [pickerOpen, setPickerOpen] = createSignal(false);
+  const [dragDepth, setDragDepth] = createSignal(0);
+  const [emojiCatalog, setEmojiCatalog] = createSignal<EmojiCatalog | null>(emojiCatalogIfLoaded());
+  let textareaEl: HTMLTextAreaElement | undefined;
+  let mirrorEl: HTMLDivElement | undefined;
+  let fileInputEl: HTMLInputElement | undefined;
 
-  const mentionState = createMemo(() => {
-    const draft = props.draft;
-    const pos = props.cursorPos ?? draft.length;
-    const participants = props.participants ?? [];
-    const currentUserId = props.currentUserId;
-    const textBefore = draft.slice(0, pos);
-    const atIndex = textBefore.lastIndexOf('@');
-    if (atIndex === -1) return null;
-    // Require @ at start of line or after whitespace so we don't trigger mid-word
-    const prevChar = atIndex > 0 ? textBefore[atIndex - 1] : ' ';
-    if (prevChar !== ' ' && prevChar !== '\n') return null;
-    const query = textBefore.slice(atIndex + 1).toLowerCase();
-    const others = currentUserId
-      ? participants.filter((p) => p.id !== currentUserId)
-      : participants;
-    const filtered =
-      query === ''
-        ? others
-        : others.filter((p) => {
-            const name = participantDisplayName(p).toLowerCase();
-            const username = (p.username ?? '').toLowerCase();
-            return name.startsWith(query) || username.startsWith(query);
-          });
-    if (filtered.length === 0) return null;
-    return { queryStart: atIndex, cursorEnd: pos, query, list: filtered };
+  // The Unicode catalogue backs :shortcode: completion and serialization; load it once
+  // the composer exists rather than on first keystroke, so the first ":smi" already works.
+  onMount(() => {
+    if (!emojiCatalog()) loadEmojiCatalog().then(setEmojiCatalog).catch(() => undefined);
   });
 
-  const mentionOpen = () => mentionState() !== null;
-  const mentionList = () => mentionState()?.list ?? [];
-  const maxIndex = () => Math.max(0, mentionList().length - 1);
+  function autoGrow(el: HTMLTextAreaElement) {
+    el.style.height = 'auto';
+    const next = Math.min(el.scrollHeight, COMPOSER_MAX_HEIGHT_PX);
+    el.style.height = `${next}px`;
+    el.style.overflowY = el.scrollHeight > COMPOSER_MAX_HEIGHT_PX ? 'auto' : 'hidden';
+    if (mirrorEl) mirrorEl.scrollTop = el.scrollTop;
+  }
+
+  // Re-measure whenever the draft changes (typing, mention insert, clear-after-send).
+  createEffect(() => {
+    void props.draft;
+    const el = textareaEl;
+    if (!el) return;
+    queueMicrotask(() => autoGrow(el));
+  });
+
+  const catalog = () => props.mentionCatalog ?? EMPTY_CATALOG;
+  const overlayTokens = createMemo(() => tokenizeDraft(props.draft, catalog()));
+  const hasAttachments = () => (props.attachments?.length ?? 0) > 0;
+  const canSend = () => (props.draft.trim().length > 0 || hasAttachments()) && !props.disabled;
+
+  const completion = createMemo(() => {
+    const draft = props.draft;
+    const pos = props.cursorPos ?? draft.length;
+    const textBefore = draft.slice(0, pos);
+    const atIndex = textBefore.lastIndexOf('@');
+    const hashIndex = props.spaceRooms?.length ? textBefore.lastIndexOf('#') : -1;
+    const colonIndex = textBefore.lastIndexOf(':');
+    const triggerIndex = Math.max(atIndex, hashIndex, colonIndex);
+    if (triggerIndex === -1) return null;
+    const trigger = textBefore[triggerIndex]!;
+    // Only trigger at a word boundary ("email@" / "10:30" must not open the menu).
+    if (triggerIndex > 0 && isWordChar(textBefore[triggerIndex - 1])) return null;
+    const query = textBefore.slice(triggerIndex + 1);
+    if (query.includes('\n') || /\s/.test(query)) return null;
+    const q = query.toLowerCase();
+
+    const candidates: Candidate[] = [];
+    if (trigger === ':') {
+      // Emoji needs a couple of characters so a lone ":" (smileys, times) stays quiet.
+      if (q.length < 2) return null;
+      for (const c of props.customEmojis ?? []) {
+        if (!c.name.toLowerCase().includes(q)) continue;
+        candidates.push({ kind: 'emoji', key: `custom:${c.id}`, label: `:${c.name}:`, sublabel: t('composer.customEmoji'), insertText: `:${c.name}: `, custom: c });
+        if (candidates.length >= 6) break;
+      }
+      const cat = emojiCatalog();
+      if (cat) {
+        for (const e of searchEmoji(cat, q, 8)) {
+          const unicode = withSkinTone(e, appearance.emojiSkinTone);
+          candidates.push({ kind: 'emoji', key: `u:${e.hexcode}`, label: `:${e.shortcode}:`, sublabel: e.label, insertText: `${unicode} `, unicode });
+        }
+      }
+    } else if (trigger === '#') {
+      for (const r of props.spaceRooms ?? []) {
+        if (r.type !== ROOM_TYPE_TEXT || !r.name) continue;
+        if (q !== '' && !r.name.toLowerCase().startsWith(q)) continue;
+        candidates.push({ kind: 'channel', key: `channel:${r.id}`, label: r.name, insertText: `#${r.name} ` });
+      }
+    } else {
+      const currentUserId = props.currentUserId;
+      const others = currentUserId
+        ? (props.participants ?? []).filter((p) => p.id !== currentUserId)
+        : props.participants ?? [];
+      for (const p of others) {
+        const name = participantDisplayName(p);
+        const username = p.username ?? '';
+        if (!username) continue;
+        if (q !== '' && !name.toLowerCase().startsWith(q) && !username.toLowerCase().startsWith(q)) continue;
+        candidates.push({
+          kind: 'user',
+          key: `user:${p.id}`,
+          label: name,
+          sublabel: `@${username}`,
+          insertText: `@${username} `,
+          participant: p,
+        });
+      }
+      for (const r of props.spaceRoles ?? []) {
+        if (r.name === EVERYONE_ROLE_NAME || !r.mentionable) continue;
+        if (q !== '' && !r.name.toLowerCase().startsWith(q)) continue;
+        candidates.push({
+          kind: 'role',
+          key: `role:${r.id}`,
+          label: r.name,
+          colorHex: spaceRoleColorHex(r.color),
+          insertText: `@${r.name} `,
+        });
+      }
+      if (props.canMentionEveryone) {
+        for (const s of SPECIALS) {
+          if (q !== '' && !s.token.startsWith(q)) continue;
+          candidates.push({
+            kind: 'special',
+            key: `special:${s.token}`,
+            label: s.token,
+            sublabel: t(s.sublabelKey),
+            insertText: `@${s.token} `,
+          });
+        }
+      }
+    }
+    if (candidates.length === 0) return null;
+    return { queryStart: triggerIndex, cursorEnd: pos, list: candidates.slice(0, 12) };
+  });
+
+  const completionOpen = () => completion() !== null;
+  const completionList = () => completion()?.list ?? [];
+  const maxIndex = () => Math.max(0, completionList().length - 1);
   const effectiveSelectedIndex = () => Math.min(selectedIndex(), maxIndex());
 
+  function select(candidate: Candidate) {
+    const state = completion();
+    if (!state || !props.onInsertMention) return;
+    props.onInsertMention(state.queryStart, state.cursorEnd, candidate.insertText);
+    setSelectedIndex(0);
+  }
+
+  /** Insert text at the caret (used by the emoji picker). */
+  function insertAtCaret(text: string) {
+    const el = textareaEl;
+    const pos = el ? el.selectionStart : props.draft.length;
+    props.onInsertMention?.(pos, el ? el.selectionEnd : pos, text);
+  }
+
   function handleKeyDown(e: KeyboardEvent) {
-    const state = mentionState();
+    const state = completion();
     if (state) {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
@@ -74,14 +252,11 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
         setSelectedIndex((i) => Math.max(i - 1, 0));
         return;
       }
-      if (e.key === 'Enter') {
-        const list = mentionList();
-        const idx = effectiveSelectedIndex();
-        const user = list[idx];
-        if (user && props.onInsertMention) {
+      if (e.key === 'Enter' || e.key === 'Tab') {
+        const candidate = completionList()[effectiveSelectedIndex()];
+        if (candidate) {
           e.preventDefault();
-          props.onInsertMention(state.queryStart, state.cursorEnd, user.id);
-          setSelectedIndex(0);
+          select(candidate);
         }
         return;
       }
@@ -90,77 +265,374 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
         return;
       }
     }
+    if (e.key === 'Escape' && props.replyTo) {
+      e.preventDefault();
+      props.replyTo.onCancel();
+      return;
+    }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      if (props.draft.trim() && !props.disabled) {
+      if (canSend()) {
         (e.currentTarget as HTMLTextAreaElement).form?.requestSubmit();
       }
     }
   }
 
-  function handleSelect(userId: string) {
-    const state = mentionState();
-    if (!state || !props.onInsertMention) return;
-    props.onInsertMention(state.queryStart, state.cursorEnd, userId);
-    setSelectedIndex(0);
+  function handlePaste(e: ClipboardEvent) {
+    if (!props.onAddFiles) return;
+    const files = [...(e.clipboardData?.files ?? [])];
+    if (files.length === 0) return;
+    e.preventDefault();
+    props.onAddFiles(files);
   }
+
+  function handleDrop(e: DragEvent) {
+    setDragDepth(0);
+    if (!props.onAddFiles) return;
+    const files = [...(e.dataTransfer?.files ?? [])];
+    if (files.length === 0) return;
+    e.preventDefault();
+    props.onAddFiles(files);
+  }
+
+  const tokenClass = (kind: string): string => {
+    switch (kind) {
+      case 'user':
+      case 'channel':
+      case 'everyone':
+        return 'rounded bg-primary/25 text-primary';
+      case 'emoji':
+        return 'rounded bg-primary/15 text-primary';
+      case 'role':
+        return 'rounded';
+      case 'url':
+        return 'text-primary underline underline-offset-2';
+      case 'code':
+        return 'rounded bg-muted text-foreground';
+      case 'marker':
+        return 'text-muted-foreground/60';
+      case 'bold':
+      case 'italic':
+        return 'text-foreground';
+      default:
+        return '';
+    }
+  };
+
+  const hasTopStrip = () => hasAttachments() || !!props.replyTo;
 
   return (
     <>
-      <form onSubmit={props.onSubmit} class="p-3 shrink-0">
-        <div class="flex gap-2 relative">
-          <textarea
-            ref={props.inputRef}
-            value={props.draft}
-            onInput={props.onInput}
-            onKeyDown={handleKeyDown}
-            onKeyUp={(e) => props.onCursorChange?.((e.target as HTMLTextAreaElement).selectionStart)}
-            onClick={(e) => props.onCursorChange?.((e.target as HTMLTextAreaElement).selectionStart)}
-            placeholder={props.placeholder}
-            rows={1}
-            class="flex-1 min-h-[44px] max-h-[200px] resize-y rounded-lg border border-input bg-background px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring"
-            disabled={props.disabled}
-          />
-          <button
-            type="submit"
-            disabled={!props.draft.trim() || props.disabled}
-            class="md:hidden p-2 rounded-lg bg-primary text-primary-foreground disabled:opacity-50 disabled:cursor-not-allowed hover:bg-primary-hover transition-colors"
-            title="Send"
-            aria-label="Send"
-          >
-            <i class={`fa-solid fa-paper-plane text-sm ${props.disabled ? 'opacity-70' : ''}`} />
-          </button>
-          <Show when={mentionOpen()}>
-            <div
-              class="absolute left-2 right-12 md:right-2 bottom-full mb-1 max-h-48 overflow-y-auto rounded-lg border border-border bg-card shadow-lg py-1 z-10"
-              role="listbox"
-              aria-label="Mention a user"
-            >
-              {mentionList().map((p, i) => (
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={i === effectiveSelectedIndex()}
-                  class={`w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors ${
-                    i === effectiveSelectedIndex() ? 'bg-primary/20 text-primary' : 'text-foreground hover:bg-muted/70'
-                  }`}
-                  onClick={() => handleSelect(p.id)}
-                >
-                  <div class="size-7 rounded-full bg-muted flex items-center justify-center text-xs font-medium shrink-0">
-                    {(p.display_name || p.username || '?')[0].toUpperCase()}
-                  </div>
-                  <span class="truncate">{participantDisplayName(p)}</span>
-                </button>
-              ))}
+      <Show
+        when={!props.noSendMessage}
+        fallback={
+          <div class="shrink-0 px-4 pt-2">
+            <div class="flex min-h-11 items-center gap-2.5 rounded-lg border border-border bg-muted/40 px-4 py-3 text-sm text-muted-foreground">
+              <i class="fa-solid fa-lock text-xs" aria-hidden="true" />
+              {props.noSendMessage}
+            </div>
+          </div>
+        }
+      >
+        <form
+          onSubmit={(e) => props.onSubmit(e)}
+          class="relative shrink-0 px-4 pt-2"
+          onDragEnter={(e) => {
+            if (!props.onAddFiles || !e.dataTransfer?.types.includes('Files')) return;
+            e.preventDefault();
+            setDragDepth((d) => d + 1);
+          }}
+          onDragOver={(e) => {
+            if (!props.onAddFiles || !e.dataTransfer?.types.includes('Files')) return;
+            e.preventDefault();
+            if (e.dataTransfer) e.dataTransfer.dropEffect = 'copy';
+          }}
+          onDragLeave={(e) => {
+            if (!props.onAddFiles || !e.dataTransfer?.types.includes('Files')) return;
+            setDragDepth((d) => Math.max(0, d - 1));
+          }}
+          onDrop={handleDrop}
+        >
+          <Show when={dragDepth() > 0}>
+            <div class="pointer-events-none absolute inset-x-4 inset-y-0 z-20 flex items-center justify-center rounded-lg border-2 border-dashed border-primary bg-primary/10 text-sm font-medium text-primary">
+              <i class="fa-solid fa-paperclip me-2" aria-hidden="true" />
+              {t('composer.dropFiles')}
             </div>
           </Show>
-        </div>
-      </form>
-      <div class="h-3 flex items-center px-4 min-h-0 pb-3">
-        <Show when={props.showTyping}>
-          <p class="text-xs text-muted-foreground">{props.typingMessage}</p>
-        </Show>
-      </div>
+          <Show when={props.attachmentError}>
+            <p class="mb-1.5 flex items-center gap-1.5 text-xs text-destructive">
+              <i class="fa-solid fa-circle-exclamation" aria-hidden="true" />
+              {props.attachmentError}
+            </p>
+          </Show>
+          <div class="relative flex items-end gap-2">
+            <div class="relative min-w-0 flex-1">
+              <Show when={hasAttachments()}>
+                <div class="flex flex-wrap gap-2 rounded-t-lg border border-b-0 border-input bg-muted/40 p-2">
+                  <For each={props.attachments}>
+                    {(att) => {
+                      const kind = attachmentKind(att.file.type, att.file.name);
+                      return (
+                        <div
+                          class="group/pending relative flex w-24 flex-col overflow-hidden rounded-md border border-border/70 bg-background/70"
+                          title={`${att.file.name} (${formatFileSize(att.file.size)})`}
+                        >
+                          <div class="flex h-20 items-center justify-center overflow-hidden bg-muted/40">
+                            <Show
+                              when={kind === 'image' && att.previewUrl}
+                              fallback={
+                                <Show
+                                  when={kind === 'video' && att.previewUrl}
+                                  fallback={
+                                    <i class={`fa-solid ${fileIcon(att.file.type, att.file.name)} text-2xl text-muted-foreground`} aria-hidden="true" />
+                                  }
+                                >
+                                  <video src={att.previewUrl} muted class="size-full object-cover" />
+                                </Show>
+                              }
+                            >
+                              <img src={att.previewUrl} alt="" class="size-full object-cover" />
+                            </Show>
+                          </div>
+                          <p class="truncate px-1.5 py-1 text-[11px] text-muted-foreground">{att.file.name}</p>
+                          <div class="absolute right-1 top-1">
+                            <IconButton
+                              size="sm"
+                              tone="overlay"
+                              icon="fa-solid fa-xmark"
+                              label={t('composer.removeAttachment', { name: att.file.name })}
+                              onClick={() => props.onRemoveAttachment?.(att.localId)}
+                            />
+                          </div>
+                        </div>
+                      );
+                    }}
+                  </For>
+                </div>
+              </Show>
+              <Show when={props.replyTo}>
+                {(reply) => (
+                  <div
+                    class={`flex items-center gap-2 border border-b-0 border-input bg-muted/40 py-1.5 pl-3 pr-1.5 text-xs ${
+                      hasAttachments() ? 'border-t-0' : 'rounded-t-lg'
+                    }`}
+                  >
+                    <i class="fa-solid fa-reply shrink-0 -scale-x-100 text-[11px] text-muted-foreground" aria-hidden="true" />
+                    <span class="shrink-0 text-muted-foreground">{t('composer.replyingTo')}</span>
+                    <span class="shrink-0 font-semibold text-foreground">{reply().name}</span>
+                    <span class="min-w-0 flex-1 truncate text-muted-foreground">{reply().preview}</span>
+                    <Show when={reply().onJump}>
+                      <button
+                        type="button"
+                        class="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                        onClick={() => reply().onJump?.()}
+                      >
+                        {t('composer.jump')}
+                      </button>
+                    </Show>
+                    <IconButton size="sm" icon="fa-solid fa-xmark" label={t('composer.cancelReply')} onClick={() => reply().onCancel()} />
+                  </div>
+                )}
+              </Show>
+              <div class={`relative ${props.disabled ? 'opacity-50' : ''}`}>
+                {/* Paint order is DOM order: field fill, then the styled mirror, then the
+                    transparent textarea on top (it owns the caret, selection and events),
+                    then the attach/emoji buttons floating at either end. */}
+                <div
+                  aria-hidden="true"
+                  class={`absolute inset-0 rounded-lg bg-background/80 ${hasTopStrip() ? 'rounded-t-none' : ''}`}
+                />
+                <div
+                  ref={(el) => {
+                    mirrorEl = el;
+                  }}
+                  aria-hidden="true"
+                  class={`pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words rounded-lg border border-transparent text-foreground ${composerTextClass} ${
+                    hasTopStrip() ? 'rounded-t-none' : ''
+                  }`}
+                >
+                  <For each={overlayTokens()}>
+                    {(t) => (
+                      <span
+                        class={tokenClass(t.kind)}
+                        style={
+                          t.kind === 'role' && t.colorHex
+                            ? { 'background-color': `${t.colorHex}33`, color: t.colorHex }
+                            : undefined
+                        }
+                      >
+                        {t.text}
+                      </span>
+                    )}
+                  </For>
+                  {/* A trailing newline needs something after it to take up a line, like the textarea's caret does. */}
+                  <Show when={props.draft.endsWith('\n')}>{'​'}</Show>
+                </div>
+                <textarea
+                  ref={(el) => {
+                    textareaEl = el;
+                    props.inputRef(el);
+                  }}
+                  value={props.draft}
+                  onInput={(e) => props.onInput(e)}
+                  onKeyDown={handleKeyDown}
+                  onKeyUp={(e) => props.onCursorChange?.((e.target as HTMLTextAreaElement).selectionStart)}
+                  onClick={(e) => props.onCursorChange?.((e.target as HTMLTextAreaElement).selectionStart)}
+                  onPaste={handlePaste}
+                  onScroll={(e) => {
+                    if (mirrorEl) mirrorEl.scrollTop = e.currentTarget.scrollTop;
+                  }}
+                  placeholder={props.placeholder}
+                  rows={1}
+                  spellcheck={settings.spellcheck}
+                  class={`relative box-border block min-h-11 w-full resize-none overflow-hidden rounded-lg border border-input bg-transparent text-transparent caret-foreground placeholder:text-muted-foreground transition-colors focus:border-ring/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0 disabled:cursor-not-allowed ${composerTextClass} ${
+                    hasTopStrip() ? 'rounded-t-none' : ''
+                  }`}
+                  disabled={props.disabled}
+                />
+                <div class="absolute bottom-1.5 left-1.5">
+                  <IconButton
+                    size="sm"
+                    tone="subtle"
+                    icon="fa-solid fa-circle-plus"
+                    label={t('composer.attachFiles')}
+                    title={props.onAddFiles ? t('composer.attachFiles') : t('composer.attachUnavailable')}
+                    disabled={!props.onAddFiles || props.disabled}
+                    onClick={() => fileInputEl?.click()}
+                  />
+                  <input
+                    ref={(el) => {
+                      fileInputEl = el;
+                    }}
+                    type="file"
+                    multiple
+                    class="hidden"
+                    tabIndex={-1}
+                    onChange={(e) => {
+                      const files = [...(e.currentTarget.files ?? [])];
+                      e.currentTarget.value = '';
+                      if (files.length) props.onAddFiles?.(files);
+                    }}
+                  />
+                </div>
+                <div class="absolute bottom-1.5 right-1.5">
+                  <IconButton
+                    size="sm"
+                    tone="subtle"
+                    icon="fa-solid fa-face-smile"
+                    label={t('composer.emoji')}
+                    active={pickerOpen()}
+                    disabled={props.disabled}
+                    onClick={() => setPickerOpen((v) => !v)}
+                  />
+                </div>
+              </div>
+            </div>
+            <button
+              type="submit"
+              disabled={!canSend()}
+              class="inline-flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50 md:hidden"
+              title={t('common.send')}
+              aria-label={t('common.send')}
+            >
+              <i class="fa-solid fa-paper-plane text-sm" aria-hidden="true" />
+            </button>
+            <Show when={pickerOpen()}>
+              <div class="absolute bottom-full left-0 right-0 z-30 mb-2 flex justify-end">
+                <EmojiPicker
+                  onClose={() => setPickerOpen(false)}
+                  onPick={(pick) => {
+                    insertAtCaret(pick.custom ? `:${pick.custom.name}: ` : `${pick.unicode} `);
+                    setPickerOpen(false);
+                  }}
+                />
+              </div>
+            </Show>
+            <Show when={completionOpen()}>
+              <div
+                class={`absolute bottom-full left-0 right-13 mb-2 max-h-60 overflow-y-auto md:right-0 ${appMenuPanel}`}
+                role="listbox"
+                aria-label={t('composer.completionAria')}
+              >
+                <div class="flex flex-col gap-0.5">
+                  <For each={completionList()}>
+                    {(c, i) => (
+                      <button
+                        type="button"
+                        role="option"
+                        aria-selected={i() === effectiveSelectedIndex()}
+                        class={`${appMenuItem} ${
+                          i() === effectiveSelectedIndex()
+                            ? 'bg-primary/15 text-foreground'
+                            : 'text-foreground hover:bg-accent/70'
+                        }`}
+                        onMouseEnter={() => setSelectedIndex(i())}
+                        onMouseDown={(e) => e.preventDefault()}
+                        onClick={() => select(c)}
+                      >
+                        <Show when={c.kind === 'user'}>
+                          <MessageAvatar
+                            name={c.label}
+                            avatar={(c as { participant: RoomParticipant }).participant.avatar}
+                            class="size-6 text-[11px]"
+                          />
+                          <span class="truncate">{c.label}</span>
+                          <span class="truncate text-xs text-muted-foreground">
+                            {(c as { sublabel?: string }).sublabel}
+                          </span>
+                        </Show>
+                        <Show when={c.kind === 'role'}>
+                          <span class="flex size-6 shrink-0 items-center justify-center">
+                            <span
+                              class="size-2.5 rounded-full ring-1 ring-border/40"
+                              style={{ 'background-color': (c as { colorHex: string }).colorHex }}
+                            />
+                          </span>
+                          <span class="truncate">{c.label}</span>
+                          <span class="truncate text-xs text-muted-foreground">{t('composer.role')}</span>
+                        </Show>
+                        <Show when={c.kind === 'channel'}>
+                          <span class="flex size-6 shrink-0 items-center justify-center text-muted-foreground">
+                            <i class="fa-solid fa-hashtag text-xs" aria-hidden="true" />
+                          </span>
+                          <span class="truncate">{c.label}</span>
+                          <span class="truncate text-xs text-muted-foreground">{t('composer.room')}</span>
+                        </Show>
+                        <Show when={c.kind === 'special'}>
+                          <span class="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary">
+                            <i class="fa-solid fa-at text-[11px]" aria-hidden="true" />
+                          </span>
+                          <span class="truncate">@{c.label}</span>
+                          <span class="truncate text-xs text-muted-foreground">
+                            {(c as { sublabel?: string }).sublabel}
+                          </span>
+                        </Show>
+                        <Show when={c.kind === 'emoji'}>
+                          {(() => {
+                            const ec = c as Extract<Candidate, { kind: 'emoji' }>;
+                            return (
+                              <>
+                                <span class="flex size-6 shrink-0 items-center justify-center">
+                                  <Show when={ec.custom} fallback={<Emoji emoji={ec.unicode!} class="!m-0 !size-5" />}>
+                                    <img src={ec.custom!.url} alt="" class="size-5 object-contain" />
+                                  </Show>
+                                </span>
+                                <span class="truncate">{ec.label}</span>
+                                <span class="truncate text-xs text-muted-foreground">{ec.sublabel}</span>
+                              </>
+                            );
+                          })()}
+                        </Show>
+                      </button>
+                    )}
+                  </For>
+                </div>
+              </div>
+            </Show>
+          </div>
+        </form>
+      </Show>
+      <TypingIndicator people={props.typingUsers ?? []} />
     </>
   );
 };

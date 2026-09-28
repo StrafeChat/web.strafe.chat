@@ -3,8 +3,9 @@
  */
 
 import { ApiError } from './ApiError';
+import { apiUrl } from '../lib/runtimeConfig';
 
-const API_URL = import.meta.env.VITE_API_URL ?? 'http://192.168.1.115:4000';
+const API_URL = apiUrl();
 
 export { ApiError } from './ApiError';
 
