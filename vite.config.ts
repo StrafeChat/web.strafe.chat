@@ -4,12 +4,35 @@ import solidPlugin from 'vite-plugin-solid';
 import devtools from 'solid-devtools/vite';
 import wasm from 'vite-plugin-wasm';
 
+// A unique id per build. Exposed to the bundle as __BUILD_ID__ and also written to
+// /version.json (emitted below), so a running client can poll that file and tell when a
+// newer build has been deployed - then prompt the user to refresh.
+const buildId = String(Date.now());
+
+/** Emits /version.json alongside the build so the client can detect new deploys. */
+function versionFilePlugin() {
+  return {
+    name: 'strafe-version-file',
+    generateBundle() {
+      // eslint-disable-next-line @typescript-eslint/no-invalid-this
+      (this as { emitFile: (f: { type: 'asset'; fileName: string; source: string }) => void }).emitFile({
+        type: 'asset',
+        fileName: 'version.json',
+        source: JSON.stringify({ buildId }),
+      });
+    },
+  };
+}
+
 export default defineConfig({
+  define: {
+    __BUILD_ID__: JSON.stringify(buildId),
+  },
   // wasm(): loads the @matrix-org/matrix-sdk-crypto-wasm E2EE engine as an ES module.
   // Its init glue uses top-level await; build.target is already esnext below, so every
   // target browser supports that natively and vite-plugin-top-level-await's transform
   // (which broke on this project's SWC toolchain) isn't needed.
-  plugins: [devtools(), solidPlugin(), tailwindcss(), wasm()],
+  plugins: [devtools(), solidPlugin(), tailwindcss(), wasm(), versionFilePlugin()],
   server: {
     port: 3000,
     strictPort: true,

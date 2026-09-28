@@ -1342,6 +1342,17 @@ export default {
     bot: 'Bot-Konto',
     botTag: 'Bot',
   },
+  userMenu: {
+    acceptFriend: 'Freundschaftsanfrage annehmen',
+    block: 'Blockieren',
+    unblock: 'Blockierung aufheben',
+    blockTitle: '{{name}} blockieren?',
+    blockBody: 'Sie können dich nicht mehr anschreiben oder dir eine Freundschaftsanfrage senden, und du siehst ihre Nachrichten nicht mehr.',
+  },
+  update: {
+    available: 'Eine neue Version ist verfügbar',
+    action: 'Aktualisieren',
+  },
   connection: {
     reconnecting: 'Verbindung wird wiederhergestellt …',
   },

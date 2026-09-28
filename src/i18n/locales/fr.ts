@@ -1350,6 +1350,17 @@ export default {
     bot: 'Compte bot',
     botTag: 'Bot',
   },
+  userMenu: {
+    acceptFriend: 'Accepter la demande d’ami',
+    block: 'Bloquer',
+    unblock: 'Débloquer',
+    blockTitle: 'Bloquer {{name}} ?',
+    blockBody: 'Cette personne ne pourra plus vous envoyer de message ni de demande d’ami, et vous ne verrez plus ses messages.',
+  },
+  update: {
+    available: 'Une nouvelle version est disponible',
+    action: 'Mettre à jour',
+  },
   connection: {
     reconnecting: 'Reconnexion…',
   },

@@ -1350,6 +1350,17 @@ export default {
     bot: 'Cuenta de bot',
     botTag: 'Bot',
   },
+  userMenu: {
+    acceptFriend: 'Aceptar solicitud de amistad',
+    block: 'Bloquear',
+    unblock: 'Desbloquear',
+    blockTitle: '¿Bloquear a {{name}}?',
+    blockBody: 'No podrán enviarte mensajes ni solicitudes de amistad, y no verás sus mensajes.',
+  },
+  update: {
+    available: 'Hay una nueva versión disponible',
+    action: 'Actualizar',
+  },
   connection: {
     reconnecting: 'Reconectando…',
   },

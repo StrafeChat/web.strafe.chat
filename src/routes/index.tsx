@@ -15,6 +15,8 @@ import AdminPage from '../pages/AdminPage';
 import OAuthAuthorizePage from '../pages/OAuthAuthorizePage';
 import { StargateProvider } from '../components/StargateProvider';
 import { ConnectionStatusBanner } from '../components/ConnectionStatusBanner';
+import { UpdateAvailableBanner } from '../components/UpdateAvailableBanner';
+import { initUpdateCheck } from '../stores/updateAvailable';
 import { RecoveryModal } from '../components/RecoveryModal';
 import { E2eeEnvironmentModal } from '../components/E2eeEnvironmentModal';
 import { ExternalLinkModal } from '../components/ExternalLinkModal';
@@ -57,11 +59,13 @@ function NotFound() {
 
 function RootLayout(props: { children?: import('solid-js').JSX.Element }) {
   onMount(() => hydrateAuth());
+  onMount(() => initUpdateCheck());
   return (
     <StargateProvider>
       <Show when={auth.hydrated} fallback={<LoadingScreen />}>
         <AppBackground />
         <ConnectionStatusBanner />
+        <UpdateAvailableBanner />
         {props.children}
         <RecoveryModal />
         <E2eeEnvironmentModal />

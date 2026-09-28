@@ -1344,6 +1344,17 @@ export default {
     bot: 'Bot account',
     botTag: 'Bot',
   },
+  userMenu: {
+    acceptFriend: 'Accept friend request',
+    block: 'Block',
+    unblock: 'Unblock',
+    blockTitle: 'Block {{name}}?',
+    blockBody: 'They won’t be able to message you or send you a friend request, and you won’t see their messages.',
+  },
+  update: {
+    available: 'A new version is available',
+    action: 'Update',
+  },
   connection: {
     reconnecting: 'Reconnecting…',
   },

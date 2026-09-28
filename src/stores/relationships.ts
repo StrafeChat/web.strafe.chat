@@ -41,6 +41,16 @@ export async function loadRelationships(): Promise<void> {
   }
 }
 
+/** The relationship type between the current user and `userId` (RelType.None if none). Reactive. */
+export function relationshipType(userId: string): number {
+  return relationships.relationships.find((r) => r.id === userId || r.user.id === userId)?.type ?? RelType.None;
+}
+
+/** Whether the current user has blocked `userId`. Reactive. */
+export function isBlocked(userId: string): boolean {
+  return relationshipType(userId) === RelType.Blocked;
+}
+
 export function clearRelationships() {
   setRelationships({ relationships: [], loading: false, hydrated: false });
 }

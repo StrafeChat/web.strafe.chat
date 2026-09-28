@@ -11,6 +11,8 @@ import { newHeaderDismissed } from '../stores/newHeaderDismissed';
 import { formatMessageTimestamp, formatDateHeader, formatTimeOfDay } from '../lib/utils/datetime';
 import { t } from '../i18n';
 import { showContextMenu } from '../stores/contextMenu';
+import { buildUserMenuItems } from '../lib/userContextMenu';
+import { isBlocked } from '../stores/relationships';
 import { openReportDialog } from './ReportDialog';
 import { deleteMessage as deleteMessageApi } from '../api/messages';
 import { Tooltip } from './ui/Tooltip';
@@ -201,6 +203,27 @@ export const MessageList: Component<MessageListProps> = (props) => {
   function openAuthorProfile(msg: DecryptedMessage, anchor: HTMLElement) {
     openProfileForUser(msg.sender_id, anchor);
   }
+
+  /** Right-clicking a message author gives the same user menu as a member row. */
+  function openAuthorMenu(msg: DecryptedMessage, e: MouseEvent) {
+    const s = getSenderDisplay(msg.sender_id, props.participants, currentUserId());
+    const items = buildUserMenuItems({
+      userId: msg.sender_id,
+      username: s.username || '',
+      displayName: s.name,
+      discriminator: s.discriminator,
+      currentUserId: currentUserId(),
+      onMessage: props.onMessageUser,
+      spaceId: props.spaceId,
+      roomId: props.roomId,
+    });
+    if (items.length) showContextMenu(e, items);
+  }
+
+  // Messages from blocked users are hidden. Filtered only for rendering (and the grouping
+  // that reads the previous rendered message); unread/scroll bookkeeping still sees the raw
+  // list, which is fine - a blocked message is rare and simply doesn't appear.
+  const visibleMessages = createMemo(() => props.messages.filter((m) => !isBlocked(m.sender_id)));
 
   /** Profile card for any user id in this room - message authors and @mention pills alike. */
   function openProfileForUser(userId: string, anchor: HTMLElement) {
@@ -472,9 +495,9 @@ export const MessageList: Component<MessageListProps> = (props) => {
           onLoadOlder={props.onLoadOlder ?? (() => {})}
           getScrollContainer={getScrollContainer}
         />
-        <For each={props.messages}>
+        <For each={visibleMessages()}>
           {(msg, i) => {
-            const prev = () => props.messages[i() - 1];
+            const prev = () => visibleMessages()[i() - 1];
             const showHeader = () => shouldShowHeader(msg, prev());
             const needsDateHeader = () => shouldShowDateHeader(msg, prev());
             const sender = () =>
@@ -662,6 +685,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                           e.stopPropagation();
                           openAuthorProfile(msg, e.currentTarget);
                         }}
+                        onContextMenu={(e) => openAuthorMenu(msg, e)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault();
@@ -740,6 +764,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                           e.stopPropagation();
                           openAuthorProfile(msg, e.currentTarget);
                         }}
+                        onContextMenu={(e) => openAuthorMenu(msg, e)}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault();
@@ -799,6 +824,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                             e.stopPropagation();
                             openAuthorProfile(msg, e.currentTarget);
                           }}
+                          onContextMenu={(e) => openAuthorMenu(msg, e)}
                           onKeyDown={(e) => {
                             if (e.key === 'Enter' || e.key === ' ') {
                               e.preventDefault();

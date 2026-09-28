@@ -5,8 +5,8 @@ import type { SpaceRole } from '../../api/spaces';
 import { PresenceDot, presenceStatusLabel } from '../PresenceDot';
 import { MessageAvatar } from '../messageList/MessageAvatar';
 import { presence } from '../../stores/presence';
-import { showContextMenu } from '../../stores/contextMenu';
-import { openReportDialog } from '../ReportDialog';
+import { showContextMenu, type ContextMenuItem } from '../../stores/contextMenu';
+import { buildUserMenuItems } from '../../lib/userContextMenu';
 import { appActivityRail, appSectionLabel } from '../../theme/appChrome';
 import { highestHoistedRole, memberHighestRolePosition, spaceRoleColorHex } from '../../lib/spacePermissions';
 import { openUserProfileFromParticipant } from '../../stores/userProfilePopover';
@@ -306,73 +306,28 @@ const MemberRow: Component<{
         props.dim ? 'opacity-60 hover:opacity-100' : ''
       }`}
       onContextMenu={(e) => {
-        const tag =
-          props.p.discriminator != null
-            ? `${props.p.username}#${String(props.p.discriminator).padStart(4, '0')}`
-            : `@${props.p.username}`;
-        const items = [
-          ...(!isSelf()
-            ? [
-                {
-                  label: t('friends.actions.message'),
-                  icon: 'fa-message' as const,
-                  onClick: () => props.onMessageUser(props.p.id),
-                },
-              ]
-            : []),
-          {
-            label: t('userArea.copyUsername'),
-            icon: 'fa-copy' as const,
-            onClick: () => navigator.clipboard.writeText(tag),
-          },
-          ...(!isSelf()
-            ? [
-                {
-                  label: t('profile.report'),
-                  icon: 'fa-flag' as const,
-                  danger: true as const,
-                  onClick: () =>
-                    openReportDialog({
-                      targetType: 'user',
-                      targetId: props.p.id,
-                      targetName: displayName(),
-                      spaceId: props.spaceId,
-                      roomId: props.roomId,
-                    }),
-                },
-              ]
-            : []),
+        const extraItems: ContextMenuItem[] = [
           ...(props.isCreator && !isSelf() && props.onRemoveMember
-            ? [
-                {
-                  label: t('room.members.removeFromGroup'),
-                  icon: 'fa-user-minus' as const,
-                  danger: true as const,
-                  onClick: () => props.onRemoveMember?.(props.p.id),
-                },
-              ]
+            ? [{ label: t('room.members.removeFromGroup'), icon: 'fa-user-minus', danger: true, onClick: () => props.onRemoveMember?.(props.p.id) }]
             : []),
           ...(canKick() && props.onKickMember
-            ? [
-                {
-                  label: t('room.members.kick'),
-                  icon: 'fa-user-minus' as const,
-                  danger: true as const,
-                  onClick: () => props.onKickMember?.(props.p.id),
-                },
-              ]
+            ? [{ label: t('room.members.kick'), icon: 'fa-user-minus', danger: true, onClick: () => props.onKickMember?.(props.p.id) }]
             : []),
           ...(canBan() && props.onBanMember
-            ? [
-                {
-                  label: t('room.members.ban'),
-                  icon: 'fa-gavel' as const,
-                  danger: true as const,
-                  onClick: () => props.onBanMember?.(props.p.id),
-                },
-              ]
+            ? [{ label: t('room.members.ban'), icon: 'fa-gavel', danger: true, onClick: () => props.onBanMember?.(props.p.id) }]
             : []),
         ];
+        const items = buildUserMenuItems({
+          userId: props.p.id,
+          username: props.p.username,
+          displayName: displayName(),
+          discriminator: props.p.discriminator,
+          currentUserId: props.currentUserId,
+          onMessage: props.onMessageUser,
+          spaceId: props.spaceId,
+          roomId: props.roomId,
+          extraItems,
+        });
         if (items.length) showContextMenu(e, items);
       }}
     >

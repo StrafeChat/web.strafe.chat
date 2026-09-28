@@ -59,3 +59,13 @@ export function putRelationship(userId: string) {
 export function removeRelationship(userId: string) {
   return api<void>(`/users/@me/relationships/${userId}`, { method: 'DELETE' });
 }
+
+/** Block a user. Removes any friendship or pending request between you first. */
+export function blockUser(userId: string) {
+  return api<void>(`/users/@me/relationships/${userId}/block`, { method: 'PUT' });
+}
+
+/** Unblock a user. */
+export function unblockUser(userId: string) {
+  return api<void>(`/users/@me/relationships/${userId}/block`, { method: 'DELETE' });
+}

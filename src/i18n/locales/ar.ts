@@ -1412,6 +1412,17 @@ export default {
     bot: 'حساب بوت',
     botTag: 'بوت',
   },
+  userMenu: {
+    acceptFriend: 'قبول طلب الصداقة',
+    block: 'حظر',
+    unblock: 'إلغاء الحظر',
+    blockTitle: 'حظر {{name}}؟',
+    blockBody: 'لن يتمكنوا من مراسلتك أو إرسال طلب صداقة إليك، ولن ترى رسائلهم.',
+  },
+  update: {
+    available: 'يتوفر إصدار جديد',
+    action: 'تحديث',
+  },
   connection: {
     reconnecting: 'إعادة الاتصال…',
   },
