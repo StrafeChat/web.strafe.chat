@@ -36,7 +36,7 @@ import { Button } from './ui/Button';
 import { Textarea } from './ui/Textarea';
 import { isMessagePinned, pinMessage, unpinMessage } from '../stores/pinnedMessages';
 import { openUserProfilePopover } from '../stores/userProfilePopover';
-import { roleNamesForMember, spaceJoinedLabel } from '../lib/userProfilePopoverHelpers';
+import { popoverSubjectFromSender } from '../lib/userProfilePopoverHelpers';
 import { viewerRoleCeiling } from '../lib/spacePermissions';
 
 const MESSAGE_GROUP_THRESHOLD_MS = 5 * 60 * 1000;
@@ -207,7 +207,6 @@ export const MessageList: Component<MessageListProps> = (props) => {
     const uid = currentUserId();
     const s = getSenderDisplay(userId, props.participants, uid);
     const p = props.participants?.find((x) => x.id === userId);
-    const roleIds = p ? (p as { roles?: string[] }).roles : undefined;
     const spaceRoleContext =
       props.spaceId &&
       props.spaceRoles != null &&
@@ -225,21 +224,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
 
     openUserProfilePopover({
       anchor,
-      subject: {
-        userId: s.userId,
-        displayName: s.name,
-        username: s.username || t('common.unknown').toLowerCase(),
-        discriminator: s.discriminator ?? 0,
-        avatar: s.avatar,
-        banner: s.banner,
-        aboutMe: s.aboutMe,
-        bio: s.bio,
-        homeDomain: (p as { home_domain?: string } | undefined)?.home_domain,
-        spaceRoleNames: roleNamesForMember(roleIds, props.spaceRoles),
-        joinedAtLabel: p ? spaceJoinedLabel(p) : undefined,
-        publicFlags: s.publicFlags,
-        bot: s.bot,
-      },
+      subject: popoverSubjectFromSender(s, { participant: p, spaceRoles: props.spaceRoles }),
       currentUserId: uid,
       onMessageUser: props.onMessageUser,
       spaceRoleContext,

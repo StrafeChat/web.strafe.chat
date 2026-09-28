@@ -18,6 +18,7 @@ import {
 } from '../../lib/messageSearch';
 import { auth } from '../../stores/auth';
 import { openUserProfilePopover } from '../../stores/userProfilePopover';
+import { popoverSubjectFromSender } from '../../lib/userProfilePopoverHelpers';
 import { formatMessageTimestamp } from '../../lib/utils/datetime';
 import { t } from '../../i18n';
 
@@ -112,16 +113,7 @@ export const RoomSearchPanel: Component<RoomSearchPanelProps> = (props) => {
     const s = getSenderDisplay(userId, props.participants, currentUserId());
     openUserProfilePopover({
       anchor,
-      subject: {
-        userId: s.userId,
-        displayName: s.name,
-        username: s.username || t('common.unknown').toLowerCase(),
-        discriminator: s.discriminator ?? 0,
-        avatar: s.avatar,
-        banner: s.banner,
-        aboutMe: s.aboutMe,
-        bio: s.bio,
-      },
+      subject: popoverSubjectFromSender(s, { participant: props.participants?.find((x) => x.id === userId), spaceRoles: props.spaceRoles }),
       currentUserId: currentUserId(),
     });
   }

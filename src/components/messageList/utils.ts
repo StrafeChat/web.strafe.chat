@@ -130,6 +130,8 @@ export interface SenderDisplay {
   aboutMe?: string;
   publicFlags?: number;
   bot?: boolean;
+  /** Federation: the user's home instance, shown after the tag when it isn't this one. */
+  homeDomain?: string;
 }
 
 export function getSenderDisplay(
@@ -163,5 +165,6 @@ export function getSenderDisplay(
     aboutMe: p?.about_me,
     publicFlags: p?.public_flags,
     bot: p?.bot,
+    homeDomain: p?.home_domain,
   };
 }

@@ -1,7 +1,7 @@
 import { createStore } from 'solid-js/store';
 import type { RoomParticipant } from '../api/rooms';
 import type { SpaceRole } from '../api/spaces';
-import { roleNamesForMember, spaceJoinedLabel } from '../lib/userProfilePopoverHelpers';
+import { popoverSubjectFromParticipant } from '../lib/userProfilePopoverHelpers';
 
 /** When set, popover may show role toggles for this space member (requires permission). */
 export type SpaceMemberRoleEditContext = {
@@ -168,21 +168,7 @@ export function openUserProfileFromParticipant(opts: {
   spaceRoles?: SpaceRole[];
   spaceRoleContext?: SpaceMemberRoleEditContext | null;
 }): void {
-  const p = opts.participant;
-  const roleIds = (p as { roles?: string[] }).roles;
-  const subject: UserProfilePopoverSubject = {
-    userId: p.id,
-    displayName: p.display_name || p.username || 'Unknown',
-    username: p.username,
-    discriminator: p.discriminator ?? 0,
-    homeDomain: p.home_domain,
-    avatar: p.avatar,
-    banner: p.banner,
-    aboutMe: p.about_me,
-    bio: p.bio,
-    spaceRoleNames: roleNamesForMember(roleIds, opts.spaceRoles),
-    joinedAtLabel: spaceJoinedLabel(p),
-  };
+  const subject = popoverSubjectFromParticipant(opts.participant, opts.spaceRoles);
   openUserProfilePopover({
     anchor: opts.anchor,
     subject,

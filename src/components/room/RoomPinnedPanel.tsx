@@ -14,6 +14,7 @@ import { appFloatPanel, appSectionLabel } from '../../theme/appChrome';
 import { EmptyState } from '../ui/EmptyState';
 import { IconButton } from '../ui/IconButton';
 import { openUserProfilePopover } from '../../stores/userProfilePopover';
+import { popoverSubjectFromSender } from '../../lib/userProfilePopoverHelpers';
 import { t } from '../../i18n';
 
 export interface RoomPinnedPanelProps {
@@ -57,16 +58,7 @@ export const RoomPinnedPanel: Component<RoomPinnedPanelProps> = (props) => {
                   const s = getSenderDisplay(userId, props.participants, currentUserId());
                   openUserProfilePopover({
                     anchor,
-                    subject: {
-                      userId: s.userId,
-                      displayName: s.name,
-                      username: s.username || t('common.unknown').toLowerCase(),
-                      discriminator: s.discriminator ?? 0,
-                      avatar: s.avatar,
-                      banner: s.banner,
-                      aboutMe: s.aboutMe,
-                      bio: s.bio,
-                    },
+                    subject: popoverSubjectFromSender(s, { participant: props.participants?.find((x) => x.id === userId), spaceRoles: props.spaceRoles }),
                     currentUserId: currentUserId(),
                   });
                 }

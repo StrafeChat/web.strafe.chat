@@ -77,6 +77,8 @@ export function hydrateFromReady(payload: {
     banner?: string;
     bio?: string;
     about_me?: string;
+    public_flags?: number;
+    bot?: boolean;
     presence?: { status: string; custom_status?: string };
   };
   session_id?: string;
@@ -101,6 +103,8 @@ export function hydrateFromReady(payload: {
       ...(typeof payload.user.banner === 'string' ? { banner: payload.user.banner } : {}),
       ...(typeof payload.user.bio === 'string' ? { bio: payload.user.bio } : {}),
       ...(typeof payload.user.about_me === 'string' ? { about_me: payload.user.about_me } : {}),
+      ...(typeof payload.user.public_flags === 'number' ? { public_flags: payload.user.public_flags } : {}),
+      ...(payload.user.bot ? { bot: true } : {}),
     };
     setAuth('user', user);
     if (payload.user.presence?.status) {

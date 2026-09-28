@@ -2,7 +2,6 @@ import type { Component } from 'solid-js';
 import { Show, For, createMemo } from 'solid-js';
 import { MessageAvatar } from './messageList/MessageAvatar';
 import { UserBadges } from './UserBadges';
-import { MessageBody } from './messageList/MessageBody';
 import { PresenceDot } from './PresenceDot';
 import { IconButton } from './ui/IconButton';
 import { openReportDialog } from './ReportDialog';
@@ -149,16 +148,6 @@ export const UserProfileFullModal: Component = () => {
               </button>
             </div>
 
-            <Show when={subject()?.aboutMe?.trim()}>
-              <div class="border-t border-border pt-4">
-                <p class={`mb-2 ${appSectionLabel}`}>{t('settings.profile.aboutMe')}</p>
-                <MessageBody
-                  text={subject()!.aboutMe!.trim()}
-                  class="break-words text-sm leading-relaxed text-foreground/95"
-                />
-              </div>
-            </Show>
-
             <Show when={bioHtml()}>
               <div class="border-t border-border pt-4">
                 <p class={`mb-2 ${appSectionLabel}`}>{t('settings.profile.bio')}</p>
@@ -170,7 +159,7 @@ export const UserProfileFullModal: Component = () => {
               </div>
             </Show>
 
-            <Show when={!subject()?.aboutMe?.trim() && !bioHtml()}>
+            <Show when={!bioHtml()}>
               <div class="border-t border-border pt-4">
                 <p class="text-sm text-muted-foreground">{t('profile.noBio')}</p>
               </div>

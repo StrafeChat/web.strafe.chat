@@ -21,6 +21,7 @@ import { setMemberSpaceRoles } from '../api/spaces';
 import type { SpaceRole } from '../api/spaces';
 import { spaceRoleColorHex } from '../lib/spacePermissions';
 import { appMenuItemDefault, appMenuPanel, appSectionLabel, zLayer } from '../theme/appChrome';
+import { isMdViewport } from '../stores/mobileShellLayout';
 import { t } from '../i18n';
 
 const EVERYONE_ROLE_NAME = '@everyone';
@@ -64,6 +65,9 @@ export const UserProfilePopover: Component = () => {
 
   const subject = () => userProfilePopover.subject;
   const roleEditCtx = () => userProfilePopover.spaceRoleContext;
+  // Under the md breakpoint the card is a bottom-sheet drawer (with a dimmed backdrop)
+  // instead of a floating popover anchored to the click - one surface, not a tiny card.
+  const mobile = () => !isMdViewport();
 
   function revertPickedFromContext() {
     const ctx = roleEditCtx();
@@ -338,17 +342,28 @@ export const UserProfilePopover: Component = () => {
   return (
     <Show when={userProfilePopover.open && subject()}>
       <Portal>
+        <Show when={mobile()}>
+          <div
+            class={`fixed inset-0 ${zLayer.popover} bg-black/60 backdrop-blur-sm dialog-overlay-in`}
+            onClick={() => closeUserProfilePopover()}
+          />
+        </Show>
         <div
           id="user-profile-popover-root"
           ref={setRootRef}
           data-modal
-          class={`fixed ${zLayer.popover} flex max-h-[85vh] w-[320px] flex-col overflow-hidden rounded-3xl border border-border bg-popover/95 shadow-2xl shadow-black/50 backdrop-blur-xl`}
-          style={{
+          class={`fixed ${zLayer.popover} flex max-h-[85vh] flex-col overflow-hidden border border-border bg-popover/95 shadow-2xl shadow-black/50 backdrop-blur-xl dialog-panel-in dialog-sheet inset-x-0 bottom-0 w-full rounded-t-3xl pb-[env(safe-area-inset-bottom)] md:inset-x-auto md:bottom-auto md:w-[320px] md:rounded-3xl md:pb-0`}
+          style={mobile() ? undefined : {
             left: `${userProfilePopover.left}px`,
             top: `${userProfilePopover.top}px`,
           }}
           onClick={(e) => e.stopPropagation()}
         >
+          <Show when={mobile()}>
+            <div class="pointer-events-none absolute inset-x-0 top-0 z-10 flex justify-center pt-2" aria-hidden="true">
+              <div class="h-1 w-10 rounded-sm bg-white/70 shadow-sm shadow-black/40" />
+            </div>
+          </Show>
           <div class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             <div class="relative">
               <div
