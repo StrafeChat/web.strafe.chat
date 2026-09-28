@@ -52,3 +52,14 @@ render(
   ),
   root!,
 );
+
+// Register the service worker for install-to-home-screen and a basic offline shell.
+// Production only - in dev the cache would fight Vite's HMR, and `import.meta.env.PROD`
+// lets this be tree-shaken out of the dev bundle entirely.
+if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/sw.js').catch((err) => {
+      console.warn('Service worker registration failed:', err);
+    });
+  });
+}
