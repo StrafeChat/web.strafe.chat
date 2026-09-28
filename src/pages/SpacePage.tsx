@@ -800,8 +800,15 @@ const SpacePage: Component = () => {
           searchPeople={visibleMembers()}
           searchChannels={searchChannels()}
           showMembersToggle
-          membersPanelOpen={!!(settings as SettingsData).membersPanelOpen}
-          onToggleMembers={() => setMembersPanelOpen(!(settings as SettingsData).membersPanelOpen)}
+          // On a phone the members list is a swipe-in drawer keyed off mobileMembersOpen,
+          // not the desktop membersPanelOpen setting - so the header button has to drive the
+          // one that matches the viewport, or on mobile it toggled a setting nothing showed.
+          membersPanelOpen={isMdViewport() ? !!(settings as SettingsData).membersPanelOpen : mobileMembersOpen()}
+          onToggleMembers={() =>
+            isMdViewport()
+              ? setMembersPanelOpen(!(settings as SettingsData).membersPanelOpen)
+              : setMobileMembersOpen(!mobileMembersOpen())
+          }
           onAddPeople={() => {}}
           notifyMode={currentRoom()?.notify_mode ?? 0}
           muted={isRoomMuted(currentRoom())}

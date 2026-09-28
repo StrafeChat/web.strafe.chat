@@ -75,6 +75,17 @@ export const DatePickerField: Component<DatePickerFieldProps> = (props) => {
   const [pickMode, setPickMode] = createSignal<PickMode>('days');
 
   let rootEl: HTMLDivElement | undefined;
+  let triggerEl: HTMLButtonElement | undefined;
+
+  // Desktop only: open upward when the calendar would run past the bottom of the viewport
+  // (a short form like the register card, with this field near the bottom). Measured, not
+  // guessed, so the direction is right for wherever the field actually sits.
+  const [dropUp, setDropUp] = createSignal(false);
+  // Max height the panel may take on the chosen side, so it never runs off the top or
+  // bottom of a short viewport - it scrolls internally instead.
+  const [maxPanelHeight, setMaxPanelHeight] = createSignal<number | undefined>();
+  const APPROX_PANEL_HEIGHT = 400;
+  const VIEWPORT_MARGIN = 12;
 
   const [isNarrow, setIsNarrow] = createSignal(
     typeof window !== 'undefined' ? window.matchMedia('(max-width: 767px)').matches : false,
@@ -95,6 +106,33 @@ export const DatePickerField: Component<DatePickerFieldProps> = (props) => {
     };
     window.addEventListener('keydown', onKey);
     onCleanup(() => window.removeEventListener('keydown', onKey));
+  });
+
+  // Decide the drop direction each time it opens (and on resize while open).
+  createEffect(() => {
+    if (!open() || isNarrow() || !rootEl) {
+      setDropUp(false);
+      return;
+    }
+    const decide = () => {
+      // Measure the field container, not the button: `top-full`/`bottom-full` anchor the
+      // panel to the container's edges (which include the label above and any error
+      // below), so that is the box the available room has to be measured against.
+      const r = rootEl!.getBoundingClientRect();
+      const below = window.innerHeight - r.bottom;
+      const above = r.top;
+      // Flip up only when there is not enough room below AND more room above, so the
+      // default stays downward whenever it fits.
+      const up = below < APPROX_PANEL_HEIGHT && above > below;
+      setDropUp(up);
+      // Cap to whichever side we chose so the panel always fits on screen; it scrolls
+      // internally when the room is tight.
+      const room = (up ? above : below) - VIEWPORT_MARGIN;
+      setMaxPanelHeight(room < APPROX_PANEL_HEIGHT ? Math.max(220, room) : undefined);
+    };
+    decide();
+    window.addEventListener('resize', decide);
+    onCleanup(() => window.removeEventListener('resize', decide));
   });
 
   createEffect(() => {
@@ -469,6 +507,7 @@ export const DatePickerField: Component<DatePickerFieldProps> = (props) => {
         type="button"
         id={fieldId}
         disabled={props.disabled}
+        ref={(el) => (triggerEl = el)}
         onClick={() => !props.disabled && setOpen(!open())}
         class={`${inputBaseClass} h-10 min-h-10 cursor-pointer items-center justify-between gap-2 px-3 py-2 text-start hover:border-border hover:bg-accent/40 disabled:pointer-events-none ${
           props.error ? inputErrorClass : ''
@@ -494,7 +533,10 @@ export const DatePickerField: Component<DatePickerFieldProps> = (props) => {
           when={isNarrow()}
           fallback={
             <div
-              class="absolute left-0 right-0 top-full z-20 mt-1 w-full overflow-hidden rounded-2xl border border-border bg-popover/95 p-3 shadow-2xl shadow-black/40 backdrop-blur-xl"
+              class={`absolute left-0 right-0 z-20 w-full overflow-y-auto overscroll-contain rounded-2xl border border-border bg-popover/95 p-3 shadow-2xl shadow-black/40 backdrop-blur-xl ${
+                dropUp() ? 'bottom-full mb-1' : 'top-full mt-1'
+              }`}
+              style={maxPanelHeight() ? { 'max-height': `${maxPanelHeight()}px` } : undefined}
               role="dialog"
               aria-label={t('datepicker.chooseDate')}
             >

@@ -118,6 +118,8 @@ export default {
     yesterdayAt: 'Yesterday at {{time}}',
   },
   friends: {
+    pendingRequests_one: '{{count}} pending friend request',
+    pendingRequests_other: '{{count}} pending friend requests',
     tabs: {
       online: 'Online',
       all: 'All',
@@ -1139,7 +1141,6 @@ export default {
       twemoji: 'The open-source Twitter/X emoji set. Flat, bright, and consistent across every platform.',
       noto: "Google's emoji, as seen on Android and Chrome OS.",
       openmoji: 'Community-drawn outlined style with a hand-made feel.',
-      fluent: "Microsoft's rounded 3D-style emoji.",
       native: 'Whatever your operating system draws. Fastest, but looks different per device.',
     },
     skinTones: {
@@ -1217,6 +1218,9 @@ export default {
     },
     overview: {
       openReports: 'Open reports',
+      accounts: 'Accounts',
+      online: 'Online now',
+      spaces: 'Spaces',
       bans: 'Active bans',
       invites: 'Invite codes',
       registration: 'Registration',
@@ -1599,6 +1603,7 @@ export default {
         title: 'Emoji',
         style: 'Emoji style',
         preview: 'Emoji preview',
+        attribution: 'Emoji artwork is bundled from these open sets and served by this instance, never a third-party CDN:',
         skinTone: 'Default skin tone',
         skinToneDescription: 'Applied when you pick an emoji that supports skin tones.',
       },

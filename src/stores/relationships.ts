@@ -1,4 +1,5 @@
 import { createStore } from 'solid-js/store';
+import { notificationPrefs, playNotificationSound } from './notificationPrefs';
 import { listRelationships, type Relationship, type RelationshipUser, type RelationshipType } from '../api/relationships';
 import { setUserPresence, type UserPresence } from './presence';
 import { onStargateEvent } from '../services/stargate/client';
@@ -164,6 +165,8 @@ function applyRelationshipRequest(payload: unknown): void {
   setRelationships('relationships', (rels: Relationship[]) => {
     const exists = rels.some((r) => (normId(r.user.id) ?? r.user.id) === otherUserId);
     if (exists) return rels;
+    // A real, new request just arrived - the same cue a new message gets.
+    if (notificationPrefs.sounds) playNotificationSound(notificationPrefs.volume);
     const next = [...rels, { id: otherUserId, type: RelType.IncomingRequest, user, nickname: undefined, is_spam_request: undefined, stranger_request: undefined, user_ignored: undefined, since }];
     return dedupeByUserId(next);
   });

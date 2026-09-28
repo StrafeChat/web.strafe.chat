@@ -120,6 +120,8 @@ export default {
     yesterdayAt: 'Hier à {{time}}',
   },
   friends: {
+    pendingRequests_one: '{{count}} demande d’ami en attente',
+    pendingRequests_other: '{{count}} demandes d’ami en attente',
     tabs: {
       online: 'En ligne',
       all: 'Tous',
@@ -1145,7 +1147,6 @@ export default {
       twemoji: "Le jeu d'emojis open source de Twitter/X. Plat, lumineux et cohérent sur toutes les plateformes.",
       noto: 'Les emojis de Google, comme sur Android et Chrome OS.',
       openmoji: 'Style au trait dessiné par la communauté, à l\'allure artisanale.',
-      fluent: 'Les emojis arrondis façon 3D de Microsoft.',
       native: "Ce que dessine votre système d'exploitation. Le plus rapide, mais différent selon l'appareil.",
     },
     skinTones: {
@@ -1223,6 +1224,9 @@ export default {
     },
     overview: {
       openReports: 'Signalements ouverts',
+      accounts: 'Comptes',
+      online: 'En ligne',
+      spaces: 'Espaces',
       bans: 'Bannissements actifs',
       invites: "Codes d'invitation",
       registration: 'Inscription',
@@ -1605,6 +1609,7 @@ export default {
         title: 'Emoji',
         style: "Style d'emoji",
         preview: "Aperçu des emojis",
+        attribution: "Les illustrations des emojis proviennent de ces jeux libres et sont servies par cette instance, jamais par un CDN tiers :",
         skinTone: 'Couleur de peau par défaut',
         skinToneDescription: 'Appliquée lorsque vous choisissez un emoji compatible.',
       },

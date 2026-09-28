@@ -531,6 +531,10 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
             <button
               type="submit"
               disabled={!canSend()}
+              // Keep the textarea focused so the on-screen keyboard does not close and
+              // reopen on every send. preventDefault on pointer-down blocks the focus
+              // change; the click still fires and submits.
+              onPointerDown={(e) => e.preventDefault()}
               class="inline-flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50 md:hidden"
               title={t('common.send')}
               aria-label={t('common.send')}

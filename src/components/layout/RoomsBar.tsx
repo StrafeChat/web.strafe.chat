@@ -26,6 +26,7 @@ import {
 } from '../../theme/appChrome';
 import { isMdViewport, openMobileContent } from '../../stores/mobileShellLayout';
 import { isRoomMuted, muteRoom, unmuteRoom } from '../../lib/roomNotify';
+import { incomingFriendRequests } from '../../lib/mobileNotifications';
 import { IconButton } from '../ui/IconButton';
 import { t } from '../../i18n';
 
@@ -34,6 +35,8 @@ interface PaneButtonProps {
   active?: boolean;
   icon: string;
   label: string;
+  /** Red count badge (e.g. incoming friend requests). 0 hides it. */
+  badge?: number;
 }
 
 /**
@@ -61,6 +64,11 @@ const PaneButton: Component<PaneButtonProps> = (props) => {
         <i class={`fa-solid ${props.icon} text-sm`} aria-hidden="true" />
       </div>
       <span class="min-w-0 truncate text-sm font-medium">{props.label}</span>
+      <Show when={(props.badge ?? 0) > 0}>
+        <span class="ms-auto inline-flex min-w-[18px] items-center justify-center rounded-full bg-destructive px-1.5 text-[11px] font-semibold leading-5 text-destructive-foreground">
+          {(props.badge ?? 0) > 99 ? '99+' : props.badge}
+        </span>
+      </Show>
     </a>
   );
 };
@@ -195,7 +203,7 @@ export const RoomsBar: Component = () => {
         <div class="shrink-0 px-3 py-2">
           <div class="flex flex-col gap-0.5">
             <PaneButton href="/" active={pathname() === '/'} icon="fa-house" label={t('nav.home')} />
-            <PaneButton href="/friends" active={pathname() === '/friends'} icon="fa-user-group" label={t('nav.friends')} />
+            <PaneButton href="/friends" active={pathname() === '/friends'} icon="fa-user-group" label={t('nav.friends')} badge={incomingFriendRequests().length} />
             <PaneButton href="/notes" active={isNotesActive()} icon="fa-note-sticky" label={t('nav.notes')} />
           </div>
         </div>

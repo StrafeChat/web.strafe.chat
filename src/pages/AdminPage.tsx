@@ -174,15 +174,24 @@ const Overview: Component<{ onOpenReports: () => void; onOpenBans: () => void }>
       <span class="text-xs text-muted-foreground">{label}</span>
     </button>
   );
+  // -1 is the server saying "could not determine"; show a dash, never a wrong 0.
+  const num = (v: number) => (v < 0 ? '\u2014' : v.toLocaleString());
   return (
     <div class="space-y-4">
       <Show when={stats()} fallback={<p class="text-sm text-muted-foreground">…</p>}>
         {(s) => (
-          <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            {stat(t('admin.overview.openReports'), s().open_reports, props.onOpenReports)}
-            {stat(t('admin.overview.bans'), s().bans, props.onOpenBans)}
-            {stat(t('admin.overview.invites'), s().invites, () => openUserSettings('instance'))}
-            {stat(t('admin.overview.registration'), s().invite_only ? t('admin.overview.inviteOnly') : t('admin.overview.open'))}
+          <div class="space-y-3">
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {stat(t('admin.overview.accounts'), num(s().accounts))}
+              {stat(t('admin.overview.online'), num(s().online))}
+              {stat(t('admin.overview.spaces'), num(s().spaces))}
+            </div>
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              {stat(t('admin.overview.openReports'), s().open_reports, props.onOpenReports)}
+              {stat(t('admin.overview.bans'), s().bans, props.onOpenBans)}
+              {stat(t('admin.overview.invites'), s().invites, () => openUserSettings('instance'))}
+              {stat(t('admin.overview.registration'), s().invite_only ? t('admin.overview.inviteOnly') : t('admin.overview.open'))}
+            </div>
           </div>
         )}
       </Show>

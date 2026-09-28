@@ -7,7 +7,7 @@
  * copies had already drifted - space rooms had neither half.
  */
 
-import { createEffect, onCleanup, onMount } from 'solid-js';
+import { createEffect, on, onCleanup, onMount } from 'solid-js';
 
 export interface ComposerAutoFocusOptions {
   /** The composer textarea, once it is mounted. Undefined while it isn't (e.g. no send permission). */
@@ -39,17 +39,24 @@ function shouldRedirectKey(e: KeyboardEvent): boolean {
   return true;
 }
 
+// A coarse pointer (a phone) should never be auto-focused: it pops the on-screen keyboard
+// unbidden - on entering a room, and again every time the room object updates - which is
+// exactly what "the textbox keeps popping up" was.
+const coarsePointer = () => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
+
 export function createComposerAutoFocus(opts: ComposerAutoFocusOptions): void {
   const enabled = () => opts.enabled?.() ?? true;
 
-  // Focus on entering a room. Deferred: the effect can run in the same tick the composer is
-  // created, before it is in the document and focusable.
-  createEffect(() => {
-    const key = opts.focusKey();
-    const el = opts.inputRef();
-    if (!key || !el || !enabled()) return;
-    queueMicrotask(() => el.focus());
-  });
+  // Focus on entering a room, and when the composer first mounts - but NOT when the room
+  // object merely updates (a new message, a presence change). `on` compares the focus key,
+  // so re-reading room state that returns the same room id does not re-fire this; a plain
+  // createEffect did, silently refocusing on desktop and popping the keyboard on mobile.
+  createEffect(
+    on([opts.focusKey, opts.inputRef], ([key, el]) => {
+      if (!key || !el || !enabled() || coarsePointer()) return;
+      queueMicrotask(() => el.focus());
+    })
+  );
 
   onMount(() => {
     function handleKeyDown(e: KeyboardEvent) {

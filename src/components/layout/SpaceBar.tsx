@@ -1,4 +1,5 @@
 import type { Component } from 'solid-js';
+import { incomingFriendRequests } from '../../lib/mobileNotifications';
 import { createSignal, For, Show } from 'solid-js';
 import { A, useLocation } from '@solidjs/router';
 import { lastVisited } from '../../stores/lastVisited';
@@ -116,6 +117,8 @@ export const SpaceBar: Component = () => {
   const pathname = () => location.pathname;
   const currentUserId = () => auth.user?.id ?? '';
   const activeRoomId = () => pathname().match(/^\/spaces\/[^/]+\/rooms\/([^/]+)/)?.[1] ?? null;
+
+  const friendRequestCount = () => incomingFriendRequests().length;
 
   const homeUnreadCount = () => {
     const uid = currentUserId();
@@ -239,9 +242,18 @@ export const SpaceBar: Component = () => {
           >
             <span class="relative inline-flex items-center justify-center">
               <HomeIcon />
-              <Show when={homeUnreadCount() > 0}>
-                <span class="absolute -top-1 -right-1 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-semibold px-1">
-                  {homeUnreadCount() > 99 ? '99+' : homeUnreadCount()}
+              <Show
+                when={friendRequestCount() > 0}
+                fallback={
+                  <Show when={homeUnreadCount() > 0}>
+                    <span class="absolute -top-1 -right-1 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-semibold px-1">
+                      {homeUnreadCount() > 99 ? '99+' : homeUnreadCount()}
+                    </span>
+                  </Show>
+                }
+              >
+                <span class="absolute -top-1 -right-1 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-semibold px-1" title={t('friends.pendingRequests', { count: friendRequestCount() })}>
+                  {friendRequestCount() > 99 ? '99+' : friendRequestCount()}
                 </span>
               </Show>
             </span>

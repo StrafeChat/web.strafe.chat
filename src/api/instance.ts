@@ -178,6 +178,10 @@ export interface InstanceStats {
   bans: number;
   invites: number;
   invite_only: boolean;
+  /** Instance-wide counts; -1 means the server could not determine it right now. */
+  accounts: number;
+  online: number;
+  spaces: number;
 }
 
 export function getInstanceStats() {

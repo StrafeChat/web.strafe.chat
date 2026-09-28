@@ -126,6 +126,12 @@ export default {
     yesterdayAt: 'أمس الساعة {{time}}',
   },
   friends: {
+    pendingRequests_zero: 'لا طلبات صداقة معلّقة',
+    pendingRequests_one: 'طلب صداقة معلّق واحد',
+    pendingRequests_two: 'طلبا صداقة معلّقان',
+    pendingRequests_few: '{{count}} طلبات صداقة معلّقة',
+    pendingRequests_many: '{{count}} طلب صداقة معلّق',
+    pendingRequests_other: '{{count}} طلب صداقة معلّق',
     tabs: {
       online: 'متصلون',
       all: 'الكل',
@@ -1203,7 +1209,6 @@ export default {
       twemoji: 'مجموعة إيموجي Twitter/X مفتوحة المصدر. مسطحة وزاهية ومتناسقة على كل المنصات.',
       noto: 'إيموجي Google كما تظهر على Android وChrome OS.',
       openmoji: 'نمط بخطوط خارجية يرسمه المجتمع بلمسة يدوية.',
-      fluent: 'إيموجي Microsoft المستديرة بنمط ثلاثي الأبعاد.',
       native: 'ما يرسمه نظام التشغيل لديك. الأسرع، لكنه يختلف من جهاز لآخر.',
     },
     skinTones: {
@@ -1281,6 +1286,9 @@ export default {
     },
     overview: {
       openReports: 'بلاغات مفتوحة',
+      accounts: 'الحسابات',
+      online: 'المتصلون الآن',
+      spaces: 'المساحات',
       bans: 'حالات حظر نشطة',
       invites: 'رموز الدعوة',
       registration: 'التسجيل',
@@ -1663,6 +1671,7 @@ export default {
         title: 'الإيموجي',
         style: 'نمط الإيموجي',
         preview: 'معاينة الإيموجي',
+        attribution: 'رسوم الإيموجي مأخوذة من هذه المجموعات المفتوحة وتُقدّمها هذه النسخة، لا شبكة توصيل محتوى تابعة لجهة خارجية:',
         skinTone: 'لون البشرة الافتراضي',
         skinToneDescription: 'يُطبَّق عند اختيار إيموجي يدعم ألوان البشرة.',
       },

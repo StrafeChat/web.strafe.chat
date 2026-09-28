@@ -435,8 +435,12 @@ const RoomPage: Component = () => {
         onSearchQueryChange={setSearchDraft}
         onSearchSubmit={handleSearchSubmit}
         searchPeople={room()?.participants}
-        membersPanelOpen={!!(settings as SettingsData).membersPanelOpen}
-        onToggleMembers={() => setMembersPanelOpen(!(settings as SettingsData).membersPanelOpen)}
+        membersPanelOpen={isMdViewport() ? !!(settings as SettingsData).membersPanelOpen : mobileMembersOpen()}
+        onToggleMembers={() =>
+          isMdViewport()
+            ? setMembersPanelOpen(!(settings as SettingsData).membersPanelOpen)
+            : setMobileMembersOpen(!mobileMembersOpen())
+        }
         onAddPeople={() => setShowAddPeople(true)}
         isCreator={room()?.type === 2 && !!room()?.creator_id && room()?.creator_id !== '0' && room()?.creator_id === auth.user?.id}
         onOpenSettings={() => setRenameModalOpen(true)}
