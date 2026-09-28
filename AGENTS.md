@@ -70,7 +70,7 @@ new i18n keys.
   RNNoise in an AudioWorklet (`src/lib/voice/rnnoise.ts`, bundled WASM, runs locally);
   Opus DTX stays off (comfort-noise switching audibly pulses). Tiles get measured pixel
   sizes from `fitTiles` (a CSS aspect ratio ignored the stage height and overflowed the
-  controls). UI lives in `src/components/voice/`; `docs/VOICE.md` explains the whole
+  controls). UI lives in `src/components/voice/`; [`docs/VOICE.md`](https://github.com/StrafeChat/deploy/blob/main/docs/VOICE.md) explains the whole
   flow.
 - **Call media is E2EE.** Per-sender keys (`src/lib/e2ee/callKeys.ts`) travel Olm-encrypted
   over the to-device channel and feed LiveKit's key provider (`src/lib/voice/e2ee.ts`).
