@@ -9,6 +9,7 @@ export type SectionId =
   | 'notifications'
   | 'keybinds'
   | 'language'
+  | 'developers'
   | 'instance';
 
 export interface SettingsNavItem {
@@ -22,6 +23,16 @@ export const ACCOUNT_ITEMS: SettingsNavItem[] = [
   { id: 'account', labelKey: 'settings.sections.account.title', icon: 'fa-user' },
   { id: 'devices', labelKey: 'settings.sections.devices.title', icon: 'fa-shield-halved' },
 ];
+
+/**
+ * A person's own OAuth2 applications and bots. Available to everyone - the developer
+ * platform is not gated - so it sits in its own group after the app preferences.
+ */
+export const DEVELOPERS_ITEM: SettingsNavItem = {
+  id: 'developers',
+  labelKey: 'settings.sections.developers.title',
+  icon: 'fa-code',
+};
 
 /**
  * Shown only to an instance administrator, so it is not part of APP_ITEMS - the modal

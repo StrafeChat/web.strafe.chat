@@ -3,7 +3,7 @@ import { createSignal, createMemo, Show, createEffect } from 'solid-js';
 import { userSettingsOpen, closeUserSettings, takePendingSettingsSection, hasPendingSettingsSection } from '../stores/userSettingsModal';
 import { confirmDialog } from '../stores/confirmDialog';
 import { getInstanceCapabilities } from '../api/instance';
-import { ACCOUNT_ITEMS, APP_ITEMS, INSTANCE_ITEM, sectionDescription, sectionTitle, type SectionId, type SettingsNavItem } from './settings/types.js';
+import { ACCOUNT_ITEMS, APP_ITEMS, INSTANCE_ITEM, DEVELOPERS_ITEM, sectionDescription, sectionTitle, type SectionId, type SettingsNavItem } from './settings/types.js';
 import {
   SettingsShell,
   SettingsNav,
@@ -17,6 +17,7 @@ import {
   AccessibilitySettingsPage,
   KeybindsSettingsPage,
   InstanceSettingsPage,
+  DevelopersSettingsPage,
   type SettingsNavGroup,
 } from './settings';
 import { SearchInput } from './ui/SearchInput';
@@ -60,6 +61,9 @@ export const UserSettingsModal: Component = () => {
     const groups: SettingsNavGroup<SectionId>[] = [];
     if (account.length) groups.push({ label: t('settings.groups.account'), items: account });
     if (app.length) groups.push({ label: t('settings.groups.app'), items: app });
+    if (navMatches(DEVELOPERS_ITEM, q)) {
+      groups.push({ label: t('settings.groups.developers'), items: [toDef(DEVELOPERS_ITEM)] });
+    }
     if (isInstanceAdmin() && navMatches(INSTANCE_ITEM, q)) {
       groups.push({ label: t('settings.sections.instance.title'), items: [toDef(INSTANCE_ITEM)] });
     }
@@ -167,6 +171,9 @@ export const UserSettingsModal: Component = () => {
           </Show>
           <Show when={section() === 'instance' && isInstanceAdmin()}>
             <InstanceSettingsPage />
+          </Show>
+          <Show when={section() === 'developers'}>
+            <DevelopersSettingsPage />
           </Show>
           <Show when={section() === 'keybinds'}>
             <KeybindsSettingsPage />

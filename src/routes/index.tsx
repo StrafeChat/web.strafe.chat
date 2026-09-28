@@ -12,6 +12,7 @@ import SpacePage from '../pages/SpacePage';
 import RoomPage from '../pages/RoomPage';
 import InvitePage from '../pages/InvitePage';
 import AdminPage from '../pages/AdminPage';
+import OAuthAuthorizePage from '../pages/OAuthAuthorizePage';
 import { StargateProvider } from '../components/StargateProvider';
 import { RecoveryModal } from '../components/RecoveryModal';
 import { E2eeEnvironmentModal } from '../components/E2eeEnvironmentModal';
@@ -96,6 +97,7 @@ export function AppRouter() {
       </Route>
       <Route path="/invite/:code" component={InvitePage} />
       <Route path="/admin" component={AdminPage} />
+      <Route path="/oauth2/authorize" component={OAuthAuthorizePage} />
       <Route path="*404" component={NotFound} />
     </Router>
   );
