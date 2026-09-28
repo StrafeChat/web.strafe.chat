@@ -9,6 +9,7 @@ import { MobileNotificationsPanel } from './MobileNotificationsPanel';
 import { MobileYouPanel } from './MobileYouPanel';
 import { ContextMenu } from '../ContextMenu';
 import { UserProfilePopover } from '../UserProfilePopover';
+import { ReportDialog } from '../ReportDialog';
 import { UserProfileFullModal } from '../UserProfileFullModal';
 import { IncomingCallModal, ScreenShareDialog, VoiceDock, VoiceStatsPopover, VoiceUserMenu } from '../voice';
 import { leaveVoiceRoom, toggleDeafen, toggleMute } from '../../stores/voice';
@@ -251,6 +252,7 @@ export const AppShell: Component<AppShellProps> = (props) => {
       <UserProfilePopover />
       <UserProfileFullModal />
       <IncomingCallModal />
+      <ReportDialog />
     </div>
   );
 };

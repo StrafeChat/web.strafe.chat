@@ -1,5 +1,8 @@
 import { createStore } from 'solid-js/store';
 import { api } from '../api/client';
+import { getInstanceCapabilities } from '../api/instance';
+import { disconnectStargate, onStargateEvent } from '../services/stargate/client';
+import { logout } from './auth';
 
 /**
  * What this client knows about the instance it's connected to. Federation info decides
@@ -21,6 +24,9 @@ export interface InstanceState {
   /** Registration needs an invite code. The registration form asks for one when this is
    * set; the server still decides, and waives it for the very first account. */
   inviteOnly: boolean;
+  /** The signed-in account administers this instance. Asked of the server after every
+   * connection; false until it answers, which is the safe way to be wrong. */
+  instanceAdmin: boolean;
 }
 
 export const [instance, setInstance] = createStore<InstanceState>({
@@ -31,6 +37,7 @@ export const [instance, setInstance] = createStore<InstanceState>({
   captcha: { enabled: false, provider: '', siteKey: '', apiUrl: '' },
   voiceEnabled: false,
   inviteOnly: false,
+  instanceAdmin: false,
 });
 
 interface IndexResponse {
@@ -100,4 +107,35 @@ export function formatHandle(u: { username?: string; discriminator?: number | st
 /** True when the user lives on another instance. */
 export function isRemoteUser(u: { home_domain?: string } | undefined | null): boolean {
   return !!u?.home_domain && !!instance.domain && u.home_domain !== instance.domain;
+}
+
+// ---- the signed-in account's standing on this instance --------------------------------
+
+/**
+ * Whether the current account administers this instance. Decides whether the admin
+ * dashboard link and the instance settings section exist at all; every action behind
+ * them is checked again by the server.
+ */
+export function loadInstanceCapabilities(): Promise<void> {
+  return getInstanceCapabilities()
+    .then((res) => setInstance('instanceAdmin', res.instance_admin === true))
+    .catch(() => setInstance('instanceAdmin', false));
+}
+
+/**
+ * The gateway tells a session it has been revoked - the account was banned, or signed out
+ * everywhere - just before the server closes the socket. Sign out here rather than
+ * waiting for the next API call to 401, and land on the login page with a reason so the
+ * person is not left staring at a reconnecting spinner. A hard navigation on purpose:
+ * it also drops every bit of in-memory state that belonged to the session.
+ */
+export function initInstanceHandlers(): () => void {
+  return onStargateEvent((event) => {
+    if (event.t !== 'SESSION_REVOKED') return;
+    const d = ((event.d as { d?: unknown })?.d ?? event.d) as { reason?: string } | undefined;
+    logout();
+    disconnectStargate();
+    const why = d?.reason === 'banned' ? 'banned' : 'revoked';
+    window.location.assign(`/login?reason=${why}`);
+  });
 }

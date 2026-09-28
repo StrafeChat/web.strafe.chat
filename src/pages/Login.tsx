@@ -1,5 +1,5 @@
-import { createSignal } from 'solid-js';
-import { useNavigate, A } from '@solidjs/router';
+import { createSignal, Show } from 'solid-js';
+import { useNavigate, useSearchParams, A } from '@solidjs/router';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -21,6 +21,15 @@ import { translateCaughtApiError } from '../lib/formatApiError';
 export default function Login() {
   const [t] = useReactiveTranslate();
   const navigate = useNavigate();
+  // ?reason=banned|revoked: set by the gateway handler that signed us out. Read once;
+  // it is a one-line explanation, not state.
+  const [params] = useSearchParams<{ reason?: string }>();
+  const arrivalNotice = () =>
+    params.reason === 'banned'
+      ? t('auth.login.bannedNotice')
+      : params.reason === 'revoked'
+        ? t('auth.login.revokedNotice')
+        : '';
   const [email, setEmail] = createSignal('');
   const [password, setPassword] = createSignal('');
   const [errorLines, setErrorLines] = createSignal<string[]>([]);
@@ -66,6 +75,11 @@ export default function Login() {
           </CardHeader>
           <form onSubmit={handleSubmit}>
             <CardContent class={authCardContentClass}>
+              <Show when={arrivalNotice()}>
+                <p role="status" class="rounded-lg border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-foreground">
+                  {arrivalNotice()}
+                </p>
+              </Show>
               <Input
                 type="email"
                 label={t('auth.login.emailLabel')}

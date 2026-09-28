@@ -21,7 +21,7 @@ import { initRoomNotifySettingsHandler } from '../lib/roomNotify';
 import { resyncDevice } from '../lib/e2ee/service';
 import { applyVoiceSettingsToSession, initPushToTalk, initVoiceHandlers, voice } from '../stores/voice';
 import { voiceSettings } from '../stores/voiceSettings';
-import { loadInstanceInfo } from '../stores/instance';
+import { initInstanceHandlers, loadInstanceCapabilities, loadInstanceInfo } from '../stores/instance';
 import { on } from 'solid-js';
 
 // How long to wait for the WS READY payload before falling back to REST. Only matters
@@ -45,6 +45,7 @@ export const StargateProvider: Component<{ children?: import('solid-js').JSX.Ele
     initCustomEmojiHandlers();
     initRoomNotifySettingsHandler();
     initVoiceHandlers();
+    onCleanup(initInstanceHandlers());
     onCleanup(initPushToTalk());
     // Whether this instance has voice (and a captcha, federation...) - decides which
     // call controls exist at all.
@@ -64,6 +65,8 @@ export const StargateProvider: Component<{ children?: import('solid-js').JSX.Ele
       // while this client was disconnected.
       const uid = auth.user?.id;
       if (uid) void resyncDevice(uid).catch((err) => console.warn('[e2ee] device resync after reconnect failed', err));
+      // Whether this account administers the instance - decides if the dashboard exists.
+      void loadInstanceCapabilities();
     });
     onCleanup(unsub);
   });

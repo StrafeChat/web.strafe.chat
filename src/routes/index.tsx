@@ -11,6 +11,7 @@ import NotesPage from '../pages/NotesPage';
 import SpacePage from '../pages/SpacePage';
 import RoomPage from '../pages/RoomPage';
 import InvitePage from '../pages/InvitePage';
+import AdminPage from '../pages/AdminPage';
 import { StargateProvider } from '../components/StargateProvider';
 import { RecoveryModal } from '../components/RecoveryModal';
 import { E2eeEnvironmentModal } from '../components/E2eeEnvironmentModal';
@@ -94,6 +95,7 @@ export function AppRouter() {
         <Route path="/spaces/:spaceId/rooms/:roomId" component={SpacePage} />
       </Route>
       <Route path="/invite/:code" component={InvitePage} />
+      <Route path="/admin" component={AdminPage} />
       <Route path="*404" component={NotFound} />
     </Router>
   );

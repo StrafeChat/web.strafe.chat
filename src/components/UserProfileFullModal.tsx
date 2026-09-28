@@ -4,6 +4,7 @@ import { MessageAvatar } from './messageList/MessageAvatar';
 import { MessageBody } from './messageList/MessageBody';
 import { PresenceDot } from './PresenceDot';
 import { IconButton } from './ui/IconButton';
+import { openReportDialog } from './ReportDialog';
 import { ResponsiveDialog } from './ui/ResponsiveDialog';
 import { markdownAndHtmlToSanitizedBioHtml } from '../lib/profileRichText';
 import {
@@ -91,6 +92,20 @@ export const UserProfileFullModal: Component = () => {
                   if (!s) return;
                   openSafetyNumberModal({ userId: s.userId, displayName: s.displayName });
                   closeUserProfileFullModal();
+                }}
+              />
+            </Show>
+            <Show when={!isSelf()}>
+              <IconButton
+                size="lg"
+                tone="overlay"
+                icon="fa-solid fa-flag"
+                label={t('profile.report')}
+                onClick={() => {
+                  const s = subject();
+                  if (!s) return;
+                  closeUserProfileFullModal();
+                  openReportDialog({ targetType: 'user', targetId: s.userId, targetName: s.displayName });
                 }}
               />
             </Show>

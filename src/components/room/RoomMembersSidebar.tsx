@@ -6,6 +6,7 @@ import { PresenceDot } from '../PresenceDot';
 import { MessageAvatar } from '../messageList/MessageAvatar';
 import { presence } from '../../stores/presence';
 import { showContextMenu } from '../../stores/contextMenu';
+import { openReportDialog } from '../ReportDialog';
 import { appActivityRail, appSectionLabel } from '../../theme/appChrome';
 import { highestHoistedRole, memberHighestRolePosition, spaceRoleColorHex } from '../../lib/spacePermissions';
 import { openUserProfileFromParticipant } from '../../stores/userProfilePopover';
@@ -164,6 +165,7 @@ export const RoomMembersSidebar: Component<RoomMembersSidebarProps> = (props) =>
     isCreator: isCreator(),
     spaceRoles: props.spaceRoles,
     spaceId: props.spaceId,
+    roomId: props.roomId,
     spaceOwnerId: props.spaceOwnerId,
     canManageMemberRoles: props.canManageMemberRoles,
     onSpaceMemberRolesUpdated: props.onSpaceMemberRolesUpdated,
@@ -231,6 +233,8 @@ const MemberRow: Component<{
   /** Offline rows render slightly faded, like Discord. */
   dim?: boolean;
   spaceId?: string;
+  /** Where the report dialog says the member was seen, when opened from a room. */
+  roomId?: string;
   spaceOwnerId?: string;
   canManageMemberRoles?: boolean;
   onSpaceMemberRolesUpdated?: () => void;
@@ -316,6 +320,23 @@ const MemberRow: Component<{
             icon: 'fa-copy' as const,
             onClick: () => navigator.clipboard.writeText(tag),
           },
+          ...(!isSelf()
+            ? [
+                {
+                  label: t('profile.report'),
+                  icon: 'fa-flag' as const,
+                  danger: true as const,
+                  onClick: () =>
+                    openReportDialog({
+                      targetType: 'user',
+                      targetId: props.p.id,
+                      targetName: displayName(),
+                      spaceId: props.spaceId,
+                      roomId: props.roomId,
+                    }),
+                },
+              ]
+            : []),
           ...(props.isCreator && !isSelf() && props.onRemoveMember
             ? [
                 {

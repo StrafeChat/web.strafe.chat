@@ -11,6 +11,7 @@ import { newHeaderDismissed } from '../stores/newHeaderDismissed';
 import { formatMessageTimestamp, formatDateHeader, formatTimeOfDay } from '../lib/utils/datetime';
 import { t } from '../i18n';
 import { showContextMenu } from '../stores/contextMenu';
+import { openReportDialog } from './ReportDialog';
 import { deleteMessage as deleteMessageApi } from '../api/messages';
 import { Tooltip } from './ui/Tooltip';
 import {
@@ -596,6 +597,27 @@ export const MessageList: Component<MessageListProps> = (props) => {
                                 pinned
                                   ? unpinMessage(props.roomId, msg.id)
                                   : pinMessage(props.roomId, msg.id),
+                            },
+                          ]
+                        : []),
+                      ...(!isOwn && roomId
+                        ? [
+                            {
+                              label: t('messages.actions.report'),
+                              icon: 'fa-flag',
+                              danger: true,
+                              onClick: () => {
+                                const s = getSenderDisplay(msg.sender_id, props.participants, currentUserId());
+                                openReportDialog({
+                                  targetType: 'user',
+                                  targetId: msg.sender_id,
+                                  targetName: s.name,
+                                  spaceId: props.spaceId,
+                                  roomId,
+                                  messageId: msg.id,
+                                  messageText: bodyText,
+                                });
+                              },
                             },
                           ]
                         : []),

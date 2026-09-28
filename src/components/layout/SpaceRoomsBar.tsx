@@ -3,6 +3,7 @@ import { createSignal, createResource, createMemo, createEffect, For, Show, onMo
 import { Portal } from 'solid-js/web';
 import { useParams, useMatch, useNavigate } from '@solidjs/router';
 import { deleteSpaceRoom, getSpaceRooms, leaveSpace, type SpaceRoom } from '../../api/spaces';
+import { openReportDialog } from '../ReportDialog';
 import { spaces, setSpaceRooms, removeSpace, spaceRoles, ensureSpaceRoles, refreshSpaceRooms } from '../../stores/spaces';
 import { messages } from '../../stores/messages';
 import { auth } from '../../stores/auth';
@@ -482,6 +483,19 @@ export const SpaceRoomsBar: Component = () => {
                   </Show>
                   <Show when={!isSpaceOwner()}>
                     <div class={appMenuSeparator} role="separator" />
+                    <button
+                      type="button"
+                      role="menuitem"
+                      class={`${appMenuItemDanger} justify-between`}
+                      onClick={() => {
+                        setSpaceMenuOpen(false);
+                        const sp = space();
+                        if (sp) openReportDialog({ targetType: 'space', targetId: sp.id, targetName: sp.name, spaceId: sp.id });
+                      }}
+                    >
+                      <span>{t('space.report')}</span>
+                      <i class="fa-solid fa-flag text-[13px]" aria-hidden />
+                    </button>
                     <button
                       type="button"
                       role="menuitem"

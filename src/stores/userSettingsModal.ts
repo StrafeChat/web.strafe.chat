@@ -2,6 +2,7 @@ import { createSignal } from 'solid-js';
 
 /** Matches `SectionId` in settings — avoid importing components from stores */
 export type UserSettingsSection =
+  | 'instance'
   | 'account'
   | 'devices'
   | 'appearance'

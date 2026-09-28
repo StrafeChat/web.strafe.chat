@@ -1,5 +1,7 @@
 import type { Component } from 'solid-js';
 import { createSignal, onMount, For, Show } from 'solid-js';
+import { useNavigate } from '@solidjs/router';
+import { closeUserSettings } from '../../stores/userSettingsModal';
 import {
   createInstanceInvite,
   listInstanceInvites,
@@ -39,6 +41,7 @@ const chipOff = 'bg-muted/40 text-muted-foreground hover:bg-accent hover:text-fo
  * invite codes that admit new accounts while registration is closed.
  */
 export const InstanceSettingsPage: Component = () => {
+  const navigate = useNavigate();
   const [invites, setInvites] = createSignal<InstanceInvite[]>([]);
   const [loading, setLoading] = createSignal(true);
   const [error, setError] = createSignal('');
@@ -117,6 +120,23 @@ export const InstanceSettingsPage: Component = () => {
 
   return (
     <div class="space-y-4">
+      <a
+        href="/admin"
+        class={`${settingsRowShell} no-underline`}
+        onClick={(e) => {
+          e.preventDefault();
+          closeUserSettings();
+          navigate('/admin');
+        }}
+      >
+        <div class={settingsRowIcon}><i class="fa-solid fa-shield-halved" aria-hidden="true" /></div>
+        <div class="min-w-0 flex-1">
+          <div class="text-sm font-medium text-foreground">{t('settings.instance.dashboard')}</div>
+          <div class="text-xs text-muted-foreground">{t('settings.instance.dashboardHint')}</div>
+        </div>
+        <i class="fa-solid fa-chevron-right text-xs text-muted-foreground" aria-hidden="true" />
+      </a>
+
       <div class={settingsSectionTitle}>{t('settings.instance.invitesTitle')}</div>
       <p class="px-0.5 text-sm text-muted-foreground">{t('settings.instance.invitesDescription')}</p>
 

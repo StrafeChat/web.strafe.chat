@@ -1,4 +1,5 @@
 import type { Component } from 'solid-js';
+import { useNavigate } from '@solidjs/router';
 import { createSignal, Show, For, onCleanup, onMount, createEffect } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { auth } from '../../stores/auth';
@@ -40,6 +41,7 @@ function formatDiscriminator(d: number): string {
 }
 
 export const UserArea: Component = () => {
+  const navigate = useNavigate();
   const [isHovering, setIsHovering] = createSignal(false);
   const [popoverOpen, setPopoverOpen] = createSignal(false);
   const [popoverPos, setPopoverPos] = createSignal<{ left: number; bottom: number } | null>(null);
@@ -327,6 +329,19 @@ export const UserArea: Component = () => {
                   </div>
                 </Show>
 
+                <Show when={instance.instanceAdmin}>
+                  <button
+                    type="button"
+                    class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-foreground transition-colors hover:bg-accent/60"
+                    onClick={() => {
+                      setPopoverOpen(false);
+                      navigate('/admin');
+                    }}
+                  >
+                    <i class="fa-solid fa-shield-halved w-4 text-center text-muted-foreground" aria-hidden="true" />
+                    {t('userArea.adminDashboard')}
+                  </button>
+                </Show>
                 <button
                   type="button"
                   class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-foreground transition-colors hover:bg-accent/60"
