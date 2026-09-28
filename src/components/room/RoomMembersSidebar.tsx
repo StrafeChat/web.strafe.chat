@@ -2,7 +2,7 @@ import type { Component } from 'solid-js';
 import { For, Show, createMemo } from 'solid-js';
 import type { RoomParticipant } from '../../api/rooms';
 import type { SpaceRole } from '../../api/spaces';
-import { PresenceDot } from '../PresenceDot';
+import { PresenceDot, presenceStatusLabel } from '../PresenceDot';
 import { MessageAvatar } from '../messageList/MessageAvatar';
 import { presence } from '../../stores/presence';
 import { showContextMenu } from '../../stores/contextMenu';
@@ -10,7 +10,6 @@ import { openReportDialog } from '../ReportDialog';
 import { appActivityRail, appSectionLabel } from '../../theme/appChrome';
 import { highestHoistedRole, memberHighestRolePosition, spaceRoleColorHex } from '../../lib/spacePermissions';
 import { openUserProfileFromParticipant } from '../../stores/userProfilePopover';
-import { isRemoteUser } from '../../stores/instance';
 import { IconButton } from '../ui/IconButton';
 import { t } from '../../i18n';
 
@@ -245,7 +244,6 @@ const MemberRow: Component<{
   onBanMember?: (userId: string) => void;
 }> = (props) => {
   const displayName = () => props.p.display_name || props.p.username || t('common.unknown');
-  const statusText = () => presence.byUser[props.p.id]?.custom_status ?? props.p.presence?.custom_status;
   const isSelf = () => props.p.id === props.currentUserId;
   const isSpaceOwnerTarget = () => props.spaceOwnerId != null && props.p.id === props.spaceOwnerId;
   /** Discord-style hierarchy: can only kick/ban a member whose highest role is below ours. */
@@ -266,8 +264,15 @@ const MemberRow: Component<{
     return hr ? spaceRoleColorHex(hr.color) : undefined;
   });
 
-  const subline = () =>
-    statusText() || (isRemoteUser(props.p) ? `@${props.p.username}@${props.p.home_domain}` : `@${props.p.username}`);
+  // Mirror the user area under the avatar: the member's custom status if set, otherwise the
+  // status label ("Online" / "Idle" / …). Nothing when offline - a status line reads wrong
+  // there (and for others invisible is already reported as offline).
+  const subline = () => {
+    const st = presence.byUser[props.p.id]?.status ?? props.p.presence?.status;
+    if (st !== 'online' && st !== 'idle' && st !== 'dnd') return undefined;
+    const custom = presence.byUser[props.p.id]?.custom_status ?? props.p.presence?.custom_status;
+    return custom || presenceStatusLabel(st);
+  };
 
   function openProfile(e: MouseEvent) {
     e.stopPropagation();
@@ -395,7 +400,9 @@ const MemberRow: Component<{
               <i class="fa-solid fa-crown shrink-0 text-[10px] text-amber-400" title={t('room.members.owner')} aria-hidden="true" />
             )}
           </p>
-          <p class="mt-0.5 truncate text-xs leading-snug text-muted-foreground">{subline()}</p>
+          <Show when={subline()}>
+            <p class="mt-0.5 truncate text-xs leading-snug text-muted-foreground">{subline()}</p>
+          </Show>
         </div>
       </button>
       {props.isCreator && !isSelf() && props.onRemoveMember && (

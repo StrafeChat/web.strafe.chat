@@ -55,9 +55,21 @@ export const SpaceRoomsBar: Component = () => {
   const roomMatch = useMatch(() => '/spaces/:spaceId/rooms/:roomId');
   const activeRoomId = () => roomMatch()?.params?.roomId;
 
-  /** Section ids that are expanded (collapsed when not in set) */
-  const [openSectionIds, setOpenSectionIds] = createSignal<Set<string>>(new Set());
-  const [sectionsInitialized, setSectionsInitialized] = createSignal(false);
+  // Sections are open by default; we only remember the ones the user explicitly collapsed,
+  // persisted per device so the state survives navigating between spaces, remounts and
+  // reloads. (The previous approach tracked "open" ids in a fresh-every-mount signal seeded
+  // once, so switching spaces left the new space's sections out of the set - all collapsed.)
+  const COLLAPSED_SECTIONS_KEY = 'strafe:collapsedSectionIds';
+  const loadCollapsedSections = (): Set<string> => {
+    try {
+      const raw = localStorage.getItem(COLLAPSED_SECTIONS_KEY);
+      if (raw) return new Set(JSON.parse(raw) as string[]);
+    } catch {
+      /* private mode / bad json */
+    }
+    return new Set();
+  };
+  const [collapsedSectionIds, setCollapsedSectionIds] = createSignal<Set<string>>(loadCollapsedSections());
 
   const space = () => spaces.spaces.find((s) => s.id === spaceId());
   const [editingRoom, setEditingRoom] = createSignal<SpaceRoom | null>(null);
@@ -166,19 +178,16 @@ export const SpaceRoomsBar: Component = () => {
       .sort((a, b) => a.position - b.position)
   );
 
-  createEffect(() => {
-    const secs = sections();
-    if (secs.length > 0 && !sectionsInitialized()) {
-      setOpenSectionIds(new Set(secs.map((s) => s.id)));
-      setSectionsInitialized(true);
-    }
-  });
-
   function toggleSection(sectionId: string) {
-    setOpenSectionIds((prev) => {
+    setCollapsedSectionIds((prev) => {
       const next = new Set(prev);
       if (next.has(sectionId)) next.delete(sectionId);
       else next.add(sectionId);
+      try {
+        localStorage.setItem(COLLAPSED_SECTIONS_KEY, JSON.stringify([...next]));
+      } catch {
+        /* private mode */
+      }
       return next;
     });
   }
@@ -569,7 +578,7 @@ export const SpaceRoomsBar: Component = () => {
           </Show>
           <For each={sections()}>
             {(section) => {
-              const isOpen = () => openSectionIds().has(section.id);
+              const isOpen = () => !collapsedSectionIds().has(section.id);
               const children = () => childrenOf(section);
               const secScope = `sec:${section.id}`;
               // Collapsing a section otherwise hides its children's unread/mention state
