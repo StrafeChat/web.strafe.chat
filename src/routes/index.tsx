@@ -14,6 +14,7 @@ import InvitePage from '../pages/InvitePage';
 import AdminPage from '../pages/AdminPage';
 import OAuthAuthorizePage from '../pages/OAuthAuthorizePage';
 import { StargateProvider } from '../components/StargateProvider';
+import { ConnectionStatusBanner } from '../components/ConnectionStatusBanner';
 import { RecoveryModal } from '../components/RecoveryModal';
 import { E2eeEnvironmentModal } from '../components/E2eeEnvironmentModal';
 import { ExternalLinkModal } from '../components/ExternalLinkModal';
@@ -60,6 +61,7 @@ function RootLayout(props: { children?: import('solid-js').JSX.Element }) {
     <StargateProvider>
       <Show when={auth.hydrated} fallback={<LoadingScreen />}>
         <AppBackground />
+        <ConnectionStatusBanner />
         {props.children}
         <RecoveryModal />
         <E2eeEnvironmentModal />

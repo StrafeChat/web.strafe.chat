@@ -1342,6 +1342,9 @@ export default {
     bot: 'Bot-Konto',
     botTag: 'Bot',
   },
+  connection: {
+    reconnecting: 'Verbindung wird wiederhergestellt …',
+  },
   oauth: {
     title: '{{app}} autorisieren',
     subtitle: 'Angemeldet als {{name}}',

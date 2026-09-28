@@ -5,7 +5,7 @@ import { stargate } from '../stores/stargate';
 import { connectStargate, disconnectStargate, subscribe, unsubscribe, onStargateReady } from '../services/stargate/client';
 import { hydrateFromReady, bootstrapFromRest } from '../stores/auth';
 import { rooms } from '../stores/rooms';
-import { initStargateMessageHandler } from '../stores/messages';
+import { initStargateMessageHandler, loadMessages, messages } from '../stores/messages';
 import { initPresenceHandler } from '../stores/presence';
 import { initReadStateHandler } from '../stores/readState';
 import { initTypingHandler } from '../stores/typing';
@@ -70,6 +70,23 @@ export const StargateProvider: Component<{ children?: import('solid-js').JSX.Ele
     });
     onCleanup(unsub);
   });
+
+  // When the socket comes back after a drop (mobile background, network blip), pull the
+  // latest messages for every room already open so anything missed while disconnected shows
+  // without waiting to re-enter the room. Quiet = merge in place, don't yank the scroll to
+  // the bottom. READY itself already refreshes rooms/spaces/relationships/presence.
+  createEffect(
+    on(
+      () => stargate.ready,
+      (ready, prev) => {
+        if (!ready || prev !== false) return;
+        for (const roomId of Object.keys(messages.byRoom)) {
+          void loadMessages(roomId, undefined, undefined, { quiet: true });
+        }
+      },
+      { defer: true }
+    )
+  );
 
   createEffect(() => {
     const token = auth.token;

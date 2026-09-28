@@ -140,7 +140,12 @@ function roomFromPayload(payload: unknown): Room | null {
         display_name: typeof p.display_name === 'string' ? p.display_name : '',
         discriminator: typeof p.discriminator === 'number' ? p.discriminator : undefined,
         avatar: typeof p.avatar === 'string' ? p.avatar : undefined,
+        banner: typeof p.banner === 'string' ? p.banner : undefined,
+        bio: typeof p.bio === 'string' ? p.bio : undefined,
+        about_me: typeof p.about_me === 'string' ? p.about_me : undefined,
         presence: p.presence as RoomParticipant['presence'],
+        ...(typeof p.public_flags === 'number' ? { public_flags: p.public_flags } : {}),
+        ...(p.bot === true ? { bot: true } : {}),
         ...(typeof p.home_domain === 'string' ? { home_domain: p.home_domain } : {}),
         ...(p.origin_id != null ? { origin_id: String(p.origin_id) } : {}),
       }))

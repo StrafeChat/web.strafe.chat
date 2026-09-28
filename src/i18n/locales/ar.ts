@@ -1412,6 +1412,9 @@ export default {
     bot: 'حساب بوت',
     botTag: 'بوت',
   },
+  connection: {
+    reconnecting: 'إعادة الاتصال…',
+  },
   oauth: {
     title: 'الإذن لـ {{app}}',
     subtitle: 'مسجّل الدخول باسم {{name}}',

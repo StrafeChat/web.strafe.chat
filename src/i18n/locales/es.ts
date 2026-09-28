@@ -1350,6 +1350,9 @@ export default {
     bot: 'Cuenta de bot',
     botTag: 'Bot',
   },
+  connection: {
+    reconnecting: 'Reconectando…',
+  },
   oauth: {
     title: 'Autorizar {{app}}',
     subtitle: 'Sesión iniciada como {{name}}',

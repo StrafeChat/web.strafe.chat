@@ -1,6 +1,7 @@
 import { createStore } from 'solid-js/store';
 import { listSpaceMembers, type SpaceMember } from '../api/spaces';
 import { onStargateEvent } from '../services/stargate/client';
+import { setUserPresence } from './presence';
 import { stargateEventInnerRecord } from './spaceSync';
 
 /**
@@ -40,6 +41,13 @@ export function ensureSpaceMembers(spaceId: string, opts: { force?: boolean } = 
       const list = await listSpaceMembers(spaceId);
       setSpaceMembers('bySpaceId', spaceId, list);
       setSpaceMembers('loadedAt', spaceId, Date.now());
+      // Seed the global presence map so the status dot agrees with the online/offline
+      // grouping - without this a member the sidebar lists as online showed an offline
+      // dot, because the dot reads only presence.byUser and the list also falls back to
+      // the member object's own presence.
+      for (const m of list) {
+        if (m.presence?.status) setUserPresence(m.id, m.presence);
+      }
     } finally {
       setSpaceMembers('loading', spaceId, false);
       inflight.delete(spaceId);
@@ -125,6 +133,7 @@ export function initSpaceMembersHandlers(): () => void {
         ...(roles ? { roles } : {}),
       };
       upsertSpaceMember(spaceId, member);
+      if (member.presence?.status) setUserPresence(member.id, member.presence);
       return;
     }
 

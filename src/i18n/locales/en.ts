@@ -1344,6 +1344,9 @@ export default {
     bot: 'Bot account',
     botTag: 'Bot',
   },
+  connection: {
+    reconnecting: 'Reconnecting…',
+  },
   oauth: {
     title: 'Authorize {{app}}',
     subtitle: 'Signed in as {{name}}',

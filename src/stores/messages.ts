@@ -139,7 +139,8 @@ export async function retryPendingDecrypts(): Promise<void> {
 export async function loadMessages(
   roomId: string,
   before?: string,
-  getScrollContainer?: () => HTMLDivElement | undefined
+  getScrollContainer?: () => HTMLDivElement | undefined,
+  opts?: { quiet?: boolean }
 ) {
   const isInitialLoad = !before;
   if (isInitialLoad) {
@@ -188,7 +189,7 @@ export async function loadMessages(
       }
       return sortByCreatedAt(merged);
     });
-    if (isInitialLoad && decrypted.length > 0) {
+    if (isInitialLoad && decrypted.length > 0 && !opts?.quiet) {
       setMessages('scrollToBottomTick', roomId, (t) => (t ?? 0) + 1);
     }
     if (!isInitialLoad && saved && container) {
