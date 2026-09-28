@@ -88,6 +88,16 @@ new i18n keys.
   `ResponsiveDialog`, `Tooltip`, `IconButton`, `UserCell`, the settings modal shells
   (`SettingsShell`/`SettingsNav`/`SettingsPanel`). Check `src/components/` for something
   close before writing a new component from scratch.
+- **Developer platform & profile badges (client)**: the **Developers** settings section
+  (`src/components/settings/DevelopersSettingsPage.tsx`) manages a person's OAuth2
+  applications and bots, and the standalone consent screen at `/oauth2/authorize`
+  (`src/pages/OAuthAuthorizePage.tsx`) drives the authorization-code flow — both through
+  `src/api/developers.ts`. A client secret or bot token is shown once in a copy-now banner
+  and never persisted, mirroring the server returning it a single time. Profile badges come
+  from a user's `public_flags` bitfield: `src/lib/badges.ts` maps bits to icons and
+  `src/components/UserBadges.tsx` renders them (plus a BOT tag from the `bot` flag) beside
+  the name in the profile popover and full modal. Thread `public_flags`/`bot` through any
+  new user-shaped payload the same way the existing subjects do.
 
 ## Verification expectations
 
