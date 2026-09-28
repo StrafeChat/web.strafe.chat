@@ -19,6 +19,9 @@ export interface RegisterInput {
   discriminator?: number;
   /** Challenge response; required only by instances that enabled a captcha. */
   captcha_token?: string;
+  /** Instance invite code. Required only by invite-only instances, and not even then for
+   * the very first account - there is nobody to have issued one yet. */
+  invite?: string;
 }
 
 export interface RegisterResponse {

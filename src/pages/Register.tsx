@@ -1,10 +1,11 @@
-import { createSignal, onMount, Show } from 'solid-js';
+import { createSignal, onCleanup, onMount, Show } from 'solid-js';
 import { useNavigate, A } from '@solidjs/router';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
 import { DatePickerField } from '../components/ui/DatePickerField';
 import { register } from '../api/auth';
+import { checkInstanceInvite } from '../api/instance';
 import {
   authCardClass,
   authCardContentClass,
@@ -63,6 +64,39 @@ export default function Register() {
   const [captchaBroken, setCaptchaBroken] = createSignal(false);
   let resetCaptcha: (() => void) | null = null;
   const captchaRequired = () => instance.captcha.enabled;
+
+  // Instance invite, when registration is closed to everyone without one.
+  const [invite, setInvite] = createSignal('');
+  const [inviteErr, setInviteErr] = createSignal('');
+  const [inviteChecked, setInviteChecked] = createSignal(false);
+  const inviteRequired = () => instance.inviteOnly;
+
+  // Say the code is wrong while it can still be fixed, rather than after a username and
+  // password have been filled in and the button pressed. The server remains the only
+  // authority - this is only about when the bad news arrives - so a check that fails
+  // (offline, rate limited) says nothing and leaves the decision to submit.
+  let inviteCheckTimer: ReturnType<typeof setTimeout> | undefined;
+  function onInviteInput(value: string) {
+    setInvite(value);
+    setInviteErr('');
+    setInviteChecked(false);
+    setErrorLines([]);
+    clearTimeout(inviteCheckTimer);
+    const code = value.trim();
+    if (!code) return;
+    inviteCheckTimer = setTimeout(() => {
+      void checkInstanceInvite(code)
+        .then((res) => {
+          // Drop a reply for a code the user has since edited away from.
+          if (invite().trim() !== code) return;
+          setInviteChecked(true);
+          if (!res.valid) setInviteErr(t('auth.register.errors.inviteInvalid'));
+        })
+        .catch(() => undefined);
+    }, 400);
+  }
+  onCleanup(() => clearTimeout(inviteCheckTimer));
+
   onMount(() => void loadInstanceInfo());
 
   function clearStep1Errors() {
@@ -144,6 +178,13 @@ export default function Register() {
       ok = false;
     }
 
+    // Only block on a code the server has already called bad. An empty one still goes
+    // through: this account may be the instance's first, which needs no invite, and only
+    // the server knows whether that is so.
+    if (inviteRequired() && inviteChecked() && inviteErr()) {
+      ok = false;
+    }
+
     if (!ok) return;
 
     setLoading(true);
@@ -155,6 +196,7 @@ export default function Register() {
         password: pVal,
         date_of_birth: dateOfBirthRFC3339,
         ...(captchaToken() ? { captcha_token: captchaToken() } : {}),
+        ...(invite().trim() ? { invite: invite().trim() } : {}),
       });
       navigate('/login?registered=1', { replace: true });
     } catch (err) {
@@ -246,6 +288,20 @@ export default function Register() {
                   required
                   error={passwordErr()}
                 />
+                <Show when={inviteRequired()}>
+                  <Input
+                    type="text"
+                    label={t('auth.register.inviteLabel')}
+                    placeholder={t('auth.register.invitePlaceholder')}
+                    value={invite()}
+                    onInput={(e) => onInviteInput(e.currentTarget.value)}
+                    autocomplete="off"
+                    autocapitalize="none"
+                    spellcheck={false}
+                    disabled={loading()}
+                    error={inviteErr()}
+                  />
+                </Show>
                 <Show when={captchaRequired()}>
                   <CaptchaWidget
                     provider={instance.captcha.provider}

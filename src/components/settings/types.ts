@@ -8,7 +8,8 @@ export type SectionId =
   | 'voice'
   | 'notifications'
   | 'keybinds'
-  | 'language';
+  | 'language'
+  | 'instance';
 
 export interface SettingsNavItem {
   id: SectionId;
@@ -21,6 +22,16 @@ export const ACCOUNT_ITEMS: SettingsNavItem[] = [
   { id: 'account', labelKey: 'settings.sections.account.title', icon: 'fa-user' },
   { id: 'devices', labelKey: 'settings.sections.devices.title', icon: 'fa-shield-halved' },
 ];
+
+/**
+ * Shown only to an instance administrator, so it is not part of APP_ITEMS - the modal
+ * appends it once the server confirms who is asking.
+ */
+export const INSTANCE_ITEM: SettingsNavItem = {
+  id: 'instance',
+  labelKey: 'settings.sections.instance.title',
+  icon: 'fa-server',
+};
 
 export const APP_ITEMS: SettingsNavItem[] = [
   { id: 'appearance', labelKey: 'settings.sections.appearance.title', icon: 'fa-palette' },

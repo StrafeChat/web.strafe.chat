@@ -13,6 +13,8 @@ const SERVER_MESSAGE_TO_KEY: Record<string, string> = {
   'internal error': 'errors.api.internal',
   unauthorized: 'errors.api.unauthorized',
   'invite-only mode enabled': 'errors.api.inviteOnly',
+  'an invite code is required to register on this instance': 'errors.api.inviteRequired',
+  'that invite code is not valid': 'errors.api.inviteInvalid',
   'email already in use': 'errors.api.emailInUse',
   'discriminator already in use for this username': 'errors.api.discriminatorInUse',
   'password does not meet requirements': 'errors.api.weakPassword',

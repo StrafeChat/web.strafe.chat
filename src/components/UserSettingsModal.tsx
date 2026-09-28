@@ -2,7 +2,8 @@ import type { Component } from 'solid-js';
 import { createSignal, createMemo, Show, createEffect } from 'solid-js';
 import { userSettingsOpen, closeUserSettings, takePendingSettingsSection } from '../stores/userSettingsModal';
 import { confirmDialog } from '../stores/confirmDialog';
-import { ACCOUNT_ITEMS, APP_ITEMS, sectionDescription, sectionTitle, type SectionId, type SettingsNavItem } from './settings/types.js';
+import { getInstanceCapabilities } from '../api/instance';
+import { ACCOUNT_ITEMS, APP_ITEMS, INSTANCE_ITEM, sectionDescription, sectionTitle, type SectionId, type SettingsNavItem } from './settings/types.js';
 import {
   SettingsShell,
   SettingsNav,
@@ -15,6 +16,7 @@ import {
   VoiceVideoSettingsPage,
   AccessibilitySettingsPage,
   KeybindsSettingsPage,
+  InstanceSettingsPage,
   type SettingsNavGroup,
 } from './settings';
 import { SearchInput } from './ui/SearchInput';
@@ -29,6 +31,9 @@ function navMatches(item: SettingsNavItem, q: string): boolean {
 
 export const UserSettingsModal: Component = () => {
   const [section, setSection] = createSignal<SectionId>('account');
+  // Asked of the server rather than inferred: only it knows who administers the instance.
+  // Failing closed simply hides the section, which is the right way to be wrong.
+  const [isInstanceAdmin, setIsInstanceAdmin] = createSignal(false);
   const [searchQuery, setSearchQuery] = createSignal('');
   const [hasUnsavedChanges, setHasUnsavedChanges] = createSignal(false);
   const [confirming, setConfirming] = createSignal(false);
@@ -39,6 +44,9 @@ export const UserSettingsModal: Component = () => {
     if (userSettingsOpen()) {
       const s = takePendingSettingsSection();
       if (s) setSection(s);
+      void getInstanceCapabilities()
+        .then((res) => setIsInstanceAdmin(res.instance_admin))
+        .catch(() => setIsInstanceAdmin(false));
     } else {
       setSection('account');
     }
@@ -52,6 +60,9 @@ export const UserSettingsModal: Component = () => {
     const groups: SettingsNavGroup<SectionId>[] = [];
     if (account.length) groups.push({ label: t('settings.groups.account'), items: account });
     if (app.length) groups.push({ label: t('settings.groups.app'), items: app });
+    if (isInstanceAdmin() && navMatches(INSTANCE_ITEM, q)) {
+      groups.push({ label: t('settings.sections.instance.title'), items: [toDef(INSTANCE_ITEM)] });
+    }
     return groups;
   });
 
@@ -152,6 +163,9 @@ export const UserSettingsModal: Component = () => {
           </Show>
           <Show when={section() === 'notifications'}>
             <NotificationsSettingsPage />
+          </Show>
+          <Show when={section() === 'instance' && isInstanceAdmin()}>
+            <InstanceSettingsPage />
           </Show>
           <Show when={section() === 'keybinds'}>
             <KeybindsSettingsPage />

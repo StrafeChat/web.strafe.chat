@@ -18,6 +18,9 @@ export interface InstanceState {
   captcha: { enabled: boolean; provider: string; siteKey: string; apiUrl: string };
   /** Voice/video calling (a LiveKit server is configured). Off hides every call control. */
   voiceEnabled: boolean;
+  /** Registration needs an invite code. The registration form asks for one when this is
+   * set; the server still decides, and waives it for the very first account. */
+  inviteOnly: boolean;
 }
 
 export const [instance, setInstance] = createStore<InstanceState>({
@@ -27,6 +30,7 @@ export const [instance, setInstance] = createStore<InstanceState>({
   domain: '',
   captcha: { enabled: false, provider: '', siteKey: '', apiUrl: '' },
   voiceEnabled: false,
+  inviteOnly: false,
 });
 
 interface IndexResponse {
@@ -35,6 +39,7 @@ interface IndexResponse {
   features?: {
     captcha?: { enabled?: boolean; provider?: string; site_key?: string; api_url?: string };
     voice?: { enabled?: boolean };
+    invite_only?: { enabled?: boolean };
   };
 }
 
@@ -70,6 +75,7 @@ export function loadInstanceInfo(): Promise<void> {
             apiUrl: cap?.api_url ?? '',
           },
           voiceEnabled: res.features?.voice?.enabled === true,
+          inviteOnly: res.features?.invite_only?.enabled === true,
         });
       })
       .catch((e) => {
