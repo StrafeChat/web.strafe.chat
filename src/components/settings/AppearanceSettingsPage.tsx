@@ -24,7 +24,7 @@ import {
 } from '../../stores/appearance';
 import type { ThemeDefinition } from '../../theme/themes';
 import { setEmojiProvider, setEmojiSkinTone } from '../../stores/appearance';
-import { EMOJI_PROVIDERS, getEmojiProvider, type EmojiProviderId } from '../../lib/emoji/providers';
+import { EMOJI_ATTRIBUTIONS, EMOJI_PROVIDERS, getEmojiProvider, type EmojiProviderId } from '../../lib/emoji/providers';
 import { SKIN_TONES } from '../../lib/emoji/data';
 import { Emoji } from '../emoji/Emoji';
 import { Toggle } from '../ui/Toggle';
@@ -285,6 +285,34 @@ export const AppearanceSettingsPage: Component = () => {
               )}
             </For>
           </div>
+          <p class="px-1 text-[11px] leading-relaxed text-muted-foreground">
+            {t('settings.appearance.emoji.attribution')}{' '}
+            <For each={EMOJI_ATTRIBUTIONS}>
+              {(a, i) => (
+                <>
+                  <Show when={i() > 0}>{' · '}</Show>
+                  <a
+                    href={a.sourceUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    class="text-foreground underline decoration-dotted underline-offset-2 hover:text-primary"
+                  >
+                    {a.name}
+                  </a>{' '}
+                  (
+                  <a
+                    href={a.licenseUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    class="underline decoration-dotted underline-offset-2 hover:text-primary"
+                  >
+                    {a.license}
+                  </a>
+                  )
+                </>
+              )}
+            </For>
+          </p>
           <SettingRow
             icon="fa-hand"
             title={t('settings.appearance.emoji.skinTone')}

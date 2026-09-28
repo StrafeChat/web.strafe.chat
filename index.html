@@ -21,8 +21,10 @@
                      contain still has img-src and every other route out; the protection
                      that matters here is script-src.
         img/media    this origin, data/blob (canvas previews, decrypted attachments), and
-                     any http(s) host (the instance's CDN, federated instances' CDNs, the
-                     emoji image sets) for the same reason as connect-src.
+                     any http(s) host for the same reason as connect-src: the instance's own
+                     CDN (which also serves the bundled emoji sets, so nothing external is
+                     needed to render emoji) and federated instances' CDNs are chosen per
+                     deployment and unknowable to a static host expression.
         style/font   this origin plus Google Fonts; 'unsafe-inline' for style because the
                      framework sets inline style attributes.
         frame-src    Turnstile only. object-src none, base-uri self, form-action self.

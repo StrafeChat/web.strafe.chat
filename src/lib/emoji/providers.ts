@@ -1,9 +1,19 @@
 /**
  * Emoji image providers. Each turns an emoji sequence into an image URL (or, for the
- * native provider, opts out so the OS font renders it). All image sets are served from
- * jsDelivr, which mirrors the projects' own GitHub/npm releases.
+ * native provider, opts out so the OS font renders it).
+ *
+ * Every image set is served from the instance's own CDN (nebula), never a third-party host:
+ * the sets are seeded into nebula and served under `/v1/emoji/<set>/…` (see the emoji
+ * seeding in the nebula repo, and deploy/Caddyfile's `/cdn` route). This keeps to the
+ * project's privacy-first and self-hostable principles - rendering an emoji is a request to
+ * the instance you are already talking to, so no viewer's IP or referrer leaks to an
+ * outside CDN, and an instance with no outbound internet access still renders every emoji.
+ * The per-set file-name conventions below mirror each upstream project's own layout, so
+ * seeding is a straight copy of the upstream assets.
  */
-export type EmojiProviderId = 'twemoji' | 'noto' | 'openmoji' | 'fluent' | 'native';
+import { cdnUrl } from '../runtimeConfig';
+
+export type EmojiProviderId = 'twemoji' | 'noto' | 'openmoji' | 'native';
 
 export interface EmojiProvider {
   id: EmojiProviderId;
@@ -11,6 +21,15 @@ export interface EmojiProvider {
   description: string;
   /** null = render the emoji as text with the system font. */
   imageUrl: ((emoji: string) => string) | null;
+}
+
+/** Credit for a bundled artwork set - shown in the appearance settings and CREDITS.md. */
+export interface EmojiAttribution {
+  id: Exclude<EmojiProviderId, 'native'>;
+  name: string;
+  license: string;
+  licenseUrl: string;
+  sourceUrl: string;
 }
 
 /** Hex code points of a sequence, lowercase, joined by `sep`. */
@@ -24,10 +43,14 @@ function codepoints(emoji: string, sep: string, opts: { stripVS16: 'never' | 'al
   return out.join(sep);
 }
 
-const TWEMOJI_BASE = 'https://cdn.jsdelivr.net/gh/jdecked/twemoji@16.0.1/assets/svg/';
-const NOTO_BASE = 'https://cdn.jsdelivr.net/gh/googlefonts/noto-emoji@main/svg/emoji_u';
-const OPENMOJI_BASE = 'https://cdn.jsdelivr.net/npm/openmoji@15.1.0/color/svg/';
-const FLUENT_BASE = 'https://cdn.jsdelivr.net/npm/fluentui-emoji@1.1.1/icons/modern/';
+// The instance CDN base for a seeded emoji set. Resolved once at load, like the API client:
+// config.js (which sets window.__STRAFE_CONFIG__) is loaded before this bundle.
+const emojiBase = (set: string): string => `${cdnUrl()}/v1/emoji/${set}/`;
+
+const TWEMOJI_BASE = emojiBase('twemoji');
+// Noto file names carry an `emoji_u` prefix inside the set directory.
+const NOTO_BASE = `${emojiBase('noto')}emoji_u`;
+const OPENMOJI_BASE = emojiBase('openmoji');
 
 export const EMOJI_PROVIDERS: EmojiProvider[] = [
   {
@@ -51,16 +74,40 @@ export const EMOJI_PROVIDERS: EmojiProvider[] = [
     imageUrl: (e) => `${OPENMOJI_BASE}${codepoints(e, '-', { stripVS16: 'unlessZwj' }).toUpperCase()}.svg`,
   },
   {
-    id: 'fluent',
-    name: 'Fluent (3D)',
-    description: "Microsoft's rounded 3D-style emoji.",
-    imageUrl: (e) => `${FLUENT_BASE}${codepoints(e, '-', { stripVS16: 'unlessZwj' })}.svg`,
-  },
-  {
     id: 'native',
     name: 'System',
     description: 'Whatever your operating system draws. Fastest, but looks different per device.',
     imageUrl: null,
+  },
+];
+
+/**
+ * Licences for the bundled artwork. Twemoji and OpenMoji are CC-BY / CC-BY-SA and *require*
+ * visible attribution; Noto (Apache-2.0) requires the licence notice be preserved, which the
+ * seeded LICENSE files and CREDITS.md do. Keep this in step with the versions the nebula
+ * fetch script pins.
+ */
+export const EMOJI_ATTRIBUTIONS: EmojiAttribution[] = [
+  {
+    id: 'twemoji',
+    name: 'Twemoji',
+    license: 'CC-BY 4.0',
+    licenseUrl: 'https://creativecommons.org/licenses/by/4.0/',
+    sourceUrl: 'https://github.com/jdecked/twemoji',
+  },
+  {
+    id: 'noto',
+    name: 'Noto Emoji',
+    license: 'Apache-2.0',
+    licenseUrl: 'https://www.apache.org/licenses/LICENSE-2.0',
+    sourceUrl: 'https://github.com/googlefonts/noto-emoji',
+  },
+  {
+    id: 'openmoji',
+    name: 'OpenMoji',
+    license: 'CC-BY-SA 4.0',
+    licenseUrl: 'https://creativecommons.org/licenses/by-sa/4.0/',
+    sourceUrl: 'https://openmoji.org',
   },
 ];
 

@@ -22,6 +22,7 @@ RUN chmod +x /docker-entrypoint.d/40-strafe-config.sh
 COPY --from=build /app/dist /usr/share/nginx/html
 
 ENV STRAFE_API_URL="" \
-    STRAFE_STARGATE_URL=""
+    STRAFE_STARGATE_URL="" \
+    STRAFE_CDN_URL=""
 
 EXPOSE 80

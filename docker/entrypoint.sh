@@ -6,8 +6,9 @@ set -e
 cfg=/usr/share/nginx/html/config.js
 api=$(printf '%s' "${STRAFE_API_URL:-}" | sed 's/["\\]/\\&/g')
 gw=$(printf '%s' "${STRAFE_STARGATE_URL:-}" | sed 's/["\\]/\\&/g')
+cdn=$(printf '%s' "${STRAFE_CDN_URL:-}" | sed 's/["\\]/\\&/g')
 cat > "$cfg" <<EOF
-// Generated at container start from STRAFE_API_URL / STRAFE_STARGATE_URL.
-window.__STRAFE_CONFIG__ = { apiUrl: "$api", stargateUrl: "$gw" };
+// Generated at container start from STRAFE_API_URL / STRAFE_STARGATE_URL / STRAFE_CDN_URL.
+window.__STRAFE_CONFIG__ = { apiUrl: "$api", stargateUrl: "$gw", cdnUrl: "$cdn" };
 EOF
-echo "strafe web: config.js -> api=${STRAFE_API_URL:-<default>} gateway=${STRAFE_STARGATE_URL:-<default>}"
+echo "strafe web: config.js -> api=${STRAFE_API_URL:-<default>} gateway=${STRAFE_STARGATE_URL:-<default>} cdn=${STRAFE_CDN_URL:-<default>}"
