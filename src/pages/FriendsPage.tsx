@@ -1,4 +1,5 @@
 import type { Component, JSX } from 'solid-js';
+import { MobileRailsOpenButton } from '../components/layout/MobileRailsOpenButton';
 import { createSignal, For, Show } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import {
@@ -22,7 +23,7 @@ import { Tabs } from '../components/ui/Tabs';
 import { EmptyState } from '../components/ui/EmptyState';
 import { showContextMenu } from '../stores/contextMenu';
 import { ResponsiveDialog } from '../components/ui/ResponsiveDialog';
-import { appDialogActions, appPageHeader, appPageTitle, appSectionLabel } from '../theme/appChrome';
+import { appDialogActions, appPageHeader, appPageTitle, appSectionLabel, appContentBand } from '../theme/appChrome';
 import { t } from '../i18n';
 
 type TabId = 'online' | 'all' | 'pending' | 'blocked';
@@ -300,19 +301,32 @@ const FriendsPage: Component = () => {
           </ResponsiveDialog>
       </Show>
       <div class={`${appPageHeader} gap-3`}>
+        <MobileRailsOpenButton />
         <div class="flex min-w-0 items-center gap-2">
           <i class="fa-solid fa-user-group shrink-0 text-muted-foreground" aria-hidden="true" />
           <h1 class={appPageTitle}>{t('nav.friends')}</h1>
         </div>
+        {/* Four tabs, a title and a button do not fit in 375px: on a phone the tabs get
+            a row of their own under the header. Same signal either way. */}
         <Tabs<TabId>
           size="sm"
           aria-label={t('friends.listAria')}
           value={tab()}
           onChange={(v) => setTab(v)}
           items={tabItems()}
-          class="ms-1"
+          class="ms-1 max-md:hidden"
         />
         <div class="ms-auto shrink-0">{addFriendButton('sm')}</div>
+      </div>
+      <div class={`${appContentBand} shrink-0 px-3 py-2 md:hidden`}>
+        <Tabs<TabId>
+          size="sm"
+          aria-label={t('friends.listAria')}
+          value={tab()}
+          onChange={(v) => setTab(v)}
+          items={tabItems()}
+          class="w-full"
+        />
       </div>
       <div class="flex min-h-0 flex-1 flex-col overflow-y-auto bg-transparent">
         <Show when={relationships.loading}>

@@ -1,6 +1,6 @@
 import type { Component } from 'solid-js';
 import { createSignal, For, Show } from 'solid-js';
-import { A, useLocation, useMatch } from '@solidjs/router';
+import { A, useLocation, useMatch} from '@solidjs/router';
 import { UserArea } from './UserArea';
 import { VoiceDock } from '../voice/VoiceDock';
 import { CreateGroupModal } from '../CreateGroupModal';
@@ -24,7 +24,7 @@ import {
   appListRowIdle,
   appSectionLabel,
 } from '../../theme/appChrome';
-import { isMdViewport } from '../../stores/mobileShellLayout';
+import { isMdViewport, openMobileContent } from '../../stores/mobileShellLayout';
 import { isRoomMuted, muteRoom, unmuteRoom } from '../../lib/roomNotify';
 import { IconButton } from '../ui/IconButton';
 import { t } from '../../i18n';
@@ -36,14 +36,34 @@ interface PaneButtonProps {
   label: string;
 }
 
-const PaneButton: Component<PaneButtonProps> = (props) => (
-  <A href={props.href} class={`${appListRow} ${props.active ? appListRowActive : appListRowIdle}`}>
-    <div class="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted">
-      <i class={`fa-solid ${props.icon} text-sm`} aria-hidden="true" />
-    </div>
-    <span class="min-w-0 truncate text-sm font-medium">{props.label}</span>
-  </A>
-);
+/**
+ * A plain anchor rather than the router's `A`: a click handler passed through `A` never
+ * reached the element here (the anchor ended up with no delegated handler at all), and
+ * this row must do two things on a phone - navigate, and bring the content panel on
+ * screen even when the path did not change. Modifier and middle clicks are left to the
+ * browser, which is what the real href is for.
+ */
+const PaneButton: Component<PaneButtonProps> = (props) => {
+  const navigate = useNavigate();
+  return (
+    <a
+      href={props.href}
+      aria-current={props.active ? 'page' : undefined}
+      class={`${appListRow} ${props.active ? appListRowActive : appListRowIdle}`}
+      onClick={(e) => {
+        if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) return;
+        e.preventDefault();
+        navigate(props.href);
+        if (!isMdViewport()) openMobileContent();
+      }}
+    >
+      <div class="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted">
+        <i class={`fa-solid ${props.icon} text-sm`} aria-hidden="true" />
+      </div>
+      <span class="min-w-0 truncate text-sm font-medium">{props.label}</span>
+    </a>
+  );
+};
 
 interface ConvItemProps {
   name: string;

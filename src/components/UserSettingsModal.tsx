@@ -1,6 +1,6 @@
 import type { Component } from 'solid-js';
 import { createSignal, createMemo, Show, createEffect } from 'solid-js';
-import { userSettingsOpen, closeUserSettings, takePendingSettingsSection } from '../stores/userSettingsModal';
+import { userSettingsOpen, closeUserSettings, takePendingSettingsSection, hasPendingSettingsSection } from '../stores/userSettingsModal';
 import { confirmDialog } from '../stores/confirmDialog';
 import { getInstanceCapabilities } from '../api/instance';
 import { ACCOUNT_ITEMS, APP_ITEMS, INSTANCE_ITEM, sectionDescription, sectionTitle, type SectionId, type SettingsNavItem } from './settings/types.js';
@@ -99,6 +99,7 @@ export const UserSettingsModal: Component = () => {
         open={userSettingsOpen()}
         onClose={() => void requestClose()}
         labelledBy="user-settings-title"
+        initialMobileView={hasPendingSettingsSection() ? 'panel' : 'nav'}
       >
         <SettingsNav<SectionId>
           title={t('settings.title')}

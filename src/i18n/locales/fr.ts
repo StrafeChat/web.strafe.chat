@@ -1485,6 +1485,7 @@ export default {
     title: 'Paramètres',
     searchAria: 'Rechercher dans les paramètres',
     escToClose: 'Échap pour fermer',
+    backToSections: 'Retour aux réglages',
     groups: {
       account: 'Votre compte',
       app: "Paramètres de l'application",

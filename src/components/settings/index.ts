@@ -1,6 +1,7 @@
 export type { SectionId, SettingsNavItem } from './types.js';
 export { formatDiscriminator, sectionTitle, sectionDescription, ACCOUNT_ITEMS, APP_ITEMS, INSTANCE_ITEM } from './types.js';
-export { SettingsShell, SettingsNav, settingsNavButtonBase } from './SettingsShell';
+export { SettingsShell, SettingsNav, settingsNavButtonBase, useSettingsMobileView } from './SettingsShell';
+export type { SettingsMobileView } from './SettingsShell';
 export type { SettingsShellProps, SettingsNavProps, SettingsNavGroup, SettingsNavItemDef } from './SettingsShell';
 export { SettingsPanel } from './SettingsPanel';
 export type { SettingsPanelProps } from './SettingsPanel';

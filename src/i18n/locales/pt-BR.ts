@@ -1485,6 +1485,7 @@ export default {
     title: 'Configurações',
     searchAria: 'Buscar configurações',
     escToClose: 'ESC para fechar',
+    backToSections: 'Voltar para as configurações',
     groups: {
       account: 'Sua conta',
       app: 'Configurações do app',

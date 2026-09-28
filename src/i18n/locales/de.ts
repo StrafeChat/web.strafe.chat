@@ -1477,6 +1477,7 @@ export default {
     title: 'Einstellungen',
     searchAria: 'Einstellungen durchsuchen',
     escToClose: 'ESC zum Schließen',
+    backToSections: 'Zurück zu den Einstellungen',
     groups: {
       account: 'Dein Konto',
       app: 'App-Einstellungen',

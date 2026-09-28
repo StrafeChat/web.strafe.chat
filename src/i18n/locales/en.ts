@@ -1479,6 +1479,7 @@ export default {
     title: 'Settings',
     searchAria: 'Search settings',
     escToClose: 'ESC to close',
+    backToSections: 'Back to settings',
     groups: {
       account: 'Your account',
       app: 'App settings',

@@ -122,20 +122,31 @@ export const AppShell: Component<AppShellProps> = (props) => {
     });
   });
 
-  /** Mobile: entering a room shows the conversation, leaving one shows the list. */
+  /**
+   * Mobile: entering a room shows the conversation, leaving one shows the list. Friends and
+   * Notes are pages too - they render into the content panel, so they must bring it on
+   * screen the way a room does; forcing the list for them left both pages one viewport
+   * to the right with nothing to swipe to them. Home (the list) and a space's root stay
+   * on the nav side. This tracks *path changes*; a tap on a row whose path is already
+   * current is handled by the row itself.
+   */
+  let prevPath: string | undefined;
   createEffect(() => {
     if (isMdViewport()) return;
     const p = location.pathname;
-    const inDmOrGroupRoom = /^\/rooms\/[^/]+/.test(p);
-    const inSpaceChannel = /^\/spaces\/[^/]+\/rooms\/[^/]+/.test(p);
-    if (inDmOrGroupRoom || inSpaceChannel) {
+    const prev = prevPath;
+    prevPath = p;
+    const isRoom = (x: string | undefined) =>
+      !!x && (/^\/rooms\/[^/]+/.test(x) || /^\/spaces\/[^/]+\/rooms\/[^/]+/.test(x));
+    if (isRoom(p) || p === '/friends' || p === '/notes') {
+      setMobileMembersOpen(false);
       setMobilePanel('content');
-    } else if (
-      p === '/' ||
-      p === '/friends' ||
-      p === '/notes' ||
-      /^\/spaces\/[^/]+$/.test(p)
-    ) {
+    } else if (/^\/spaces\/[^/]+$/.test(p)) {
+      setMobilePanel('nav');
+    } else if (p === '/' && (prev === undefined || isRoom(prev) || /^\/spaces\//.test(prev))) {
+      // Home means the list when you arrive from a room or a space - leaving a group,
+      // the rail's home icon. Coming from Friends or Notes it is a tap on the Home row,
+      // and that tap already asked for the content side: leave it alone so the page shows.
       setMobilePanel('nav');
     }
   });

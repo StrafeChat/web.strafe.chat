@@ -6,6 +6,7 @@ import { rooms, setRooms, isNotesRoom } from '../stores/rooms';
 import { setUserPresence } from '../stores/presence';
 import { auth } from '../stores/auth';
 import { appPageHeader, appPageTitle } from '../theme/appChrome';
+import { MobileRailsOpenButton } from '../components/layout/MobileRailsOpenButton';
 import { t } from '../i18n';
 
 /** Notes room from store (loadRooms includes it once it exists). */
@@ -73,6 +74,7 @@ const NotesPage: Component = () => {
   return (
     <div class="flex-1 flex flex-col">
       <div class={`${appPageHeader} gap-2`}>
+        <MobileRailsOpenButton />
         <i class="fa-solid fa-note-sticky text-muted-foreground shrink-0" />
         <h1 class={appPageTitle}>{t('nav.notes')}</h1>
       </div>

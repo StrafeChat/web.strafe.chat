@@ -1543,6 +1543,7 @@ export default {
     title: 'الإعدادات',
     searchAria: 'البحث في الإعدادات',
     escToClose: 'ESC للإغلاق',
+    backToSections: 'العودة إلى الإعدادات',
     groups: {
       account: 'حسابك',
       app: 'إعدادات التطبيق',

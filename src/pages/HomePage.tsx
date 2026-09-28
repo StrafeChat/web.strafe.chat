@@ -7,6 +7,7 @@ import { authGlassSurface } from '../components/auth/authLayout';
 import { Button } from '../components/ui/Button';
 import { CreateGroupModal } from '../components/CreateGroupModal';
 import { CreateSpaceModal } from '../components/CreateSpaceModal';
+import { MobileRailsOpenButton } from '../components/layout/MobileRailsOpenButton';
 import { t } from '../i18n';
 
 function greetingKey(): string {
@@ -26,6 +27,7 @@ const HomePage: Component = () => {
   return (
     <div class="flex flex-1 flex-col">
       <div class={`${appPageHeader} gap-2`}>
+        <MobileRailsOpenButton />
         <i class="fa-solid fa-house shrink-0 text-muted-foreground" aria-hidden="true" />
         <h1 class={appPageTitle}>{t('nav.home')}</h1>
       </div>
