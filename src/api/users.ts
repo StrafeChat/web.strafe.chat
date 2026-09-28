@@ -13,6 +13,8 @@ export interface MeResponse {
   avatar?: string;
   banner?: string;
   accent_color?: string;
+  public_flags?: number;
+  bot?: boolean;
   presence?: unknown;
 }
 
@@ -44,6 +46,8 @@ export function toAuthUser(
   banner?: string;
   bio?: string;
   about_me?: string;
+  public_flags?: number;
+  bot?: boolean;
 } {
   const d = parseInt(me.discriminator, 10);
   return {
@@ -55,6 +59,8 @@ export function toAuthUser(
     ...(me.banner ? { banner: me.banner } : {}),
     ...(typeof me.bio === 'string' ? { bio: me.bio } : {}),
     ...(typeof me.about_me === 'string' ? { about_me: me.about_me } : {}),
+    ...(typeof me.public_flags === 'number' ? { public_flags: me.public_flags } : {}),
+    ...(me.bot ? { bot: true } : {}),
   };
 }
 

@@ -1,6 +1,7 @@
 import type { Component } from 'solid-js';
-import { createResource, createSignal, For, Show } from 'solid-js';
+import { createEffect, createResource, createSignal, For, Show } from 'solid-js';
 import { A, Navigate, useNavigate } from '@solidjs/router';
+import { BADGES } from '../lib/badges';
 import {
   banUser,
   getInstanceCapabilities,
@@ -23,7 +24,7 @@ import {
   type ResolveAction,
   type SpaceDetail,
   type UserDetail,
-} from '../api/instance';
+  setUserBadges,} from '../api/instance';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
@@ -281,6 +282,32 @@ const UserPanel: Component<{ userId: string; onOpenReport: (id: string) => void;
   const [detail, { refetch }] = createResource(() => props.userId, (id) => getUserDetail(id));
   const [banOpen, setBanOpen] = createSignal(false);
   const [error, setError] = createSignal('');
+  // Badge flags, edited optimistically and saved on each toggle. `null` until a detail
+  // loads (or right after a switch to a new user), when it seeds from the server.
+  const [badgeFlags, setBadgeFlags] = createSignal<number | null>(null);
+  const [badgeSaving, setBadgeSaving] = createSignal(false);
+
+  createEffect(() => {
+    const d = detail();
+    setBadgeFlags(d ? (d.user.public_flags ?? 0) : null);
+  });
+
+  async function toggleBadge(userId: string, bit: number) {
+    const cur = badgeFlags() ?? 0;
+    const next = cur ^ bit;
+    setBadgeFlags(next);
+    setBadgeSaving(true);
+    setError('');
+    try {
+      const res = await setUserBadges(userId, next);
+      setBadgeFlags(res.public_flags);
+    } catch {
+      setBadgeFlags(cur);
+      setError(t('admin.actionFailed'));
+    } finally {
+      setBadgeSaving(false);
+    }
+  }
 
   async function unban(d: UserDetail) {
     const ok = await confirmDialog({
@@ -350,6 +377,37 @@ const UserPanel: Component<{ userId: string; onOpenReport: (id: string) => void;
           </Show>
           <Show when={error()}>
             <p class="text-sm text-destructive">{error()}</p>
+          </Show>
+
+          <Show when={!d().user.home_domain}>
+            <section class="space-y-2">
+              <div class={settingsSectionTitle}>{t('admin.users.badges')}</div>
+              <p class="px-0.5 text-xs text-muted-foreground">{t('admin.users.badgesHint')}</p>
+              <div class="flex flex-wrap gap-1.5">
+                <For each={BADGES}>
+                  {(b) => {
+                    const on = () => ((badgeFlags() ?? 0) & b.bit) !== 0;
+                    return (
+                      <button
+                        type="button"
+                        class={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50 ${
+                          on() ? 'border-primary bg-primary/15 text-foreground' : 'border-border/70 bg-background/40 text-muted-foreground hover:bg-muted/30'
+                        }`}
+                        aria-pressed={on()}
+                        disabled={badgeSaving()}
+                        onClick={() => void toggleBadge(d().user.id, b.bit)}
+                      >
+                        <i class={`fa-solid ${b.icon} text-[13px]`} style={{ color: on() ? b.color : undefined }} aria-hidden="true" />
+                        {t(`badges.${b.id}`)}
+                        <Show when={on()}>
+                          <i class="fa-solid fa-check text-[10px] text-primary" aria-hidden="true" />
+                        </Show>
+                      </button>
+                    );
+                  }}
+                </For>
+              </div>
+            </section>
           </Show>
 
           <section class="space-y-2">

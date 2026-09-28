@@ -11,6 +11,8 @@ export type UserProfileFullSubject = {
   aboutMe?: string;
   spaceRoleNames?: string[];
   joinedAtLabel?: string;
+  publicFlags?: number;
+  bot?: boolean;
 };
 
 type State = {

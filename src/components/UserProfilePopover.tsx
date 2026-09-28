@@ -2,6 +2,7 @@ import type { Component } from 'solid-js';
 import { Show, For, onMount, onCleanup, createEffect, createSignal, createMemo } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { MessageAvatar } from './messageList/MessageAvatar';
+import { UserBadges } from './UserBadges';
 import { MessageBody } from './messageList/MessageBody';
 import { PresenceDot } from './PresenceDot';
 import { createPM } from '../api/rooms';
@@ -276,6 +277,8 @@ export const UserProfilePopover: Component = () => {
         aboutMe: s.aboutMe,
         spaceRoleNames: s.spaceRoleNames,
         joinedAtLabel: s.joinedAtLabel,
+        publicFlags: s.publicFlags,
+        bot: s.bot,
       },
       {
         currentUserId: userProfilePopover.currentUserId,
@@ -405,9 +408,12 @@ export const UserProfilePopover: Component = () => {
             </div>
 
             <div class="px-4 pb-1 pt-2.5">
-              <h3 class="text-lg font-semibold leading-tight text-foreground break-words">
-                {subject()!.displayName}
-              </h3>
+              <div class="flex items-center gap-1.5">
+                <h3 class="min-w-0 flex-1 text-lg font-semibold leading-tight text-foreground break-words">
+                  {subject()!.displayName}
+                </h3>
+                <UserBadges flags={subject()!.publicFlags} bot={subject()!.bot} size={14} class="shrink-0" />
+              </div>
               <button
                 type="button"
                 onClick={copyTag}

@@ -25,6 +25,8 @@ export interface AuthState {
     banner?: string;
     bio?: string;
     about_me?: string;
+    public_flags?: number;
+    bot?: boolean;
   } | null;
   token: string | null;
   sessionId: string | null;

@@ -1246,6 +1246,8 @@ export default {
       email: 'Email',
       created: 'Created',
       adminBadge: 'Administrator',
+      badges: 'Badges',
+      badgesHint: 'Click a badge to grant or remove it. Changes are saved immediately and shown on their profile.',
       remote: 'From {{domain}}',
       bannedBadge: 'Banned',
       ban: 'Ban from instance',
@@ -1330,6 +1332,17 @@ export default {
       takeDownHint: 'This removes the space for everyone. Use it for spaces that exist to break the rules, not for one bad room.',
       takeDownReason: 'Reason (for the audit log)',
     },
+  },
+  badges: {
+    founder: 'Founder',
+    staff: 'Staff',
+    support: 'Support',
+    contributor: 'Contributor',
+    translator: 'Translator',
+    bugDiscloser: 'Bug Discloser',
+    alphaTester: 'Alpha Tester',
+    bot: 'Bot account',
+    botTag: 'Bot',
   },
   settings: {
     notifications: {

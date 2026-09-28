@@ -237,6 +237,8 @@ export const MessageList: Component<MessageListProps> = (props) => {
         homeDomain: (p as { home_domain?: string } | undefined)?.home_domain,
         spaceRoleNames: roleNamesForMember(roleIds, props.spaceRoles),
         joinedAtLabel: p ? spaceJoinedLabel(p) : undefined,
+        publicFlags: s.publicFlags,
+        bot: s.bot,
       },
       currentUserId: uid,
       onMessageUser: props.onMessageUser,

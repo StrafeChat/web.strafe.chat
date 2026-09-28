@@ -1244,6 +1244,8 @@ export default {
       email: 'E-Mail',
       created: 'Erstellt',
       adminBadge: 'Administrator',
+      badges: 'Abzeichen',
+      badgesHint: 'Klicke ein Abzeichen an, um es zu vergeben oder zu entfernen. Änderungen werden sofort gespeichert und im Profil angezeigt.',
       remote: 'Von {{domain}}',
       bannedBadge: 'Gesperrt',
       ban: 'Von der Instanz verbannen',
@@ -1328,6 +1330,17 @@ export default {
       takeDownHint: 'Das entfernt den Space für alle. Für Spaces, die nur existieren, um Regeln zu brechen – nicht wegen eines einzelnen Raums.',
       takeDownReason: 'Grund (für das Audit-Log)',
     },
+  },
+  badges: {
+    founder: 'Gründer',
+    staff: 'Team',
+    support: 'Support',
+    contributor: 'Mitwirkender',
+    translator: 'Übersetzer',
+    bugDiscloser: 'Bug-Melder',
+    alphaTester: 'Alpha-Tester',
+    bot: 'Bot-Konto',
+    botTag: 'Bot',
   },
   settings: {
     notifications: {

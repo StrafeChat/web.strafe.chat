@@ -1,6 +1,7 @@
 import type { Component } from 'solid-js';
 import { Show, For, createMemo } from 'solid-js';
 import { MessageAvatar } from './messageList/MessageAvatar';
+import { UserBadges } from './UserBadges';
 import { MessageBody } from './messageList/MessageBody';
 import { PresenceDot } from './PresenceDot';
 import { IconButton } from './ui/IconButton';
@@ -129,12 +130,15 @@ export const UserProfileFullModal: Component = () => {
         <div class="px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-3 md:pb-6">
           <div class="flex flex-col gap-4">
             <div>
-              <h2
-                id="user-profile-full-title"
-                class="break-words text-xl font-semibold leading-tight text-foreground"
-              >
-                {subject()!.displayName}
-              </h2>
+              <div class="flex flex-wrap items-center gap-2">
+                <h2
+                  id="user-profile-full-title"
+                  class="break-words text-xl font-semibold leading-tight text-foreground"
+                >
+                  {subject()!.displayName}
+                </h2>
+                <UserBadges flags={subject()!.publicFlags} bot={subject()!.bot} size={16} />
+              </div>
               <button
                 type="button"
                 onClick={copyTag}

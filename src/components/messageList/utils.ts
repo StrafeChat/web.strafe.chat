@@ -128,6 +128,8 @@ export interface SenderDisplay {
   discriminator?: number;
   bio?: string;
   aboutMe?: string;
+  publicFlags?: number;
+  bot?: boolean;
 }
 
 export function getSenderDisplay(
@@ -145,6 +147,8 @@ export function getSenderDisplay(
       discriminator: auth.user?.discriminator,
       bio: auth.user?.bio,
       aboutMe: auth.user?.about_me,
+      publicFlags: auth.user?.public_flags,
+      bot: auth.user?.bot,
     };
   }
   const p = participants?.find((x) => x.id === senderId);
@@ -157,5 +161,7 @@ export function getSenderDisplay(
     discriminator: p?.discriminator,
     bio: p?.bio,
     aboutMe: p?.about_me,
+    publicFlags: p?.public_flags,
+    bot: p?.bot,
   };
 }

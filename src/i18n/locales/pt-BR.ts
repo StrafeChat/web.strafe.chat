@@ -1252,6 +1252,8 @@ export default {
       email: 'E-mail',
       created: 'Criada',
       adminBadge: 'Administrador',
+      badges: 'Emblemas',
+      badgesHint: 'Clique em um emblema para conceder ou remover. As mudanças são salvas na hora e aparecem no perfil.',
       remote: 'De {{domain}}',
       bannedBadge: 'Banida',
       ban: 'Banir da instância',
@@ -1336,6 +1338,17 @@ export default {
       takeDownHint: 'Isso remove o espaço para todo mundo. Use com espaços que existem para quebrar as regras, não por causa de uma sala problemática.',
       takeDownReason: 'Motivo (para o registro de auditoria)',
     },
+  },
+  badges: {
+    founder: 'Fundador',
+    staff: 'Equipe',
+    support: 'Suporte',
+    contributor: 'Colaborador',
+    translator: 'Tradutor',
+    bugDiscloser: 'Divulgador de bugs',
+    alphaTester: 'Testador alfa',
+    bot: 'Conta de bot',
+    botTag: 'Bot',
   },
   settings: {
     notifications: {

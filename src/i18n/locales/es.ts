@@ -1252,6 +1252,8 @@ export default {
       email: 'Correo',
       created: 'Creada',
       adminBadge: 'Administrador',
+      badges: 'Insignias',
+      badgesHint: 'Haz clic en una insignia para otorgarla o quitarla. Los cambios se guardan al instante y se muestran en su perfil.',
       remote: 'De {{domain}}',
       bannedBadge: 'Expulsada',
       ban: 'Expulsar de la instancia',
@@ -1336,6 +1338,17 @@ export default {
       takeDownHint: 'Esto elimina el espacio para todos. Úsalo con espacios que existen para saltarse las normas, no por una sala problemática.',
       takeDownReason: 'Motivo (para el registro de auditoría)',
     },
+  },
+  badges: {
+    founder: 'Fundador',
+    staff: 'Personal',
+    support: 'Soporte',
+    contributor: 'Colaborador',
+    translator: 'Traductor',
+    bugDiscloser: 'Divulgador de fallos',
+    alphaTester: 'Probador alfa',
+    bot: 'Cuenta de bot',
+    botTag: 'Bot',
   },
   settings: {
     notifications: {

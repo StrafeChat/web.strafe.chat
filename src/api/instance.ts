@@ -63,6 +63,8 @@ export interface AdminUser {
   created_at?: string;
   bot?: boolean;
   verified_email?: boolean;
+  /** Profile-badge bitfield (see lib/badges.ts). */
+  public_flags?: number;
 }
 
 export interface AdminSpace {
@@ -202,6 +204,13 @@ export function banUser(userId: string, input: { reason?: string; max_age_second
 
 export function unbanUser(userId: string) {
   return api<void>(`/instance/users/${encodeURIComponent(userId)}/ban`, { method: 'DELETE' });
+}
+
+export function setUserBadges(userId: string, flags: number) {
+  return api<{ public_flags: number }>(`/instance/users/${encodeURIComponent(userId)}/badges`, {
+    method: 'PATCH',
+    json: { flags },
+  });
 }
 
 export function listBans() {

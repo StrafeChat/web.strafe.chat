@@ -1314,6 +1314,8 @@ export default {
       email: 'البريد',
       created: 'أُنشئ',
       adminBadge: 'مدير',
+      badges: 'الشارات',
+      badgesHint: 'انقر على شارة لمنحها أو إزالتها. تُحفظ التغييرات فورًا وتظهر في ملفه الشخصي.',
       remote: 'من {{domain}}',
       bannedBadge: 'محظور',
       ban: 'حظر من الخادم',
@@ -1398,6 +1400,17 @@ export default {
       takeDownHint: 'يزيل هذا المساحة للجميع. استخدمه مع المساحات القائمة لخرق القواعد، لا بسبب غرفة واحدة سيئة.',
       takeDownReason: 'السبب (لسجل التدقيق)',
     },
+  },
+  badges: {
+    founder: 'المؤسس',
+    staff: 'الطاقم',
+    support: 'الدعم',
+    contributor: 'مساهم',
+    translator: 'مترجم',
+    bugDiscloser: 'مُبلّغ عن ثغرة',
+    alphaTester: 'مختبِر ألفا',
+    bot: 'حساب بوت',
+    botTag: 'بوت',
   },
   settings: {
     notifications: {

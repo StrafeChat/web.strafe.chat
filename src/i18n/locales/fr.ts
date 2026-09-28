@@ -1252,6 +1252,8 @@ export default {
       email: 'E-mail',
       created: 'Créé',
       adminBadge: 'Administrateur',
+      badges: 'Badges',
+      badgesHint: 'Cliquez sur un badge pour l’attribuer ou le retirer. Les changements sont enregistrés aussitôt et affichés sur son profil.',
       remote: 'De {{domain}}',
       bannedBadge: 'Banni',
       ban: "Bannir de l'instance",
@@ -1336,6 +1338,17 @@ export default {
       takeDownHint: "Cela supprime l'espace pour tout le monde. À réserver aux espaces qui existent pour enfreindre les règles, pas à un salon problématique.",
       takeDownReason: "Motif (pour le journal d'audit)",
     },
+  },
+  badges: {
+    founder: 'Fondateur',
+    staff: 'Équipe',
+    support: 'Assistance',
+    contributor: 'Contributeur',
+    translator: 'Traducteur',
+    bugDiscloser: 'Rapporteur de faille',
+    alphaTester: 'Testeur alpha',
+    bot: 'Compte bot',
+    botTag: 'Bot',
   },
   settings: {
     notifications: {

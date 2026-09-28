@@ -32,6 +32,9 @@ export type UserProfilePopoverSubject = {
   bio?: string;
   spaceRoleNames?: string[];
   joinedAtLabel?: string;
+  /** Profile-badge bitfield and bot flag, for the badge row. */
+  publicFlags?: number;
+  bot?: boolean;
 };
 
 const POPOVER_WIDTH = 320;
