@@ -7,6 +7,7 @@ import { CustomEmoji } from '../emoji/CustomEmoji';
 import { extractSpaceInviteCodeFromUrl } from '../../lib/utils/spaceInviteLink';
 import { SpaceInviteLinkEmbed } from '../SpaceInviteLinkEmbed';
 import { LinkPreview } from './LinkPreview';
+import { VideoPlayer } from '../media';
 import { mediaKind, type MediaKind } from '../../lib/gif/providers';
 import { isExternalLink, requestOpenExternalLink } from '../../stores/externalLink';
 import { spaces } from '../../stores/spaces';
@@ -68,25 +69,34 @@ const guardClick = (href: string) => (e: MouseEvent) => {
  * so the request just hangs - a timeout is the only reliable signal. */
 const MEDIA_LOAD_TIMEOUT_MS = 5000;
 
+/** Last path segment of a URL, for a video player's aria-label / download name. */
+function mediaFilename(href: string): string {
+  try {
+    const name = new URL(href).pathname.split('/').pop();
+    return name ? decodeURIComponent(name) : href;
+  } catch {
+    return href;
+  }
+}
+
 const MediaEmbed: Component<{ href: string; kind: MediaKind; allowLinkPreviews?: boolean; showLinkOnFail?: boolean }> = (
   props
 ) => {
   const [failed, setFailed] = createSignal(false);
-  let mediaEl: HTMLImageElement | HTMLVideoElement | undefined;
+  let imgEl: HTMLImageElement | undefined;
+  let ready = false; // set once the media actually loads (img onload, or the player's onReady)
   let timer: number | undefined;
-  const loaded = () => {
-    const el = mediaEl;
-    if (el instanceof HTMLImageElement) return el.complete && el.naturalWidth > 0;
-    if (el instanceof HTMLVideoElement) return el.readyState >= 1;
-    return false;
-  };
+  const isReady = () => ready || !!(imgEl?.complete && imgEl.naturalWidth > 0);
   onMount(() => {
     timer = window.setTimeout(() => {
-      if (!loaded()) setFailed(true);
+      if (!isReady()) setFailed(true);
     }, MEDIA_LOAD_TIMEOUT_MS);
   });
   onCleanup(() => clearTimeout(timer));
-  const onLoaded = () => clearTimeout(timer);
+  const onLoaded = () => {
+    ready = true;
+    clearTimeout(timer);
+  };
   const onFail = () => {
     clearTimeout(timer);
     setFailed(true);
@@ -126,7 +136,7 @@ const MediaEmbed: Component<{ href: string; kind: MediaKind; allowLinkPreviews?:
             onClick={guardClick(props.href)}
           >
             <img
-              ref={(el) => (mediaEl = el)}
+              ref={(el) => (imgEl = el)}
               src={props.href}
               alt={props.kind === 'gif' ? 'GIF' : ''}
               loading="lazy"
@@ -138,14 +148,12 @@ const MediaEmbed: Component<{ href: string; kind: MediaKind; allowLinkPreviews?:
           </a>
         }
       >
-        <video
-          ref={(el) => (mediaEl = el)}
+        <VideoPlayer
           src={props.href}
-          controls
-          preload="metadata"
-          onLoadedMetadata={onLoaded}
+          filename={mediaFilename(props.href)}
+          onReady={onLoaded}
           onError={onFail}
-          class="my-1.5 block max-h-80 max-w-full rounded-lg bg-black/30"
+          class="my-1.5"
         />
       </Show>
     </Show>
@@ -164,15 +172,15 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
     }
     return count > 0 && count <= JUMBO_MAX;
   });
-  // A message whose only content is a media link (GIF/image/video, Discord-style) renders as
-  // just that media, no URL text. Mixed with other text, the link stays and the embed goes below.
-  const loneMedia = createMemo((): { href: string; kind: MediaKind } | null => {
+  // A message whose only content is a GIF renders as just the animation, no URL text (the
+  // GIF-picker / tenor-giphy behaviour). Image, video and page links keep their URL - and the
+  // media or a fallback preview card is embedded below it - so the link is never swallowed.
+  const loneGif = createMemo((): { href: string; kind: MediaKind } | null => {
     let found: { href: string; kind: MediaKind } | null = null;
     for (const s of segments()) {
       if (s.type === 'link') {
-        const kind = mediaKind(s.href);
-        if (!kind || found) return null; // a non-media link, or more than one link
-        found = { href: s.href, kind };
+        if (mediaKind(s.href) !== 'gif' || found) return null; // not a lone GIF
+        found = { href: s.href, kind: 'gif' };
       } else if (s.type === 'text' && s.content.trim() === '') {
         continue;
       } else {
@@ -201,7 +209,7 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
 
   return (
     <div class={props.class}>
-      <Show when={loneMedia()} fallback={
+      <Show when={loneGif()} fallback={
       <>
       <For each={segments()}>
         {(seg) => {
@@ -274,8 +282,9 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
                 {seg.text}
               </a>
             );
-            // A media link (GIF/image/video) alongside other text: keep the link and add the
-            // media below it. (A message that is only media is handled by loneMedia above.)
+            // A media link (GIF/image/video): keep the link and add the media (or, if the URL
+            // turns out to be an HTML page, a preview card) below it. A message that is only a
+            // GIF is handled by loneGif above and shows just the animation.
             const kind = mediaKind(href);
             if (kind) {
               return (

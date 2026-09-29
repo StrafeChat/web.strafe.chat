@@ -3,21 +3,39 @@ import { Show, createMemo, onMount } from 'solid-js';
 import { ensureLinkPreview, linkPreviews } from '../../stores/linkPreviews';
 import type { LinkMetadata } from '../../api/unfurl';
 import { isExternalLink, requestOpenExternalLink } from '../../stores/externalLink';
+import { VideoPlayer } from '../media';
+import { videoEmbed } from '../../lib/embeds/providers';
+import { IframeEmbed } from './IframeEmbed';
+
+/** Last path segment of a URL, a reasonable fallback name for a video with no title. */
+function mediaName(href: string): string {
+  try {
+    const name = new URL(href).pathname.split('/').pop();
+    return name ? decodeURIComponent(name) : 'video';
+  } catch {
+    return 'video';
+  }
+}
 
 /**
  * A rich link-preview card, modelled on Discord's embed: an accent edge in the site's theme
  * colour, a provider (favicon + site name) and author line, a title, a description, and media -
- * a full-width image, a small right-hand thumbnail, or a video (played inline when the link is a
- * real file, else the poster with a play affordance that opens the source). Only renders once
- * /unfurl returned something worth showing.
+ * a full-width image, a small right-hand thumbnail, or a video. A video plays inline in our own
+ * player when the link is a real file, in a click-to-load provider <iframe> for an embeddable one
+ * (YouTube, Vimeo, …), and otherwise falls back to a poster that opens the source. Only renders
+ * once /unfurl returned something worth showing.
  */
 export const LinkPreview: Component<{ url: string }> = (props) => {
   onMount(() => ensureLinkPreview(props.url));
   const entry = () => linkPreviews.byUrl[props.url];
+  const data = () => (entry()?.status === 'ok' ? entry()?.data : undefined);
+  const embed = createMemo(() => videoEmbed(props.url));
 
+  // Render for real metadata, or - even without any - for an embeddable provider, so a YouTube
+  // link still gets an inline player though YouTube serves our unfurl bot no preview at all.
   return (
-    <Show when={entry()?.status === 'ok' && entry()?.data}>
-      {(data) => <Card d={data()} fallbackUrl={props.url} />}
+    <Show when={data() || embed()}>
+      <Card d={data() ?? {}} fallbackUrl={props.url} />
     </Show>
   );
 };
@@ -33,16 +51,20 @@ const Card: Component<{ d: LinkMetadata; fallbackUrl: string }> = (props) => {
 
   const video = () => props.d.video;
   const image = () => props.d.image;
-  // A video is playable inline only when it's a real media file, not an embed page (YouTube).
+  // A known provider (YouTube, Vimeo, …) whose page we can frame and play in-app, derived from the
+  // link itself rather than the metadata - so it works even if the page didn't declare an og:video.
+  const embed = createMemo(() => videoEmbed(props.d.url) || videoEmbed(props.fallbackUrl));
+  // A declared video is playable in our native player only when it's a real media file, not an
+  // embed page (those go through the provider iframe above, or a poster that opens the source).
   const videoPlayable = createMemo(() => {
     const v = video();
     if (!v?.url) return false;
     return (props.d.video_type ?? '').startsWith('video/') || /\.(mp4|webm|mov|m4v)(\?|$)/i.test(v.url);
   });
-  // Big media (video or a large image) stacks under the text; a plain "summary" image is a small
-  // thumbnail beside it.
-  const bigMedia = () => !!video() || (!!image() && !!props.d.image_large);
-  const thumbnail = () => !video() && !!image() && !props.d.image_large;
+  // Big media (a video, an inline embed, or a large image) stacks under the text; a plain
+  // "summary" image is a small thumbnail beside it.
+  const bigMedia = () => !!video() || !!embed() || (!!image() && !!props.d.image_large);
+  const thumbnail = () => !video() && !embed() && !!image() && !props.d.image_large;
 
   const textBlock = (): JSX.Element => (
     <>
@@ -74,45 +96,52 @@ const Card: Component<{ d: LinkMetadata; fallbackUrl: string }> = (props) => {
     </>
   );
 
-  const mediaBlock = (): JSX.Element => (
-    <Show
-      when={video()}
-      fallback={
-        <a href={href()} target="_blank" rel="noopener noreferrer" onClick={openGuarded} class="mt-2 block overflow-hidden rounded">
-          <img src={image()!.url} alt="" class="max-h-80 w-full rounded object-cover" loading="lazy" draggable={false} />
-        </a>
-      }
-    >
-      {(v) => (
-        <Show
-          when={videoPlayable()}
-          fallback={
-            // An embed-only video (e.g. YouTube): poster + play badge; click opens the source.
-            <a
-              href={href()}
-              target="_blank"
-              rel="noopener noreferrer"
-              onClick={openGuarded}
-              class="group relative mt-2 block overflow-hidden rounded bg-black/30"
-            >
-              <Show when={image()?.url}>
-                <img src={image()!.url} alt="" class="max-h-80 w-full rounded object-cover" loading="lazy" draggable={false} />
-              </Show>
-              <span class="absolute inset-0 flex items-center justify-center">
-                <span class="flex size-12 items-center justify-center rounded-full bg-black/60 text-white transition-colors group-hover:bg-black/75">
-                  <i class="fa-solid fa-play ms-0.5" aria-hidden="true" />
-                </span>
-              </span>
-            </a>
-          }
+  const mediaBlock = (): JSX.Element => {
+    // A real media file → our own player.
+    const v = video();
+    if (videoPlayable() && v) {
+      return (
+        <VideoPlayer
+          src={v.url}
+          filename={props.d.title || mediaName(v.url)}
+          width={v.width}
+          height={v.height}
+          poster={image()?.url}
+          class="mt-2"
+        />
+      );
+    }
+    // A known provider (YouTube, Vimeo, …) → click-to-load inline iframe.
+    const e = embed();
+    if (e) return <IframeEmbed embed={e} poster={image()?.url ?? e.poster} title={props.d.title} />;
+    // An unknown embed page that still declared a video → poster whose click opens the source.
+    if (v) {
+      return (
+        <a
+          href={href()}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={openGuarded}
+          class="group relative mt-2 block overflow-hidden rounded bg-black/30"
         >
-          <video controls preload="metadata" poster={image()?.url} class="mt-2 max-h-80 w-full rounded bg-black/30">
-            <source src={v().url} type={props.d.video_type || undefined} />
-          </video>
-        </Show>
-      )}
-    </Show>
-  );
+          <Show when={image()?.url}>
+            <img src={image()!.url} alt="" class="max-h-80 w-full rounded object-cover" loading="lazy" draggable={false} />
+          </Show>
+          <span class="absolute inset-0 flex items-center justify-center">
+            <span class="flex size-12 items-center justify-center rounded-full bg-black/60 text-white transition-colors group-hover:bg-black/75">
+              <i class="fa-solid fa-play ms-0.5" aria-hidden="true" />
+            </span>
+          </span>
+        </a>
+      );
+    }
+    // Otherwise a plain image.
+    return (
+      <a href={href()} target="_blank" rel="noopener noreferrer" onClick={openGuarded} class="mt-2 block overflow-hidden rounded">
+        <img src={image()!.url} alt="" class="max-h-80 w-full rounded object-cover" loading="lazy" draggable={false} />
+      </a>
+    );
+  };
 
   return (
     <div

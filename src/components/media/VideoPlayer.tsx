@@ -9,6 +9,12 @@ import { t } from '../../i18n';
 
 const MAX_W = 400;
 const MAX_H = 300;
+// A portrait clip gets a taller budget and a floor on its width, so a tall, thin video isn't
+// squeezed so narrow that the control bar's buttons collide. Below COMPACT_W the row drops its
+// (widest, most expendable) time readout so it still never overflows.
+const MAX_H_PORTRAIT = 420;
+const MIN_W = 232;
+const COMPACT_W = 288;
 /** How long the controls stay after the pointer stops moving while playing. */
 const HIDE_AFTER_MS = 2500;
 
@@ -19,6 +25,13 @@ export interface VideoPlayerProps {
   height?: number;
   /** Where the download button points (the decrypted object URL for E2EE clips). */
   downloadUrl?: string;
+  /** Frame shown before playback - e.g. an unfurled video's thumbnail. */
+  poster?: string;
+  /** Fired once metadata loads (the source is a real, playable video). */
+  onReady?: () => void;
+  /** Fired if the source fails to load (e.g. a media-looking URL that is really an HTML page),
+   * so an inline link embed can fall back to a preview card. */
+  onError?: () => void;
   class?: string;
 }
 
@@ -38,7 +51,16 @@ export const VideoPlayer: Component<VideoPlayerProps> = (props) => {
   let hideTimer: ReturnType<typeof setTimeout> | undefined;
 
   const hasDims = () => (props.width ?? 0) > 0 && (props.height ?? 0) > 0;
-  const box = createMemo(() => fitWithin(props.width ?? 0, props.height ?? 0, MAX_W, MAX_H));
+  const box = createMemo(() => {
+    const w = props.width ?? 0;
+    const h = props.height ?? 0;
+    const fit = fitWithin(w, h, MAX_W, h > w ? MAX_H_PORTRAIT : MAX_H);
+    // Never let the frame get narrower than the controls need; a thinner clip letterboxes within.
+    return { width: Math.max(fit.width, MIN_W), height: fit.height };
+  });
+  // A narrow (portrait) player hides the time readout so the button row keeps its layout instead
+  // of the buttons squeezing into each other. Fullscreen is always wide enough.
+  const compact = () => !fullscreen() && box().width < COMPACT_W;
   const pipSupported = typeof document !== 'undefined' && 'pictureInPictureEnabled' in document && document.pictureInPictureEnabled;
 
   function showControls() {
@@ -60,6 +82,15 @@ export const VideoPlayer: Component<VideoPlayerProps> = (props) => {
 
   onCleanup(() => {
     if (hideTimer) clearTimeout(hideTimer);
+  });
+
+  // Report load outcome to a caller (e.g. an inline link embed deciding whether the URL was a
+  // real video or an HTML page it should unfurl instead).
+  createEffect(() => {
+    if (player.ready()) props.onReady?.();
+  });
+  createEffect(() => {
+    if (player.failed()) props.onError?.();
   });
 
   function onFullscreenChange() {
@@ -146,7 +177,7 @@ export const VideoPlayer: Component<VideoPlayerProps> = (props) => {
         fullscreen()
           ? undefined
           : hasDims()
-            ? { width: `${box().width}px`, height: `${box().height}px` }
+            ? { width: `${box().width}px`, height: `${box().height}px`, 'max-width': '100%' }
             : { width: `${MAX_W}px`, 'max-width': '100%', 'aspect-ratio': '16 / 9', 'max-height': `${MAX_H}px` }
       }
       tabIndex={0}
@@ -163,6 +194,7 @@ export const VideoPlayer: Component<VideoPlayerProps> = (props) => {
           player.attach(el);
         }}
         src={props.src}
+        poster={props.poster}
         preload="metadata"
         playsinline
         class={`block ${fullscreen() ? 'max-h-full max-w-full' : 'size-full object-contain'}`}
@@ -201,7 +233,9 @@ export const VideoPlayer: Component<VideoPlayerProps> = (props) => {
         onClick={(e) => e.stopPropagation()}
       >
         <SeekBar player={player} />
-        <div class="flex items-center gap-1">
+        {/* [&>*]:shrink-0 keeps every button at its natural size - on a narrow (portrait) player
+            they must never squeeze into each other; the spacer and hidden time give the room. */}
+        <div class="flex items-center gap-1 [&>*]:shrink-0">
           <button
             type="button"
             class="flex size-8 items-center justify-center rounded-md text-white/90 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
@@ -212,11 +246,13 @@ export const VideoPlayer: Component<VideoPlayerProps> = (props) => {
             <i class={`fa-solid ${player.playing() ? 'fa-pause' : 'fa-play'} text-sm`} aria-hidden="true" />
           </button>
           <VolumeControl player={player} />
-          <span class="ms-1 font-mono text-[11px] tabular-nums text-white/85" aria-live="off">
-            {formatMediaTime(player.currentTime())}
-            <span class="text-white/50"> / </span>
-            {formatMediaTime(player.duration())}
-          </span>
+          <Show when={!compact()}>
+            <span class="ms-1 whitespace-nowrap font-mono text-[11px] tabular-nums text-white/85" aria-live="off">
+              {formatMediaTime(player.currentTime())}
+              <span class="text-white/50"> / </span>
+              {formatMediaTime(player.duration())}
+            </span>
+          </Show>
           <div class="flex-1" />
           <div class="relative">
             <button
@@ -260,7 +296,7 @@ export const VideoPlayer: Component<VideoPlayerProps> = (props) => {
               </div>
             </Show>
           </div>
-          <Show when={pipSupported}>
+          <Show when={pipSupported && !compact()}>
             <button
               type="button"
               class="flex size-8 items-center justify-center rounded-md text-white/90 transition-colors hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
