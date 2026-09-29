@@ -190,6 +190,7 @@ export const EmojiPicker: Component<EmojiPickerProps> = (props) => {
       }
       role="dialog"
       aria-label={t('emoji.picker.title')}
+      data-no-tooltip
     >
       <div class="flex items-center gap-2 border-b border-border/70 p-2">
         <SearchInput

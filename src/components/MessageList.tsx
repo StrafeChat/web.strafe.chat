@@ -702,6 +702,12 @@ export const MessageList: Component<MessageListProps> = (props) => {
                                 setEditingMessageId(msg.id);
                               },
                             },
+                          ]
+                        : []),
+                      // Delete: your own message anywhere, or anyone's here with Manage Messages
+                      // (the backend enforces the same - PermManageMessages in a space text room).
+                      ...((isOwn || props.canManageMessages === true) && roomId
+                        ? [
                             {
                               label: t('messages.actions.delete'),
                               icon: 'fa-trash',
@@ -999,6 +1005,8 @@ export const MessageList: Component<MessageListProps> = (props) => {
                         }}
                       />
                     </Tooltip>
+                  </Show>
+                  <Show when={props.roomId && (msg.sender_id === currentUserId() || props.canManageMessages === true)}>
                     <Tooltip label={t('messages.actions.delete')} inline side="top">
                       <IconButton
                         size="sm"

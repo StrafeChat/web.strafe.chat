@@ -14,6 +14,7 @@ import { instance } from '../../../stores/instance';
 import { isConnectedTo, joinVoiceRoom, voiceStatesForRoom } from '../../../stores/voice';
 import { voicePermsFor } from '../../../lib/voice/perms';
 import { VoiceChannelUsers } from '../../voice/VoiceChannelUsers';
+import { t } from '../../../i18n';
 
 const ROOM_TYPE_TEXT = 3;
 const ROOM_TYPE_VOICE = 4;
@@ -31,6 +32,10 @@ export interface SpaceChannelRowProps {
   onReorderDrop?: (e: DragEvent, targetId: string) => void;
   /** True while this row is the item being dragged (same scope). */
   reorderDragSource?: () => boolean;
+  /** Hover actions on the row, shown only when the viewer has the permission. Passing the
+   * callback is what reveals the button (the parent gates it), Discord-style. */
+  onEditRoom?: (room: SpaceRoom) => void;
+  onInvite?: (room: SpaceRoom) => void;
 }
 
 /** Text/voice row (shared by top-level channels and channels inside sections). */
@@ -95,7 +100,7 @@ export const SpaceChannelRow: Component<SpaceChannelRowProps> = (props) => {
     <>
     <A
       href={`/spaces/${props.spaceId}/rooms/${props.room.id}`}
-      class={`${appCompactRow} ${
+      class={`group/room ${appCompactRow} ${
         reorderSource()
           ? 'bg-muted/60 text-muted-foreground ring-1 ring-inset ring-dashed ring-primary/35'
           : props.activeRoomId === props.room.id
@@ -128,6 +133,47 @@ export const SpaceChannelRow: Component<SpaceChannelRowProps> = (props) => {
       >
         {props.room.name || 'unnamed'}
       </span>
+      {/* Hover actions (invite + settings). Shown only when the parent passes the handler, i.e.
+          the viewer has the permission. The name is flex-1, so these shrink it on hover rather
+          than shoving the unread/mention indicators. Inside the <A>, so each stops navigation. */}
+      <Show when={props.onInvite || props.onEditRoom}>
+        <span
+          class={`shrink-0 items-center gap-0.5 ps-1 ${
+            props.activeRoomId === props.room.id ? 'flex' : 'hidden group-hover/room:flex'
+          }`}
+        >
+          <Show when={props.onInvite}>
+            <button
+              type="button"
+              class="flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+              aria-label={t('space.inviteMembers')}
+              data-tooltip={t('space.inviteMembers')}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                props.onInvite!(props.room);
+              }}
+            >
+              <i class="fa-solid fa-user-plus text-[11px]" aria-hidden="true" />
+            </button>
+          </Show>
+          <Show when={props.onEditRoom}>
+            <button
+              type="button"
+              class="flex size-5 items-center justify-center rounded text-muted-foreground transition-colors hover:text-foreground"
+              aria-label={t('space.roomSettings')}
+              data-tooltip={t('space.roomSettings')}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                props.onEditRoom!(props.room);
+              }}
+            >
+              <i class="fa-solid fa-gear text-[11px]" aria-hidden="true" />
+            </button>
+          </Show>
+        </span>
+      </Show>
       <Show when={muted()}>
         <i class="fa-solid fa-bell-slash shrink-0 text-[10px] text-muted-foreground/70" aria-hidden="true" />
       </Show>

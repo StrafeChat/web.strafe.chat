@@ -43,6 +43,7 @@ import { Select } from './ui/Select';
 import { Tabs } from './ui/Tabs';
 import { Toggle } from './ui/Toggle';
 import { TriStateToggle, type TriState } from './ui/TriStateToggle';
+import { UserCell } from './ui/UserCell';
 import { SettingsNav, SettingsPanel, SettingsShell, type SettingsNavGroup, type SettingsNavItemDef } from './settings';
 import { SpaceEmojiSettings } from './settings/SpaceEmojiSettings';
 import {
@@ -58,6 +59,14 @@ import { t } from '../i18n';
 
 const EVERYONE = '@everyone';
 
+/** Discord's default role palette, offered as quick swatches next to the custom colour picker. */
+const ROLE_COLOR_SWATCHES = [
+  '#1abc9c', '#2ecc71', '#3498db', '#9b59b6', '#e91e63',
+  '#f1c40f', '#e67e22', '#e74c3c', '#95a5a6', '#607d8b',
+  '#11806a', '#1f8b4c', '#206694', '#71368a', '#ad1457',
+  '#c27c0e', '#a84300', '#992d22', '#979c9f', '#546e7a',
+];
+
 /** Role color (24-bit RGB). */
 function intToHex(c: number): string {
   const u = c >>> 0;
@@ -70,7 +79,7 @@ function hexToInt(h: string): number {
 }
 
 type SpaceSettingsSection = 'general' | 'system' | 'roles' | 'emojis' | 'members' | 'invites' | 'bans' | 'audit';
-type RolesSubTab = 'edit' | 'channel' | 'members';
+type RolesSubTab = 'display' | 'permissions' | 'members' | 'channel';
 
 interface SpaceSettingsModalProps {
   open: boolean;
@@ -91,7 +100,7 @@ interface SpaceSettingsModalProps {
 
 export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) => {
   const [nav, setNav] = createSignal<SpaceSettingsSection>('general');
-  const [rolesSubTab, setRolesSubTab] = createSignal<RolesSubTab>('edit');
+  const [rolesSubTab, setRolesSubTab] = createSignal<RolesSubTab>('display');
   const [selectedRoleId, setSelectedRoleId] = createSignal('');
   const [permMask, setPermMask] = createSignal(0);
   const [roleName, setRoleName] = createSignal('');
@@ -103,8 +112,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
   const [denyMask, setDenyMask] = createSignal(0);
   const [overrideTargetType, setOverrideTargetType] = createSignal<'role' | 'user'>('role');
   const [selectedOverrideUserId, setSelectedOverrideUserId] = createSignal('');
-  const [selectedMemberId, setSelectedMemberId] = createSignal('');
-  const [memberRolePick, setMemberRolePick] = createSignal<Set<string>>(new Set());
+  const [memberSearch, setMemberSearch] = createSignal('');
   const [permSearch, setPermSearch] = createSignal('');
   const [err, setErr] = createSignal('');
   const [busy, setBusy] = createSignal(false);
@@ -241,13 +249,10 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
     setDenyMask((prev) => (state === 'deny' ? prev | bit : prev & ~bit));
   }
 
+  // Clear the "add members" search when switching roles, so it doesn't carry over.
   createEffect(() => {
-    const uid = selectedMemberId();
-    if (!uid || rolesSubTab() !== 'members') return;
-    const m = props.members.find((x) => x.id === uid);
-    const s = new Set<string>();
-    if (m?.roles) for (const r of m.roles) if (r) s.add(r);
-    setMemberRolePick(s);
+    selectedRoleId();
+    setMemberSearch('');
   });
 
   createEffect(() => {
@@ -436,24 +441,71 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
   /** Only the owner may change the owner's roles - but they may, on themselves. */
   const canAssignTo = (userId: string) => userId === viewerId() || userId !== props.ownerId;
 
-  async function saveMemberRoles() {
-    const uid = selectedMemberId();
-    if (!uid || !canAssignTo(uid) || !props.canManageRoles) return;
+  // --- Manage Members: who holds the selected role (Discord's per-role member list) ---
+  const roleMemberCount = (roleId: string) =>
+    props.members.reduce((n, m) => n + (m.roles?.includes(roleId) ? 1 : 0), 0);
+  const roleMembers = createMemo(() => {
+    const rid = selectedRoleId();
+    return rid ? props.members.filter((m) => m.roles?.includes(rid)) : [];
+  });
+  const addableMembers = createMemo(() => {
+    const rid = selectedRoleId();
+    if (!rid) return [];
+    const q = memberSearch().trim().toLowerCase();
+    return props.members
+      .filter((m) => !m.roles?.includes(rid) && canAssignTo(m.id))
+      .filter(
+        (m) =>
+          !q ||
+          (m.display_name || '').toLowerCase().includes(q) ||
+          (m.username || '').toLowerCase().includes(q)
+      )
+      .slice(0, 50);
+  });
+
+  /** Add or remove the selected role from one member, preserving their other custom roles. */
+  async function toggleMemberInRole(userId: string, add: boolean) {
+    const rid = selectedRoleId();
+    const role = currentRole();
+    if (!rid || !role || role.name === EVERYONE) return;
+    if (!props.canManageRoles || !canAssignTo(userId) || roleLockedForViewer(role)) return;
     const custom = roles()?.filter((r) => r.name !== EVERYONE) ?? [];
-    // Locked roles are sent back exactly as they came so a save never tries to strip one
-    // the viewer may not touch (the server would keep it anyway, but this keeps the
-    // request honest about what it is asking for).
-    const chosen = custom.filter((r) => memberRolePick().has(r.id)).map((r) => r.id);
+    const m = props.members.find((x) => x.id === userId);
+    const next = new Set((m?.roles ?? []).filter((id) => custom.some((r) => r.id === id)));
+    if (add) next.add(rid);
+    else next.delete(rid);
     setBusy(true);
     setErr('');
     try {
-      await setMemberSpaceRoles(props.spaceId, uid, chosen);
+      await setMemberSpaceRoles(props.spaceId, userId, [...next]);
       props.onMembersUpdated?.();
     } catch (e) {
       setErr(e instanceof Error ? e.message : t('spaceSettings.memberUpdateFailed'));
     } finally {
       setBusy(false);
     }
+  }
+
+  // --- Unsaved-changes bar for the Display/Permissions tabs (Discord auto-tracks edits) ---
+  const roleDirty = createMemo(() => {
+    const r = currentRole();
+    if (!r) return false;
+    return (
+      (r.name !== EVERYONE && roleName().trim() !== r.name && roleName().trim() !== '') ||
+      hexToInt(roleColorHex()) !== (r.color ?? 0) ||
+      roleHoist() !== !!r.hoist ||
+      roleMentionable() !== !!r.mentionable ||
+      permMask() !== r.permissions
+    );
+  });
+  function resetRoleEdits() {
+    const r = currentRole();
+    if (!r) return;
+    setRoleName(r.name);
+    setRoleColorHex(intToHex(r.color ?? 0));
+    setRoleHoist(!!r.hoist);
+    setRoleMentionable(!!r.mentionable);
+    setPermMask(r.permissions);
   }
 
   const panelTitle = () => {
@@ -647,6 +699,12 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                               style={{ 'background-color': intToHex(r.color ?? 0) }}
                             />
                             <span class="truncate">{r.name}</span>
+                            <Show when={!isEveryone}>
+                              <span class="ms-auto shrink-0 text-[11px] tabular-nums text-muted-foreground/70">
+                                <i class="fa-solid fa-user me-0.5 text-[9px]" aria-hidden="true" />
+                                {roleMemberCount(r.id)}
+                              </span>
+                            </Show>
                           </div>
                           <Show when={lineAfter}>
                             <div
@@ -715,48 +773,65 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                       value={rolesSubTab()}
                       onChange={(v) => setRolesSubTab(v)}
                       items={[
-                        { id: 'edit', label: t('spaceSettings.tabRolePerms') },
+                        { id: 'display', label: t('spaceSettings.tabDisplay') },
+                        { id: 'permissions', label: t('spaceSettings.tabPermissions') },
+                        { id: 'members', label: t('spaceSettings.tabMembers') },
                         { id: 'channel', label: t('spaceSettings.tabThisRoom'), disabled: !props.roomId },
-                        { id: 'members', label: t('spaceSettings.tabAssign') },
                       ]}
                     />
 
-                    <Show when={rolesSubTab() === 'edit'}>
+                    <Show when={rolesSubTab() === 'display'}>
                       <div class="space-y-5">
-                        <div class="grid gap-4 sm:grid-cols-2">
-                          <Input
-                            label={t('spaceSettings.roleName')}
-                            type="text"
-                            value={roleName()}
-                            disabled={!props.canManageRoles || r().name === EVERYONE}
-                            onInput={(e) => setRoleName(e.currentTarget.value)}
-                          />
-                          <div class="w-full space-y-1.5">
-                            <label class="text-sm font-medium text-foreground" for="space-role-color-hex">
-                              {t('spaceSettings.roleColor')}
-                            </label>
-                            <div class="flex gap-2">
+                        <Input
+                          label={t('spaceSettings.roleName')}
+                          type="text"
+                          value={roleName()}
+                          disabled={!props.canManageRoles || r().name === EVERYONE}
+                          onInput={(e) => setRoleName(e.currentTarget.value)}
+                        />
+                        <div class="space-y-2">
+                          <label class="text-sm font-medium text-foreground" for="space-role-color-hex">
+                            {t('spaceSettings.roleColor')}
+                          </label>
+                          <div class="flex flex-wrap items-center gap-1.5">
+                            <For each={ROLE_COLOR_SWATCHES}>
+                              {(hex) => (
+                                <button
+                                  type="button"
+                                  disabled={!props.canManageRoles}
+                                  aria-label={hex}
+                                  onClick={() => setRoleColorHex(hex)}
+                                  class="size-7 rounded-md border border-border/40 transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                  classList={{ 'ring-2 ring-ring ring-offset-2 ring-offset-background': roleColorHex().toLowerCase() === hex }}
+                                  style={{ 'background-color': hex }}
+                                />
+                              )}
+                            </For>
+                            <label
+                              class="relative flex size-7 cursor-pointer items-center justify-center rounded-md border border-dashed border-border/70 text-muted-foreground transition-colors hover:text-foreground"
+                              data-tooltip={t('spaceSettings.pickRoleColor')}
+                              aria-label={t('spaceSettings.pickRoleColor')}
+                            >
+                              <i class="fa-solid fa-eye-dropper text-[11px]" aria-hidden="true" />
                               <input
                                 type="color"
                                 value={roleColorHex()}
                                 disabled={!props.canManageRoles}
                                 onInput={(e) => setRoleColorHex(e.currentTarget.value)}
-                                aria-label={t('spaceSettings.pickRoleColor')}
-                                class="h-10 w-14 shrink-0 cursor-pointer rounded-lg border border-input bg-background/80 p-1 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                class="absolute inset-0 cursor-pointer opacity-0"
                               />
-                              <input
-                                id="space-role-color-hex"
-                                type="text"
-                                value={roleColorHex()}
-                                disabled={!props.canManageRoles}
-                                onInput={(e) => setRoleColorHex(e.currentTarget.value)}
-                                class={`${inputBaseClass} h-10 min-w-0 flex-1 px-3 font-mono`}
-                                placeholder="#99aab5"
-                              />
-                            </div>
+                            </label>
+                            <input
+                              id="space-role-color-hex"
+                              type="text"
+                              value={roleColorHex()}
+                              disabled={!props.canManageRoles}
+                              onInput={(e) => setRoleColorHex(e.currentTarget.value)}
+                              class={`${inputBaseClass} h-9 w-28 px-3 font-mono`}
+                              placeholder="#99aab5"
+                            />
                           </div>
                         </div>
-
                         <div class="flex flex-col gap-4 rounded-xl border border-border/60 bg-card/20 p-4">
                           <div class="flex items-center justify-between gap-4">
                             <div>
@@ -770,66 +845,65 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                               <p class="text-sm font-medium text-foreground">{t('spaceSettings.mentionable')}</p>
                               <p class="text-xs text-muted-foreground">{t('spaceSettings.mentionableHint')}</p>
                             </div>
-                            <Toggle
-                              checked={roleMentionable()}
-                              disabled={!props.canManageRoles}
-                              onChange={setRoleMentionable}
-                            />
+                            <Toggle checked={roleMentionable()} disabled={!props.canManageRoles} onChange={setRoleMentionable} />
                           </div>
                         </div>
+                      </div>
+                    </Show>
 
-                        <div>
-                          <div class="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                            <h4 class="text-sm font-semibold text-foreground">{t('spaceSettings.spaceWidePerms')}</h4>
-                            <div class="flex items-center gap-2">
-                              <SearchInput
-                                size="md"
-                                placeholder={t('spaceSettings.searchPerms')}
-                                aria-label={t('spaceSettings.searchPerms')}
-                                value={permSearch()}
-                                onValueChange={setPermSearch}
-                                wrapperClass="w-full sm:w-56"
-                              />
-                              <Show when={props.canManageRoles}>
-                                <Button type="button" variant="outline" size="sm" class="h-9 shrink-0" onClick={() => setPermMask(0)}>
-                                  {t('spaceSettings.clearAll')}
-                                </Button>
-                              </Show>
-                            </div>
-                          </div>
-                          <div class="space-y-4">
-                            <For each={filteredPermGroups()}>
-                              {(group) => (
-                                <div>
-                                  <p class={`mb-1.5 px-1 ${appSectionLabel}`}>{group.category}</p>
-                                  <div class="space-y-1 rounded-xl border border-border/60 bg-card/10 p-2">
-                                    <For each={group.rows}>
-                                      {(row) => (
-                                        <div class="flex items-center justify-between gap-4 rounded-lg px-3 py-3 hover:bg-muted/20">
-                                          <div class="min-w-0 flex-1">
-                                            <p class="text-sm font-medium text-foreground">{row.label}</p>
-                                            <p class="text-xs text-muted-foreground">{row.description}</p>
-                                          </div>
-                                          <Toggle
-                                            checked={hasPerm(permMask(), row.bit)}
-                                            disabled={!props.canManageRoles}
-                                            onChange={(on) => setPermMask(togglePerm(permMask(), row.bit, on))}
-                                          />
-                                        </div>
-                                      )}
-                                    </For>
-                                  </div>
+                    <Show when={rolesSubTab() === 'permissions'}>
+                      <div class="space-y-4">
+                        <div class="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                          <SearchInput
+                            size="md"
+                            placeholder={t('spaceSettings.searchPerms')}
+                            aria-label={t('spaceSettings.searchPerms')}
+                            value={permSearch()}
+                            onValueChange={setPermSearch}
+                            wrapperClass="w-full sm:w-64"
+                          />
+                          <Show when={props.canManageRoles}>
+                            <Button type="button" variant="outline" size="sm" class="h-9 shrink-0" onClick={() => setPermMask(0)}>
+                              {t('spaceSettings.clearAll')}
+                            </Button>
+                          </Show>
+                        </div>
+                        <div class="space-y-4">
+                          <For each={filteredPermGroups()}>
+                            {(group) => (
+                              <div>
+                                <div class="mb-1.5 flex items-center justify-between gap-2 px-1">
+                                  <p class={appSectionLabel}>{group.category}</p>
+                                  <Show when={props.canManageRoles}>
+                                    <Toggle
+                                      checked={group.rows.every((row) => hasPerm(permMask(), row.bit))}
+                                      onChange={(on) =>
+                                        setPermMask((m) => group.rows.reduce((acc, row) => togglePerm(acc, row.bit, on), m))
+                                      }
+                                    />
+                                  </Show>
                                 </div>
-                              )}
-                            </For>
-                          </div>
+                                <div class="space-y-1 rounded-xl border border-border/60 bg-card/10 p-2">
+                                  <For each={group.rows}>
+                                    {(row) => (
+                                      <div class="flex items-center justify-between gap-4 rounded-lg px-3 py-3 hover:bg-muted/20">
+                                        <div class="min-w-0 flex-1">
+                                          <p class="text-sm font-medium text-foreground">{row.label}</p>
+                                          <p class="text-xs text-muted-foreground">{row.description}</p>
+                                        </div>
+                                        <Toggle
+                                          checked={hasPerm(permMask(), row.bit)}
+                                          disabled={!props.canManageRoles}
+                                          onChange={(on) => setPermMask(togglePerm(permMask(), row.bit, on))}
+                                        />
+                                      </div>
+                                    )}
+                                  </For>
+                                </div>
+                              </div>
+                            )}
+                          </For>
                         </div>
-
-                        <Show when={props.canManageRoles}>
-                          <Button type="button" onClick={() => saveRole()} loading={busy()} disabled={busy()}>
-                            {t('common.saveChanges')}
-                          </Button>
-                        </Show>
                       </div>
                     </Show>
 
@@ -896,64 +970,97 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                     </Show>
 
                     <Show when={rolesSubTab() === 'members'}>
-                      <div class="space-y-4">
-                        <p class="text-sm text-muted-foreground">{t('spaceSettings.membersExplain')}</p>
-                        <div class="max-w-md">
-                          <Select label={t('roomSettings.member')} value={selectedMemberId()} onValueChange={setSelectedMemberId}>
-                            <option value="">{t('spaceSettings.selectMember')}</option>
-                            {/* The owner is listed when the viewer *is* the owner: giving
-                                yourself a role is ordinary, being given one by someone
-                                else is not. */}
-                            <For each={props.members.filter((m) => canAssignTo(m.id))}>
-                              {(m) => (
-                                <option value={m.id}>
-                                  {m.display_name || m.username}#{m.discriminator}
-                                </option>
-                              )}
-                            </For>
-                          </Select>
-                        </div>
-                        <Show when={selectedMemberId()}>
-                          <div class="space-y-1 rounded-xl border border-border/60 bg-card/10 p-2">
-                            <For each={roles()?.filter((x) => x.name !== EVERYONE) ?? []}>
-                              {(role) => (
-                                <div class="flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 hover:bg-muted/20">
-                                  <span class="flex min-w-0 items-center gap-2 text-sm text-foreground">
-                                    <span
-                                      class="size-2.5 shrink-0 rounded-full border border-border/40"
-                                      style={{ 'background-color': intToHex(role.color ?? 0) }}
-                                    />
-                                    <span class="truncate">{role.name}</span>
-                                    <Show when={roleLockedForViewer(role)}>
-                                      <i
-                                        class="fa-solid fa-lock text-[10px] text-muted-foreground"
-                                        title={t('spaceSettings.members.roleLocked')}
-                                        aria-hidden="true"
-                                      />
-                                    </Show>
-                                  </span>
-                                  <Toggle
-                                    checked={memberRolePick().has(role.id)}
-                                    disabled={!props.canManageRoles || roleLockedForViewer(role)}
-                                    onChange={(on) => {
-                                      setMemberRolePick((prev) => {
-                                        const next = new Set(prev);
-                                        if (on) next.add(role.id);
-                                        else next.delete(role.id);
-                                        return next;
-                                      });
-                                    }}
-                                  />
-                                </div>
-                              )}
-                            </For>
+                      <Show
+                        when={r().name !== EVERYONE}
+                        fallback={<p class="text-sm text-muted-foreground">{t('spaceSettings.everyoneAllMembers')}</p>}
+                      >
+                        <div class="space-y-5">
+                          <div>
+                            <p class={`mb-2 ${appSectionLabel}`}>
+                              {t('spaceSettings.membersWithRole', { count: roleMembers().length })}
+                            </p>
+                            <Show
+                              when={roleMembers().length}
+                              fallback={<p class="text-sm text-muted-foreground">{t('spaceSettings.noMembersWithRole')}</p>}
+                            >
+                              <div class="space-y-0.5 rounded-xl border border-border/60 bg-card/10 p-2">
+                                <For each={roleMembers()}>
+                                  {(m) => (
+                                    <div class="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 hover:bg-muted/20">
+                                      <UserCell size="sm" name={m.display_name || m.username} username={m.username} discriminator={m.discriminator} avatar={m.avatar} />
+                                      <Show when={props.canManageRoles && canAssignTo(m.id) && !roleLockedForViewer(r())}>
+                                        <button
+                                          type="button"
+                                          class="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/15 hover:text-destructive disabled:opacity-50"
+                                          aria-label={t('spaceSettings.removeFromRole')}
+                                          data-tooltip={t('spaceSettings.removeFromRole')}
+                                          disabled={busy()}
+                                          onClick={() => toggleMemberInRole(m.id, false)}
+                                        >
+                                          <i class="fa-solid fa-xmark" aria-hidden="true" />
+                                        </button>
+                                      </Show>
+                                    </div>
+                                  )}
+                                </For>
+                              </div>
+                            </Show>
                           </div>
-                          <Show when={props.canManageRoles}>
-                            <Button type="button" onClick={() => saveMemberRoles()} loading={busy()} disabled={busy()}>
-                              {t('spaceSettings.saveMemberRoles')}
-                            </Button>
+                          <Show when={props.canManageRoles && !roleLockedForViewer(r())}>
+                            <div>
+                              <p class={`mb-2 ${appSectionLabel}`}>{t('spaceSettings.addMembers')}</p>
+                              <SearchInput
+                                size="md"
+                                placeholder={t('spaceSettings.searchMembers')}
+                                aria-label={t('spaceSettings.searchMembers')}
+                                value={memberSearch()}
+                                onValueChange={setMemberSearch}
+                                wrapperClass="w-full"
+                              />
+                              <Show
+                                when={addableMembers().length}
+                                fallback={<p class="mt-2 text-sm text-muted-foreground">{t('spaceSettings.noMembersToAdd')}</p>}
+                              >
+                                <div class="mt-2 max-h-56 space-y-0.5 overflow-y-auto rounded-xl border border-border/60 bg-card/10 p-2">
+                                  <For each={addableMembers()}>
+                                    {(m) => (
+                                      <button
+                                        type="button"
+                                        class="flex w-full items-center justify-between gap-3 rounded-lg px-2 py-1.5 text-start transition-colors hover:bg-muted/30 disabled:opacity-50"
+                                        disabled={busy()}
+                                        onClick={() => toggleMemberInRole(m.id, true)}
+                                      >
+                                        <UserCell size="sm" name={m.display_name || m.username} username={m.username} discriminator={m.discriminator} avatar={m.avatar} />
+                                        <i class="fa-solid fa-plus shrink-0 text-xs text-muted-foreground" aria-hidden="true" />
+                                      </button>
+                                    )}
+                                  </For>
+                                </div>
+                              </Show>
+                            </div>
                           </Show>
-                        </Show>
+                        </div>
+                      </Show>
+                    </Show>
+
+                    {/* Unsaved-changes bar for Display/Permissions edits (Members / This room save on the spot). */}
+                    <Show
+                      when={
+                        props.canManageRoles &&
+                        (rolesSubTab() === 'display' || rolesSubTab() === 'permissions') &&
+                        roleDirty()
+                      }
+                    >
+                      <div class="sticky bottom-0 z-10 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border/70 bg-popover/95 px-4 py-3 shadow-lg backdrop-blur">
+                        <p class="text-sm text-muted-foreground">{t('spaceSettings.unsavedRoleChanges')}</p>
+                        <div class="flex items-center gap-2">
+                          <Button type="button" variant="outline" size="sm" onClick={() => resetRoleEdits()} disabled={busy()}>
+                            {t('spaceSettings.resetRole')}
+                          </Button>
+                          <Button type="button" size="sm" onClick={() => saveRole()} loading={busy()} disabled={busy()}>
+                            {t('common.saveChanges')}
+                          </Button>
+                        </div>
                       </div>
                     </Show>
                   </>

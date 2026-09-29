@@ -113,7 +113,7 @@ export const GifPicker: Component<GifPickerProps> = (props) => {
   const aspect = (g: GifResult) => (g.previewWidth > 0 && g.previewHeight > 0 ? g.previewWidth / g.previewHeight : 1);
 
   return (
-    <div class="flex min-h-0 flex-1 flex-col">
+    <div class="flex min-h-0 flex-1 flex-col" data-no-tooltip>
       <div class="flex items-center gap-2 border-b border-border/70 p-2">
         <SearchInput
           size="sm"

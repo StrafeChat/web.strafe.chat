@@ -162,8 +162,24 @@ export const TooltipHost: Component = () => {
    * carries only `title=""`. */
   function hostFrom(node: EventTarget | null): HTMLElement | null {
     if (!(node instanceof Element)) return null;
+    // A subtree can opt out of tooltips entirely by carrying `data-no-tooltip` (the emoji/GIF
+    // picker does): still strip any native title so no browser bubble shows - preserving it as an
+    // aria-label - but never open a custom bubble either.
+    const suppressed = !!node.closest('[data-no-tooltip]');
     const titled = node.closest('[title]');
-    if (titled instanceof HTMLElement) adoptNativeTitle(titled);
+    if (titled instanceof HTMLElement) {
+      if (suppressed) {
+        const tag = titled.tagName;
+        const title = titled.getAttribute('title');
+        if (tag !== 'IFRAME' && tag !== 'ABBR' && title != null) {
+          if (title && !hasAccessibleName(titled)) titled.setAttribute('aria-label', title);
+          titled.removeAttribute('title');
+        }
+      } else {
+        adoptNativeTitle(titled);
+      }
+    }
+    if (suppressed) return null;
     const host = node.closest('[data-tooltip]');
     return host instanceof HTMLElement ? host : null;
   }

@@ -552,6 +552,8 @@ export const SpaceRoomsBar: Component = () => {
                       spaceId={spaceId()!}
                       activeRoomId={activeRoomId()}
                       onContextMenu={openRoomMenu}
+                      onEditRoom={canManageRooms() ? setEditingRoom : undefined}
+                      onInvite={canCreateInvite() ? () => setInviteOpen(true) : undefined}
                       reorderScopeKey="top"
                       reorderEnabled={canManageRooms()}
                       reorderDragSource={() =>
@@ -666,6 +668,8 @@ export const SpaceRoomsBar: Component = () => {
                               spaceId={spaceId()!}
                               activeRoomId={activeRoomId()}
                               onContextMenu={openRoomMenu}
+                              onEditRoom={canManageRooms() ? setEditingRoom : undefined}
+                              onInvite={canCreateInvite() ? () => setInviteOpen(true) : undefined}
                               reorderScopeKey={secScope}
                               reorderEnabled={canManageRooms()}
                               reorderDragSource={() =>
