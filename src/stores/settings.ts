@@ -9,6 +9,11 @@ export type SettingsData = {
   restoreLastVisited: boolean;
   /** Browser spellcheck in the message composer. */
   spellcheck: boolean;
+  /** Show link previews in end-to-end encrypted rooms (PMs, groups, E2EE channels). Off by
+   * default: generating a preview means sending the link to the server to fetch, which the
+   * server would otherwise never see in an encrypted room. Non-encrypted channels always
+   * preview and ignore this. */
+  linkPreviewsInEncrypted: boolean;
 };
 
 const DEFAULTS: SettingsData = {
@@ -16,6 +21,7 @@ const DEFAULTS: SettingsData = {
   membersPanelOpen: false,
   restoreLastVisited: false,
   spellcheck: true,
+  linkPreviewsInEncrypted: false,
 };
 
 function loadSettings(): SettingsData {
@@ -28,6 +34,7 @@ function loadSettings(): SettingsData {
         membersPanelOpen: parsed.membersPanelOpen ?? DEFAULTS.membersPanelOpen,
         restoreLastVisited: parsed.restoreLastVisited ?? DEFAULTS.restoreLastVisited,
         spellcheck: parsed.spellcheck ?? DEFAULTS.spellcheck,
+        linkPreviewsInEncrypted: parsed.linkPreviewsInEncrypted ?? DEFAULTS.linkPreviewsInEncrypted,
       };
     }
   } catch {
@@ -67,4 +74,9 @@ export function setRestoreLastVisited(on: boolean) {
 export function setSpellcheck(on: boolean) {
   setSettings('spellcheck', on);
   persistSettings({ spellcheck: on });
+}
+
+export function setLinkPreviewsInEncrypted(on: boolean) {
+  setSettings('linkPreviewsInEncrypted', on);
+  persistSettings({ linkPreviewsInEncrypted: on });
 }

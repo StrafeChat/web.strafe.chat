@@ -1732,6 +1732,9 @@ export default {
         compactDescription: "Affiche plus de messages à l'écran.",
         membersPanel: 'Panneau des membres ouvert par défaut',
         membersPanelDescription: "Affiche la barre des membres à l'ouverture d'un salon.",
+        linkPreviewsEncrypted: 'Aperçus de liens dans les discussions chiffrées',
+        linkPreviewsEncryptedDescription:
+          'Affiche des aperçus pour les liens dans les MP, groupes et salons chiffrés. En générer un envoie le lien au serveur pour le récupérer ; désactivé par défaut pour préserver la confidentialité des discussions chiffrées.',
       },
       gif: {
         title: 'Fournisseur de GIF',

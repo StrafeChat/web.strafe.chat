@@ -4,6 +4,7 @@ import {
   settings,
   setMessageCompact,
   setMembersPanelOpen,
+  setLinkPreviewsInEncrypted,
   type SettingsData,
 } from '../../stores/settings';
 import {
@@ -408,6 +409,18 @@ export const AppearanceSettingsPage: Component = () => {
                 label={t('settings.appearance.chat.membersPanel')}
                 checked={!!(settings as SettingsData).membersPanelOpen}
                 onChange={() => setMembersPanelOpen(!(settings as SettingsData).membersPanelOpen)}
+              />
+            }
+          />
+          <SettingRow
+            icon="fa-link"
+            title={t('settings.appearance.chat.linkPreviewsEncrypted')}
+            description={t('settings.appearance.chat.linkPreviewsEncryptedDescription')}
+            control={
+              <Toggle
+                label={t('settings.appearance.chat.linkPreviewsEncrypted')}
+                checked={!!(settings as SettingsData).linkPreviewsInEncrypted}
+                onChange={(on) => setLinkPreviewsInEncrypted(on)}
               />
             }
           />

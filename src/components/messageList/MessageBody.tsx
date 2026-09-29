@@ -6,6 +6,7 @@ import { Emoji } from '../emoji/Emoji';
 import { CustomEmoji } from '../emoji/CustomEmoji';
 import { extractSpaceInviteCodeFromUrl } from '../../lib/utils/spaceInviteLink';
 import { SpaceInviteLinkEmbed } from '../SpaceInviteLinkEmbed';
+import { LinkPreview } from './LinkPreview';
 import { isGifUrl } from '../../lib/gif/providers';
 import { isExternalLink, requestOpenExternalLink } from '../../stores/externalLink';
 import { spaces } from '../../stores/spaces';
@@ -26,6 +27,9 @@ export interface MessageBodyProps {
   /** Rendered inline at the very end of the content, so an "(edited)" marker sits on the last
    * line of text instead of dropping to its own line (Discord-style). */
   trailing?: import('solid-js').JSX.Element;
+  /** Render link-preview cards under the text for the http(s) URLs in this message. The caller
+   * decides (non-encrypted room, or the per-user opt-in for encrypted ones). */
+  allowLinkPreviews?: boolean;
 }
 
 const pillBase = 'rounded px-1 py-0.5 font-medium';
@@ -96,6 +100,23 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
       }
     }
     return href;
+  });
+
+  // Distinct http(s) links worth a preview card - not GIFs (rendered inline already) or space
+  // invites (which get their own embed). Capped so a link-dump doesn't fill the screen.
+  const previewUrls = createMemo(() => {
+    if (!props.allowLinkPreviews) return [];
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const s of segments()) {
+      if (s.type !== 'link') continue;
+      if (isGifUrl(s.href) || extractSpaceInviteCodeFromUrl(s.href)) continue;
+      if (!/^https?:\/\//i.test(s.href) || seen.has(s.href)) continue;
+      seen.add(s.href);
+      out.push(s.href);
+      if (out.length >= 4) break;
+    }
+    return out;
   });
 
   return (
@@ -277,6 +298,7 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
           </>
         )}
       </Show>
+      <For each={previewUrls()}>{(u) => <LinkPreview url={u} />}</For>
     </div>
   );
 };

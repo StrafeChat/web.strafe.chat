@@ -1724,6 +1724,9 @@ export default {
         compactDescription: 'Mehr Nachrichten auf dem Bildschirm.',
         membersPanel: 'Mitgliederpanel standardmäßig offen',
         membersPanelDescription: 'Mitgliederleiste beim Öffnen eines Raums anzeigen.',
+        linkPreviewsEncrypted: 'Linkvorschauen in verschlüsselten Chats',
+        linkPreviewsEncryptedDescription:
+          'Vorschauen für Links in DMs, Gruppen und verschlüsselten Kanälen anzeigen. Dafür wird der Link zum Abrufen an den Server gesendet – standardmäßig aus, damit verschlüsselte Chats privat bleiben.',
       },
       gif: {
         title: 'GIF-Anbieter',

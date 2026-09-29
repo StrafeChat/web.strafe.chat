@@ -1726,6 +1726,9 @@ export default {
         compactDescription: 'Fit more messages on screen.',
         membersPanel: 'Members panel open by default',
         membersPanelDescription: 'Show the members sidebar when opening a room.',
+        linkPreviewsEncrypted: 'Link previews in encrypted chats',
+        linkPreviewsEncryptedDescription:
+          'Show previews for links in PMs, groups and encrypted channels. Generating one sends the link to the server to fetch — off by default so encrypted chats stay private.',
       },
       gif: {
         title: 'GIF provider',

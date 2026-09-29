@@ -151,6 +151,9 @@ export const MessageList: Component<MessageListProps> = (props) => {
   const getScrollContainer = () => listRef[0]?.();
   const currentUserId = () => auth.user?.id;
   const compact = () => (props.compact !== undefined ? props.compact : settings.messageCompact);
+  // Link previews always render in non-encrypted rooms; in E2EE rooms only when the user opts
+  // in (unfurling sends the link to the server, which it otherwise never sees there).
+  const allowLinkPreviews = () => props.e2eeEnabled !== true || settings.linkPreviewsInEncrypted;
   const canReact = () => props.canReact !== false;
 
   let publishTimer: ReturnType<typeof setTimeout> | null = null;
@@ -816,6 +819,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                           participants={props.participants}
                           spaceRoles={props.spaceRoles}
                           onMentionClick={openProfileForUser}
+                          allowLinkPreviews={allowLinkPreviews()}
                           trailing={
                             <Show when={isEdited(msg)}>
                               <Tooltip label={t('messages.editedAt', { time: formatMessageTimestamp(new Date(msg.updated_at!)) })} inline side="top">
@@ -879,6 +883,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                         participants={props.participants}
                         spaceRoles={props.spaceRoles}
                         onMentionClick={openProfileForUser}
+                        allowLinkPreviews={allowLinkPreviews()}
                         trailing={
                           <Show when={isEdited(msg)}>
                             <Tooltip label={t('messages.editedAt', { time: formatMessageTimestamp(new Date(msg.updated_at!)) })} inline side="top">

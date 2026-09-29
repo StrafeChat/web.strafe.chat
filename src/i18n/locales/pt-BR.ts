@@ -1732,6 +1732,9 @@ export default {
         compactDescription: 'Mostra mais mensagens na tela.',
         membersPanel: 'Painel de membros aberto por padrão',
         membersPanelDescription: 'Mostra a barra de membros ao abrir uma sala.',
+        linkPreviewsEncrypted: 'Prévias de links em conversas criptografadas',
+        linkPreviewsEncryptedDescription:
+          'Mostra prévias de links em DMs, grupos e canais criptografados. Gerar uma envia o link ao servidor para buscá-lo; desativado por padrão para manter conversas criptografadas privadas.',
       },
       gif: {
         title: 'Provedor de GIF',
