@@ -432,6 +432,25 @@ export async function uploadSpaceIcon(spaceId: string, file: File): Promise<Spac
   return res.json() as Promise<Space>;
 }
 
+/** Multipart upload; Nebula URL is returned on the space as `banner`. Requires Manage space (or owner). */
+export async function uploadSpaceBanner(spaceId: string, file: File): Promise<Space> {
+  const form = new FormData();
+  form.append('file', file);
+  const token = getSessionToken();
+  const headers: HeadersInit = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${getApiUrl()}/spaces/${spaceId}/banner`, {
+    method: 'POST',
+    body: form,
+    headers,
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new ApiError(err.error ?? `HTTP ${res.status}`, res.status);
+  }
+  return res.json() as Promise<Space>;
+}
+
 export function listSpaceRoles(spaceId: string) {
   return api<SpaceRole[]>(`/spaces/${spaceId}/roles`);
 }

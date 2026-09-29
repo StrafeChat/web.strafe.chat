@@ -828,6 +828,11 @@ export default {
     },
     overview: {
       identity: 'Identidad',
+      banner: 'Banner',
+      bannerHint: 'Se muestra en la parte superior de la lista de canales. Las imágenes anchas (unos 960×360) se ven mejor.',
+      noBanner: 'Aún no hay banner',
+      uploadBanner: 'Subir banner',
+      bannerUploadFailed: 'No se pudo subir el banner.',
       descriptionPlaceholder: '¿De qué trata este espacio?',
       descriptionHint: 'Se muestra en las páginas de invitación. Hasta 1000 caracteres.',
     },

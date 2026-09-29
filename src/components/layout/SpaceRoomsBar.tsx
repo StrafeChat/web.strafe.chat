@@ -373,7 +373,15 @@ export const SpaceRoomsBar: Component = () => {
       class={`flex w-[calc(100vw-72px)] shrink-0 flex-col overflow-hidden pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:w-[240px] md:pb-0 ${appChannelRail}`}
     >
       <div class="flex-1 flex flex-col min-h-0 overflow-hidden w-full">
-        <div class={`flex h-12 shrink-0 items-center gap-2 px-3 ${appHeaderBar}`}>
+        <div
+          class={`relative flex shrink-0 gap-2 px-3 ${appHeaderBar} ${
+            space()?.banner ? 'h-28 items-end pb-2' : 'h-12 items-center'
+          }`}
+        >
+          <Show when={space()?.banner}>
+            <img src={space()!.banner} alt="" class="pointer-events-none absolute inset-0 size-full object-cover" />
+            <div class="pointer-events-none absolute inset-0 bg-gradient-to-t from-background via-background/70 to-background/10" />
+          </Show>
           <button
             type="button"
             ref={(el) => {
@@ -382,7 +390,7 @@ export const SpaceRoomsBar: Component = () => {
             id="space-header-menu-trigger"
             aria-haspopup="menu"
             aria-expanded={spaceMenuOpen()}
-            class="flex items-center gap-2 min-w-0 flex-1 rounded-lg hover:bg-accent/50 px-2 py-1.5 text-left transition-colors active:scale-[0.99]"
+            class="relative flex items-center gap-2 min-w-0 flex-1 rounded-lg hover:bg-accent/50 px-2 py-1.5 text-left transition-colors active:scale-[0.99]"
             onClick={(e) => {
               e.stopPropagation();
               setSpaceMenuOpen((o) => {

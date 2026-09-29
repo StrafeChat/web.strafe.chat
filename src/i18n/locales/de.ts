@@ -820,6 +820,11 @@ export default {
     },
     overview: {
       identity: 'Identität',
+      banner: 'Banner',
+      bannerHint: 'Wird oben in der Kanalliste angezeigt. Breite Bilder (etwa 960×360) sehen am besten aus.',
+      noBanner: 'Noch kein Banner',
+      uploadBanner: 'Banner hochladen',
+      bannerUploadFailed: 'Banner konnte nicht hochgeladen werden.',
       descriptionPlaceholder: 'Worum geht es in diesem Space?',
       descriptionHint: 'Wird auf Einladungsseiten angezeigt. Bis zu 1000 Zeichen.',
     },

@@ -1,6 +1,6 @@
 import type { Component } from 'solid-js';
 import { createEffect, createSignal, Show } from 'solid-js';
-import { patchSpace, uploadSpaceIcon, type Space, type SpaceMember } from '../../../api/spaces';
+import { patchSpace, uploadSpaceIcon, uploadSpaceBanner, type Space, type SpaceMember } from '../../../api/spaces';
 import { addOrUpdateSpace } from '../../../stores/spaces';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
@@ -26,7 +26,9 @@ export const SpaceOverviewPage: Component<Props> = (props) => {
   const [description, setDescription] = createSignal('');
   const [saving, setSaving] = createSignal(false);
   const [iconBusy, setIconBusy] = createSignal(false);
+  const [bannerBusy, setBannerBusy] = createSignal(false);
   let fileInput: HTMLInputElement | undefined;
+  let bannerInput: HTMLInputElement | undefined;
 
   createEffect(() => {
     setName(props.space?.name ?? '');
@@ -62,6 +64,19 @@ export const SpaceOverviewPage: Component<Props> = (props) => {
       props.onError(e instanceof Error ? e.message : t('spaceSettings.iconUploadFailed'));
     } finally {
       setIconBusy(false);
+    }
+  }
+
+  async function onPickBanner(f: File | undefined) {
+    if (!f || !props.canManage) return;
+    setBannerBusy(true);
+    props.onError('');
+    try {
+      addOrUpdateSpace(await uploadSpaceBanner(props.spaceId, f));
+    } catch (e) {
+      props.onError(e instanceof Error ? e.message : t('spaceSettings.overview.bannerUploadFailed'));
+    } finally {
+      setBannerBusy(false);
     }
   }
 
@@ -126,6 +141,40 @@ export const SpaceOverviewPage: Component<Props> = (props) => {
             </Show>
           </div>
         </div>
+      </section>
+
+      <section class="space-y-3">
+        <h3 class={settingsSectionTitle}>{t('spaceSettings.overview.banner')}</h3>
+        <p class="text-sm text-muted-foreground">{t('spaceSettings.overview.bannerHint')}</p>
+        <div class="relative w-full overflow-hidden rounded-2xl border border-border bg-muted/40" style={{ 'aspect-ratio': '16 / 6' }}>
+          <Show
+            when={props.space?.banner}
+            fallback={
+              <div class="flex size-full items-center justify-center text-sm text-muted-foreground">
+                {t('spaceSettings.overview.noBanner')}
+              </div>
+            }
+          >
+            <img src={props.space!.banner} alt="" class="size-full object-cover" />
+          </Show>
+        </div>
+        <input
+          type="file"
+          accept="image/jpeg,image/png,image/gif,image/webp"
+          class="hidden"
+          ref={(el) => {
+            bannerInput = el;
+          }}
+          onChange={(e) => {
+            void onPickBanner(e.currentTarget.files?.[0]);
+            e.currentTarget.value = '';
+          }}
+        />
+        <Show when={props.canManage}>
+          <Button size="sm" variant="outline" disabled={bannerBusy()} loading={bannerBusy()} onClick={() => bannerInput?.click()}>
+            {t('spaceSettings.overview.uploadBanner')}
+          </Button>
+        </Show>
       </section>
 
       <SpaceDangerZone

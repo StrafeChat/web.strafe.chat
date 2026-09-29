@@ -824,6 +824,11 @@ export default {
       identity: 'Identity',
       descriptionPlaceholder: 'What is this space about?',
       descriptionHint: 'Shown on invite pages. Up to 1000 characters.',
+      banner: 'Banner',
+      bannerHint: 'Shown at the top of the channel list. Wide images (around 960×360) look best.',
+      noBanner: 'No banner yet',
+      uploadBanner: 'Upload banner',
+      bannerUploadFailed: 'Could not upload banner.',
     },
     system: {
       messagesTitle: 'System messages',

@@ -828,6 +828,11 @@ export default {
     },
     overview: {
       identity: 'Identité',
+      banner: 'Bannière',
+      bannerHint: 'Affichée en haut de la liste des salons. Les images larges (environ 960×360) sont idéales.',
+      noBanner: 'Pas encore de bannière',
+      uploadBanner: 'Importer une bannière',
+      bannerUploadFailed: 'Impossible d’importer la bannière.',
       descriptionPlaceholder: 'De quoi parle cet espace ?',
       descriptionHint: 'Affiché sur les pages d\'invitation. Jusqu\'à 1000 caractères.',
     },

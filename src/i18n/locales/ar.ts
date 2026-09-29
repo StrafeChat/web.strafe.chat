@@ -858,6 +858,11 @@ export default {
     },
     overview: {
       identity: 'الهوية',
+      banner: 'البانر',
+      bannerHint: 'يظهر أعلى قائمة القنوات. الصور العريضة (حوالي 960×360) تبدو أفضل.',
+      noBanner: 'لا يوجد بانر بعد',
+      uploadBanner: 'رفع بانر',
+      bannerUploadFailed: 'تعذّر رفع البانر.',
       descriptionPlaceholder: 'ما موضوع هذه المساحة؟',
       descriptionHint: 'يظهر في صفحات الدعوة. حتى 1000 حرف.',
     },
