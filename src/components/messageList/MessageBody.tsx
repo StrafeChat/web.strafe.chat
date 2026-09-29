@@ -1,5 +1,5 @@
 import type { Component } from 'solid-js';
-import { For, Show, createMemo } from 'solid-js';
+import { For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import { parseMessageContent } from '../../lib/utils/markdown';
 import { Emoji } from '../emoji/Emoji';
@@ -48,37 +48,109 @@ function findChannel(roomId: string): { spaceId: string; name: string } | null {
 /** Discord-style "jumbo" emoji: a message that is nothing but a few emoji renders them big. */
 const JUMBO_MAX = 10;
 
-/** Inline media for a bare image/GIF/video link: the media itself, capped and lazy-loaded. A
- * video is a real player; an image/GIF links to its source behind the usual external-link guard. */
-const MediaEmbed: Component<{ href: string; kind: MediaKind }> = (props) => (
-  <Show
-    when={props.kind === 'video'}
-    fallback={
-      <a
-        href={props.href}
-        target="_blank"
-        rel="noopener noreferrer"
-        class="my-1.5 block w-fit max-w-full overflow-hidden rounded-lg border border-border/50 bg-muted/30"
-        onClick={(e) => {
-          if (!isExternalLink(props.href)) return;
-          if (e.shiftKey) return;
-          e.preventDefault();
-          requestOpenExternalLink(props.href);
-        }}
+const guardClick = (href: string) => (e: MouseEvent) => {
+  if (!isExternalLink(href)) return;
+  if (e.shiftKey) return;
+  e.preventDefault();
+  requestOpenExternalLink(href);
+};
+
+/**
+ * Inline media for a bare image/GIF/video link: the media itself, capped and lazy-loaded. A
+ * video is a real player; an image/GIF links to its source behind the usual external-link guard.
+ *
+ * Many hosts serve an HTML page at a media-looking URL ("…/i/x.png" is a preview page, not a
+ * PNG), so the file fails to load. When it does, fall back to a link-preview card (unfurl) if the
+ * room allows one, else the plain link, so the message never renders as literally nothing.
+ */
+/** How long to wait for media to load before deciding the URL isn't really media and unfurling
+ * it instead. Some hosts serve an HTML page that neither decodes as an image nor fires `error`,
+ * so the request just hangs - a timeout is the only reliable signal. */
+const MEDIA_LOAD_TIMEOUT_MS = 5000;
+
+const MediaEmbed: Component<{ href: string; kind: MediaKind; allowLinkPreviews?: boolean; showLinkOnFail?: boolean }> = (
+  props
+) => {
+  const [failed, setFailed] = createSignal(false);
+  let mediaEl: HTMLImageElement | HTMLVideoElement | undefined;
+  let timer: number | undefined;
+  const loaded = () => {
+    const el = mediaEl;
+    if (el instanceof HTMLImageElement) return el.complete && el.naturalWidth > 0;
+    if (el instanceof HTMLVideoElement) return el.readyState >= 1;
+    return false;
+  };
+  onMount(() => {
+    timer = window.setTimeout(() => {
+      if (!loaded()) setFailed(true);
+    }, MEDIA_LOAD_TIMEOUT_MS);
+  });
+  onCleanup(() => clearTimeout(timer));
+  const onLoaded = () => clearTimeout(timer);
+  const onFail = () => {
+    clearTimeout(timer);
+    setFailed(true);
+  };
+  return (
+    <Show
+      when={!failed()}
+      fallback={
+        <Show
+          when={props.allowLinkPreviews}
+          fallback={
+            <Show when={props.showLinkOnFail}>
+              <a
+                href={props.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={guardClick(props.href)}
+                class="text-primary underline underline-offset-2 break-all hover:text-primary/90"
+              >
+                {props.href}
+              </a>
+            </Show>
+          }
+        >
+          <LinkPreview url={props.href} />
+        </Show>
+      }
+    >
+      <Show
+        when={props.kind === 'video'}
+        fallback={
+          <a
+            href={props.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            class="my-1.5 block w-fit max-w-full overflow-hidden rounded-lg border border-border/50 bg-muted/30"
+            onClick={guardClick(props.href)}
+          >
+            <img
+              ref={(el) => (mediaEl = el)}
+              src={props.href}
+              alt={props.kind === 'gif' ? 'GIF' : ''}
+              loading="lazy"
+              draggable={false}
+              onLoad={onLoaded}
+              onError={onFail}
+              class="block max-h-80 max-w-full rounded-lg object-contain"
+            />
+          </a>
+        }
       >
-        <img
+        <video
+          ref={(el) => (mediaEl = el)}
           src={props.href}
-          alt={props.kind === 'gif' ? 'GIF' : ''}
-          loading="lazy"
-          draggable={false}
-          class="block max-h-80 max-w-full rounded-lg object-contain"
+          controls
+          preload="metadata"
+          onLoadedMetadata={onLoaded}
+          onError={onFail}
+          class="my-1.5 block max-h-80 max-w-full rounded-lg bg-black/30"
         />
-      </a>
-    }
-  >
-    <video src={props.href} controls preload="metadata" class="my-1.5 block max-h-80 max-w-full rounded-lg bg-black/30" />
-  </Show>
-);
+      </Show>
+    </Show>
+  );
+};
 
 export const MessageBody: Component<MessageBodyProps> = (props) => {
   const navigate = useNavigate();
@@ -209,7 +281,7 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
               return (
                 <div class="block max-w-full my-1.5 space-y-1.5">
                   {linkAnchor}
-                  <MediaEmbed href={href} kind={kind} />
+                  <MediaEmbed href={href} kind={kind} allowLinkPreviews={props.allowLinkPreviews} />
                 </div>
               );
             }
@@ -302,7 +374,7 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
       }>
         {(media) => (
           <>
-            <MediaEmbed href={media().href} kind={media().kind} />
+            <MediaEmbed href={media().href} kind={media().kind} allowLinkPreviews={props.allowLinkPreviews} showLinkOnFail />
             {props.trailing}
           </>
         )}
