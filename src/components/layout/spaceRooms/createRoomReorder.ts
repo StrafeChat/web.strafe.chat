@@ -92,6 +92,9 @@ export function createRoomReorder(deps: RoomReorderDeps) {
     if (dy !== 0) {
       const maxScroll = Math.max(0, el.scrollHeight - el.clientHeight);
       el.scrollTop = Math.max(0, Math.min(maxScroll, el.scrollTop + dy));
+      // The rows just moved under a stationary cursor - keep the guide line on its target row
+      // instead of leaving it stranded where it was drawn on the last dragover.
+      syncReorderLineGeometry();
     }
     if ((y < topLimit || y > botLimit) && activeReorderDrag()) {
       roomsDragScrollRaf = requestAnimationFrame(tickRoomsDragAutoScroll);
@@ -161,31 +164,6 @@ export function createRoomReorder(deps: RoomReorderDeps) {
     | { targetScopeKey: string; beforeId: string; collapsedInsideSectionId?: string }
     | { targetScopeKey: string; atEnd: true; collapsedInsideSectionId?: string };
 
-  function wouldReorderChangeOrder(scopeKey: string, dragId: string, d: DropInd): boolean {
-    if (d.targetScopeKey !== scopeKey) return false;
-    const ids = orderedIdsForScope(scopeKey);
-    if (!ids.includes(dragId)) return false;
-    if ('atEnd' in d) {
-      return !sameStringOrder(ids, moveIdToEnd(ids, dragId));
-    }
-    return !sameStringOrder(ids, moveIdBefore(ids, dragId, d.beforeId));
-  }
-
-  function wouldChannelDropChangeOrder(sourceScopeKey: string, dragId: string, ind: DropInd): boolean {
-    if (ind.collapsedInsideSectionId) {
-      return channelParentSectionId(sourceScopeKey) !== ind.collapsedInsideSectionId;
-    }
-    if (channelParentSectionId(sourceScopeKey) !== channelParentSectionId(ind.targetScopeKey)) {
-      return true;
-    }
-    const ids = orderedIdsForScope(ind.targetScopeKey);
-    if (!ids.includes(dragId)) return false;
-    if ('atEnd' in ind) {
-      return !sameStringOrder(ids, moveIdToEnd(ids, dragId));
-    }
-    return !sameStringOrder(ids, moveIdBefore(ids, dragId, ind.beforeId));
-  }
-
   function syncReorderLineGeometry() {
     const drag = activeReorderDrag();
     const ind = dropIndicator();
@@ -197,10 +175,6 @@ export function createRoomReorder(deps: RoomReorderDeps) {
     try {
       if (drag.kind === 'section') {
         if (ind.targetScopeKey !== 'sections') {
-          setReorderLineRect(null);
-          return;
-        }
-        if (!wouldReorderChangeOrder('sections', drag.id, ind)) {
           setReorderLineRect(null);
           return;
         }
@@ -231,10 +205,6 @@ export function createRoomReorder(deps: RoomReorderDeps) {
           left: r.left + inset,
           width: Math.max(0, r.width - inset * 2),
         });
-        return;
-      }
-      if (!wouldChannelDropChangeOrder(drag.scopeKey, drag.id, ind)) {
-        setReorderLineRect(null);
         return;
       }
       const secExtra = ind.targetScopeKey.startsWith('sec:') ? SECTION_CHANNEL_LINE_INDENT_PX : 0;
