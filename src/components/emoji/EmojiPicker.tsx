@@ -23,6 +23,12 @@ export type EmojiPick = { unicode: string; custom?: undefined } | { unicode?: un
 export interface EmojiPickerProps {
   onPick: (pick: EmojiPick) => void;
   onClose: () => void;
+  /** When embedded in the ExpressionPicker (composer), the parent owns the panel chrome and
+   * outside-click/Escape, and this fills the parent instead of being its own fixed-size card. */
+  embedded?: boolean;
+  /** Focus the search box on open. Off on mobile, where it would re-pop the on-screen keyboard
+   * the picker just replaced. Defaults to true. */
+  autofocusSearch?: boolean;
 }
 
 type CategoryId = 'recent' | `space:${string}` | `group:${number}`;
@@ -144,22 +150,25 @@ export const EmojiPicker: Component<EmojiPickerProps> = (props) => {
     setRecent(loadRecent());
   }
 
-  // Outside click / Escape close the picker.
-  const onDocMouseDown = (e: MouseEvent) => {
-    if (rootEl && !rootEl.contains(e.target as Node)) props.onClose();
-  };
-  const onDocKey = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      e.stopPropagation();
-      props.onClose();
-    }
-  };
-  document.addEventListener('mousedown', onDocMouseDown);
-  document.addEventListener('keydown', onDocKey, true);
-  onCleanup(() => {
-    document.removeEventListener('mousedown', onDocMouseDown);
-    document.removeEventListener('keydown', onDocKey, true);
-  });
+  // Outside click / Escape close the picker - but only when standalone (the reaction picker).
+  // Embedded in the ExpressionPicker, the parent owns those so both tabs share one dismissal.
+  if (!props.embedded) {
+    const onDocMouseDown = (e: MouseEvent) => {
+      if (rootEl && !rootEl.contains(e.target as Node)) props.onClose();
+    };
+    const onDocKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        props.onClose();
+      }
+    };
+    document.addEventListener('mousedown', onDocMouseDown);
+    document.addEventListener('keydown', onDocKey, true);
+    onCleanup(() => {
+      document.removeEventListener('mousedown', onDocMouseDown);
+      document.removeEventListener('keydown', onDocKey, true);
+    });
+  }
 
   let gridEl: HTMLDivElement | undefined;
   createEffect(on([category, query], () => gridEl?.scrollTo({ top: 0 })));
@@ -174,7 +183,11 @@ export const EmojiPicker: Component<EmojiPickerProps> = (props) => {
       ref={(el) => {
         rootEl = el;
       }}
-      class={`flex h-[26rem] w-[22rem] max-w-full flex-col overflow-hidden ${appMenuPanel} !p-0`}
+      class={
+        props.embedded
+          ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
+          : `flex h-[26rem] w-[22rem] max-w-full flex-col overflow-hidden ${appMenuPanel} !p-0`
+      }
       role="dialog"
       aria-label={t('emoji.picker.title')}
     >
@@ -185,7 +198,7 @@ export const EmojiPicker: Component<EmojiPickerProps> = (props) => {
           onValueChange={setQuery}
           placeholder={t('emoji.picker.search')}
           aria-label={t('emoji.picker.search')}
-          autofocus
+          autofocus={props.autofocusSearch !== false}
           wrapperClass="flex-1"
         />
         <div class="relative">

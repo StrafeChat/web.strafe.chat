@@ -10,6 +10,7 @@ import {
   type ThemeDefinition,
 } from '../theme/themes';
 import { DEFAULT_EMOJI_PROVIDER, isEmojiProviderId, type EmojiProviderId } from '../lib/emoji/providers';
+import { DEFAULT_GIF_PROVIDER, isGifProviderId, type GifProviderId } from '../lib/gif/providers';
 import { t } from '../i18n';
 
 export type FontScale = 'sm' | 'md' | 'lg';
@@ -44,6 +45,8 @@ export interface AppearanceState {
   emojiProvider: EmojiProviderId;
   /** Default skin tone applied by the picker: 0 = none, 1..5 light → dark. */
   emojiSkinTone: number;
+  /** Which service backs the composer's GIF picker. */
+  gifProvider: GifProviderId;
 }
 
 const STORAGE_KEY = 'strafe_appearance';
@@ -64,6 +67,7 @@ const DEFAULTS: AppearanceState = {
   customCssEnabled: false,
   emojiProvider: DEFAULT_EMOJI_PROVIDER,
   emojiSkinTone: 0,
+  gifProvider: DEFAULT_GIF_PROVIDER,
 };
 
 function sanitizeTheme(raw: unknown): ThemeDefinition | null {
@@ -111,6 +115,7 @@ function load(): AppearanceState {
       emojiProvider: isEmojiProviderId(p.emojiProvider) ? p.emojiProvider : DEFAULT_EMOJI_PROVIDER,
       emojiSkinTone:
         typeof p.emojiSkinTone === 'number' && p.emojiSkinTone >= 0 && p.emojiSkinTone <= 5 ? Math.floor(p.emojiSkinTone) : 0,
+      gifProvider: isGifProviderId(p.gifProvider) ? p.gifProvider : DEFAULT_GIF_PROVIDER,
     };
   } catch {
     return { ...DEFAULTS };
@@ -210,6 +215,10 @@ export function setEmojiProvider(v: EmojiProviderId) {
 }
 export function setEmojiSkinTone(v: number) {
   setAppearance('emojiSkinTone', Math.max(0, Math.min(5, Math.floor(v))));
+  persist();
+}
+export function setGifProvider(v: GifProviderId) {
+  setAppearance('gifProvider', v);
   persist();
 }
 export function setCustomCss(css: string) {

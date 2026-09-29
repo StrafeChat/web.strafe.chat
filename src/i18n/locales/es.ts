@@ -346,9 +346,20 @@ export default {
     attachFiles: 'Adjuntar archivos',
     attachUnavailable: 'Adjuntos no disponibles',
     emoji: 'Emoji',
+    expressionPicker: 'Emoji y GIF',
     completionAria: 'Mencionar a un usuario, rol, sala, emoji o a todos',
     role: 'Rol',
     room: 'Sala',
+  },
+  gif: {
+    tab: 'GIF',
+    provider: 'Proveedor de GIF',
+    search: 'Buscar en {{provider}}',
+    item: 'GIF',
+    none: 'No se encontraron GIF',
+    error: 'No se pudieron cargar los GIF. Revisa tu conexión e inténtalo de nuevo.',
+    notConfiguredTitle: '{{provider}} no está configurado',
+    notConfiguredBody: 'Esta instancia aún no tiene una clave de API de GIF. Pide al administrador que configure una.',
   },
   attachments: {
     download: 'Descargar',
@@ -1717,6 +1728,10 @@ export default {
         compactDescription: 'Muestra más mensajes en pantalla.',
         membersPanel: 'Panel de miembros abierto por defecto',
         membersPanelDescription: 'Muestra la barra de miembros al abrir una sala.',
+      },
+      gif: {
+        title: 'Proveedor de GIF',
+        description: 'Qué servicio impulsa el selector de GIF del editor.',
       },
       css: {
         title: 'CSS personalizado',

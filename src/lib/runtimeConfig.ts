@@ -10,6 +10,11 @@ export interface RuntimeConfig {
   stargateUrl?: string;
   /** The instance's own object store / CDN (nebula). Serves avatars, emoji, attachments. */
   cdnUrl?: string;
+  /** API key for the Giphy GIF picker (developers.giphy.com). Optional - the GIF tab shows a
+   * "not configured" note without one. */
+  giphyApiKey?: string;
+  /** API key for the Heypster GIF picker (heypster.com; GIPHY-compatible API). Optional. */
+  heypsterApiKey?: string;
 }
 
 declare global {
@@ -63,4 +68,12 @@ export function cdnUrl(): string {
   if (api.endsWith('/api')) return api.slice(0, -'/api'.length) + '/cdn';
   if (api.endsWith(':4000')) return api.replace(/:4000$/, ':4010');
   return 'http://localhost:4010';
+}
+
+/** API key for a GIF provider, from runtime config or a VITE_ env fallback (dev). */
+export function giphyApiKey(): string | undefined {
+  return runtime().giphyApiKey || (import.meta.env.VITE_GIPHY_API_KEY as string | undefined) || undefined;
+}
+export function heypsterApiKey(): string | undefined {
+  return runtime().heypsterApiKey || (import.meta.env.VITE_HEYPSTER_API_KEY as string | undefined) || undefined;
 }

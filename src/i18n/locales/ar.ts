@@ -369,9 +369,20 @@ export default {
     attachFiles: 'إرفاق ملفات',
     attachUnavailable: 'المرفقات غير متاحة',
     emoji: 'إيموجي',
+    expressionPicker: 'الرموز التعبيرية وصور GIF',
     completionAria: 'الإشارة إلى مستخدم أو دور أو غرفة أو إيموجي أو الجميع',
     role: 'دور',
     room: 'غرفة',
+  },
+  gif: {
+    tab: 'GIF',
+    provider: 'مزود GIF',
+    search: 'البحث في {{provider}}',
+    item: 'GIF',
+    none: 'لم يتم العثور على صور GIF',
+    error: 'تعذّر تحميل صور GIF. تحقق من اتصالك وحاول مرة أخرى.',
+    notConfiguredTitle: '{{provider}} غير مُهيأ',
+    notConfiguredBody: 'لم تُضِف هذه المنصة مفتاح واجهة برمجة GIF بعد. اطلب من المسؤول تهيئته.',
   },
   attachments: {
     download: 'تنزيل',
@@ -1779,6 +1790,10 @@ export default {
         compactDescription: 'عرض رسائل أكثر على الشاشة.',
         membersPanel: 'لوحة الأعضاء مفتوحة افتراضيًا',
         membersPanelDescription: 'عرض شريط الأعضاء عند فتح غرفة.',
+      },
+      gif: {
+        title: 'مزود GIF',
+        description: 'الخدمة التي تُشغّل مُنتقي صور GIF في مربع الكتابة.',
       },
       css: {
         title: 'CSS مخصص',

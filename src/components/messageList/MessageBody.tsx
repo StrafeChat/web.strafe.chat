@@ -6,6 +6,7 @@ import { Emoji } from '../emoji/Emoji';
 import { CustomEmoji } from '../emoji/CustomEmoji';
 import { extractSpaceInviteCodeFromUrl } from '../../lib/utils/spaceInviteLink';
 import { SpaceInviteLinkEmbed } from '../SpaceInviteLinkEmbed';
+import { isGifUrl } from '../../lib/gif/providers';
 import { isExternalLink, requestOpenExternalLink } from '../../stores/externalLink';
 import { spaces } from '../../stores/spaces';
 import type { RoomParticipant } from '../../api/rooms';
@@ -40,6 +41,31 @@ function findChannel(roomId: string): { spaceId: string; name: string } | null {
 /** Discord-style "jumbo" emoji: a message that is nothing but a few emoji renders them big. */
 const JUMBO_MAX = 10;
 
+/** Inline GIF (or a bare .gif/.webp link): the animation itself, capped and lazy-loaded, with
+ * the source link behind a click (guarded like every other external link). */
+const GifEmbed: Component<{ href: string }> = (props) => (
+  <a
+    href={props.href}
+    target="_blank"
+    rel="noopener noreferrer"
+    class="my-1.5 block w-fit max-w-full overflow-hidden rounded-lg border border-border/50 bg-muted/30"
+    onClick={(e) => {
+      if (!isExternalLink(props.href)) return;
+      if (e.shiftKey) return;
+      e.preventDefault();
+      requestOpenExternalLink(props.href);
+    }}
+  >
+    <img
+      src={props.href}
+      alt="GIF"
+      loading="lazy"
+      draggable={false}
+      class="block max-h-80 max-w-full rounded-lg object-contain"
+    />
+  </a>
+);
+
 export const MessageBody: Component<MessageBodyProps> = (props) => {
   const navigate = useNavigate();
   const segments = createMemo(() => parseMessageContent(props.text));
@@ -52,9 +78,26 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
     }
     return count > 0 && count <= JUMBO_MAX;
   });
+  // A message whose only content is a GIF link (Discord/GIF-picker style) renders as just the
+  // GIF, no URL text. A GIF link mixed with other text keeps the link and adds the embed below.
+  const loneGifHref = createMemo(() => {
+    let href: string | null = null;
+    for (const s of segments()) {
+      if (s.type === 'link' && isGifUrl(s.href)) {
+        if (href) return null; // more than one link
+        href = s.href;
+      } else if (s.type === 'text' && s.content.trim() === '') {
+        continue;
+      } else {
+        return null;
+      }
+    }
+    return href;
+  });
 
   return (
     <div class={props.class}>
+      <Show when={loneGifHref()} fallback={
       <For each={segments()}>
         {(seg) => {
           if (seg.type === 'text') {
@@ -110,7 +153,7 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
                 </div>
               );
             }
-            return (
+            const linkAnchor = (
               <a
                 href={href}
                 target="_blank"
@@ -126,6 +169,17 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
                 {seg.text}
               </a>
             );
+            // A GIF link alongside other text: keep the link and add the animation below it.
+            // (A message that is only a GIF link is handled by loneGifHref above.)
+            if (isGifUrl(href)) {
+              return (
+                <div class="block max-w-full my-1.5 space-y-1.5">
+                  {linkAnchor}
+                  <GifEmbed href={href} />
+                </div>
+              );
+            }
+            return linkAnchor;
           }
           if (seg.type === 'mention') {
             // Accessor, not a one-shot lookup: participants often finish loading after the
@@ -209,6 +263,9 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
           return null;
         }}
       </For>
+      }>
+        {(href) => <GifEmbed href={href()} />}
+      </Show>
     </div>
   );
 };

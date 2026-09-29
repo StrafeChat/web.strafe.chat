@@ -355,9 +355,12 @@ const SpacePage: Component = () => {
     const replyTo = replyToMessageId() ?? undefined;
     setDraft('');
     setReplyToMessageId(null);
+    // Refocus synchronously, inside the send gesture, so the mobile on-screen keyboard doesn't
+    // close and pop back (a focus() after the send promise resolves lands outside the gesture,
+    // which some mobile browsers answer by flashing the keyboard).
+    inputRef()?.focus();
     sendMessage(id, text, replyTo, files)
       .then(() => {
-        inputRef()?.focus();
         dismissNewHeader(id);
       })
       .catch((err) => {
@@ -367,6 +370,15 @@ const SpacePage: Component = () => {
         attachmentDraft.restore(files);
         attachmentDraft.setError(err instanceof Error ? err.message : t('room.sendFailed'));
       });
+  }
+
+  /** Send a GIF picked from the composer's GIF tab (its .gif URL becomes the message). */
+  function handleSendGif(url: string) {
+    const id = roomId();
+    if (!id || isSending()) return;
+    sendMessage(id, url)
+      .then(() => dismissNewHeader(id))
+      .catch((err) => console.error('Send GIF failed:', err));
   }
 
   function handleReplyToMessage(msg: DecryptedMessage) {
@@ -946,6 +958,7 @@ const SpacePage: Component = () => {
                 attachmentError={attachmentDraft.error()}
                 customEmojis={allCustomEmojis()}
                 noSendMessage={canSendMessages() ? undefined : t('space.noSendPermission')}
+                onSendGif={handleSendGif}
               />
               </RoomComposerDock>
             </div>

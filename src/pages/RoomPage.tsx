@@ -340,9 +340,13 @@ const RoomPage: Component = () => {
     const replyTo = replyToMessageId() ?? undefined;
     setDraft('');
     setReplyToMessageId(null);
+    // Refocus synchronously, inside the send gesture, so the mobile on-screen keyboard doesn't
+    // close and pop back: a focus() after `await sendMessage` lands outside the gesture (a
+    // network round-trip later), which some mobile browsers answer by hiding then re-showing
+    // the keyboard. Kept for the Enter-key path; the send button also preventDefaults pointerdown.
+    inputRef()?.focus();
     try {
       await sendMessage(params.roomId, text, replyTo, files);
-      inputRef()?.focus();
       dismissNewHeader(params.roomId);
     } catch (err) {
       console.error('Send failed:', err);
@@ -350,6 +354,18 @@ const RoomPage: Component = () => {
       setDraft(raw);
       attachmentDraft.restore(files);
       attachmentDraft.setError(err instanceof Error ? err.message : t('room.sendFailed'));
+    }
+  }
+
+  /** Send a GIF picked from the composer's GIF tab: its direct .gif URL becomes the message,
+   * which the renderer shows inline (see MessageBody / isGifUrl). */
+  async function handleSendGif(url: string) {
+    if (isSending()) return;
+    try {
+      await sendMessage(params.roomId, url);
+      dismissNewHeader(params.roomId);
+    } catch (err) {
+      console.error('Send GIF failed:', err);
     }
   }
 
@@ -546,6 +562,7 @@ const RoomPage: Component = () => {
               onRemoveAttachment={attachmentDraft.remove}
               attachmentError={attachmentDraft.error()}
               customEmojis={allCustomEmojis()}
+              onSendGif={handleSendGif}
             />
             </RoomComposerDock>
           </Show>

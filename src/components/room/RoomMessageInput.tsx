@@ -14,7 +14,8 @@ import { appMenuItem, appMenuPanel } from '../../theme/appChrome';
 import { IconButton } from '../ui/IconButton';
 import { MessageAvatar } from '../messageList/MessageAvatar';
 import { Emoji } from '../emoji/Emoji';
-import { EmojiPicker } from '../emoji/EmojiPicker';
+import { ExpressionPicker, type ExpressionTab } from '../emoji/ExpressionPicker';
+import { isMdViewport } from '../../stores/mobileShellLayout';
 import { TypingIndicator, type TypingPerson } from './TypingIndicator';
 import { t } from '../../i18n';
 
@@ -68,6 +69,8 @@ export interface RoomMessageInputProps {
   attachmentError?: string;
   /** Custom emoji offered by the picker and the :name: completion. */
   customEmojis?: CustomEmoji[];
+  /** Send a GIF (its direct .gif URL) as a message, straight from the GIF picker. */
+  onSendGif?: (url: string) => void;
 }
 
 function participantDisplayName(p: RoomParticipant): string {
@@ -92,8 +95,8 @@ const SPECIALS: Array<{ token: 'everyone' | 'here'; sublabelKey: string }> = [
 const COMPOSER_MAX_HEIGHT_PX = 200;
 
 /** Typography shared by the textarea and its mirror so they stay glyph-aligned. The
- * horizontal padding leaves room for the attach (left) and emoji (right) buttons. */
-const composerTextClass = 'pl-11 pr-11 py-3 text-sm leading-5';
+ * horizontal padding leaves room for the attach (left) and the GIF+emoji (right) buttons. */
+const composerTextClass = 'pl-11 pr-[4.5rem] py-3 text-sm leading-5';
 
 function isWordChar(c: string | undefined): boolean {
   return c != null && /[\p{L}\p{N}_]/u.test(c);
@@ -102,7 +105,21 @@ function isWordChar(c: string | undefined): boolean {
 export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
   const [selectedIndex, setSelectedIndex] = createSignal(0);
   const [pickerOpen, setPickerOpen] = createSignal(false);
+  const [pickerTab, setPickerTab] = createSignal<ExpressionTab>('emoji');
   const [dragDepth, setDragDepth] = createSignal(0);
+  const mobile = () => !isMdViewport();
+
+  /** Open the emoji/GIF picker on a tab (or close if that tab is already open). On mobile the
+   * picker takes the on-screen keyboard's place, so blur the textarea to dismiss the keyboard. */
+  function togglePicker(tab: ExpressionTab) {
+    if (pickerOpen() && pickerTab() === tab) {
+      setPickerOpen(false);
+      return;
+    }
+    setPickerTab(tab);
+    setPickerOpen(true);
+    if (mobile()) textareaEl?.blur();
+  }
   const [emojiCatalog, setEmojiCatalog] = createSignal<EmojiCatalog | null>(emojiCatalogIfLoaded());
   let textareaEl: HTMLTextAreaElement | undefined;
   let mirrorEl: HTMLDivElement | undefined;
@@ -238,6 +255,18 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
     const pos = el ? el.selectionStart : props.draft.length;
     props.onInsertMention?.(pos, el ? el.selectionEnd : pos, text);
   }
+
+  const handlePickEmoji = (pick: { custom?: CustomEmoji; unicode?: string }) => {
+    insertAtCaret(pick.custom ? `:${pick.custom.name}: ` : `${pick.unicode} `);
+    setPickerOpen(false);
+    // Keep focus so desktop typing continues; on mobile the picker replaced the keyboard, so
+    // don't force it back open until the user taps the field again.
+    if (!mobile()) textareaEl?.focus();
+  };
+  const handlePickGif = (gif: { url: string }) => {
+    props.onSendGif?.(gif.url);
+    setPickerOpen(false);
+  };
 
   function handleKeyDown(e: KeyboardEvent) {
     const state = completion();
@@ -515,15 +544,26 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
                     }}
                   />
                 </div>
-                <div class="absolute bottom-1.5 right-1.5">
+                <div class="absolute bottom-1.5 right-1.5 flex items-center gap-0.5">
+                  <IconButton
+                    size="sm"
+                    tone="subtle"
+                    icon="fa-solid fa-film"
+                    label={t('gif.tab')}
+                    active={pickerOpen() && pickerTab() === 'gif'}
+                    disabled={props.disabled}
+                    data-expr-toggle=""
+                    onClick={() => togglePicker('gif')}
+                  />
                   <IconButton
                     size="sm"
                     tone="subtle"
                     icon="fa-solid fa-face-smile"
                     label={t('composer.emoji')}
-                    active={pickerOpen()}
+                    active={pickerOpen() && pickerTab() === 'emoji'}
                     disabled={props.disabled}
-                    onClick={() => setPickerOpen((v) => !v)}
+                    data-expr-toggle=""
+                    onClick={() => togglePicker('emoji')}
                   />
                 </div>
               </div>
@@ -541,14 +581,14 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
             >
               <i class="fa-solid fa-paper-plane text-sm" aria-hidden="true" />
             </button>
-            <Show when={pickerOpen()}>
+            {/* Desktop: a floating card above the composer. */}
+            <Show when={pickerOpen() && !mobile()}>
               <div class="absolute bottom-full left-0 right-0 z-30 mb-2 flex justify-end">
-                <EmojiPicker
+                <ExpressionPicker
+                  initialTab={pickerTab()}
                   onClose={() => setPickerOpen(false)}
-                  onPick={(pick) => {
-                    insertAtCaret(pick.custom ? `:${pick.custom.name}: ` : `${pick.unicode} `);
-                    setPickerOpen(false);
-                  }}
+                  onPickEmoji={handlePickEmoji}
+                  onPickGif={handlePickGif}
                 />
               </div>
             </Show>
@@ -634,6 +674,21 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
               </div>
             </Show>
           </div>
+          {/* Mobile: dock the picker where the on-screen keyboard was - same spot, replacing it.
+              It sits below the input inside the bottom-anchored composer dock, so opening it
+              pushes the field up exactly like the keyboard did. Blurring the textarea (in
+              togglePicker) dismisses the keyboard so the two never fight for the space. */}
+          <Show when={pickerOpen() && mobile()}>
+            <div class="mt-2 h-[45vh] max-h-[24rem] min-h-[15rem] overflow-hidden rounded-lg border border-border/70">
+              <ExpressionPicker
+                fill
+                initialTab={pickerTab()}
+                onClose={() => setPickerOpen(false)}
+                onPickEmoji={handlePickEmoji}
+                onPickGif={handlePickGif}
+              />
+            </div>
+          </Show>
         </form>
       </Show>
       <TypingIndicator people={props.typingUsers ?? []} />

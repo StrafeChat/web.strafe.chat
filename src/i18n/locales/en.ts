@@ -339,9 +339,20 @@ export default {
     attachFiles: 'Attach files',
     attachUnavailable: 'Attachments unavailable',
     emoji: 'Emoji',
+    expressionPicker: 'Emoji & GIFs',
     completionAria: 'Mention a user, role, room, emoji, or everyone',
     role: 'Role',
     room: 'Room',
+  },
+  gif: {
+    tab: 'GIF',
+    provider: 'GIF provider',
+    search: 'Search {{provider}}',
+    item: 'GIF',
+    none: 'No GIFs found',
+    error: "Couldn't load GIFs. Check your connection and try again.",
+    notConfiguredTitle: '{{provider}} isn’t set up',
+    notConfiguredBody: 'This instance hasn’t added a GIF API key yet. Ask the admin to configure one.',
   },
   attachments: {
     download: 'Download',
@@ -1711,6 +1722,10 @@ export default {
         compactDescription: 'Fit more messages on screen.',
         membersPanel: 'Members panel open by default',
         membersPanelDescription: 'Show the members sidebar when opening a room.',
+      },
+      gif: {
+        title: 'GIF provider',
+        description: 'Which service backs the GIF picker in the composer.',
       },
       css: {
         title: 'Custom CSS',

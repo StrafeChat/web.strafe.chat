@@ -28,8 +28,9 @@ import {
   type UiDensity,
 } from '../../stores/appearance';
 import type { ThemeDefinition } from '../../theme/themes';
-import { setEmojiProvider, setEmojiSkinTone } from '../../stores/appearance';
+import { setEmojiProvider, setEmojiSkinTone, setGifProvider } from '../../stores/appearance';
 import { EMOJI_ATTRIBUTIONS, EMOJI_PROVIDERS, getEmojiProvider, type EmojiProviderId } from '../../lib/emoji/providers';
+import { GIF_PROVIDERS, type GifProviderId } from '../../lib/gif/providers';
 import { SKIN_TONES } from '../../lib/emoji/data';
 import { Emoji } from '../emoji/Emoji';
 import { Toggle } from '../ui/Toggle';
@@ -408,6 +409,22 @@ export const AppearanceSettingsPage: Component = () => {
                 checked={!!(settings as SettingsData).membersPanelOpen}
                 onChange={() => setMembersPanelOpen(!(settings as SettingsData).membersPanelOpen)}
               />
+            }
+          />
+          <SettingRow
+            icon="fa-film"
+            title={t('settings.appearance.gif.title')}
+            description={t('settings.appearance.gif.description')}
+            control={
+              <div class="w-40">
+                <Select
+                  value={appearance.gifProvider}
+                  onValueChange={(v) => setGifProvider(v as GifProviderId)}
+                  aria-label={t('settings.appearance.gif.title')}
+                >
+                  <For each={GIF_PROVIDERS}>{(p) => <option value={p.id}>{p.name}</option>}</For>
+                </Select>
+              </div>
             }
           />
         </div>
