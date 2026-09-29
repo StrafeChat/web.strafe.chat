@@ -10,6 +10,7 @@ import { spaces } from '../stores/spaces';
 import { spaceMembers } from '../stores/spaceMembers';
 import { extractMentionedRoleIds, extractMentionedUserIds, mentionsEveryone } from '../stores/readState';
 import { notificationPrefs, playNotificationSound, showDesktopNotification } from '../stores/notificationPrefs';
+import { notificationsSuppressedByStatus } from '../stores/presence';
 import { getMessageBodyText, isSystemMessage, messagePreviewText } from '../components/messageList/utils';
 import { isRoomMuted, NotifyModeAll, NotifyModeMentions, NotifyModeNone } from './roomNotify';
 import { t } from '../i18n';
@@ -65,13 +66,19 @@ function roomContext(roomId: string, senderName: string): RoomContext | null {
     const room = list.find((r) => r.id === roomId);
     if (!room) continue;
     const space = spaces.spaces.find((s) => s.id === spaceId);
+    // A space channel's per-user mute/notify_mode lives on the rooms store copy (GET /rooms
+    // returns them; the space store copy from READY/space_rooms does not carry them), so read
+    // it there first. Without this, a channel set to "Nothing" or muted still notified after a
+    // reload - the space copy's notify_mode/muted were undefined, falling through to the global
+    // space default. Mirrors mobileNotifications.notificationItems.
+    const stored = rooms.rooms.find((r) => r.id === roomId);
     return {
       path: `/spaces/${spaceId}/rooms/${roomId}`,
       title: `${senderName} (#${room.name}${space ? ` · ${space.name}` : ''})`,
       spaceDefaultMentionsOnly: space?.default_message_notifications === 1,
       isSpace: true,
-      muted: isRoomMuted(room),
-      notifyModeOverride: room.notify_mode ?? 0,
+      muted: isRoomMuted(stored ?? room),
+      notifyModeOverride: stored?.notify_mode ?? room.notify_mode ?? 0,
     };
   }
   return null;
@@ -107,6 +114,9 @@ function mentionsMe(roomId: string, content: string): boolean {
 export function maybeNotifyMessage(roomId: string, messageId: string): void {
   const prefs = notificationPrefs;
   if (!prefs.desktop && !prefs.sounds) return;
+  // Do Not Disturb silences all message notifications (sound + desktop); the unread/mention
+  // counters are updated elsewhere, so activity is still visible in-app.
+  if (notificationsSuppressedByStatus()) return;
   const me = auth.user?.id;
   const msg = messages.byRoom[roomId]?.find((m) => m.id === messageId);
   if (!msg || !me || msg.sender_id === me || isSystemMessage(msg) || msg.pending) return;

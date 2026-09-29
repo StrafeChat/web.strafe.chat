@@ -33,6 +33,20 @@ export function isVisibleStatus(status: string | undefined): boolean {
   return status === 'online' || status === 'idle';
 }
 
+/** The current user's own presence status ('offline' when unknown). Reactive: reads the
+ * presence store, so callers inside effects/JSX re-run when the user changes their status. */
+export function selfStatus(): UserPresence['status'] {
+  const id = auth.user?.id;
+  return (id ? presence.byUser[id]?.status : undefined) ?? 'offline';
+}
+
+/** Do Not Disturb: while the user's own status is dnd, message and friend-request
+ * notifications (sound + desktop) are suppressed, matching Discord. In-app unread badges
+ * are unaffected - DND silences the interruptions, it doesn't hide activity. */
+export function notificationsSuppressedByStatus(): boolean {
+  return selfStatus() === 'dnd';
+}
+
 export function initPresenceHandler(): () => void {
   return onStargateEvent((event) => {
     if (event.t !== 'PRESENCE_UPDATE') return;
