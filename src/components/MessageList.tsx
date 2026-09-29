@@ -108,12 +108,17 @@ export interface MessageListProps {
 
 export const MessageList: Component<MessageListProps> = (props) => {
   const listRef = createSignal<HTMLDivElement>();
+  const contentRef = createSignal<HTMLDivElement>();
   const sentinelRef = createSignal<HTMLDivElement>();
   const isNearBottom = createSignal(true);
   /** True shortly after the user moves the scroll viewport (don’t auto-scroll over them). */
   const [isUserScrolling, setIsUserScrolling] = createSignal(false);
   /** Set while MessageList scrolls itself so `onScroll` does not flip user-scrolling state. */
   const programmaticScrollRef = { current: false };
+  /** Whether to keep the view glued to the newest message. Only a *user* scroll away from the
+   * bottom clears it; content growing (images/GIFs/emoji loading in) must not, or the re-pin
+   * below would give up exactly when it's needed. */
+  const stickToBottom = { current: true };
   const [editingMessageId, setEditingMessageId] = createSignal<string | null>(null);
   const [editDraft, setEditDraft] = createSignal('');
   const [pendingDelete, setPendingDelete] = createSignal<{ roomId: string; msgId: string; message: DecryptedMessage } | null>(null);
@@ -277,6 +282,9 @@ export const MessageList: Component<MessageListProps> = (props) => {
     if (!el || !roomId || !onLoad) return;
     let userScrollIdleTimer: ReturnType<typeof setTimeout> | null = null;
     const onScroll = () => {
+      const { scrollTop, clientHeight, scrollHeight } = el;
+      const near =
+        scrollHeight - scrollTop - clientHeight <= BOTTOM_THRESHOLD_PX;
       if (!programmaticScrollRef.current) {
         setIsUserScrolling(true);
         if (userScrollIdleTimer) clearTimeout(userScrollIdleTimer);
@@ -284,11 +292,9 @@ export const MessageList: Component<MessageListProps> = (props) => {
           userScrollIdleTimer = null;
           setIsUserScrolling(false);
         }, USER_SCROLL_IDLE_MS);
+        // A user scroll is the only thing that starts or stops "follow the newest message".
+        stickToBottom.current = near;
       }
-
-      const { scrollTop, clientHeight, scrollHeight } = el;
-      const near =
-        scrollHeight - scrollTop - clientHeight <= BOTTOM_THRESHOLD_PX;
       isNearBottom[1](near);
       props.onNearBottomChange?.(near);
       const hasMore = messages.hasMoreOlder[roomId] ?? true;
@@ -332,6 +338,9 @@ export const MessageList: Component<MessageListProps> = (props) => {
     const isInitialView = !roomsWithInitialScrollDone.has(roomId);
     if (isInitialView) roomsWithInitialScrollDone.add(roomId);
     const unreadIdx = isInitialView ? firstUnreadIndex() : -1;
+    // Landing on the unread divider means we're deliberately above the bottom, so don't glue
+    // to it; landing at the bottom does.
+    stickToBottom.current = unreadIdx === -1;
     const scrollToTarget = () => {
       const target = unreadIdx !== -1 ? props.messages[unreadIdx] : undefined;
       const node = target ? el.querySelector<HTMLElement>(`[data-msg-id="${target.id}"]`) : null;
@@ -356,6 +365,29 @@ export const MessageList: Component<MessageListProps> = (props) => {
       clearTimeout(timeoutId);
       programmaticScrollRef.current = false;
     });
+  });
+
+  // Re-pin to the true bottom as late content (images, GIFs, avatars, emoji) finishes loading
+  // and grows the list. The initial scroll-to-bottom measures scrollHeight before those load,
+  // so without this you enter a room landed slightly *above* the newest message and have to
+  // nudge down. A ResizeObserver on the content re-snaps to the bottom whenever it grows, but
+  // only while stickToBottom is set - reading history is never yanked.
+  createEffect(() => {
+    const content = contentRef[0]?.();
+    const el = listRef[0]?.();
+    if (!content || !el) return;
+    const repin = () => {
+      if (!stickToBottom.current || isUserScrolling()) return;
+      if (el.scrollHeight - el.scrollTop - el.clientHeight <= 1) return; // already exactly there
+      programmaticScrollRef.current = true;
+      el.scrollTop = el.scrollHeight;
+      requestAnimationFrame(() => {
+        programmaticScrollRef.current = false;
+      });
+    };
+    const ro = new ResizeObserver(repin);
+    ro.observe(content);
+    onCleanup(() => ro.disconnect());
   });
 
   // IntersectionObserver: load older when sentinel scrolls into view
@@ -479,7 +511,10 @@ export const MessageList: Component<MessageListProps> = (props) => {
     >
       {/* Bottom padding tracks the floating composer (see RoomComposerDock) so the
           newest message clears it; 0 when the page doesn't dock a composer at all. */}
-      <div class="flex flex-col p-4 gap-2 min-h-full justify-end pb-[calc(var(--composer-height,0px)+0.75rem)]">
+      <div
+        ref={(el) => contentRef[1](el)}
+        class="flex flex-col p-4 gap-2 min-h-full justify-end pb-[calc(var(--composer-height,0px)+0.75rem)]"
+      >
         <MessageListIntro
           roomType={props.roomType}
           roomName={props.roomName}
