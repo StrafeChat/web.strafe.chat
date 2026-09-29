@@ -60,8 +60,9 @@ export function createPointerDrag(opts: PointerDragOptions): PointerDragControll
   function start(e: PointerEvent, id: string, rowEl: HTMLElement) {
     if (opts.enabled && !opts.enabled()) return;
     if (e.pointerType === 'mouse' && e.button !== 0) return;
-    e.preventDefault();
-    e.stopPropagation();
+    // Suppress only the mouse default (starting a text selection). Leave touch alone so a scroll
+    // gesture on a whole-row handle still scrolls (it fires pointercancel and the drag never begins).
+    if (e.pointerType === 'mouse') e.preventDefault();
     pendingId = id;
     started = false;
     sourceEl = rowEl;
@@ -173,6 +174,16 @@ export function createPointerDrag(opts: PointerDragOptions): PointerDragControll
     started = false;
     sourceEl = null;
     setDraggingId(null);
+    if (didDrag) {
+      // A real drag just ended: swallow the click the pointer-up would otherwise fire (so a
+      // whole-row drag handle doesn't also navigate). Removed on the next tick, after that click.
+      const swallow = (ev: MouseEvent) => {
+        ev.preventDefault();
+        ev.stopPropagation();
+      };
+      document.addEventListener('click', swallow, true);
+      setTimeout(() => document.removeEventListener('click', swallow, true), 0);
+    }
     if (didDrag && id && commit) opts.onDrop(id);
     if (didDrag) opts.onEnd?.();
   }

@@ -37,7 +37,6 @@ import { SpaceRoomSettingsModal } from '../SpaceRoomSettingsModal';
 import { InviteSpaceModal } from '../InviteSpaceModal';
 import { SpaceSettingsModal } from '../SpaceSettingsModal';
 import { CreateSpaceRoomModal, CreateSpaceSectionModal } from '../CreateSpaceChannelModal';
-import { MIME_STRAFE_ROOM_REORDER } from '../../lib/roomReorder';
 import { createRoomReorder } from './spaceRooms/createRoomReorder';
 import { ChevronDownIcon } from './spaceRooms/RoomTypeIcon';
 import { SpaceChannelRow } from './spaceRooms/SpaceChannelRow';
@@ -580,7 +579,7 @@ export const SpaceRoomsBar: Component = () => {
                         activeReorderDrag()?.scopeKey === 'top' &&
                         activeReorderDrag()?.id === room.id
                       }
-                      onReorderDragActive={reorder.setReorderDragActive}
+                      onStartPointerReorder={reorder.startPointerReorder}
                       onReorderDragOverTarget={(e, id) => reorder.updateDropIndicatorForRow('top', id, e)}
                       onReorderDrop={(e, id) => reorder.commitReorderFromDropEvent(e, 'top', id)}
                     />
@@ -634,16 +633,6 @@ export const SpaceRoomsBar: Component = () => {
                         ? 'bg-muted/60 ring-1 ring-inset ring-dashed ring-primary/35'
                         : ''
                     }`}
-                    draggable={canManageRooms()}
-                    onDragStart={(e) => {
-                      if (!canManageRooms()) return;
-                      e.dataTransfer?.setData(
-                        MIME_STRAFE_ROOM_REORDER,
-                        JSON.stringify({ kind: 'section', scopeKey: 'sections', id: section.id })
-                      );
-                      if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
-                      reorder.setReorderDragActive({ kind: 'section', scopeKey: 'sections', id: section.id });
-                    }}
                     onDragOver={(e) => {
                       reorder.handleSectionHeaderDragOver(e, section.id, isOpen());
                     }}
@@ -653,6 +642,15 @@ export const SpaceRoomsBar: Component = () => {
                       type="button"
                       class={`flex min-w-0 flex-1 items-center gap-1 rounded-md px-1 py-1 text-left transition-colors hover:text-foreground ${appSectionLabel}`}
                       aria-expanded={isOpen()}
+                      onPointerDown={(e) => {
+                        if (!canManageRooms()) return;
+                        const header = (e.currentTarget as HTMLElement).closest('[data-section-header]') as HTMLElement | null;
+                        reorder.startPointerReorder(
+                          e,
+                          { kind: 'section', scopeKey: 'sections', id: section.id },
+                          header ?? (e.currentTarget as HTMLElement)
+                        );
+                      }}
                       onClick={() => toggleSection(section.id)}
                     >
                       <ChevronDownIcon
@@ -696,7 +694,7 @@ export const SpaceRoomsBar: Component = () => {
                                 activeReorderDrag()?.scopeKey === secScope &&
                                 activeReorderDrag()?.id === room.id
                               }
-                              onReorderDragActive={reorder.setReorderDragActive}
+                              onStartPointerReorder={reorder.startPointerReorder}
                               onReorderDragOverTarget={(e, id) => reorder.updateDropIndicatorForRow(secScope, id, e)}
                               onReorderDrop={(e, id) => reorder.commitReorderFromDropEvent(e, secScope, id)}
                             />

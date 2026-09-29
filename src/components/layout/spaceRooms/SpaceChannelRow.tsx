@@ -7,7 +7,7 @@ import { messages } from '../../../stores/messages';
 import { rooms } from '../../../stores/rooms';
 import { getUnreadCountForDisplay, readState } from '../../../stores/readState';
 import { isRoomMuted } from '../../../lib/roomNotify';
-import { MIME_STRAFE_ROOM_REORDER, type ReorderPayload } from '../../../lib/roomReorder';
+import type { ReorderPayload } from '../../../lib/roomReorder';
 import { appCompactRow, appCompactRowActive, appCompactRowIdle } from '../../../theme/appChrome';
 import { roomTypeIcon } from './RoomTypeIcon';
 import { instance } from '../../../stores/instance';
@@ -27,9 +27,10 @@ export interface SpaceChannelRowProps {
   /** When set with `reorderEnabled`, row participates in HTML5 reorder for this scope only. */
   reorderScopeKey?: string;
   reorderEnabled?: boolean;
-  onReorderDragActive?: (info: ReorderPayload) => void;
   onReorderDragOverTarget?: (e: DragEvent, roomId: string) => void;
   onReorderDrop?: (e: DragEvent, targetId: string) => void;
+  /** Begin a pointer drag of this row (the whole row is the handle, Discord-style). */
+  onStartPointerReorder?: (e: PointerEvent, payload: ReorderPayload, rowEl: HTMLElement) => void;
   /** True while this row is the item being dragged (same scope). */
   reorderDragSource?: () => boolean;
   /** Hover actions on the row, shown only when the viewer has the permission. Passing the
@@ -41,7 +42,6 @@ export interface SpaceChannelRowProps {
 /** Text/voice row (shared by top-level channels and channels inside sections). */
 export const SpaceChannelRow: Component<SpaceChannelRowProps> = (props) => {
 
-  let suppressLinkNav = false;
   const list = () => messages.byRoom[props.room.id] ?? [];
   const roomMeta = () => {
     const m = rooms.rooms.find((x) => x.id === props.room.id) ?? props.room;
@@ -61,31 +61,27 @@ export const SpaceChannelRow: Component<SpaceChannelRowProps> = (props) => {
   };
   const muted = () => isRoomMuted(props.room);
   const reorderOn = () => !!(props.reorderEnabled && props.reorderScopeKey && props.onReorderDrop);
-  function handleReorderDragStart(e: DragEvent) {
-    if (!reorderOn() || !props.reorderScopeKey) return;
-    e.dataTransfer?.setData(
-      MIME_STRAFE_ROOM_REORDER,
-      JSON.stringify({ kind: 'channel', scopeKey: props.reorderScopeKey, id: props.room.id })
+  function handleReorderPointerDown(e: PointerEvent) {
+    if (!reorderOn() || !props.reorderScopeKey || !props.onStartPointerReorder) return;
+    // Don't hijack the row's own controls (invite / settings hover buttons).
+    if ((e.target as HTMLElement).closest('button')) return;
+    props.onStartPointerReorder(
+      e,
+      { kind: 'channel', scopeKey: props.reorderScopeKey, id: props.room.id },
+      e.currentTarget as HTMLElement
     );
-    if (e.dataTransfer) e.dataTransfer.effectAllowed = 'move';
-    props.onReorderDragActive?.({ kind: 'channel', scopeKey: props.reorderScopeKey!, id: props.room.id });
   }
+  // Still the drop target: the pointer layer dispatches synthetic dragover/drop at the row under
+  // the cursor, and these keep the existing per-scope indicator/commit wiring.
   function handleReorderDragOver(e: DragEvent) {
     if (!reorderOn()) return;
     e.preventDefault();
-    if (e.dataTransfer) e.dataTransfer.dropEffect = 'move';
     props.onReorderDragOverTarget?.(e, props.room.id);
   }
   function handleReorderDrop(e: DragEvent) {
     if (!reorderOn() || !props.reorderScopeKey || !props.onReorderDrop) return;
     e.preventDefault();
     props.onReorderDrop(e, props.room.id);
-  }
-  function handleReorderDragEnd() {
-    suppressLinkNav = true;
-    queueMicrotask(() => {
-      suppressLinkNav = false;
-    });
   }
   const reorderSource = () => props.reorderDragSource?.() ?? false;
   const isVoice = () => props.room.type === ROOM_TYPE_VOICE;
@@ -107,19 +103,10 @@ export const SpaceChannelRow: Component<SpaceChannelRowProps> = (props) => {
             ? appCompactRowActive
             : appCompactRowIdle
       }`}
-      draggable={reorderOn()}
-      onDragStart={handleReorderDragStart}
+      onPointerDown={handleReorderPointerDown}
       onDragOver={handleReorderDragOver}
       onDrop={handleReorderDrop}
-      onDragEnd={handleReorderDragEnd}
-      onClick={(e) => {
-        if (suppressLinkNav) {
-          e.preventDefault();
-          e.stopPropagation();
-          return;
-        }
-        handleVoiceClick();
-      }}
+      onClick={() => handleVoiceClick()}
       onContextMenu={(e) => props.onContextMenu(e, props.room)}
     >
       {roomTypeIcon(props.room)}

@@ -11,6 +11,7 @@
 import { createEffect, createSignal, onCleanup } from 'solid-js';
 import { moveSpaceChannel, reorderSpaceRooms } from '../../../api/spaces';
 import { refreshSpaceRooms } from '../../../stores/spaces';
+import { createPointerDrag } from '../../../lib/dnd/createPointerDrag';
 import {
   SECTION_CHANNEL_LINE_INDENT_PX,
   ZONE_BOTTOM_FRAC,
@@ -566,11 +567,58 @@ export function createRoomReorder(deps: RoomReorderDeps) {
     else if (parsed?.kind === 'channel') commitChannelMoveFromSectionHeaderDrop(e, sectionId, sectionIsOpen);
   }
 
+  // --- Pointer-drag layer (Discord-style, replaces native HTML5 drag) ------------------------
+  // The existing per-element onDragOver/onDrop handlers already carry all the scope/section logic,
+  // so we keep them and just feed them synthetic drag events dispatched at whatever row/header/end
+  // strip is under the cursor. Starting a drag sets the payload + spins up the floating preview.
+  let pendingPayload: ReorderPayload | null = null;
+  let lastPointerX = 0;
+  let lastPointerY = 0;
+
+  function dispatchSyntheticDrag(type: 'dragover' | 'drop', x: number, y: number) {
+    const target = document.elementFromPoint(x, y) as HTMLElement | null;
+    if (!target) {
+      clearDropIndicator();
+      return;
+    }
+    const dt = new DataTransfer();
+    const payload = activeReorderDrag();
+    if (payload) dt.setData(MIME_STRAFE_ROOM_REORDER, JSON.stringify(payload));
+    target.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, dataTransfer: dt }));
+  }
+
+  const pointer = createPointerDrag({
+    enabled: () => deps.canManageRooms(),
+    scrollEl: () => deps.scrollEl(),
+    onStart: () => {
+      if (pendingPayload) setReorderDragActive(pendingPayload);
+    },
+    onMove: (_id, x, y) => {
+      lastPointerX = x;
+      lastPointerY = y;
+      dispatchSyntheticDrag('dragover', x, y);
+    },
+    onDrop: () => dispatchSyntheticDrag('drop', lastPointerX, lastPointerY),
+    onEnd: () => {
+      setReorderDragActive(null);
+      pendingPayload = null;
+    },
+  });
+
+  /** Begin a pointer drag for a channel or section row. `rowEl` is cloned as the floating preview. */
+  function startPointerReorder(e: PointerEvent, payload: ReorderPayload, rowEl: HTMLElement) {
+    if (!deps.canManageRooms()) return;
+    pendingPayload = payload;
+    pointer.start(e, payload.id, rowEl);
+  }
+
   return {
     activeReorderDrag,
     dropIndicator,
     reorderLineRect,
     setReorderDragActive,
+    startPointerReorder,
+    pointerDraggingId: pointer.draggingId,
     updateDropIndicatorForRow,
     updateDropIndicatorForSectionHeader,
     commitReorderFromDropEvent,
