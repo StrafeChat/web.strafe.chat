@@ -96,7 +96,7 @@ const COMPOSER_MAX_HEIGHT_PX = 200;
 
 /** Typography shared by the textarea and its mirror so they stay glyph-aligned. The
  * horizontal padding leaves room for the attach (left) and the GIF+emoji (right) buttons. */
-const composerTextClass = 'pl-11 pr-[4.5rem] py-3 text-sm leading-5';
+const composerTextClass = 'pl-12 pr-[5.5rem] py-3 text-sm leading-5';
 
 function isWordChar(c: string | undefined): boolean {
   return c != null && /[\p{L}\p{N}_]/u.test(c);
@@ -132,6 +132,17 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
   });
 
   function autoGrow(el: HTMLTextAreaElement) {
+    // An empty field is always exactly one line. A textarea's scrollHeight counts its
+    // placeholder, so a long placeholder in a narrow composer ("Message #some-long-channel")
+    // wraps and would inflate the empty box to two lines - which then made the bottom-pinned
+    // action buttons sit low instead of centered. Fall back to the CSS min-height until there's
+    // real content to grow for.
+    if (el.value === '') {
+      el.style.height = '';
+      el.style.overflowY = 'hidden';
+      if (mirrorEl) mirrorEl.scrollTop = 0;
+      return;
+    }
     el.style.height = 'auto';
     const next = Math.min(el.scrollHeight, COMPOSER_MAX_HEIGHT_PX);
     el.style.height = `${next}px`;
@@ -514,14 +525,14 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
                   placeholder={props.placeholder}
                   rows={1}
                   spellcheck={settings.spellcheck}
-                  class={`relative box-border block min-h-11 w-full resize-none overflow-hidden rounded-lg border border-input bg-transparent text-transparent caret-foreground placeholder:text-muted-foreground transition-colors focus:border-ring/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0 disabled:cursor-not-allowed ${composerTextClass} ${
+                  class={`relative box-border block min-h-12 w-full resize-none overflow-hidden rounded-lg border border-input bg-transparent text-transparent caret-foreground placeholder:text-muted-foreground transition-colors focus:border-ring/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0 disabled:cursor-not-allowed ${composerTextClass} ${
                     hasTopStrip() ? 'rounded-t-none' : ''
                   }`}
                   disabled={props.disabled}
                 />
                 <div class="absolute bottom-1.5 left-1.5">
                   <IconButton
-                    size="sm"
+                    size="lg"
                     tone="subtle"
                     icon="fa-solid fa-circle-plus"
                     label={t('composer.attachFiles')}
@@ -546,7 +557,7 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
                 </div>
                 <div class="absolute bottom-1.5 right-1.5 flex items-center gap-0.5">
                   <IconButton
-                    size="sm"
+                    size="lg"
                     tone="subtle"
                     icon="fa-solid fa-film"
                     label={t('gif.tab')}
@@ -556,7 +567,7 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
                     onClick={() => togglePicker('gif')}
                   />
                   <IconButton
-                    size="sm"
+                    size="lg"
                     tone="subtle"
                     icon="fa-solid fa-face-smile"
                     label={t('composer.emoji')}
@@ -575,7 +586,7 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
               // reopen on every send. preventDefault on pointer-down blocks the focus
               // change; the click still fires and submits.
               onPointerDown={(e) => e.preventDefault()}
-              class="inline-flex size-11 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50 md:hidden"
+              class="inline-flex size-12 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow-sm transition-colors hover:bg-primary-hover disabled:cursor-not-allowed disabled:opacity-50 md:hidden"
               title={t('common.send')}
               aria-label={t('common.send')}
             >
