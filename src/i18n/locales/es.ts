@@ -1701,6 +1701,16 @@ export default {
         skinTone: 'Tono de piel predeterminado',
         skinToneDescription: 'Se aplica al elegir un emoji que admite tonos de piel.',
       },
+      density: {
+        title: 'Densidad visual',
+        uiDensity: 'Densidad de la interfaz',
+        uiDensityDescription: 'Ajusta el espaciado de las listas de conversaciones, canales y miembros.',
+        compact: 'Compacta',
+        default: 'Predeterminada',
+        spacious: 'Amplia',
+        messageGroupSpacing: 'Espacio entre grupos de mensajes',
+        messageGroupSpacingDescription: 'Cuánto espacio dejar entre los mensajes de una persona y los siguientes.',
+      },
       chat: {
         title: 'Chat',
         compact: 'Modo compacto',

@@ -302,7 +302,7 @@ const MemberRow: Component<{
 
   return (
     <div
-      class={`group/member flex items-center gap-1 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent/50 ${
+      class={`group/member flex items-center gap-1 rounded-lg px-2 py-[var(--density-member-py)] transition-colors hover:bg-accent/50 ${
         props.dim ? 'opacity-60 hover:opacity-100' : ''
       }`}
       onContextMenu={(e) => {

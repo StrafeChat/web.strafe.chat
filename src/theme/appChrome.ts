@@ -105,15 +105,17 @@ export const appMenuSeparator = 'my-1 border-t border-border/60';
 /** Small uppercase group label: sidebar sections, member buckets, settings sections. */
 export const appSectionLabel = 'text-[11px] font-semibold uppercase tracking-wider text-muted-foreground';
 
-/** Interactive list rows (sidebar nav, conversations, members). Compose with a state below. */
+/** Interactive list rows (sidebar nav, conversations, members). Compose with a state below.
+ * Vertical padding is driven by the UI-density appearance setting (--density-row-py). */
 export const appListRow =
-  'flex w-full min-w-0 items-center gap-3 rounded-lg px-2 py-2 text-start transition-colors';
+  'flex w-full min-w-0 items-center gap-3 rounded-lg px-2 py-[var(--density-row-py)] text-start transition-colors';
 export const appListRowIdle = 'text-foreground hover:bg-accent hover:text-accent-foreground';
 export const appListRowActive = 'bg-primary/15 text-foreground ring-1 ring-inset ring-primary/20';
 
-/** Compact rows (channel list, section headers) - a little tighter than appListRow. */
+/** Compact rows (channel list, section headers) - a little tighter than appListRow.
+ * Vertical padding is driven by the UI-density appearance setting (--density-compact-py). */
 export const appCompactRow =
-  'flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-1.5 text-start text-sm transition-colors';
+  'flex w-full min-w-0 items-center gap-2 rounded-md px-2 py-[var(--density-compact-py)] text-start text-sm transition-colors';
 export const appCompactRowIdle = 'text-muted-foreground hover:bg-accent/50 hover:text-foreground';
 export const appCompactRowActive = 'bg-primary/15 text-foreground ring-1 ring-inset ring-primary/20';
 

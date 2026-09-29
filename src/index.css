@@ -111,6 +111,29 @@ html.reduce-motion *::after {
   scroll-behavior: auto !important;
 }
 
+/* Appearance setting: UI density. Scales the vertical padding of the conversation,
+   channel and member list rows so the whole app can be tightened or loosened, the way
+   Discord's "UI Density" does. Consumed by appListRow / appCompactRow (theme/appChrome)
+   and the member rows (RoomMembersSidebar). `default` is the bare :root values.
+   `--space-message-group` (space between message groups) defaults here and is overwritten
+   inline from the slider by the appearance store. */
+:root {
+  --density-row-py: 0.5rem;
+  --density-compact-py: 0.375rem;
+  --density-member-py: 0.375rem;
+  --space-message-group: 16px;
+}
+html[data-density='compact'] {
+  --density-row-py: 0.25rem;
+  --density-compact-py: 0.1875rem;
+  --density-member-py: 0.1875rem;
+}
+html[data-density='spacious'] {
+  --density-row-py: 0.6875rem;
+  --density-compact-py: 0.5rem;
+  --density-member-py: 0.5rem;
+}
+
 /* Dialogs (ResponsiveDialog, SettingsShell). The "in" animations deliberately have no
    fill-mode: a retained `transform: scale(1)` would turn the panel into the containing
    block for any `position: fixed` descendant (date picker sheet, inline menus). */

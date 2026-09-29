@@ -1763,6 +1763,16 @@ export default {
         skinTone: 'لون البشرة الافتراضي',
         skinToneDescription: 'يُطبَّق عند اختيار إيموجي يدعم ألوان البشرة.',
       },
+      density: {
+        title: 'الكثافة المرئية',
+        uiDensity: 'كثافة الواجهة',
+        uiDensityDescription: 'اضبط تباعد قوائم المحادثات والقنوات والأعضاء.',
+        compact: 'مضغوط',
+        default: 'افتراضي',
+        spacious: 'واسع',
+        messageGroupSpacing: 'المسافة بين مجموعات الرسائل',
+        messageGroupSpacingDescription: 'مقدار المساحة المتروكة بين رسائل الشخص والرسائل التالية.',
+      },
       chat: {
         title: 'الدردشة',
         compact: 'الوضع المضغوط',

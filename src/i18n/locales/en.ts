@@ -1695,6 +1695,16 @@ export default {
         skinTone: 'Default skin tone',
         skinToneDescription: 'Applied when you pick an emoji that supports skin tones.',
       },
+      density: {
+        title: 'Visual density',
+        uiDensity: 'UI density',
+        uiDensityDescription: 'Adjust the spacing of the conversation, channel and member lists.',
+        compact: 'Compact',
+        default: 'Default',
+        spacious: 'Spacious',
+        messageGroupSpacing: 'Space between message groups',
+        messageGroupSpacingDescription: 'How much room to leave between one person’s messages and the next.',
+      },
       chat: {
         title: 'Chat',
         compact: 'Compact mode',

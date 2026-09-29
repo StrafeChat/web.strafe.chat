@@ -15,6 +15,13 @@ import { t } from '../i18n';
 export type FontScale = 'sm' | 'md' | 'lg';
 export type CornerStyle = 'sharp' | 'soft' | 'round';
 export type FontChoice = 'system' | 'inter' | 'outfit';
+/** Row spacing across the conversation / channel / member lists, à la Discord's UI Density. */
+export type UiDensity = 'compact' | 'default' | 'spacious';
+
+/** Space between message groups, in px. Clamped to this range (Discord's is 0-24). */
+export const MESSAGE_GROUP_SPACING_MIN = 0;
+export const MESSAGE_GROUP_SPACING_MAX = 24;
+export const MESSAGE_GROUP_SPACING_DEFAULT = 16;
 
 export interface AppearanceState {
   themeId: string;
@@ -24,6 +31,10 @@ export interface AppearanceState {
   fontScale: FontScale;
   corners: CornerStyle;
   font: FontChoice;
+  /** Row spacing of the conversation / channel / member lists. */
+  uiDensity: UiDensity;
+  /** Gap between message groups, in px (see MESSAGE_GROUP_SPACING_*). */
+  messageGroupSpacing: number;
   /** Frosted-glass surfaces (backdrop blur + translucency). Off = flat opaque panels. */
   glass: boolean;
   reduceMotion: boolean;
@@ -45,6 +56,8 @@ const DEFAULTS: AppearanceState = {
   fontScale: 'md',
   corners: 'soft',
   font: 'system',
+  uiDensity: 'default',
+  messageGroupSpacing: MESSAGE_GROUP_SPACING_DEFAULT,
   glass: true,
   reduceMotion: false,
   customCss: '',
@@ -86,6 +99,11 @@ function load(): AppearanceState {
       fontScale: p.fontScale === 'sm' || p.fontScale === 'lg' ? p.fontScale : 'md',
       corners: p.corners === 'sharp' || p.corners === 'round' ? p.corners : 'soft',
       font: p.font === 'inter' || p.font === 'outfit' ? p.font : 'system',
+      uiDensity: p.uiDensity === 'compact' || p.uiDensity === 'spacious' ? p.uiDensity : 'default',
+      messageGroupSpacing:
+        typeof p.messageGroupSpacing === 'number'
+          ? Math.min(MESSAGE_GROUP_SPACING_MAX, Math.max(MESSAGE_GROUP_SPACING_MIN, Math.round(p.messageGroupSpacing)))
+          : MESSAGE_GROUP_SPACING_DEFAULT,
       glass: p.glass !== false,
       reduceMotion: p.reduceMotion === true,
       customCss: typeof p.customCss === 'string' ? p.customCss.slice(0, CUSTOM_CSS_MAX) : '',
@@ -167,6 +185,17 @@ export function setFont(v: FontChoice) {
   setAppearance('font', v);
   persist();
 }
+export function setUiDensity(v: UiDensity) {
+  setAppearance('uiDensity', v);
+  persist();
+}
+export function setMessageGroupSpacing(v: number) {
+  setAppearance(
+    'messageGroupSpacing',
+    Math.min(MESSAGE_GROUP_SPACING_MAX, Math.max(MESSAGE_GROUP_SPACING_MIN, Math.round(v)))
+  );
+  persist();
+}
 export function setGlass(v: boolean) {
   setAppearance('glass', v);
   persist();
@@ -243,7 +272,7 @@ function styleEl(id: string): HTMLStyleElement {
 
 function applyThemeStyles(
   theme: ThemeDefinition,
-  s: Pick<AppearanceState, 'fontScale' | 'corners' | 'font' | 'glass' | 'reduceMotion'>
+  s: Pick<AppearanceState, 'fontScale' | 'corners' | 'font' | 'glass' | 'reduceMotion' | 'uiDensity' | 'messageGroupSpacing'>
 ) {
   const root = document.documentElement;
   const vars: string[] = [`color-scheme: ${theme.appearance};`];
@@ -251,10 +280,15 @@ function applyThemeStyles(
   vars.push(`--font-sans: ${FONT_STACKS[s.font]};`);
   const radii = RADII[s.corners];
   if (radii) for (const v of RADIUS_VARS) vars.push(`${v}: ${radii[v]};`);
+  const spacing = Math.min(MESSAGE_GROUP_SPACING_MAX, Math.max(MESSAGE_GROUP_SPACING_MIN, Math.round(s.messageGroupSpacing)));
+  vars.push(`--space-message-group: ${spacing}px;`);
   const fontSize = FONT_SIZES[s.fontScale];
   styleEl(THEME_STYLE_ID).textContent =
     `:root {\n  ${vars.join('\n  ')}\n}\n` + (fontSize ? `html { font-size: ${fontSize}; }\n` : '');
   root.dataset.theme = theme.appearance;
+  // 'default' leaves data-density absent, so the bare :root density vars apply.
+  if (s.uiDensity === 'default') delete root.dataset.density;
+  else root.dataset.density = s.uiDensity;
   root.classList.toggle('no-glass', !s.glass);
   root.classList.toggle('reduce-motion', s.reduceMotion);
 }
@@ -280,6 +314,8 @@ export function initAppearance() {
         font: appearance.font,
         glass: appearance.glass,
         reduceMotion: appearance.reduceMotion,
+        uiDensity: appearance.uiDensity,
+        messageGroupSpacing: appearance.messageGroupSpacing,
       })
     );
     createEffect(() => applyCustomCss(appearance.customCss, appearance.customCssEnabled));

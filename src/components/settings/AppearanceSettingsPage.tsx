@@ -18,9 +18,14 @@ import {
   setGlass,
   setReduceMotion,
   setThemeId,
+  setUiDensity,
+  setMessageGroupSpacing,
+  MESSAGE_GROUP_SPACING_MIN,
+  MESSAGE_GROUP_SPACING_MAX,
   type CornerStyle,
   type FontChoice,
   type FontScale,
+  type UiDensity,
 } from '../../stores/appearance';
 import type { ThemeDefinition } from '../../theme/themes';
 import { setEmojiProvider, setEmojiSkinTone } from '../../stores/appearance';
@@ -29,13 +34,14 @@ import { SKIN_TONES } from '../../lib/emoji/data';
 import { Emoji } from '../emoji/Emoji';
 import { Toggle } from '../ui/Toggle';
 import { Tabs } from '../ui/Tabs';
+import { RangeField } from '../ui/RangeField';
 import { Select } from '../ui/Select';
 import { Button } from '../ui/Button';
 import { IconButton } from '../ui/IconButton';
 import { Textarea } from '../ui/Textarea';
 import { ThemeEditorDialog } from './ThemeEditorDialog';
 import { confirmDialog } from '../../stores/confirmDialog';
-import { settingsRowIcon, settingsRowShell, settingsSectionTitle } from './settingsChrome';
+import { settingsGroupFrame, settingsRowIcon, settingsRowShell, settingsSectionTitle } from './settingsChrome';
 import { t } from '../../i18n';
 
 const rowShell = settingsRowShell;
@@ -337,6 +343,43 @@ export const AppearanceSettingsPage: Component = () => {
               </div>
             }
           />
+        </div>
+      </section>
+
+      <section class="space-y-3">
+        <h3 class={sectionTitle}>{t('settings.appearance.density.title')}</h3>
+        <div class="space-y-2">
+          <SettingRow
+            icon="fa-up-right-and-down-left-from-center"
+            title={t('settings.appearance.density.uiDensity')}
+            description={t('settings.appearance.density.uiDensityDescription')}
+            control={
+              <Tabs
+                size="sm"
+                aria-label={t('settings.appearance.density.uiDensity')}
+                value={appearance.uiDensity}
+                onChange={(v) => setUiDensity(v as UiDensity)}
+                items={[
+                  { id: 'compact', label: t('settings.appearance.density.compact') },
+                  { id: 'default', label: t('settings.appearance.density.default') },
+                  { id: 'spacious', label: t('settings.appearance.density.spacious') },
+                ]}
+              />
+            }
+          />
+          <div class={settingsGroupFrame}>
+            <RangeField
+              label={t('settings.appearance.density.messageGroupSpacing')}
+              min={MESSAGE_GROUP_SPACING_MIN}
+              max={MESSAGE_GROUP_SPACING_MAX}
+              value={appearance.messageGroupSpacing}
+              valueLabel={`${appearance.messageGroupSpacing}px`}
+              onChange={(v) => setMessageGroupSpacing(v)}
+            />
+            <p class="mt-1 text-xs leading-snug text-muted-foreground">
+              {t('settings.appearance.density.messageGroupSpacingDescription')}
+            </p>
+          </div>
         </div>
       </section>
 

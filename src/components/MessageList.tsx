@@ -562,7 +562,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                   class={`flex gap-3 -mx-2 px-2 rounded-md group relative transition-colors md:hover:bg-muted/40 ${
                     compact() ? 'py-0.5' : 'py-0.5'
                   } ${
-                    showHeader() ? (prev() ? 'mt-3' : '') : compact() ? '-mt-0.5' : '-mt-1'
+                    showHeader() ? (prev() ? 'mt-[var(--space-message-group)]' : '') : compact() ? '-mt-0.5' : '-mt-1'
                   }`}
                   onContextMenu={(e) => {
                     const roomId = props.roomId;

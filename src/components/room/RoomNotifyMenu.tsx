@@ -79,6 +79,7 @@ export const RoomNotifyMenu: Component<RoomNotifyMenuProps> = (props) => {
         <IconButton
           icon={props.muted ? 'fa-solid fa-bell-slash' : 'fa-solid fa-bell'}
           label={t('room.notify.title')}
+          title=""
           active={open()}
           tone={props.muted ? 'subtle' : 'default'}
           onClick={() => setOpen((v) => !v)}

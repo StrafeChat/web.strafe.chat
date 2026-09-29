@@ -1693,6 +1693,16 @@ export default {
         skinTone: 'Standard-Hautton',
         skinToneDescription: 'Wird angewendet, wenn du ein Emoji mit Hauttönen wählst.',
       },
+      density: {
+        title: 'Visuelle Dichte',
+        uiDensity: 'UI-Dichte',
+        uiDensityDescription: 'Passe den Abstand der Unterhaltungs-, Kanal- und Mitgliederlisten an.',
+        compact: 'Kompakt',
+        default: 'Standard',
+        spacious: 'Weit',
+        messageGroupSpacing: 'Abstand zwischen Nachrichtengruppen',
+        messageGroupSpacingDescription: 'Wie viel Platz zwischen den Nachrichten einer Person und den nächsten bleibt.',
+      },
       chat: {
         title: 'Chat',
         compact: 'Kompaktmodus',
