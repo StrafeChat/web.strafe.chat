@@ -173,7 +173,7 @@ export const appFloatToolbar =
  */
 export const appComposerDock = 'absolute inset-x-0 bottom-0 z-20';
 /** Short gradient above the bar so content dissolves into it rather than meeting an edge. */
-export const appComposerDockFade = 'pointer-events-none h-10 w-full bg-gradient-to-b from-transparent to-card/55';
+export const appComposerDockFade = 'pointer-events-none h-4 w-full bg-gradient-to-b from-transparent to-card/55';
 /**
  * Lighter than the usual glass tint (`authGlassTint`) on purpose: at 70% opacity the
  * messages passing underneath were only a smudge, and the whole point of floating the

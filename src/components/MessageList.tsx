@@ -11,6 +11,7 @@ import { newHeaderDismissed } from '../stores/newHeaderDismissed';
 import { formatMessageTimestamp, formatDateHeader, formatTimeOfDay } from '../lib/utils/datetime';
 import { t } from '../i18n';
 import { showContextMenu } from '../stores/contextMenu';
+import { onEditLastMessageRequest } from '../lib/chatShortcuts';
 import { buildUserMenuItems } from '../lib/userContextMenu';
 import { isBlocked } from '../stores/relationships';
 import { openReportDialog } from './ReportDialog';
@@ -29,13 +30,12 @@ import {
   LoadOlderBlock,
   ReplyReference,
   MessageReactions,
+  MessageEditBox,
 } from './messageList';
 import { appFloatToolbar } from '../theme/appChrome';
 import { MessageAttachments } from './messageList/MessageAttachments';
 import { EmojiPicker, type EmojiPick } from './emoji/EmojiPicker';
 import { IconButton } from './ui/IconButton';
-import { Button } from './ui/Button';
-import { Textarea } from './ui/Textarea';
 import { isMessagePinned, pinMessage, unpinMessage } from '../stores/pinnedMessages';
 import { openUserProfilePopover } from '../stores/userProfilePopover';
 import { popoverSubjectFromSender } from '../lib/userProfilePopoverHelpers';
@@ -258,6 +258,29 @@ export const MessageList: Component<MessageListProps> = (props) => {
       spaceRoleContext,
     });
   }
+
+  // ↑ in the empty composer edits the user's most recent message here (Discord-style). The
+  // composer relays it as an event since it's a sibling with no shared state; we find the last
+  // own, real (non-pending, non-system) message and open the inline editor on it.
+  onMount(() => {
+    const off = onEditLastMessageRequest(() => {
+      if (editingMessageId()) return;
+      const uid = currentUserId();
+      if (!uid) return;
+      for (let i = props.messages.length - 1; i >= 0; i--) {
+        const m = props.messages[i]!;
+        if (m.sender_id === uid && !isSystemMessage(m) && /^\d+$/.test(m.id) && !m.pending) {
+          setEditDraft(getMessageBodyText(m));
+          setEditingMessageId(m.id);
+          queueMicrotask(() =>
+            listRef[0]?.()?.querySelector(`[data-msg-id="${m.id}"]`)?.scrollIntoView({ block: 'nearest' })
+          );
+          break;
+        }
+      }
+    });
+    onCleanup(off);
+  });
 
   /** Index of first unread that existed when we entered and NEW header not dismissed. */
   const firstUnreadIndex = () => {
@@ -513,7 +536,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
           newest message clears it; 0 when the page doesn't dock a composer at all. */}
       <div
         ref={(el) => contentRef[1](el)}
-        class="flex flex-col p-4 gap-2 min-h-full justify-end pb-[calc(var(--composer-height,0px)+0.75rem)]"
+        class="flex flex-col p-4 gap-2 min-h-full justify-end pb-[calc(var(--composer-height,0px)+0.25rem)]"
       >
         <MessageListIntro
           roomType={props.roomType}
@@ -736,46 +759,15 @@ export const MessageList: Component<MessageListProps> = (props) => {
                 </Show>
                 <div class="flex-1 min-w-0">
                   <Show when={editingMessageId() === msg.id}>
-                    <div class="space-y-2 py-1">
-                      <Textarea
-                        value={editDraft()}
-                        onInput={(e) => setEditDraft(e.currentTarget.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Escape') {
-                            e.preventDefault();
-                            setEditingMessageId(null);
-                          } else if (e.key === 'Enter' && !e.shiftKey) {
-                            e.preventDefault();
-                            const roomId = props.roomId!;
-                            const text = editDraft().trim();
-                            if (text) {
-                              editMessageInStore(roomId, msg.id, text).then(() => setEditingMessageId(null)).catch((err) => console.error('Edit failed:', err));
-                            }
-                          }
-                        }}
-                        class="min-h-[72px]"
-                        placeholder={t('messages.editPlaceholder')}
-                        autofocus
-                      />
-                      <div class="flex items-center gap-2">
-                        <Button
-                          size="sm"
-                          onClick={() => {
-                            const roomId = props.roomId!;
-                            const text = editDraft().trim();
-                            if (text) {
-                              editMessageInStore(roomId, msg.id, text).then(() => setEditingMessageId(null)).catch((err) => console.error('Edit failed:', err));
-                            }
-                          }}
-                        >
-                          {t('common.save')}
-                        </Button>
-                        <Button size="sm" variant="outline" onClick={() => setEditingMessageId(null)}>
-                          {t('common.cancel')}
-                        </Button>
-                        <span class="text-[11px] text-muted-foreground">{t('messages.editHint')}</span>
-                      </div>
-                    </div>
+                    <MessageEditBox
+                      initialValue={editDraft()}
+                      onCancel={() => setEditingMessageId(null)}
+                      onSave={(text) => {
+                        editMessageInStore(props.roomId!, msg.id, text)
+                          .then(() => setEditingMessageId(null))
+                          .catch((err) => console.error('Edit failed:', err));
+                      }}
+                    />
                   </Show>
                   <Show when={editingMessageId() !== msg.id}>
                   <Show when={msg.reply_to_id}>
@@ -824,12 +816,14 @@ export const MessageList: Component<MessageListProps> = (props) => {
                           participants={props.participants}
                           spaceRoles={props.spaceRoles}
                           onMentionClick={openProfileForUser}
+                          trailing={
+                            <Show when={isEdited(msg)}>
+                              <Tooltip label={t('messages.editedAt', { time: formatMessageTimestamp(new Date(msg.updated_at!)) })} inline side="top">
+                                <span class="text-[10px] text-muted-foreground/80 ms-1 cursor-default">{t('messages.edited')}</span>
+                              </Tooltip>
+                            </Show>
+                          }
                         />
-                        <Show when={isEdited(msg)}>
-                          <Tooltip label={t('messages.editedAt', { time: formatMessageTimestamp(new Date(msg.updated_at!)) })} inline side="top">
-                            <span class="text-[10px] text-muted-foreground/80 ms-1 cursor-default">{t('messages.edited')}</span>
-                          </Tooltip>
-                        </Show>
                       </span>
                       {/* <Show when={msg.notEncrypted && !msg.pending && props.e2eeEnabled !== false}>
                         <span class="text-[10px] text-amber-500/90 shrink-0">Not encrypted</span>
@@ -885,12 +879,14 @@ export const MessageList: Component<MessageListProps> = (props) => {
                         participants={props.participants}
                         spaceRoles={props.spaceRoles}
                         onMentionClick={openProfileForUser}
+                        trailing={
+                          <Show when={isEdited(msg)}>
+                            <Tooltip label={t('messages.editedAt', { time: formatMessageTimestamp(new Date(msg.updated_at!)) })} inline side="top">
+                              <span class="text-[10px] text-muted-foreground/80 ms-1 cursor-default align-baseline">{t('messages.edited')}</span>
+                            </Tooltip>
+                          </Show>
+                        }
                       />
-                      <Show when={isEdited(msg)}>
-                        <Tooltip label={t('messages.editedAt', { time: formatMessageTimestamp(new Date(msg.updated_at!)) })} inline side="top">
-                          <span class="text-[9px] text-muted-foreground/80 ms-1 cursor-default">{t('messages.edited')}</span>
-                        </Tooltip>
-                      </Show>
                       {/* <Show when={msg.notEncrypted && !msg.pending && props.e2eeEnabled !== false}>
                         <span class="text-[10px] text-amber-500/90">Not encrypted</span>
                       </Show> */}

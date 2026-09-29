@@ -23,6 +23,9 @@ export interface MessageBodyProps {
   spaceRoles?: SpaceRole[];
   /** When provided, user mentions become clickable (opens that user's profile card). */
   onMentionClick?: (userId: string, anchor: HTMLElement) => void;
+  /** Rendered inline at the very end of the content, so an "(edited)" marker sits on the last
+   * line of text instead of dropping to its own line (Discord-style). */
+  trailing?: import('solid-js').JSX.Element;
 }
 
 const pillBase = 'rounded px-1 py-0.5 font-medium';
@@ -98,6 +101,7 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
   return (
     <div class={props.class}>
       <Show when={loneGifHref()} fallback={
+      <>
       <For each={segments()}>
         {(seg) => {
           if (seg.type === 'text') {
@@ -263,8 +267,15 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
           return null;
         }}
       </For>
+      {props.trailing}
+      </>
       }>
-        {(href) => <GifEmbed href={href()} />}
+        {(href) => (
+          <>
+            <GifEmbed href={href()} />
+            {props.trailing}
+          </>
+        )}
       </Show>
     </div>
   );

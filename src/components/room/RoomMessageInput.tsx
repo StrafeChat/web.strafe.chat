@@ -16,6 +16,7 @@ import { MessageAvatar } from '../messageList/MessageAvatar';
 import { Emoji } from '../emoji/Emoji';
 import { ExpressionPicker, type ExpressionTab } from '../emoji/ExpressionPicker';
 import { isMdViewport } from '../../stores/mobileShellLayout';
+import { requestEditLastMessage } from '../../lib/chatShortcuts';
 import { TypingIndicator, type TypingPerson } from './TypingIndicator';
 import { t } from '../../i18n';
 
@@ -305,6 +306,13 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
         return;
       }
     }
+    // ↑ in an empty composer edits your last message (Discord). Only when empty, so it never
+    // steals the arrow key from someone moving the caret in a draft.
+    if (e.key === 'ArrowUp' && props.draft === '' && !props.replyTo) {
+      e.preventDefault();
+      requestEditLastMessage();
+      return;
+    }
     if (e.key === 'Escape' && props.replyTo) {
       e.preventDefault();
       props.replyTo.onCancel();
@@ -376,7 +384,7 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
       >
         <form
           onSubmit={(e) => props.onSubmit(e)}
-          class="relative shrink-0 px-4 pt-2"
+          class="relative shrink-0 px-4 pt-2 pb-1.5"
           onDragEnter={(e) => {
             if (!props.onAddFiles || !e.dataTransfer?.types.includes('Files')) return;
             e.preventDefault();
