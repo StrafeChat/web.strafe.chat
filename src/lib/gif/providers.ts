@@ -164,19 +164,33 @@ export async function fetchGifs(id: GifProviderId, opts: FetchGifsOptions = {}):
 // Direct-GIF URL detection, used by the message renderer to embed a bare GIF link inline.
 const GIF_HOSTS = ['giphy.com', 'media.giphy.com', 'media0.giphy.com', 'media1.giphy.com', 'media2.giphy.com', 'media3.giphy.com', 'media4.giphy.com', 'heypster.com', 'heypster-gif.com', 'media.heypster-gif.com', 'tenor.com', 'media.tenor.com', 'c.tenor.com'];
 
-/** True for a URL that should render as an inline animated GIF (a .gif anywhere, or a
- * .webp/.mp4 on a known GIF host). */
-export function isGifUrl(href: string): boolean {
+/** A message link that should render as inline media rather than an unfurl card. */
+export type MediaKind = 'gif' | 'image' | 'video';
+
+const IMAGE_EXT = /\.(png|jpe?g|webp|avif|bmp)$/;
+const VIDEO_EXT = /\.(mp4|webm|mov|m4v)$/;
+
+/** Classify a URL as directly-embeddable media, or null for a normal link. A .gif anywhere (or
+ * a .webp/.mp4 on a known GIF host) is a GIF; other image/video extensions are image/video. */
+export function mediaKind(href: string): MediaKind | null {
   let u: URL;
   try {
     u = new URL(href);
   } catch {
-    return false;
+    return null;
   }
-  if (u.protocol !== 'http:' && u.protocol !== 'https:') return false;
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return null;
   const path = u.pathname.toLowerCase();
-  if (path.endsWith('.gif')) return true;
   const host = u.hostname.toLowerCase();
-  const known = GIF_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
-  return known && (path.endsWith('.webp') || path.endsWith('.mp4'));
+  const gifHost = GIF_HOSTS.some((h) => host === h || host.endsWith(`.${h}`));
+  if (path.endsWith('.gif')) return 'gif';
+  if (gifHost && (path.endsWith('.webp') || path.endsWith('.mp4'))) return 'gif';
+  if (IMAGE_EXT.test(path)) return 'image';
+  if (VIDEO_EXT.test(path)) return 'video';
+  return null;
+}
+
+/** True for a URL that should render as an inline animated GIF. */
+export function isGifUrl(href: string): boolean {
+  return mediaKind(href) === 'gif';
 }

@@ -7,7 +7,7 @@ import { CustomEmoji } from '../emoji/CustomEmoji';
 import { extractSpaceInviteCodeFromUrl } from '../../lib/utils/spaceInviteLink';
 import { SpaceInviteLinkEmbed } from '../SpaceInviteLinkEmbed';
 import { LinkPreview } from './LinkPreview';
-import { isGifUrl } from '../../lib/gif/providers';
+import { mediaKind, type MediaKind } from '../../lib/gif/providers';
 import { isExternalLink, requestOpenExternalLink } from '../../stores/externalLink';
 import { spaces } from '../../stores/spaces';
 import type { RoomParticipant } from '../../api/rooms';
@@ -48,29 +48,36 @@ function findChannel(roomId: string): { spaceId: string; name: string } | null {
 /** Discord-style "jumbo" emoji: a message that is nothing but a few emoji renders them big. */
 const JUMBO_MAX = 10;
 
-/** Inline GIF (or a bare .gif/.webp link): the animation itself, capped and lazy-loaded, with
- * the source link behind a click (guarded like every other external link). */
-const GifEmbed: Component<{ href: string }> = (props) => (
-  <a
-    href={props.href}
-    target="_blank"
-    rel="noopener noreferrer"
-    class="my-1.5 block w-fit max-w-full overflow-hidden rounded-lg border border-border/50 bg-muted/30"
-    onClick={(e) => {
-      if (!isExternalLink(props.href)) return;
-      if (e.shiftKey) return;
-      e.preventDefault();
-      requestOpenExternalLink(props.href);
-    }}
+/** Inline media for a bare image/GIF/video link: the media itself, capped and lazy-loaded. A
+ * video is a real player; an image/GIF links to its source behind the usual external-link guard. */
+const MediaEmbed: Component<{ href: string; kind: MediaKind }> = (props) => (
+  <Show
+    when={props.kind === 'video'}
+    fallback={
+      <a
+        href={props.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        class="my-1.5 block w-fit max-w-full overflow-hidden rounded-lg border border-border/50 bg-muted/30"
+        onClick={(e) => {
+          if (!isExternalLink(props.href)) return;
+          if (e.shiftKey) return;
+          e.preventDefault();
+          requestOpenExternalLink(props.href);
+        }}
+      >
+        <img
+          src={props.href}
+          alt={props.kind === 'gif' ? 'GIF' : ''}
+          loading="lazy"
+          draggable={false}
+          class="block max-h-80 max-w-full rounded-lg object-contain"
+        />
+      </a>
+    }
   >
-    <img
-      src={props.href}
-      alt="GIF"
-      loading="lazy"
-      draggable={false}
-      class="block max-h-80 max-w-full rounded-lg object-contain"
-    />
-  </a>
+    <video src={props.href} controls preload="metadata" class="my-1.5 block max-h-80 max-w-full rounded-lg bg-black/30" />
+  </Show>
 );
 
 export const MessageBody: Component<MessageBodyProps> = (props) => {
@@ -85,32 +92,33 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
     }
     return count > 0 && count <= JUMBO_MAX;
   });
-  // A message whose only content is a GIF link (Discord/GIF-picker style) renders as just the
-  // GIF, no URL text. A GIF link mixed with other text keeps the link and adds the embed below.
-  const loneGifHref = createMemo(() => {
-    let href: string | null = null;
+  // A message whose only content is a media link (GIF/image/video, Discord-style) renders as
+  // just that media, no URL text. Mixed with other text, the link stays and the embed goes below.
+  const loneMedia = createMemo((): { href: string; kind: MediaKind } | null => {
+    let found: { href: string; kind: MediaKind } | null = null;
     for (const s of segments()) {
-      if (s.type === 'link' && isGifUrl(s.href)) {
-        if (href) return null; // more than one link
-        href = s.href;
+      if (s.type === 'link') {
+        const kind = mediaKind(s.href);
+        if (!kind || found) return null; // a non-media link, or more than one link
+        found = { href: s.href, kind };
       } else if (s.type === 'text' && s.content.trim() === '') {
         continue;
       } else {
         return null;
       }
     }
-    return href;
+    return found;
   });
 
-  // Distinct http(s) links worth a preview card - not GIFs (rendered inline already) or space
-  // invites (which get their own embed). Capped so a link-dump doesn't fill the screen.
+  // Distinct http(s) links worth a preview card - not inline media (GIF/image/video, rendered
+  // directly) or space invites (their own embed). Capped so a link-dump doesn't fill the screen.
   const previewUrls = createMemo(() => {
     if (!props.allowLinkPreviews) return [];
     const seen = new Set<string>();
     const out: string[] = [];
     for (const s of segments()) {
       if (s.type !== 'link') continue;
-      if (isGifUrl(s.href) || extractSpaceInviteCodeFromUrl(s.href)) continue;
+      if (mediaKind(s.href) || extractSpaceInviteCodeFromUrl(s.href)) continue;
       if (!/^https?:\/\//i.test(s.href) || seen.has(s.href)) continue;
       seen.add(s.href);
       out.push(s.href);
@@ -121,7 +129,7 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
 
   return (
     <div class={props.class}>
-      <Show when={loneGifHref()} fallback={
+      <Show when={loneMedia()} fallback={
       <>
       <For each={segments()}>
         {(seg) => {
@@ -194,13 +202,14 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
                 {seg.text}
               </a>
             );
-            // A GIF link alongside other text: keep the link and add the animation below it.
-            // (A message that is only a GIF link is handled by loneGifHref above.)
-            if (isGifUrl(href)) {
+            // A media link (GIF/image/video) alongside other text: keep the link and add the
+            // media below it. (A message that is only media is handled by loneMedia above.)
+            const kind = mediaKind(href);
+            if (kind) {
               return (
                 <div class="block max-w-full my-1.5 space-y-1.5">
                   {linkAnchor}
-                  <GifEmbed href={href} />
+                  <MediaEmbed href={href} kind={kind} />
                 </div>
               );
             }
@@ -291,9 +300,9 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
       {props.trailing}
       </>
       }>
-        {(href) => (
+        {(media) => (
           <>
-            <GifEmbed href={href()} />
+            <MediaEmbed href={media().href} kind={media().kind} />
             {props.trailing}
           </>
         )}

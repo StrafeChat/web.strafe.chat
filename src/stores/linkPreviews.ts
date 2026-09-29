@@ -24,7 +24,7 @@ const [linkPreviews, setLinkPreviews] = createStore<LinkPreviewState>({ byUrl: {
 export { linkPreviews };
 
 function hasContent(m: LinkMetadata): boolean {
-  return !!(m.title || m.description || m.image);
+  return !!(m.title || m.description || m.image || m.video);
 }
 
 /** Fetch (once) the preview for a URL; components read linkPreviews.byUrl[url] reactively. */
