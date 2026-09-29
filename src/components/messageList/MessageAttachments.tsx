@@ -4,8 +4,9 @@ import { Portal } from 'solid-js/web';
 import type { AttachmentView } from '../../lib/attachments/types';
 import { decryptAttachment } from '../../lib/attachments/crypto';
 import { attachmentKind, fileIcon, fitWithin, formatFileSize } from '../../lib/attachments/format';
+import { getMediaDimensions, recordMediaDimensions } from '../../lib/mediaDimensions';
 import { IconButton } from '../ui/IconButton';
-import { AudioPlayer, VideoPlayer } from '../media';
+import { AudioPlayer, VideoPlayer, videoPlayerBox } from '../media';
 import { zLayer } from '../../theme/appChrome';
 import { t } from '../../i18n';
 
@@ -59,30 +60,44 @@ const UploadProgress: Component<{ att: AttachmentView }> = (props) => (
 
 const ImageAttachment: Component<{ att: AttachmentView; onOpen: (url: string) => void }> = (props) => {
   const url = useDisplayUrl(() => props.att);
-  const box = createMemo(() => fitWithin(props.att.width ?? 0, props.att.height ?? 0, MAX_W, MAX_H));
-  const hasDims = () => (props.att.width ?? 0) > 0 && (props.att.height ?? 0) > 0;
+  const [loaded, setLoaded] = createSignal(false);
+  // Reserve the exact box up front (from the stored dimensions, or ones we cached last time we saw
+  // this URL) so the image fades into held space instead of shoving the messages below it.
+  const box = createMemo(() => {
+    const w = props.att.width ?? getMediaDimensions(props.att.url)?.width ?? 0;
+    const h = props.att.height ?? getMediaDimensions(props.att.url)?.height ?? 0;
+    return w > 0 && h > 0 ? fitWithin(w, h, MAX_W, MAX_H) : null;
+  });
+  const onLoad = (e: Event & { currentTarget: HTMLImageElement }) => {
+    setLoaded(true);
+    recordMediaDimensions(props.att.url, e.currentTarget.naturalWidth, e.currentTarget.naturalHeight);
+  };
   return (
     <button
       type="button"
-      class={`group/att relative block overflow-hidden rounded-lg bg-muted/40 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+      class={`group/att relative block overflow-hidden rounded-lg text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
         props.att.uploading ? 'cursor-default' : 'cursor-zoom-in'
       }`}
-      style={hasDims() ? { width: `${box().width}px`, height: `${box().height}px` } : undefined}
+      style={box() ? { width: `${box()!.width}px`, height: `${box()!.height}px` } : undefined}
       title={props.att.filename}
       onClick={() => {
         const u = url();
         if (u && !props.att.uploading) props.onOpen(u);
       }}
     >
-      <Show when={url()} fallback={<div class="size-full min-h-24 min-w-32 animate-pulse bg-muted/60" />}>
+      <Show when={!loaded()}>
+        <div class={`media-skeleton ${box() ? 'absolute inset-0' : 'h-40 w-56 max-w-full'} rounded-lg`} />
+      </Show>
+      <Show when={url()}>
         <img
           src={url()!}
           alt={props.att.filename}
-          class={`block ${hasDims() ? 'size-full object-cover' : 'max-h-[300px] max-w-full object-contain'} ${
-            props.att.uploading ? 'opacity-70' : ''
-          }`}
+          onLoad={onLoad}
           loading="lazy"
           decoding="async"
+          class={`rounded-lg transition-opacity duration-300 ${loaded() ? 'opacity-100' : 'opacity-0'} ${
+            props.att.uploading ? '!opacity-70' : ''
+          } ${box() ? 'absolute inset-0 size-full object-cover' : loaded() ? 'block max-h-[300px] max-w-full object-contain' : 'absolute'}`}
         />
       </Show>
       <UploadProgress att={props.att} />
@@ -92,9 +107,16 @@ const ImageAttachment: Component<{ att: AttachmentView; onOpen: (url: string) =>
 
 const VideoAttachment: Component<{ att: AttachmentView }> = (props) => {
   const url = useDisplayUrl(() => props.att);
+  // The skeleton holds the exact space the player will take, so it doesn't jump in on decrypt/load.
+  const box = createMemo(() => videoPlayerBox(props.att.width, props.att.height));
   return (
     <div class="relative max-w-full overflow-hidden rounded-lg" title={props.att.filename}>
-      <Show when={url()} fallback={<div class="h-48 w-72 animate-pulse rounded-lg bg-muted/60" />}>
+      <Show
+        when={url()}
+        fallback={
+          <div class="media-skeleton max-w-full rounded-lg" style={{ width: `${box().width}px`, height: `${box().height}px` }} />
+        }
+      >
         <VideoPlayer
           src={url()!}
           filename={props.att.filename}
@@ -111,7 +133,7 @@ const VideoAttachment: Component<{ att: AttachmentView }> = (props) => {
 const AudioAttachment: Component<{ att: AttachmentView }> = (props) => {
   const url = useDisplayUrl(() => props.att);
   return (
-    <Show when={url()} fallback={<div class="h-20 w-full max-w-md animate-pulse rounded-lg bg-muted/60" />}>
+    <Show when={url()} fallback={<div class="media-skeleton h-20 w-full max-w-md rounded-lg" />}>
       <AudioPlayer
         src={url()!}
         filename={props.att.filename}

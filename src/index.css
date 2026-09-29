@@ -89,6 +89,26 @@
   animation: msg-jump-flash 1.6s ease-out forwards;
 }
 
+/* Media placeholder: a soft shimmer in a reserved box, shown until an image/video's bytes load,
+   so the layout never jumps when the media arrives. Reduce-motion (below) stills it to a flat
+   muted box. */
+@keyframes media-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.media-skeleton {
+  background-color: var(--color-muted);
+  background-image: linear-gradient(
+    100deg,
+    transparent 20%,
+    color-mix(in srgb, var(--color-muted-foreground) 14%, transparent) 40%,
+    color-mix(in srgb, var(--color-muted-foreground) 14%, transparent) 60%,
+    transparent 80%
+  );
+  background-size: 200% 100%;
+  animation: media-shimmer 1.5s linear infinite;
+}
+
 /* Appearance setting: transparency effects off -> flat, opaque panels */
 html.no-glass [class*='backdrop-blur'] {
   backdrop-filter: none !important;

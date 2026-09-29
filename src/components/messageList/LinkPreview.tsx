@@ -1,11 +1,47 @@
 import type { Component, JSX } from 'solid-js';
-import { Show, createMemo, onMount } from 'solid-js';
+import { Show, createMemo, createSignal, onMount } from 'solid-js';
 import { ensureLinkPreview, linkPreviews } from '../../stores/linkPreviews';
 import type { LinkMetadata } from '../../api/unfurl';
 import { isExternalLink, requestOpenExternalLink } from '../../stores/externalLink';
 import { VideoPlayer } from '../media';
+import { getMediaDimensions, recordMediaDimensions } from '../../lib/mediaDimensions';
 import { videoEmbed } from '../../lib/embeds/providers';
 import { IframeEmbed } from './IframeEmbed';
+
+/**
+ * A preview-card image that reserves its space before the bytes load. When the size is known (from
+ * the unfurl, or cached from a prior load) it holds an aspect-ratio box and fades the image in over
+ * a shimmer; otherwise it shows a shimmer of a sensible height until the image arrives.
+ */
+const PreviewImage: Component<{ src: string; width?: number; height?: number }> = (props) => {
+  const [loaded, setLoaded] = createSignal(false);
+  const dims = () => {
+    const w = props.width || getMediaDimensions(props.src)?.width;
+    const h = props.height || getMediaDimensions(props.src)?.height;
+    return w && h ? { w, h } : null;
+  };
+  const onLoad = (e: Event & { currentTarget: HTMLImageElement }) => {
+    setLoaded(true);
+    recordMediaDimensions(props.src, e.currentTarget.naturalWidth, e.currentTarget.naturalHeight);
+  };
+  return (
+    <div class="relative w-full overflow-hidden rounded" style={dims() ? { 'aspect-ratio': `${dims()!.w} / ${dims()!.h}`, 'max-height': '20rem' } : undefined}>
+      <Show when={!loaded()}>
+        <div class={`media-skeleton ${dims() ? 'absolute inset-0' : 'h-44 w-full'}`} />
+      </Show>
+      <img
+        src={props.src}
+        alt=""
+        onLoad={onLoad}
+        loading="lazy"
+        decoding="async"
+        class={`rounded object-cover transition-opacity duration-300 ${loaded() ? 'opacity-100' : 'opacity-0'} ${
+          dims() ? 'absolute inset-0 size-full' : loaded() ? 'block max-h-80 w-full' : 'absolute'
+        }`}
+      />
+    </div>
+  );
+};
 
 /** Last path segment of a URL, a reasonable fallback name for a video with no title. */
 function mediaName(href: string): string {
@@ -125,7 +161,7 @@ const Card: Component<{ d: LinkMetadata; fallbackUrl: string }> = (props) => {
           class="group relative mt-2 block overflow-hidden rounded bg-black/30"
         >
           <Show when={image()?.url}>
-            <img src={image()!.url} alt="" class="max-h-80 w-full rounded object-cover" loading="lazy" draggable={false} />
+            <PreviewImage src={image()!.url} width={image()!.width} height={image()!.height} />
           </Show>
           <span class="absolute inset-0 flex items-center justify-center">
             <span class="flex size-12 items-center justify-center rounded-full bg-black/60 text-white transition-colors group-hover:bg-black/75">
@@ -138,7 +174,7 @@ const Card: Component<{ d: LinkMetadata; fallbackUrl: string }> = (props) => {
     // Otherwise a plain image.
     return (
       <a href={href()} target="_blank" rel="noopener noreferrer" onClick={openGuarded} class="mt-2 block overflow-hidden rounded">
-        <img src={image()!.url} alt="" class="max-h-80 w-full rounded object-cover" loading="lazy" draggable={false} />
+        <PreviewImage src={image()!.url} width={image()!.width} height={image()!.height} />
       </a>
     );
   };

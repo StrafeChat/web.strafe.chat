@@ -1,3 +1,3 @@
-export { VideoPlayer } from './VideoPlayer';
+export { VideoPlayer, videoPlayerBox } from './VideoPlayer';
 export { AudioPlayer } from './AudioPlayer';
 export { formatMediaTime } from './format';

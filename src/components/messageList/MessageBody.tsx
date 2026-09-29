@@ -8,6 +8,8 @@ import { extractSpaceInviteCodeFromUrl } from '../../lib/utils/spaceInviteLink';
 import { SpaceInviteLinkEmbed } from '../SpaceInviteLinkEmbed';
 import { LinkPreview } from './LinkPreview';
 import { VideoPlayer } from '../media';
+import { fitWithin } from '../../lib/attachments/format';
+import { getMediaDimensions, recordMediaDimensions } from '../../lib/mediaDimensions';
 import { mediaKind, type MediaKind } from '../../lib/gif/providers';
 import { isExternalLink, requestOpenExternalLink } from '../../stores/externalLink';
 import { spaces } from '../../stores/spaces';
@@ -83,9 +85,14 @@ const MediaEmbed: Component<{ href: string; kind: MediaKind; allowLinkPreviews?:
   props
 ) => {
   const [failed, setFailed] = createSignal(false);
+  const [shown, setShown] = createSignal(false);
   let imgEl: HTMLImageElement | undefined;
   let ready = false; // set once the media actually loads (img onload, or the player's onReady)
   let timer: number | undefined;
+  // Reserve the box from a size we cached the last time we saw this link, so a re-render (scrolling
+  // back, re-entering the room) holds space and the image fades in instead of shoving text down.
+  const cached = getMediaDimensions(props.href);
+  const box = cached ? fitWithin(cached.width, cached.height, 400, 320) : null;
   const isReady = () => ready || !!(imgEl?.complete && imgEl.naturalWidth > 0);
   onMount(() => {
     timer = window.setTimeout(() => {
@@ -96,6 +103,8 @@ const MediaEmbed: Component<{ href: string; kind: MediaKind; allowLinkPreviews?:
   const onLoaded = () => {
     ready = true;
     clearTimeout(timer);
+    setShown(true);
+    if (imgEl) recordMediaDimensions(props.href, imgEl.naturalWidth, imgEl.naturalHeight);
   };
   const onFail = () => {
     clearTimeout(timer);
@@ -132,9 +141,13 @@ const MediaEmbed: Component<{ href: string; kind: MediaKind; allowLinkPreviews?:
             href={props.href}
             target="_blank"
             rel="noopener noreferrer"
-            class="my-1.5 block w-fit max-w-full overflow-hidden rounded-lg border border-border/50 bg-muted/30"
+            class="relative my-1.5 block w-fit max-w-full overflow-hidden rounded-lg border border-border/50 bg-muted/30"
+            style={box ? { width: `${box.width}px`, height: `${box.height}px` } : undefined}
             onClick={guardClick(props.href)}
           >
+            <Show when={!shown()}>
+              <div class={`media-skeleton ${box ? 'absolute inset-0' : 'h-44 w-64 max-w-full'} rounded-lg`} />
+            </Show>
             <img
               ref={(el) => (imgEl = el)}
               src={props.href}
@@ -143,7 +156,9 @@ const MediaEmbed: Component<{ href: string; kind: MediaKind; allowLinkPreviews?:
               draggable={false}
               onLoad={onLoaded}
               onError={onFail}
-              class="block max-h-80 max-w-full rounded-lg object-contain"
+              class={`rounded-lg transition-opacity duration-300 ${shown() ? 'opacity-100' : 'opacity-0'} ${
+                box ? 'absolute inset-0 size-full object-contain' : shown() ? 'block max-h-80 max-w-full object-contain' : 'absolute'
+              }`}
             />
           </a>
         }

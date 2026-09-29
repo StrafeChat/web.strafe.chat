@@ -18,6 +18,18 @@ const COMPACT_W = 288;
 /** How long the controls stay after the pointer stops moving while playing. */
 const HIDE_AFTER_MS = 2500;
 
+/** The on-screen box the player will occupy for a clip of these dimensions - so a caller can
+ * reserve the exact same space with a skeleton and avoid a layout jump when the player mounts.
+ * Unknown dimensions get the 16:9 default the player itself falls back to. */
+export function videoPlayerBox(width?: number, height?: number): { width: number; height: number } {
+  const w = width ?? 0;
+  const h = height ?? 0;
+  if (w <= 0 || h <= 0) return { width: MAX_W, height: Math.round((MAX_W * 9) / 16) };
+  const fit = fitWithin(w, h, MAX_W, h > w ? MAX_H_PORTRAIT : MAX_H);
+  // Never let the frame get narrower than the controls need; a thinner clip letterboxes within.
+  return { width: Math.max(fit.width, MIN_W), height: fit.height };
+}
+
 export interface VideoPlayerProps {
   src: string;
   filename: string;
@@ -51,13 +63,7 @@ export const VideoPlayer: Component<VideoPlayerProps> = (props) => {
   let hideTimer: ReturnType<typeof setTimeout> | undefined;
 
   const hasDims = () => (props.width ?? 0) > 0 && (props.height ?? 0) > 0;
-  const box = createMemo(() => {
-    const w = props.width ?? 0;
-    const h = props.height ?? 0;
-    const fit = fitWithin(w, h, MAX_W, h > w ? MAX_H_PORTRAIT : MAX_H);
-    // Never let the frame get narrower than the controls need; a thinner clip letterboxes within.
-    return { width: Math.max(fit.width, MIN_W), height: fit.height };
-  });
+  const box = createMemo(() => videoPlayerBox(props.width, props.height));
   // A narrow (portrait) player hides the time readout so the button row keeps its layout instead
   // of the buttons squeezing into each other. Fullscreen is always wide enough.
   const compact = () => !fullscreen() && box().width < COMPACT_W;
