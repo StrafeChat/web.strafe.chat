@@ -26,6 +26,7 @@ import { IconButton } from '../ui/IconButton';
 import { showContextMenu } from '../../stores/contextMenu';
 import { isRoomMuted, muteRoom, unmuteRoom } from '../../lib/roomNotify';
 import { spaceMembers, loadSpaceMembers } from '../../stores/spaceMembers';
+import { consumeSpaceAction } from '../../stores/spaceQuickActions';
 import {
   memberCanCreateInvite,
   memberCanManageRooms,
@@ -109,6 +110,16 @@ export const SpaceRoomsBar: Component = () => {
   const [createSectionOpen, setCreateSectionOpen] = createSignal(false);
   const [spaceMenuOpen, setSpaceMenuOpen] = createSignal(false);
   const [spaceMenuPos, setSpaceMenuPos] = createSignal<{ top: number; left: number; width: number } | null>(null);
+
+  // The server rail's right-click menu can ask to open this space's Invite or Settings modal;
+  // once this bar is the mounted space, honour the request (navigating here first if needed).
+  createEffect(() => {
+    const sid = spaceId();
+    if (!sid) return;
+    const action = consumeSpaceAction(sid);
+    if (action === 'invite') setInviteOpen(true);
+    else if (action === 'settings') setSpaceSettingsOpen(true);
+  });
 
   let spaceMenuTriggerEl: HTMLButtonElement | undefined;
   let spaceMenuPanelEl: HTMLDivElement | undefined;

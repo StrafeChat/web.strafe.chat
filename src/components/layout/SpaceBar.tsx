@@ -1,9 +1,13 @@
 import type { Component } from 'solid-js';
 import { incomingFriendRequests } from '../../lib/mobileNotifications';
 import { createSignal, For, Show } from 'solid-js';
-import { A, useLocation } from '@solidjs/router';
+import { A, useLocation, useNavigate } from '@solidjs/router';
 import { lastVisited } from '../../stores/lastVisited';
-import { spaces } from '../../stores/spaces';
+import { spaces, removeSpace } from '../../stores/spaces';
+import { spaceMembers } from '../../stores/spaceMembers';
+import { memberCanCreateInvite, memberCanManageSpace, memberCanManageRoles } from '../../lib/spacePermissions';
+import { confirmDialog } from '../../stores/confirmDialog';
+import { requestSpaceAction, type SpaceQuickAction } from '../../stores/spaceQuickActions';
 import { lastSpaceRoom } from '../../stores/lastSpaceRoom';
 import { Tooltip } from '../ui/Tooltip';
 import { CreateSpaceModal } from '../CreateSpaceModal';
@@ -13,7 +17,7 @@ import { readState, getUnreadCountForDisplay } from '../../stores/readState';
 import { auth } from '../../stores/auth';
 import { appSpaceRail } from '../../theme/appChrome';
 import { showContextMenu } from '../../stores/contextMenu';
-import { ackAllSpaceRooms } from '../../api/spaces';
+import { ackAllSpaceRooms, leaveSpace } from '../../api/spaces';
 import { t } from '../../i18n';
 
 const iconSize = 24;
@@ -114,6 +118,7 @@ const SpaceIcon: Component<SpaceIconProps> = (props) => {
 export const SpaceBar: Component = () => {
   const [showCreateSpace, setShowCreateSpace] = createSignal(false);
   const location = useLocation();
+  const navigate = useNavigate();
   const pathname = () => location.pathname;
   const currentUserId = () => auth.user?.id ?? '';
   const activeRoomId = () => pathname().match(/^\/spaces\/[^/]+\/rooms\/([^/]+)/)?.[1] ?? null;
@@ -193,7 +198,29 @@ export const SpaceBar: Component = () => {
 
   function openSpaceMenu(e: MouseEvent, spaceId: string) {
     const unread = spaceUnreadCount(spaceId) > 0 || spaceMentionCount(spaceId) > 0;
+    const sp = spaces.spaces.find((s) => s.id === spaceId);
+    const uid = auth.user?.id;
+    const me = spaceMembers.bySpaceId[spaceId]?.find((m) => m.id === uid);
+    const roles = sp?.roles;
+    const canInvite = memberCanCreateInvite(sp, roles, me, uid);
+    const canSettings =
+      memberCanManageSpace(sp, roles, me, uid) || memberCanManageRoles(sp, roles, me, uid);
+    const isOwner = !!sp && sp.owner_id === uid;
+
+    // Invite/Settings modals live in that space's SpaceRoomsBar: flag the action and, if it's not
+    // the space we're viewing, navigate there so its bar mounts and picks the request up.
+    const openAction = (action: SpaceQuickAction) => {
+      requestSpaceAction(spaceId, action);
+      if (activeSpaceId() !== spaceId) navigate(`/spaces/${spaceId}`);
+    };
+
     showContextMenu(e, [
+      ...(canInvite
+        ? [{ label: t('space.inviteMembers'), icon: 'fa-user-plus', onClick: () => openAction('invite') }]
+        : []),
+      ...(canSettings
+        ? [{ label: t('space.settings'), icon: 'fa-sliders', onClick: () => openAction('settings') }]
+        : []),
       {
         label: t('contextMenu.markSpaceAsRead'),
         icon: 'fa-check-double',
@@ -207,6 +234,33 @@ export const SpaceBar: Component = () => {
         icon: 'fa-copy',
         onClick: () => navigator.clipboard.writeText(spaceId),
       },
+      // The owner can't leave (they must transfer or delete); everyone else can.
+      ...(sp && !isOwner
+        ? [
+            {
+              label: t('space.leave'),
+              icon: 'fa-right-from-bracket',
+              danger: true,
+              onClick: async () => {
+                const ok = await confirmDialog({
+                  title: t('space.leave'),
+                  body: t('space.leaveConfirm', { name: sp.name ?? t('space.thisSpace') }),
+                  confirmLabel: t('space.leave'),
+                  tone: 'danger',
+                  icon: 'fa-solid fa-right-from-bracket',
+                });
+                if (!ok) return;
+                try {
+                  await leaveSpace(spaceId);
+                  removeSpace(spaceId);
+                  if (activeSpaceId() === spaceId) navigate('/', { replace: true });
+                } catch (err) {
+                  console.error('Failed to leave space:', err);
+                }
+              },
+            },
+          ]
+        : []),
     ]);
   }
 
