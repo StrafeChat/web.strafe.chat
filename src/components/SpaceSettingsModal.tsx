@@ -44,6 +44,7 @@ import { Tabs } from './ui/Tabs';
 import { Toggle } from './ui/Toggle';
 import { TriStateToggle, type TriState } from './ui/TriStateToggle';
 import { UserCell } from './ui/UserCell';
+import { createPointerDrag } from '../lib/dnd/createPointerDrag';
 import { SettingsNav, SettingsPanel, SettingsShell, type SettingsNavGroup, type SettingsNavItemDef } from './settings';
 import { SpaceEmojiSettings } from './settings/SpaceEmojiSettings';
 import {
@@ -116,12 +117,10 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
   const [permSearch, setPermSearch] = createSignal('');
   const [err, setErr] = createSignal('');
   const [busy, setBusy] = createSignal(false);
-  const [dragRoleId, setDragRoleId] = createSignal('');
   const [dropIndicator, setDropIndicator] = createSignal<{
     overId: string;
     placement: 'before' | 'after';
   } | null>(null);
-  const [dragging, setDragging] = createSignal(false);
 
   // Roles and the current room's overrides come from the spaces store, which the gateway
   // keeps current; nothing is fetched when the modal opens.
@@ -397,6 +396,35 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
     }
   }
 
+  // --- Pointer-drag reordering for the role list (Discord-style, replaces native HTML5 drag) ---
+  let roleListScrollEl: HTMLDivElement | undefined;
+  const roleRowEls = new Map<string, HTMLElement>();
+
+  /** The before/after slot the cursor is over among the custom roles (@everyone stays pinned). */
+  function roleDropSlotAt(clientY: number): { overId: string; placement: 'before' | 'after' } | null {
+    const custom = roles()?.filter((x) => x.name !== EVERYONE) ?? [];
+    for (const role of custom) {
+      const el = roleRowEls.get(role.id);
+      if (!el) continue;
+      const rect = el.getBoundingClientRect();
+      if (clientY < rect.top + rect.height / 2) return { overId: role.id, placement: 'before' };
+      if (clientY <= rect.bottom) return { overId: role.id, placement: 'after' };
+    }
+    const last = custom[custom.length - 1];
+    return last ? { overId: last.id, placement: 'after' } : null;
+  }
+
+  const roleDrag = createPointerDrag({
+    enabled: () => props.canManageRoles === true && !busy(),
+    scrollEl: () => roleListScrollEl,
+    onMove: (_id, _x, y) => setDropIndicator(roleDropSlotAt(y)),
+    onDrop: (id) => {
+      const slot = dropIndicator();
+      if (slot && slot.overId !== id) void reorderRoles(id, slot.overId, slot.placement);
+    },
+    onEnd: () => setDropIndicator(null),
+  });
+
   async function saveOverride() {
     const sid = props.spaceId;
     const rid = props.roomId;
@@ -588,111 +616,62 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                 <p class="text-sm text-muted-foreground">{t('common.loading')}</p>
               </Show>
               <Show when={roles()}>
-                <div class="flex max-h-48 flex-col gap-0.5 overflow-y-auto rounded-xl border border-border/80 bg-card/20 p-1 lg:max-h-[min(420px,50vh)]">
+                <div
+                  ref={(el) => (roleListScrollEl = el)}
+                  class="flex max-h-48 flex-col gap-0.5 overflow-y-auto rounded-xl border border-border/80 bg-card/20 p-1 lg:max-h-[min(420px,50vh)]"
+                >
                   <For each={roles()!}>
                     {(r) => {
                       const isEveryone = r.name === EVERYONE;
-                      const showGrip = props.canManageRoles && !isEveryone;
-                      const dragDisabled = busy();
-                      const canReceiveDrop = props.canManageRoles;
-                      const isDraggingRole = dragRoleId() === r.id;
-                      const ind = dropIndicator();
-                      const lineBefore = ind?.overId === r.id && ind.placement === 'before';
-                      const lineAfter = ind?.overId === r.id && ind.placement === 'after';
-
-                      function updateDropIndicator(e: DragEvent, el: HTMLElement) {
-                        const rect = el.getBoundingClientRect();
-                        const mid = rect.top + rect.height / 2;
-                        const placement = e.clientY < mid ? 'before' : 'after';
-                        if (isEveryone) {
-                          if (placement === 'before') {
-                            setDropIndicator(null);
-                            return;
-                          }
-                          setDropIndicator({ overId: r.id, placement: 'after' });
-                          return;
-                        }
-                        setDropIndicator({ overId: r.id, placement });
-                      }
-
+                      const showGrip = () => props.canManageRoles && !isEveryone;
+                      const lineBefore = () => dropIndicator()?.overId === r.id && dropIndicator()?.placement === 'before';
+                      const lineAfter = () => dropIndicator()?.overId === r.id && dropIndicator()?.placement === 'after';
+                      let rowEl: HTMLDivElement | undefined;
                       return (
                         <div class="flex flex-col">
-                          <Show when={lineBefore}>
+                          <Show when={lineBefore()}>
                             <div
                               class="mb-0.5 h-0.5 shrink-0 rounded-sm bg-primary shadow-[0_0_8px_color-mix(in_srgb,var(--color-primary)_70%,transparent)]"
                               aria-hidden="true"
                             />
                           </Show>
                           <div
+                            ref={(el) => {
+                              rowEl = el;
+                              roleRowEls.set(r.id, el);
+                            }}
                             role="button"
                             tabIndex={0}
-                            class={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-start text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
+                            class={`flex w-full items-center gap-2 rounded-lg px-2 py-2 text-start text-sm outline-none transition-opacity focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
                               selectedRoleId() === r.id
                                 ? 'bg-muted text-foreground'
                                 : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
-                            } ${isDraggingRole ? 'opacity-60' : ''}`}
-                            onClick={() => {
-                              if (dragging()) return;
-                              setSelectedRoleId(r.id);
-                            }}
+                            } ${roleDrag.draggingId() === r.id ? 'opacity-40' : ''}`}
+                            onClick={() => setSelectedRoleId(r.id)}
                             onKeyDown={(e) => {
                               if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault();
-                                if (!dragging()) setSelectedRoleId(r.id);
+                                setSelectedRoleId(r.id);
                               }
                             }}
-                            onDragOver={(e) => {
-                              if (!canReceiveDrop || dragDisabled) return;
-                              if (!dragRoleId()) return;
-                              if (!e.dataTransfer) return;
-                              e.preventDefault();
-                              e.dataTransfer.dropEffect = 'move';
-                              updateDropIndicator(e, e.currentTarget as HTMLElement);
-                            }}
-                            onDrop={(e) => {
-                              if (!canReceiveDrop || dragDisabled) return;
-                              const dt = e.dataTransfer;
-                              if (!dt) return;
-                              e.preventDefault();
-                              const from = dt.getData('text/plain') || dragRoleId();
-                              const slot = dropIndicator();
-                              setDragging(false);
-                              setDragRoleId('');
-                              setDropIndicator(null);
-                              if (!from || !slot) return;
-                              void reorderRoles(from, slot.overId, slot.placement);
-                            }}
                           >
-                            {showGrip ? (
+                            <Show
+                              when={showGrip()}
+                              fallback={<span class="size-4 shrink-0" aria-hidden="true" />}
+                            >
                               <span
-                                draggable={!dragDisabled}
-                                class={`shrink-0 text-muted-foreground hover:text-foreground ${
-                                  dragDisabled ? 'cursor-not-allowed opacity-50' : 'cursor-grab active:cursor-grabbing'
+                                class={`shrink-0 touch-none text-muted-foreground hover:text-foreground ${
+                                  busy() ? 'cursor-not-allowed opacity-50' : 'cursor-grab active:cursor-grabbing'
                                 }`}
-                                onDragStart={(e) => {
-                                  if (!showGrip || dragDisabled) return;
-                                  const dt = e.dataTransfer;
-                                  if (!dt) return;
-                                  dt.effectAllowed = 'move';
-                                  dt.setData('text/plain', r.id);
-                                  setDragRoleId(r.id);
-                                  setDropIndicator(null);
-                                  setDragging(true);
-                                  e.stopPropagation();
+                                onPointerDown={(e) => {
+                                  if (rowEl) roleDrag.start(e, r.id, rowEl);
                                 }}
-                                onDragEnd={() => {
-                                  setDragging(false);
-                                  setDragRoleId('');
-                                  setDropIndicator(null);
-                                }}
-                                title={t('spaceSettings.dragToReorder')}
+                                data-tooltip={t('spaceSettings.dragToReorder')}
                                 aria-label={t('spaceSettings.reorderRole', { name: r.name })}
                               >
                                 <i class="fa-solid fa-grip-vertical" />
                               </span>
-                            ) : (
-                              <span class="size-4 shrink-0" aria-hidden="true" />
-                            )}
+                            </Show>
 
                             <span
                               class="size-3 shrink-0 rounded-full border border-border/40"
@@ -706,7 +685,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                               </span>
                             </Show>
                           </div>
-                          <Show when={lineAfter}>
+                          <Show when={lineAfter()}>
                             <div
                               class="mt-0.5 h-0.5 shrink-0 rounded-sm bg-primary shadow-[0_0_8px_color-mix(in_srgb,var(--color-primary)_70%,transparent)]"
                               aria-hidden="true"
