@@ -13,6 +13,7 @@ import {
   type SearchIdentity,
 } from '../../lib/messageSearch';
 import { t } from '../../i18n';
+import { BotTag } from '../BotTag';
 
 export interface MessageSearchBoxProps {
   value: string;
@@ -30,7 +31,7 @@ type Row =
   | { kind: 'submit' }
   | { kind: 'showFilters' }
   | { kind: 'filter'; key: SearchFilterKey }
-  | { kind: 'value'; key: SearchFilterKey; value: string; label: string; hint?: string };
+  | { kind: 'value'; key: SearchFilterKey; value: string; label: string; hint?: string; bot?: boolean };
 
 const SUGGESTION_LIMIT = 4;
 
@@ -134,6 +135,7 @@ export const MessageSearchBox: Component<MessageSearchBoxProps> = (props) => {
         key: active.key,
         value: p.username,
         label: personLabel(p),
+        bot: p.bot,
         hint: `${active.key}: ${p.username}`,
       }));
     }
@@ -147,7 +149,7 @@ export const MessageSearchBox: Component<MessageSearchBoxProps> = (props) => {
     const q = trimmed();
     const out: Row[] = [{ kind: 'submit' }, { kind: 'showFilters' }];
     for (const p of matchPeople(q)) {
-      out.push({ kind: 'value', key: 'from', value: p.username, label: personLabel(p), hint: `from: ${p.username}` });
+      out.push({ kind: 'value', key: 'from', value: p.username, label: personLabel(p), bot: p.bot, hint: `from: ${p.username}` });
     }
     if (props.channels) {
       for (const c of matchChannels(q)) {
@@ -160,6 +162,7 @@ export const MessageSearchBox: Component<MessageSearchBoxProps> = (props) => {
         key: 'mentions',
         value: p.username,
         label: personLabel(p),
+        bot: p.bot,
         hint: `mentions: ${p.username}`,
       });
     }
@@ -355,6 +358,7 @@ export const MessageSearchBox: Component<MessageSearchBoxProps> = (props) => {
                               : row.kind === 'filter'
                                 ? t(`room.search.filters.${row.key}.title`)
                                 : row.label}
+                          <BotTag bot={row.kind === 'value' ? row.bot : undefined} size="xs" />
                         </span>
                         <Show when={row.kind === 'filter' || (row.kind === 'value' && row.hint)}>
                           <span class="block truncate text-xs text-muted-foreground">

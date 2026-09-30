@@ -6,6 +6,7 @@ import { getMessageBodyText, getSenderDisplay, messagePreviewText } from './util
 import { MessageAvatar } from './MessageAvatar';
 import { scrollToMessage } from '../../lib/utils/messages';
 import { t } from '../../i18n';
+import { BotTag } from '../BotTag';
 
 export interface ReplyReferenceProps {
   replyToId: string;
@@ -62,6 +63,7 @@ export const ReplyReference: Component<ReplyReferenceProps> = (props) => {
         >
           <MessageAvatar name={sender()!.name} avatar={sender()!.avatar} class="size-4 text-[9px] ring-0" />
           <span class="shrink-0 font-semibold text-foreground/90 group-hover/reply:underline">{sender()!.name}</span>
+          <BotTag bot={sender()!.bot} size="xs" class="ms-0" />
           <span class="min-w-0 truncate text-muted-foreground group-hover/reply:text-foreground/80">
             {preview() || <span class="italic">{t('messages.noText')}</span>}
           </span>

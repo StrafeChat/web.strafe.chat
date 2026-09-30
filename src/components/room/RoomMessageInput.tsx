@@ -20,6 +20,7 @@ import { isMdViewport } from '../../stores/mobileShellLayout';
 import { requestEditLastMessage } from '../../lib/chatShortcuts';
 import { TypingIndicator, type TypingPerson } from './TypingIndicator';
 import { t } from '../../i18n';
+import { BotTag } from '../BotTag';
 
 export interface ReplyTarget {
   /** Author of the message being replied to. */
@@ -695,6 +696,7 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
                             class="size-6 text-[11px]"
                           />
                           <span class="truncate">{c.label}</span>
+                          <BotTag bot={(c as { participant: RoomParticipant }).participant.bot} size="xs" class="ms-0" />
                           <span class="truncate text-xs text-muted-foreground">
                             {(c as { sublabel?: string }).sublabel}
                           </span>

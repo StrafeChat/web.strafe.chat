@@ -198,7 +198,7 @@ export const SpaceMembersPage: Component<Props> = (props) => {
                     <tr class={appTableRow} onContextMenu={(e) => hasActions() && openMenu(e, m)}>
                       <td class={appTableCell}>
                         <div class="flex items-center gap-2">
-                          <UserCell name={memberName(m)} username={m.username} discriminator={m.discriminator} avatar={m.avatar} />
+                          <UserCell name={memberName(m)} bot={m.bot} username={m.username} discriminator={m.discriminator} avatar={m.avatar} />
                           <Show when={isOwner(m.id)}>
                             <i class="fa-solid fa-crown text-[11px] text-amber-400" title={t('room.members.owner')} aria-hidden="true" />
                           </Show>

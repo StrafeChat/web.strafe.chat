@@ -3,6 +3,7 @@ import { Show, For, onMount, onCleanup, createEffect, createSignal, createMemo, 
 import { Portal } from 'solid-js/web';
 import { MessageAvatar } from './messageList/MessageAvatar';
 import { UserBadges } from './UserBadges';
+import { BotTag } from './BotTag';
 import { MessageBody } from './messageList/MessageBody';
 import { PresenceDot } from './PresenceDot';
 import { createPM } from '../api/rooms';
@@ -441,8 +442,9 @@ export const UserProfilePopover: Component = () => {
               <div class="flex items-center gap-1.5">
                 <h3 class="min-w-0 flex-1 text-lg font-semibold leading-tight text-foreground break-words">
                   {subject()!.displayName}
+                  <BotTag bot={subject()!.bot} size="sm" class="relative -top-px" />
                 </h3>
-                <UserBadges flags={subject()!.publicFlags} bot={subject()!.bot} size={14} class="shrink-0" />
+                <UserBadges flags={subject()!.publicFlags} size={14} class="shrink-0" />
               </div>
               <button
                 type="button"

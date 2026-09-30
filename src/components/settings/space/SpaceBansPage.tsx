@@ -101,7 +101,7 @@ export const SpaceBansPage: Component<Props> = (props) => {
                   {(b) => (
                     <tr class={appTableRow}>
                       <td class={appTableCell}>
-                        <UserCell name={nameOf(b)} username={b.user?.username} discriminator={b.user?.discriminator} avatar={b.user?.avatar} />
+                        <UserCell name={nameOf(b)} bot={b.user?.bot} username={b.user?.username} discriminator={b.user?.discriminator} avatar={b.user?.avatar} />
                       </td>
                       <td class={`${appTableCell} max-w-xs`}>
                         <span class={b.reason ? 'text-foreground' : 'text-muted-foreground'}>{b.reason || t('spaceSettings.bans.noReason')}</span>

@@ -1486,6 +1486,11 @@ export default {
       generatedUrlEmpty: 'Pick at least one scope (and a redirect URI) to build the link.',
       copyUrl: 'Copy URL',
       openUrl: 'Open',
+      botProfile: 'Bot profile',
+      botProfileHint: 'How the bot looks to everyone: avatar, banner, display name, about me and bio. Changes show up wherever the bot appears.',
+      botDisplayName: 'Display name',
+      botAboutMe: 'About me',
+      botBio: 'Bio',
     },
     authorizedApps: {
       intro: 'Applications you have signed in with or given access to your account. Revoking one stops it from acting for you immediately.',

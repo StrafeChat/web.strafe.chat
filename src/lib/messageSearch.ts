@@ -38,6 +38,7 @@ export interface SearchIdentity {
   id: string;
   username: string;
   display_name?: string;
+  bot?: boolean;
 }
 
 export interface SearchChannel {

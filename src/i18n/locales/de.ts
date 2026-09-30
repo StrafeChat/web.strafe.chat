@@ -1484,6 +1484,11 @@ export default {
       generatedUrlEmpty: 'Wähle mindestens einen Scope (und eine Weiterleitungs-URI), um den Link zu erstellen.',
       copyUrl: 'URL kopieren',
       openUrl: 'Öffnen',
+      botProfile: 'Bot-Profil',
+      botProfileHint: 'So sieht der Bot für alle aus: Avatar, Banner, Anzeigename, Über mich und Bio. Änderungen erscheinen überall, wo der Bot auftaucht.',
+      botDisplayName: 'Anzeigename',
+      botAboutMe: 'Über mich',
+      botBio: 'Bio',
     },
     authorizedApps: {
       intro: 'Anwendungen, mit denen du dich angemeldet oder denen du Zugriff auf dein Konto gegeben hast. Ein Widerruf stoppt sie sofort.',

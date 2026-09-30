@@ -9,8 +9,11 @@ import { RoomNotifyMenu } from './RoomNotifyMenu';
 import { MessageSearchBox } from './MessageSearchBox';
 import type { SearchChannel, SearchIdentity } from '../../lib/messageSearch';
 import { t } from '../../i18n';
+import { BotTag } from '../BotTag';
 
 export interface RoomHeaderProps {
+  /** A 1:1 PM with a bot: the BOT tag follows the name. */
+  bot?: boolean;
   headerIcon: string;
   name: string;
   pmOtherUserId: string | undefined;
@@ -55,7 +58,10 @@ export const RoomHeader: Component<RoomHeaderProps> = (props) => (
     <div class="flex min-w-0 items-center gap-2">
       <MobileRailsOpenButton />
       <i class={`fa-solid ${props.headerIcon} shrink-0 text-muted-foreground`} aria-hidden="true" />
-      <h1 class={`truncate ${appPageTitle}`}>{props.name}</h1>
+      <h1 class={`flex min-w-0 items-center ${appPageTitle}`}>
+        <span class="truncate">{props.name}</span>
+        <BotTag bot={props.bot} size="sm" />
+      </h1>
       <Show when={props.pmOtherUserId}>
         {(uid) => <PresenceDot userId={uid()} class="mt-0.5 size-2 shrink-0" />}
       </Show>

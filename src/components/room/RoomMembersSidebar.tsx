@@ -12,6 +12,7 @@ import { highestHoistedRole, memberHighestRolePosition, spaceRoleColorHex } from
 import { openUserProfileFromParticipant } from '../../stores/userProfilePopover';
 import { IconButton } from '../ui/IconButton';
 import { t } from '../../i18n';
+import { BotTag } from '../BotTag';
 
 export interface RoomMembersSidebarProps {
   participants: RoomParticipant[];
@@ -351,6 +352,7 @@ const MemberRow: Component<{
             >
               {displayName()}
             </span>
+            <BotTag bot={props.p.bot} size="xs" />
             {props.creatorId != null && props.p.id === props.creatorId && (
               <i class="fa-solid fa-crown shrink-0 text-[10px] text-amber-400" title={t('room.members.owner')} aria-hidden="true" />
             )}

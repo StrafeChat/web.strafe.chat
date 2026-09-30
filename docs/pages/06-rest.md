@@ -231,6 +231,7 @@ Managed from the client's *Settings → Developers*; listed for completeness. On
 | `GET` /applications/:id/public | Public profile of any application (id, name, description, icon, has_bot, bot_public, bot) - how a client shows *Add to Space* on a bot's profile |
 | `POST` /applications/:id/secret | New client secret (once) |
 | `POST` /applications/:id/bot | Add the bot; returns it with its `token` (once) |
+| `PATCH` /applications/:id/bot (`display_name`, `about_me`, `bio`, `accent_color`), `POST` /applications/:id/bot/avatar, `POST` /applications/:id/bot/banner (multipart `file`) | The bot's profile, edited by the application's owner |
 | `POST` /applications/:id/bot/token | New bot token (once); disconnects the bot |
 | `GET` /oauth2/@me/grants, `DELETE` /oauth2/@me/grants/:app_id | The applications you authorized, and revoking one |
 

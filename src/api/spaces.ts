@@ -198,6 +198,7 @@ export interface UserSummary {
   discriminator: number;
   display_name: string;
   avatar?: string;
+  bot?: boolean;
 }
 
 export interface SpaceInvite {

@@ -24,6 +24,10 @@ Click **Add Bot** on the application. This creates the bot account and shows its
 - **The bot's user ID is the application's client ID.** Wherever the bot appears (a member list, a message's `sender_id`), that id is also the `client_id` of its install link, so anyone can add the bot without looking anything up.
 - The bot's username is derived from the application's name (`Weather Bot` → `Weather_Bot`) with a random discriminator, and its display name is the application's name. Its avatar starts as the application's icon.
 
+### The bot's profile
+
+A bot has a full profile like anyone else - avatar, banner, display name, about me (the short line on its profile card) and bio (the longer text on its full profile). Edit them under **Bot profile** on the application page; changes show everywhere the bot appears, live. The same is available to the owner over the API: `PATCH /applications/:id/bot` with `display_name`, `about_me`, `bio` or `accent_color` (the usual profile limits apply), and `POST /applications/:id/bot/avatar` / `…/bot/banner` with a multipart `file`. Bots are always shown with a **BOT** tag right after their name, so a bot can never pass for a person.
+
 **Reset Token** invalidates the current token immediately: any gateway connection using it receives `SESSION_REVOKED` and is closed, and REST calls with it get `401`.
 
 ### Public and private bots

@@ -439,6 +439,7 @@ const RoomPage: Component = () => {
       <RoomHeader
         headerIcon={headerIcon()}
         name={name()}
+        bot={room()?.type === 1 && room()?.participants?.some((p) => p.id === pmOtherUserId() && p.bot === true)}
         pmOtherUserId={pmOtherUserId()}
         e2ee={room()?.type === 1 || (room()?.type === 2 && room()?.e2ee_enabled !== false)}
         isGroup={room()?.type === 2}

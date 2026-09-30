@@ -9,12 +9,17 @@ import {
   resetApplicationSecret,
   addBot,
   resetBotToken,
+  updateBotProfile,
+  uploadBotAvatar,
+  uploadBotBanner,
   authorizeUrl,
   scopeKey,
   OAUTH_SCOPES,
   type Application,
+  type BotProfile,
   type OAuthScope,
 } from '../../api/developers';
+import { BotTag } from '../BotTag';
 import { confirmDialog } from '../../stores/confirmDialog';
 import { PermAdministrator, SPACE_ROLE_PERM_GROUPS } from '../../lib/spacePermissions';
 import { Button } from '../ui/Button';
@@ -69,6 +74,18 @@ export const DevelopersSettingsPage: Component = () => {
   const [detailBusy, setDetailBusy] = createSignal(false);
   const [detailErr, setDetailErr] = createSignal('');
 
+  // Bot profile editor state (seeded from app.bot when a detail view opens).
+  const [bName, setBName] = createSignal('');
+  const [bAbout, setBAbout] = createSignal('');
+  const [bBio, setBBio] = createSignal('');
+  const [botSaving, setBotSaving] = createSignal(false);
+  const [botAvatarUploading, setBotAvatarUploading] = createSignal(false);
+  const [botBannerUploading, setBotBannerUploading] = createSignal(false);
+  const [botMediaErr, setBotMediaErr] = createSignal('');
+  let botAvatarInput: HTMLInputElement | undefined;
+  let botBannerInput: HTMLInputElement | undefined;
+  const BOT_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
+
   // URL generator state.
   const [genScopes, setGenScopes] = createSignal<Set<OAuthScope>>(new Set(['identify']));
   const [genPerms, setGenPerms] = createSignal(0);
@@ -98,7 +115,71 @@ export const DevelopersSettingsPage: Component = () => {
       setGenScopes(new Set<OAuthScope>(app.has_bot ? ['bot'] : ['identify']));
       setGenPerms(0);
       setGenRedirect(app.redirect_uris[0] ?? '');
+      seedBotForm(app.bot);
+      setBotMediaErr('');
     });
+  }
+
+  function seedBotForm(bot: BotProfile | undefined) {
+    setBName(bot?.display_name ?? '');
+    setBAbout(bot?.about_me ?? '');
+    setBBio(bot?.bio ?? '');
+  }
+
+  /** Swap the bot profile on the selected app (and in the list) after an edit or upload. */
+  function replaceBot(bot: BotProfile) {
+    const app = selected();
+    if (!app) return;
+    replaceApp({ ...app, bot });
+  }
+
+  const botDirty = () => {
+    const bot = selected()?.bot;
+    if (!bot) return false;
+    return bName().trim() !== (bot.display_name ?? '') || bAbout().trim() !== (bot.about_me ?? '') || bBio().trim() !== (bot.bio ?? '');
+  };
+
+  async function saveBotProfile() {
+    const app = selected();
+    if (!app?.bot) return;
+    setBotSaving(true);
+    setDetailErr('');
+    try {
+      const bot = await updateBotProfile(app.id, { display_name: bName().trim(), about_me: bAbout().trim(), bio: bBio().trim() });
+      replaceBot(bot);
+      seedBotForm(bot);
+    } catch (err) {
+      setDetailErr(err instanceof Error ? err.message : t('settings.developers.saveFailed'));
+    } finally {
+      setBotSaving(false);
+    }
+  }
+
+  async function onBotImagePicked(e: Event, kind: 'avatar' | 'banner') {
+    const input = e.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = '';
+    const app = selected();
+    if (!file || !app?.bot) return;
+    if (!file.type.startsWith('image/')) {
+      setBotMediaErr(t('settings.profile.imageTypeError'));
+      return;
+    }
+    if (file.size > BOT_IMAGE_MAX_BYTES) {
+      setBotMediaErr(t('settings.profile.imageSizeError'));
+      return;
+    }
+    setBotMediaErr('');
+    const setBusy = kind === 'avatar' ? setBotAvatarUploading : setBotBannerUploading;
+    setBusy(true);
+    try {
+      const bot = kind === 'avatar' ? await uploadBotAvatar(app.id, file) : await uploadBotBanner(app.id, file);
+      replaceBot(bot);
+    } catch (err) {
+      setBotMediaErr(err instanceof Error ? err.message : t('settings.profile.uploadFailed'));
+    } finally {
+      setBusy(false);
+    }
   }
 
   function closeDetail() {
@@ -201,6 +282,7 @@ export const DevelopersSettingsPage: Component = () => {
       const bot = await addBot(app.id);
       const updated = await getApplication(app.id);
       replaceApp(updated);
+      seedBotForm(updated.bot);
       setSecret({ labelKey: 'settings.developers.botToken', value: bot.token });
       setGenScopes(new Set<OAuthScope>(['bot']));
     } catch {
@@ -506,11 +588,9 @@ export const DevelopersSettingsPage: Component = () => {
                   {(bot) => <MessageAvatar name={bot().display_name || bot().username} avatar={bot().avatar} class="size-10 text-sm" />}
                 </Show>
                 <div class="min-w-0 flex-1">
-                  <div class="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                  <div class="flex items-center text-sm font-medium text-foreground">
                     <span class="truncate">{app().bot?.display_name || app().bot?.username || t('settings.developers.botActive')}</span>
-                    <span class="shrink-0 rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
-                      {t('badges.botTag')}
-                    </span>
+                    <BotTag bot size="sm" />
                   </div>
                   <div class="truncate font-mono text-xs text-muted-foreground">
                     <Show when={app().bot} fallback={t('settings.developers.botActiveHint')}>
@@ -552,6 +632,126 @@ export const DevelopersSettingsPage: Component = () => {
               </div>
             </Show>
           </div>
+
+          {/* Bot profile: how the bot looks to everyone. */}
+          <Show when={app().bot}>
+            {(bot) => (
+              <>
+                <div class={settingsSectionTitle}>{t('settings.developers.botProfile')}</div>
+                <div class={`${settingsGroupFrame} space-y-4`}>
+                  <p class="text-xs text-muted-foreground">{t('settings.developers.botProfileHint')}</p>
+                  <div class="overflow-hidden rounded-xl border border-border bg-muted/15">
+                    <input
+                      ref={(el) => {
+                        botAvatarInput = el;
+                      }}
+                      type="file"
+                      accept="image/jpeg,image/png,image/gif,image/webp"
+                      class="hidden"
+                      onChange={(e) => void onBotImagePicked(e, 'avatar')}
+                    />
+                    <input
+                      ref={(el) => {
+                        botBannerInput = el;
+                      }}
+                      type="file"
+                      accept="image/jpeg,image/png,image/gif,image/webp"
+                      class="hidden"
+                      onChange={(e) => void onBotImagePicked(e, 'banner')}
+                    />
+                    <button
+                      type="button"
+                      disabled={botBannerUploading()}
+                      title={t('settings.profile.changeBanner')}
+                      aria-label={t('settings.profile.changeBannerAria')}
+                      class="group/banner relative flex h-24 w-full cursor-pointer border-0 bg-gradient-to-br from-primary/30 to-primary/10 bg-cover bg-center p-0 text-start outline-none ring-inset ring-ring transition focus-visible:ring-2 disabled:cursor-wait disabled:opacity-70"
+                      style={bot().banner ? { 'background-image': `url(${bot().banner})` } : undefined}
+                      onClick={() => {
+                        if (!botBannerUploading()) botBannerInput?.click();
+                      }}
+                    >
+                      <span class="pointer-events-none absolute inset-0 bg-black/0 transition-colors group-hover/banner:bg-black/50 group-focus-visible/banner:bg-black/45" />
+                      <span class="pointer-events-none absolute inset-0 flex items-center justify-center px-4 text-center text-sm font-medium text-white opacity-0 transition-opacity group-hover/banner:opacity-100 group-focus-visible/banner:opacity-100">
+                        {t('settings.profile.changeBanner')}
+                      </span>
+                      <Show when={botBannerUploading()}>
+                        <span class="absolute inset-0 z-[1] flex items-center justify-center bg-background/60 text-sm font-medium text-foreground backdrop-blur-[2px]">
+                          {t('common.uploading')}
+                        </span>
+                      </Show>
+                    </button>
+                    <div class="flex items-end gap-3 px-4 pb-3 pt-1">
+                      <button
+                        type="button"
+                        disabled={botAvatarUploading()}
+                        title={t('settings.profile.changeAvatar')}
+                        aria-label={t('settings.profile.changeAvatarAria')}
+                        class="group/avatar relative -mt-10 shrink-0 cursor-pointer rounded-full border-0 bg-transparent p-0 outline-none ring-offset-2 ring-offset-card transition focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-70"
+                        onClick={() => {
+                          if (!botAvatarUploading()) botAvatarInput?.click();
+                        }}
+                      >
+                        <span class="relative block rounded-full">
+                          <MessageAvatar
+                            name={bName() || bot().display_name || bot().username}
+                            avatar={bot().avatar}
+                            class="pointer-events-none size-16 border-[3px] border-card bg-primary text-lg text-primary-foreground shadow-md"
+                          />
+                          <span class="pointer-events-none absolute inset-0 rounded-full bg-black/0 transition-colors group-hover/avatar:bg-black/55 group-focus-visible/avatar:bg-black/50" />
+                          <span class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full px-2 text-center text-[10px] font-semibold leading-tight text-white opacity-0 transition-opacity group-hover/avatar:opacity-100 group-focus-visible/avatar:opacity-100">
+                            {t('settings.profile.changeAvatar')}
+                          </span>
+                        </span>
+                        <Show when={botAvatarUploading()}>
+                          <span class="absolute inset-0 z-[2] flex items-center justify-center rounded-full bg-background/60 text-[11px] font-medium text-foreground backdrop-blur-[2px]">
+                            …
+                          </span>
+                        </Show>
+                      </button>
+                      <div class="min-w-0 flex-1 pb-1">
+                        <div class="flex items-center text-sm font-semibold text-foreground">
+                          <span class="truncate">{bName().trim() || bot().display_name || bot().username}</span>
+                          <BotTag bot size="sm" />
+                        </div>
+                        <p class="text-[11px] text-muted-foreground">{t('settings.profile.mediaHint')}</p>
+                        <Show when={botMediaErr()}>
+                          <p class="text-xs text-destructive">{botMediaErr()}</p>
+                        </Show>
+                      </div>
+                    </div>
+                  </div>
+                  <Input
+                    type="text"
+                    label={t('settings.developers.botDisplayName')}
+                    value={bName()}
+                    onInput={(e) => setBName(e.currentTarget.value)}
+                    maxlength={32}
+                  />
+                  <Textarea
+                    label={t('settings.developers.botAboutMe')}
+                    hint={t('settings.profile.aboutMeHint')}
+                    placeholder={t('settings.profile.aboutMePlaceholder')}
+                    value={bAbout()}
+                    onInput={(e) => setBAbout(e.currentTarget.value)}
+                    maxlength={190}
+                    rows={2}
+                  />
+                  <Textarea
+                    label={t('settings.developers.botBio')}
+                    hint={t('settings.profile.bioHint')}
+                    placeholder={t('settings.profile.bioPlaceholder')}
+                    value={bBio()}
+                    onInput={(e) => setBBio(e.currentTarget.value)}
+                    maxlength={190}
+                    rows={3}
+                  />
+                  <Button onClick={() => void saveBotProfile()} loading={botSaving()} disabled={!botDirty()} class="w-full sm:w-auto">
+                    {t('common.saveChanges')}
+                  </Button>
+                </div>
+              </>
+            )}
+          </Show>
 
           {/* OAuth2 credentials */}
           <div class={settingsSectionTitle}>{t('settings.developers.oauthTitle')}</div>

@@ -1,4 +1,5 @@
-import { api } from './client';
+import { api, getApiUrl } from './client';
+import { ApiError } from './ApiError';
 
 /**
  * Developer platform: OAuth2 applications and their bots. An application's client_id is its
@@ -11,6 +12,11 @@ export interface BotProfile {
   discriminator: string;
   display_name: string;
   avatar: string;
+  banner?: string;
+  bio?: string;
+  about_me?: string;
+  accent_color?: string;
+  public_flags?: number;
   bot: true;
 }
 
@@ -81,6 +87,44 @@ export function addBot(id: string) {
 }
 export function resetBotToken(id: string) {
   return api<{ token: string }>(`/applications/${encodeURIComponent(id)}/bot/token`, { method: 'POST' });
+}
+
+// ---- the bot's profile (edited by the application's owner) -------------------------------
+
+export interface BotProfilePatch {
+  display_name?: string;
+  bio?: string;
+  about_me?: string;
+  accent_color?: string;
+}
+export function updateBotProfile(id: string, patch: BotProfilePatch) {
+  return api<BotProfile>(`/applications/${encodeURIComponent(id)}/bot`, { method: 'PATCH', json: patch });
+}
+
+async function uploadBotImage(id: string, kind: 'avatar' | 'banner', file: File): Promise<BotProfile> {
+  const form = new FormData();
+  form.append('file', file);
+  const headers: HeadersInit = {};
+  const token = localStorage.getItem('session_token');
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${getApiUrl()}/applications/${encodeURIComponent(id)}/bot/${kind}`, {
+    method: 'POST',
+    body: form,
+    headers,
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string };
+    throw new ApiError(err.error ?? `HTTP ${res.status}`, res.status);
+  }
+  return res.json() as Promise<BotProfile>;
+}
+/** Multipart avatar upload for the bot; the stored URL comes back on the profile. */
+export function uploadBotAvatar(id: string, file: File) {
+  return uploadBotImage(id, 'avatar', file);
+}
+/** Multipart banner upload for the bot. */
+export function uploadBotBanner(id: string, file: File) {
+  return uploadBotImage(id, 'banner', file);
 }
 
 // ---- OAuth2 (as an authorization server, for the consent screen) --------------------------
