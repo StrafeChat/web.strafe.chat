@@ -12,6 +12,7 @@ import {
   AppearanceSettingsPage,
   LanguageSettingsPage,
   DevicesSettingsPage,
+  SecuritySettingsPage,
   NotificationsSettingsPage,
   VoiceVideoSettingsPage,
   AccessibilitySettingsPage,
@@ -161,6 +162,9 @@ export const UserSettingsModal: Component = () => {
           <div class={section() === 'devices' ? 'contents' : 'hidden'} aria-hidden={section() !== 'devices'}>
             <DevicesSettingsPage />
           </div>
+          <Show when={section() === 'security'}>
+            <SecuritySettingsPage />
+          </Show>
           <Show when={section() === 'accessibility'}>
             <AccessibilitySettingsPage />
           </Show>

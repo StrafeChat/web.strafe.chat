@@ -10,6 +10,7 @@ export type { ProfileSettingsPageProps } from './ProfileSettingsPage';
 export { AppearanceSettingsPage } from './AppearanceSettingsPage';
 export { LanguageSettingsPage } from './LanguageSettingsPage';
 export { DevicesSettingsPage } from './DevicesSettingsPage';
+export { SecuritySettingsPage } from './SecuritySettingsPage';
 export { NotificationsSettingsPage } from './NotificationsSettingsPage';
 export { VoiceVideoSettingsPage } from './VoiceVideoSettingsPage';
 export { AccessibilitySettingsPage } from './AccessibilitySettingsPage';

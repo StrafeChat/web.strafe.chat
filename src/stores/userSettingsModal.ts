@@ -4,6 +4,7 @@ import { createSignal } from 'solid-js';
 export type UserSettingsSection =
   | 'instance'
   | 'account'
+  | 'security'
   | 'devices'
   | 'authorizedApps'
   | 'appearance'

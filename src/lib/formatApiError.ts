@@ -21,6 +21,16 @@ const SERVER_MESSAGE_TO_KEY: Record<string, string> = {
   'password does not meet requirements': 'errors.api.weakPassword',
   'invalid username': 'errors.api.invalidUsername',
   'validation failed': 'errors.api.validationFailed',
+  // Two-factor auth
+  'mfa session expired or invalid, please log in again': 'errors.api.mfaTokenInvalid',
+  'too many attempts, please log in again': 'errors.api.mfaTooManyAttempts',
+  'invalid authenticator code': 'errors.api.invalidTotpCode',
+  'invalid or already-used recovery code': 'errors.api.invalidRecoveryCode',
+  'passkey verification failed': 'errors.api.invalidPasskeyResponse',
+  'authenticator app is already enabled': 'errors.api.totpAlreadyEnabled',
+  'authenticator app is not enabled': 'errors.api.totpNotEnabled',
+  'passkeys are not configured on this instance': 'errors.api.webauthnNotConfigured',
+  'passkey not found': 'errors.api.passkeyNotFound',
   // Zog login
   'email must be valid': 'errors.validation.emailInvalid',
   'email is required': 'errors.validation.emailRequired',
