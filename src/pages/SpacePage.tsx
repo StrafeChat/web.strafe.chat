@@ -35,7 +35,7 @@ import { auth } from '../stores/auth';
 import { stargate } from '../stores/stargate';
 import { readState, ackRoomOptimistic, messageIdGt, getUnreadBannerInfo } from '../stores/readState';
 import { createViewportAck } from '../lib/viewportAck';
-import { MessageList } from '../components/MessageList';
+import { MessageList } from '../components/MessageListView';
 import { MessageSkeleton } from '../components/MessageSkeleton';
 import {
   RoomComposerDock,

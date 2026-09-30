@@ -30,6 +30,49 @@ export function attachmentKind(contentType: string | undefined, filename?: strin
   return 'file';
 }
 
+/**
+ * Filename stem that marks an attachment as a voice message rather than an uploaded
+ * audio file. The messages API has no flag bit and no per-attachment metadata bag, so the
+ * marker has to ride on something every client already round-trips: in a plaintext room
+ * the server stores the name we uploaded, and in an E2EE room the name travels inside the
+ * Megolm-encrypted body. That also means older clients keep working - they see a plain
+ * playable audio attachment and never learn it was a voice message.
+ */
+export const VOICE_MESSAGE_STEM = 'voice-message';
+
+/** The name a recorded clip is uploaded under, given the container the browser produced. */
+export function voiceMessageFilename(extension: string): string {
+  return `${VOICE_MESSAGE_STEM}.${extension.replace(/^\./, '').toLowerCase()}`;
+}
+
+/**
+ * Containers a recorded clip can arrive in. Kept in sync with the recorder's list in
+ * lib/voiceRecorder.ts; `webm` is included because Opus-in-WebM is the common case.
+ */
+const VOICE_MESSAGE_EXTS = new Set(['webm', 'ogg', 'm4a', 'mp4']);
+
+/**
+ * Whether this attachment is a voice message. The extension check is deliberate: it keeps a
+ * file that merely happens to be named `voice-message.png` out of the voice UI, and it stops
+ * the stem from hijacking some unrelated audio upload.
+ *
+ * A content type still wins when it clearly disagrees, with one exception: `.webm` is
+ * ambiguous - our clips are `audio/webm`, but a server or client that drops the type leaves
+ * a bare extension, and `attachmentKind` calls `.webm` a video. The stem already said this
+ * is a recording, so we honour it there rather than silently downgrading it to a video tile.
+ */
+export function isVoiceMessage(contentType: string | undefined, filename?: string): boolean {
+  const name = (filename ?? '').toLowerCase();
+  const dot = name.lastIndexOf('.');
+  if (dot <= 0) return false;
+  if (name.slice(0, dot) !== VOICE_MESSAGE_STEM) return false;
+  const ext = name.slice(dot + 1);
+  if (!VOICE_MESSAGE_EXTS.has(ext)) return false;
+  const kind = attachmentKind(contentType, filename);
+  if (contentType && kind !== 'audio' && !(ext === 'webm' && kind === 'video')) return false;
+  return true;
+}
+
 /** Font Awesome icon for a non-media file. */
 export function fileIcon(contentType: string | undefined, filename?: string): string {
   const t = (contentType ?? '').toLowerCase();

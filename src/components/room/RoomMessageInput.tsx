@@ -8,7 +8,14 @@ import { spaceRoleColorHex } from '../../lib/spacePermissions';
 import { EMPTY_CATALOG, tokenizeDraft, type MentionCatalog } from '../../lib/utils/mentions';
 import { emojiCatalogIfLoaded, loadEmojiCatalog, searchEmoji, withSkinTone, type EmojiCatalog } from '../../lib/emoji/data';
 import type { PendingAttachment } from '../../lib/attachments/draft';
-import { attachmentKind, fileIcon, formatFileSize } from '../../lib/attachments/format';
+import { attachmentKind, fileIcon, formatFileSize, isVoiceMessage } from '../../lib/attachments/format';
+import {
+  isVoiceRecordingSupported,
+  startVoiceRecording,
+  VOICE_MESSAGE_MAX_MS,
+  VoiceRecorderError,
+  type VoiceRecorderHandle,
+} from '../../lib/voiceRecorder';
 import { appearance } from '../../stores/appearance';
 import { settings } from '../../stores/settings';
 import { appMenuItem, appMenuPanel, zLayer } from '../../theme/appChrome';
@@ -16,6 +23,9 @@ import { IconButton } from '../ui/IconButton';
 import { MessageAvatar } from '../messageList/MessageAvatar';
 import { Emoji } from '../emoji/Emoji';
 import { ExpressionPicker, type ExpressionTab } from '../emoji/ExpressionPicker';
+import { VoiceMessagePlayer } from '../media';
+import { WAVEFORM_BARS } from '../media/waveform';
+import { VoiceRecordingBar } from './VoiceRecordingBar';
 import { isMdViewport } from '../../stores/mobileShellLayout';
 import { requestEditLastMessage } from '../../lib/chatShortcuts';
 import { TypingIndicator, type TypingPerson } from './TypingIndicator';
@@ -208,7 +218,99 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
   const catalog = () => props.mentionCatalog ?? EMPTY_CATALOG;
   const overlayTokens = createMemo(() => tokenizeDraft(props.draft, catalog()));
   const hasAttachments = () => (props.attachments?.length ?? 0) > 0;
-  const canSend = () => (props.draft.trim().length > 0 || hasAttachments()) && !props.disabled && !props.sending;
+  // Recording blocks sending: the field is hidden behind the recording bar, so an Enter or a
+  // click on send must not fire a half-written draft while the mic is hot.
+  const canSend = () =>
+    (props.draft.trim().length > 0 || hasAttachments()) && !props.disabled && !props.sending && !recording();
+
+  // Voice messages. The recorder lives here rather than in the page because it is pure UI
+  // state that dies with the composer; the finished clip is handed to the normal
+  // attachment queue, so it uploads, encrypts and previews like any other attachment.
+  const [recording, setRecording] = createSignal(false);
+  const [voiceLevels, setVoiceLevels] = createSignal<number[]>([]);
+  const [voiceElapsedMs, setVoiceElapsedMs] = createSignal(0);
+  const [voiceError, setVoiceError] = createSignal('');
+  let recorder: VoiceRecorderHandle | null = null;
+  let recordTimer: number | null = null;
+
+  function clearRecordTimer() {
+    if (recordTimer !== null) {
+      window.clearInterval(recordTimer);
+      recordTimer = null;
+    }
+  }
+
+  /** Human-readable reason for a failed start, so the UI can say why rather than shrug. */
+  function voiceErrorKey(err: unknown): string {
+    const reason = err instanceof VoiceRecorderError ? err.reason : 'failed';
+    switch (reason) {
+      case 'unsupported':
+        return t('attachments.voice.unsupported');
+      case 'denied':
+        return t('attachments.voice.denied');
+      case 'unavailable':
+        return t('attachments.voice.unavailable');
+      default:
+        return t('attachments.voice.failed');
+    }
+  }
+
+  async function beginRecording() {
+    if (recording() || props.disabled) return;
+    setVoiceError('');
+    let handle: VoiceRecorderHandle;
+    try {
+      handle = await startVoiceRecording();
+    } catch (err) {
+      setVoiceError(voiceErrorKey(err));
+      return;
+    }
+    recorder = handle;
+    setRecording(true);
+    setVoiceLevels([]);
+    setVoiceElapsedMs(0);
+    // Poll rather than push: the recorder is deliberately Solid-free, and a 100ms tick is
+    // smooth enough for a waveform that grows 72 slots over minutes.
+    recordTimer = window.setInterval(() => {
+      const h = recorder;
+      if (!h) return;
+      const elapsed = h.elapsedMs();
+      setVoiceElapsedMs(elapsed);
+      setVoiceLevels(h.levels().slice(-WAVEFORM_BARS));
+      if (elapsed >= VOICE_MESSAGE_MAX_MS) void stopRecording();
+    }, 100);
+  }
+
+  async function stopRecording() {
+    const handle = recorder;
+    recorder = null;
+    clearRecordTimer();
+    if (!handle) return;
+    setRecording(false);
+    setVoiceLevels([]);
+    setVoiceElapsedMs(0);
+    const clip = await handle.stop();
+    // A clip shorter than the floor is a mis-click, not a message.
+    if (!clip) {
+      setVoiceError(t('attachments.voice.tooShort'));
+      return;
+    }
+    props.onAddFiles?.([clip.file]);
+  }
+
+  function cancelRecording() {
+    recorder?.cancel();
+    recorder = null;
+    clearRecordTimer();
+    setRecording(false);
+    setVoiceLevels([]);
+    setVoiceElapsedMs(0);
+  }
+
+  // Never leave the microphone running if the composer goes away mid-recording.
+  onCleanup(() => {
+    if (recorder) cancelRecording();
+  });
 
   const completion = createMemo(() => {
     const draft = props.draft;
@@ -430,7 +532,7 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
       >
         <form
           onSubmit={(e) => {
-            if (props.sending) {
+            if (props.sending || recording()) {
               e.preventDefault();
               return;
             }
@@ -465,6 +567,12 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
               {props.attachmentError}
             </p>
           </Show>
+          <Show when={voiceError()}>
+            <p class="mb-1.5 flex items-center gap-1.5 text-xs text-destructive">
+              <i class="fa-solid fa-circle-exclamation" aria-hidden="true" />
+              {voiceError()}
+            </p>
+          </Show>
           <div class="relative flex items-end gap-2">
             <div class="relative min-w-0 flex-1">
               <Show when={hasAttachments()}>
@@ -472,39 +580,63 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
                   <For each={props.attachments}>
                     {(att) => {
                       const kind = attachmentKind(att.file.type, att.file.name);
+                      // A queued voice message is playable straight away, so you can check
+                      // the take before committing it to the room.
+                      const isVoice = () => isVoiceMessage(att.file.type, att.file.name) && !!att.previewUrl;
                       return (
-                        <div
-                          class="group/pending relative flex w-24 flex-col overflow-hidden rounded-md border border-border/70 bg-background/70"
-                          title={`${att.file.name} (${formatFileSize(att.file.size)})`}
-                        >
-                          <div class="flex h-20 items-center justify-center overflow-hidden bg-muted/40">
-                            <Show
-                              when={kind === 'image' && att.previewUrl}
-                              fallback={
-                                <Show
-                                  when={kind === 'video' && att.previewUrl}
-                                  fallback={
-                                    <i class={`fa-solid ${fileIcon(att.file.type, att.file.name)} text-2xl text-muted-foreground`} aria-hidden="true" />
-                                  }
-                                >
-                                  <video src={att.previewUrl} muted class="size-full object-cover" />
-                                </Show>
-                              }
+                        <Show
+                          when={!isVoice()}
+                          fallback={
+                            <div
+                              class="group/pending relative w-full max-w-sm"
+                              title={`${att.file.name} (${formatFileSize(att.file.size)})`}
                             >
-                              <img src={att.previewUrl} alt="" class="size-full object-cover" />
-                            </Show>
+                              <VoiceMessagePlayer src={att.previewUrl!} size={att.file.size} filename={att.file.name} />
+                              <div class="absolute end-1.5 top-1.5">
+                                <IconButton
+                                  size="sm"
+                                  tone="overlay"
+                                  icon="fa-solid fa-xmark"
+                                  label={t('composer.removeAttachment', { name: att.file.name })}
+                                  onClick={() => props.onRemoveAttachment?.(att.localId)}
+                                />
+                              </div>
+                            </div>
+                          }
+                        >
+                          <div
+                            class="group/pending relative flex w-24 flex-col overflow-hidden rounded-md border border-border/70 bg-background/70"
+                            title={`${att.file.name} (${formatFileSize(att.file.size)})`}
+                          >
+                            <div class="flex h-20 items-center justify-center overflow-hidden bg-muted/40">
+                              <Show
+                                when={kind === 'image' && att.previewUrl}
+                                fallback={
+                                  <Show
+                                    when={kind === 'video' && att.previewUrl}
+                                    fallback={
+                                      <i class={`fa-solid ${fileIcon(att.file.type, att.file.name)} text-2xl text-muted-foreground`} aria-hidden="true" />
+                                    }
+                                  >
+                                    <video src={att.previewUrl} muted class="size-full object-cover" />
+                                  </Show>
+                                }
+                              >
+                                <img src={att.previewUrl} alt="" class="size-full object-cover" />
+                              </Show>
+                            </div>
+                            <p class="truncate px-1.5 py-1 text-[11px] text-muted-foreground">{att.file.name}</p>
+                            <div class="absolute right-1 top-1">
+                              <IconButton
+                                size="sm"
+                                tone="overlay"
+                                icon="fa-solid fa-xmark"
+                                label={t('composer.removeAttachment', { name: att.file.name })}
+                                onClick={() => props.onRemoveAttachment?.(att.localId)}
+                              />
+                            </div>
                           </div>
-                          <p class="truncate px-1.5 py-1 text-[11px] text-muted-foreground">{att.file.name}</p>
-                          <div class="absolute right-1 top-1">
-                            <IconButton
-                              size="sm"
-                              tone="overlay"
-                              icon="fa-solid fa-xmark"
-                              label={t('composer.removeAttachment', { name: att.file.name })}
-                              onClick={() => props.onRemoveAttachment?.(att.localId)}
-                            />
-                          </div>
-                        </div>
+                        </Show>
                       );
                     }}
                   </For>
@@ -534,7 +666,16 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
                   </div>
                 )}
               </Show>
-              <div class={`relative ${props.disabled ? 'opacity-50' : ''}`}>
+              <Show when={recording()}>
+                <VoiceRecordingBar
+                  levels={voiceLevels()}
+                  elapsedMs={voiceElapsedMs()}
+                  maxMs={VOICE_MESSAGE_MAX_MS}
+                  onStop={() => void stopRecording()}
+                  onCancel={cancelRecording}
+                />
+              </Show>
+              <div class={`relative ${props.disabled ? 'opacity-50' : ''} ${recording() ? 'hidden' : ''}`}>
                 {/* Paint order is DOM order: field fill, then the styled mirror, then the
                     transparent textarea on top (it owns the caret, selection and events),
                     then the attach/emoji buttons floating at either end. */}
@@ -636,6 +777,18 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
                     data-expr-toggle=""
                     onClick={() => togglePicker('emoji')}
                   />
+                  <Show when={props.onAddFiles && !recording()}>
+                    <IconButton
+                      size="lg"
+                      tone="subtle"
+                      icon="fa-solid fa-microphone"
+                      label={t('composer.recordVoice')}
+                      title={isVoiceRecordingSupported() ? t('composer.recordVoice') : t('composer.voiceUnavailable')}
+                      disabled={props.disabled}
+                      data-expr-toggle=""
+                      onClick={() => void beginRecording()}
+                    />
+                  </Show>
                 </div>
               </div>
             </div>

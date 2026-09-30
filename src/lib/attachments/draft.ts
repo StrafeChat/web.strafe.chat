@@ -50,7 +50,10 @@ export function createAttachmentDraft(opts: { maxFiles?: number; maxBytes?: numb
       }
       const item: PendingAttachment = { localId: `att-${Date.now()}-${nextLocalId++}`, file };
       const kind = attachmentKind(file.type, file.name);
-      if (kind === 'image' || kind === 'video') item.previewUrl = URL.createObjectURL(file);
+      // Audio gets a URL too so a recorded voice message can be played back from the
+      // composer's pending strip before it is sent, and so the optimistic message shows a
+      // real waveform rather than waiting on the upload.
+      if (kind === 'image' || kind === 'video' || kind === 'audio') item.previewUrl = URL.createObjectURL(file);
       if (kind === 'image') {
         const dims = await readImageDimensions(file);
         if (dims) {

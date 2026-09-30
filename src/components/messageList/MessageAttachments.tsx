@@ -3,10 +3,10 @@ import { For, Show, createEffect, createMemo, createResource, createSignal, onCl
 import { Portal } from 'solid-js/web';
 import type { AttachmentView } from '../../lib/attachments/types';
 import { decryptAttachment } from '../../lib/attachments/crypto';
-import { attachmentKind, fileIcon, fitWithin, formatFileSize } from '../../lib/attachments/format';
+import { attachmentKind, fileIcon, fitWithin, formatFileSize, isVoiceMessage } from '../../lib/attachments/format';
 import { getMediaDimensions, recordMediaDimensions } from '../../lib/mediaDimensions';
 import { IconButton } from '../ui/IconButton';
-import { AudioPlayer, VideoPlayer, videoPlayerBox } from '../media';
+import { AudioPlayer, VideoPlayer, VoiceMessagePlayer, videoPlayerBox } from '../media';
 import { zLayer } from '../../theme/appChrome';
 import { t } from '../../i18n';
 
@@ -146,6 +146,22 @@ const AudioAttachment: Component<{ att: AttachmentView }> = (props) => {
   );
 };
 
+const VoiceMessageAttachment: Component<{ att: AttachmentView }> = (props) => {
+  const url = useDisplayUrl(() => props.att);
+  return (
+    <Show when={url()} fallback={<div class="media-skeleton h-16 w-full max-w-sm rounded-lg" />}>
+      <VoiceMessagePlayer
+        src={url()!}
+        size={props.att.size}
+        filename={props.att.filename}
+        downloadUrl={props.att.uploading ? undefined : url()!}
+      >
+        <UploadProgress att={props.att} />
+      </VoiceMessagePlayer>
+    </Show>
+  );
+};
+
 const FileCard: Component<{ att: AttachmentView; children?: import('solid-js').JSX.Element }> = (props) => {
   const url = useDisplayUrl(() => props.att);
   return (
@@ -235,7 +251,8 @@ const Lightbox: Component<{ url: string; att: AttachmentView; onClose: () => voi
 };
 
 /** Renders a message's attachments below its text: images and video inline, audio with a
- * player, everything else as a download card. */
+ * player, everything else as a download card. A voice message gets the compact
+ * play/waveform shape instead of the full audio player. */
 export const MessageAttachments: Component<{ attachments: AttachmentView[] }> = (props) => {
   const [lightbox, setLightbox] = createSignal<{ url: string; att: AttachmentView } | null>(null);
   // Close the lightbox if the message (and its object URLs) goes away underneath it.
@@ -255,8 +272,16 @@ export const MessageAttachments: Component<{ attachments: AttachmentView[] }> = 
                 <Show
                   when={kind() === 'video'}
                   fallback={
-                    <Show when={kind() === 'audio'} fallback={<FileCard att={att} />}>
-                      <AudioAttachment att={att} />
+                    <Show
+                      when={kind() === 'audio'}
+                      fallback={<FileCard att={att} />}
+                    >
+                      <Show
+                        when={isVoiceMessage(att.contentType, att.filename)}
+                        fallback={<AudioAttachment att={att} />}
+                      >
+                        <VoiceMessageAttachment att={att} />
+                      </Show>
                     </Show>
                   }
                 >

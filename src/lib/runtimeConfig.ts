@@ -41,11 +41,16 @@ export function apiUrl(): string {
 
 export function stargateUrl(): string {
   const fromRuntime = runtime().stargateUrl;
-  if (fromRuntime) return fromRuntime;
+  if (fromRuntime) return trimSlash(fromRuntime);
   const fromEnv = import.meta.env.VITE_STARGATE_URL as string | undefined;
-  if (fromEnv) return fromEnv;
-  // Derive from the API URL when only that was configured (same host, gateway port).
+  if (fromEnv) return trimSlash(fromEnv);
+  // Derive from the API URL when only that was configured. Behind Caddy both live on the
+  // instance domain, so `<domain>/api` pairs with `<domain>/gateway/events` (https -> wss);
+  // a bare dev API on :4000 pairs with a standalone gateway on :4001 (/events).
   const api = apiUrl();
+  if (api.endsWith('/api')) {
+    return api.slice(0, -'/api'.length).replace(/^http/, 'ws') + '/gateway/events';
+  }
   if (api.endsWith(':4000')) return api.replace(/^http/, 'ws').replace(/:4000$/, ':4001') + '/events';
   return 'ws://localhost:4001/events';
 }
