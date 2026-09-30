@@ -15,7 +15,7 @@ import {
 import { getTypingUserIds, removeTyping } from '../stores/typing';
 import { sendTyping, createPM, getRoom, removeRoomParticipant, updateRoom } from '../api/rooms';
 import { subscribe, unsubscribe, onStargateEvent } from '../services/stargate/client';
-import { MessageList } from '../components/MessageList';
+import { MessageList } from '../components/MessageListView';
 import { MessageSkeleton } from '../components/MessageSkeleton';
 import { AddPeopleModal } from '../components/AddPeopleModal';
 import {
