@@ -66,7 +66,9 @@ export const ExpressionPicker: Component<ExpressionPickerProps> = (props) => {
       class={
         props.fill
           ? 'flex h-full w-full flex-col overflow-hidden bg-card'
-          : `flex h-[26rem] w-[22rem] max-w-full flex-col overflow-hidden ${appMenuPanel} !p-0`
+          : // Desktop: fills the portal wrapper, which is sized and positioned (and clamped to
+            // the viewport) by RoomMessageInput so the card is never clipped.
+            `flex h-full w-full flex-col overflow-hidden ${appMenuPanel} !p-0`
       }
       role="dialog"
       aria-label={t('composer.expressionPicker')}

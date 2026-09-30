@@ -56,8 +56,11 @@ interface SpaceIconProps {
 }
 
 const SpaceIcon: Component<SpaceIconProps> = (props) => {
+  // No overflow-hidden here: the icon image is clipped by an inner layer (below) so the
+  // corner mention badge, which sits just outside the squircle, isn't sliced into a half
+  // circle. The clip layer follows this element's animated radius via rounded-[inherit].
   const base =
-    'flex items-center justify-center size-12 rounded-[24px] text-foreground font-semibold text-sm transition-all duration-200 hover:rounded-[16px] overflow-hidden';
+    'flex items-center justify-center size-12 rounded-[24px] text-foreground font-semibold text-sm transition-all duration-200 hover:rounded-[16px]';
   // Accessors, not consts: this component lives for the whole session inside <For>, so a
   // one-shot `const hasUnread = ...` froze whatever the counts were at creation. A space
   // that was unread at page load kept its dot and badge (reading "0") after everything was
@@ -67,18 +70,22 @@ const SpaceIcon: Component<SpaceIconProps> = (props) => {
   const hasUnread = () => (props.unreadCount ?? 0) > 0;
   const hasMention = () => (props.mentionCount ?? 0) > 0;
   const content = (
-    <span class="relative flex items-center justify-center w-full h-full">
-      {props.icon ? (
-        <img src={props.icon} alt="" class="size-full min-w-full min-h-full object-cover" />
-      ) : (
-        <span class="flex items-center justify-center w-full h-full">{props.initial}</span>
-      )}
+    <>
+      {/* Clip layer: rounds the icon image to the squircle, following the button's animated
+          radius. Kept separate from the badge so overflow-hidden never touches the badge. */}
+      <span class="absolute inset-0 flex items-center justify-center overflow-hidden rounded-[inherit]">
+        {props.icon ? (
+          <img src={props.icon} alt="" class="size-full object-cover" />
+        ) : (
+          <span>{props.initial}</span>
+        )}
+      </span>
       <Show when={hasMention()}>
-        <span class="absolute -top-1 -right-1 min-w-[16px] h-[16px] flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-semibold px-1 ring-2 ring-background">
+        <span class="absolute -top-1 -right-1 z-10 min-w-[16px] h-[16px] flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-semibold px-1 ring-2 ring-background">
           {(props.mentionCount ?? 0) > 99 ? '99+' : props.mentionCount}
         </span>
       </Show>
-    </span>
+    </>
   );
   const dotClass = () =>
     hasUnread() && !props.active

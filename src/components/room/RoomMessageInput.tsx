@@ -1,5 +1,6 @@
 import type { Component } from 'solid-js';
-import { createEffect, createMemo, createSignal, For, Show, onMount } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, Show, onCleanup, onMount } from 'solid-js';
+import { Portal } from 'solid-js/web';
 import type { RoomParticipant } from '../../api/rooms';
 import type { SpaceRole, SpaceRoom } from '../../api/spaces';
 import type { CustomEmoji } from '../../api/emojis';
@@ -10,7 +11,7 @@ import type { PendingAttachment } from '../../lib/attachments/draft';
 import { attachmentKind, fileIcon, formatFileSize } from '../../lib/attachments/format';
 import { appearance } from '../../stores/appearance';
 import { settings } from '../../stores/settings';
-import { appMenuItem, appMenuPanel } from '../../theme/appChrome';
+import { appMenuItem, appMenuPanel, zLayer } from '../../theme/appChrome';
 import { IconButton } from '../ui/IconButton';
 import { MessageAvatar } from '../messageList/MessageAvatar';
 import { Emoji } from '../emoji/Emoji';
@@ -125,6 +126,47 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
   let textareaEl: HTMLTextAreaElement | undefined;
   let mirrorEl: HTMLDivElement | undefined;
   let fileInputEl: HTMLInputElement | undefined;
+
+  // Desktop expression picker: portaled to <body> and positioned against the toggle buttons,
+  // so the room's overflow-hidden scroll area can't clip the tall card (it opens upward from a
+  // composer pinned to the bottom - previously the top of the picker was sliced off on short
+  // viewports). Measured on open and on resize/scroll; clamped to the viewport, shrinking its
+  // height when there isn't room for the full card so it's never cut off.
+  let toggleClusterEl: HTMLDivElement | undefined;
+  const EXPR_WIDTH = 352; // 22rem
+  const EXPR_HEIGHT = 416; // 26rem
+  const [exprAnchor, setExprAnchor] = createSignal<
+    { left: number; top: number; width: number; height: number } | null
+  >(null);
+  function measureExprAnchor() {
+    const el = toggleClusterEl;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    const margin = 8;
+    const gap = 8;
+    const width = Math.min(EXPR_WIDTH, window.innerWidth - margin * 2);
+    const availableAbove = r.top - gap - margin;
+    const height = Math.max(0, Math.min(EXPR_HEIGHT, availableAbove));
+    const top = r.top - gap - height;
+    let left = r.right - width;
+    if (left + width > window.innerWidth - margin) left = window.innerWidth - margin - width;
+    if (left < margin) left = margin;
+    setExprAnchor({ left, top, width, height });
+  }
+  createEffect(() => {
+    if (!pickerOpen() || mobile()) {
+      setExprAnchor(null);
+      return;
+    }
+    measureExprAnchor();
+    const onReflow = () => measureExprAnchor();
+    window.addEventListener('resize', onReflow);
+    window.addEventListener('scroll', onReflow, true);
+    onCleanup(() => {
+      window.removeEventListener('resize', onReflow);
+      window.removeEventListener('scroll', onReflow, true);
+    });
+  });
 
   // The Unicode catalogue backs :shortcode: completion and serialization; load it once
   // the composer exists rather than on first keystroke, so the first ":smi" already works.
@@ -563,7 +605,7 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
                     }}
                   />
                 </div>
-                <div class="absolute bottom-1.5 right-1.5 flex items-center gap-0.5">
+                <div class="absolute bottom-1.5 right-1.5 flex items-center gap-0.5" ref={(el) => (toggleClusterEl = el)}>
                   <IconButton
                     size="lg"
                     tone="subtle"
@@ -600,16 +642,29 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
             >
               <i class="fa-solid fa-paper-plane text-sm" aria-hidden="true" />
             </button>
-            {/* Desktop: a floating card above the composer. */}
-            <Show when={pickerOpen() && !mobile()}>
-              <div class="absolute bottom-full left-0 right-0 z-30 mb-2 flex justify-end">
-                <ExpressionPicker
-                  initialTab={pickerTab()}
-                  onClose={() => setPickerOpen(false)}
-                  onPickEmoji={handlePickEmoji}
-                  onPickGif={handlePickGif}
-                />
-              </div>
+            {/* Desktop: a floating card, portaled to <body> and positioned above the toggle
+                buttons so the room's overflow-hidden scroll area can't clip it. */}
+            <Show when={pickerOpen() && !mobile() && exprAnchor()}>
+              {(anchor) => (
+                <Portal>
+                  <div
+                    class={`fixed ${zLayer.popover}`}
+                    style={{
+                      left: `${anchor().left}px`,
+                      top: `${anchor().top}px`,
+                      width: `${anchor().width}px`,
+                      height: `${anchor().height}px`,
+                    }}
+                  >
+                    <ExpressionPicker
+                      initialTab={pickerTab()}
+                      onClose={() => setPickerOpen(false)}
+                      onPickEmoji={handlePickEmoji}
+                      onPickGif={handlePickGif}
+                    />
+                  </div>
+                </Portal>
+              )}
             </Show>
             <Show when={completionOpen()}>
               <div

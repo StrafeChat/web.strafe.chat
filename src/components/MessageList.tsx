@@ -150,6 +150,15 @@ export const MessageList: Component<MessageListProps> = (props) => {
 
   const getScrollContainer = () => listRef[0]?.();
   const currentUserId = () => auth.user?.id;
+  // Whether a message pings the current user - mirrors the server-authoritative signal the
+  // mention badge uses (mention_everyone / the resolved `mentions` list), so a message is
+  // highlighted iff it actually bumped your mention count. Own messages never highlight.
+  const mentionsCurrentUser = (msg: DecryptedMessage): boolean => {
+    const uid = currentUserId();
+    if (!uid || msg.sender_id === uid) return false;
+    if (msg.mention_everyone === true) return true;
+    return msg.mentions?.some((m) => String(m) === uid) ?? false;
+  };
   const compact = () => (props.compact !== undefined ? props.compact : settings.messageCompact);
   // Link previews always render in non-encrypted rooms; in E2EE rooms only when the user opts
   // in (unfurling sends the link to the server, which it otherwise never sees there).
@@ -620,7 +629,11 @@ export const MessageList: Component<MessageListProps> = (props) => {
                   fallback={(
                 <div
                   data-msg-id={msg.id}
-                  class={`flex gap-3 -mx-2 px-2 rounded-md group relative transition-colors md:hover:bg-muted/40 ${
+                  class={`flex gap-3 -mx-2 px-2 rounded-md group relative transition-colors ${
+                    mentionsCurrentUser(msg)
+                      ? 'bg-primary/10 md:hover:bg-primary/15 shadow-[inset_2px_0_0_0_var(--color-primary)]'
+                      : 'md:hover:bg-muted/40'
+                  } ${
                     compact() ? 'py-0.5' : 'py-0.5'
                   } ${
                     showHeader() ? (prev() ? 'mt-[var(--space-message-group)]' : '') : compact() ? '-mt-0.5' : '-mt-1'
@@ -737,7 +750,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                     <Show
                       when={showHeader()}
                       fallback={
-                        <span class="w-10 select-none text-center text-[10px] leading-5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+                        <span class="w-10 select-none whitespace-nowrap tabular-nums text-center text-[10px] leading-5 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
                           {formatTimeOfDay(new Date(msg.created_at))}
                         </span>
                       }
