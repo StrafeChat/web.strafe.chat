@@ -90,14 +90,30 @@ new i18n keys.
   close before writing a new component from scratch.
 - **Developer platform & profile badges (client)**: the **Developers** settings section
   (`src/components/settings/DevelopersSettingsPage.tsx`) manages a person's OAuth2
-  applications and bots, and the standalone consent screen at `/oauth2/authorize`
-  (`src/pages/OAuthAuthorizePage.tsx`) drives the authorization-code flow — both through
-  `src/api/developers.ts`. A client secret or bot token is shown once in a copy-now banner
-  and never persisted, mirroring the server returning it a single time. Profile badges come
-  from a user's `public_flags` bitfield: `src/lib/badges.ts` maps bits to icons and
-  `src/components/UserBadges.tsx` renders them (plus a BOT tag from the `bot` flag) beside
-  the name in the profile popover and full modal. Thread `public_flags`/`bot` through any
-  new user-shaped payload the same way the existing subjects do.
+  applications and bots - name/description/redirect URIs, the bot card with its **Public
+  bot** switch and *Add to a space* shortcut, and an **OAuth2 URL generator** (scopes, bot
+  permissions grouped like the role editor, redirect URI) - and links to the docs. The
+  standalone consent screen at `/oauth2/authorize` (`src/pages/OAuthAuthorizePage.tsx`)
+  drives the authorization-code flow and, with the `bot` scope, the bot installer (space
+  picker over the spaces the person manages, requested permissions with the ungrantable
+  ones greyed, a success card when there is no redirect). **Account → Authorized Apps**
+  (`AuthorizedAppsSettingsPage.tsx`) lists grants and revokes them. All through
+  `src/api/developers.ts`; a client secret or bot token is shown once in a copy-now banner
+  and never persisted. A bot's user id is its application's client id, so the profile
+  popover offers *Add to Space* on any bot whose application still exists
+  (`getPublicApplication`). Roles with `bot_id` are **managed bot roles**: show the bot
+  chip, never offer delete or assignment. Profile badges come from a user's `public_flags`
+  bitfield: `src/lib/badges.ts` maps bits to icons and `src/components/UserBadges.tsx`
+  renders them (plus a BOT tag from the `bot` flag) beside the name in the profile popover
+  and full modal. Thread `public_flags`/`bot` through any new user-shaped payload the same
+  way the existing subjects do.
+- **Developer docs site** (`docs/pages/*.md` + `docs/template.html`, `theme.css`,
+  `docs.js`, built by `scripts/docs-plugin.mjs`): served at `/docs/` in dev and emitted
+  into `dist/docs/` by `vite build`, so every instance ships it. Plain Markdown with a
+  front-matter block; standalone pages with their own strict CSP and no third-party
+  assets. When you change an endpoint, scope, gateway event or permission bit, update the
+  page that documents it in the same change. `npm run docs:build` writes the site to a
+  directory for a quick look.
 
 ## Verification expectations
 
