@@ -3,6 +3,7 @@ import { defineConfig } from 'vite';
 import solidPlugin from 'vite-plugin-solid';
 import devtools from 'solid-devtools/vite';
 import wasm from 'vite-plugin-wasm';
+import { strafeDocsPlugin } from './scripts/docs-plugin.mjs';
 
 // A unique id per build. Exposed to the bundle as __BUILD_ID__ and also written to
 // /version.json (emitted below), so a running client can poll that file and tell when a
@@ -32,7 +33,9 @@ export default defineConfig({
   // Its init glue uses top-level await; build.target is already esnext below, so every
   // target browser supports that natively and vite-plugin-top-level-await's transform
   // (which broke on this project's SWC toolchain) isn't needed.
-  plugins: [devtools(), solidPlugin(), tailwindcss(), wasm(), versionFilePlugin()],
+  // strafeDocsPlugin(): the developer docs at /docs/ (docs/pages/*.md), served in dev and
+  // emitted into dist/docs/ so every instance ships them.
+  plugins: [devtools(), solidPlugin(), tailwindcss(), wasm(), versionFilePlugin(), strafeDocsPlugin()],
   server: {
     port: 3000,
     strictPort: true,

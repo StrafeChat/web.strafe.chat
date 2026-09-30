@@ -9,6 +9,7 @@
     "build": "vite build",
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
+    "docs:build": "node scripts/docs-plugin.mjs dist",
     "serve": "vite preview"
   },
   "license": "MIT",

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; font-src 'self'; base-uri 'self'; form-action 'none'; object-src 'none'; frame-ancestors 'none';"
+    />
+    <meta name="description" content="{{description}}" />
+    <meta name="color-scheme" content="dark light" />
+    <title>{{title}} · Strafe Developer Docs</title>
+    <link rel="icon" href="/icons/icon-192.png" />
+    <link rel="stylesheet" href="{{base}}assets/docs.css" />
+    <script src="/config.js" defer></script>
+    <script src="{{base}}assets/docs.js" defer></script>
+  </head>
+  <body>
+    <a class="skip" href="#content">Skip to content</a>
+    <header class="topbar">
+      <button type="button" class="menu-btn" id="menu-btn" aria-label="Open navigation" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+      <a class="brand" href="{{base}}"><span class="brand-mark">Strafe</span><span class="brand-dot">.chat</span> <span class="brand-docs">Developers</span></a>
+      <div class="search" id="search">
+        <input type="search" id="search-input" placeholder="Search the docs…" aria-label="Search the docs" autocomplete="off" spellcheck="false" />
+        <kbd>/</kbd>
+        <div class="search-results" id="search-results" hidden></div>
+      </div>
+      <a class="top-link" href="/">Open Strafe</a>
+    </header>
+    <div class="layout">
+      <aside class="sidebar" id="sidebar">
+        <nav aria-label="Documentation">
+          <ul class="nav">{{nav}}</ul>
+        </nav>
+        <div class="sidebar-foot">
+          <div class="instance">
+            <div class="instance-label">This instance</div>
+            <div class="instance-row"><span>API</span><code data-instance="api">…</code></div>
+            <div class="instance-row"><span>Gateway</span><code data-instance="gateway">…</code></div>
+          </div>
+        </div>
+      </aside>
+      <div class="backdrop" id="backdrop" hidden></div>
+      <main class="content" id="content">
+        <article class="prose">{{content}}</article>
+        <nav class="pager" aria-label="Pages">{{pager}}</nav>
+        <footer class="foot">Strafe is open source · <a href="https://github.com/StrafeChat" target="_blank" rel="noopener">github.com/StrafeChat</a> · this documentation ships with every instance at <code>/docs/</code></footer>
+      </main>
+      <aside class="right">{{toc}}</aside>
+    </div>
+  </body>
+</html>
