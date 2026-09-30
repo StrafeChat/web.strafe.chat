@@ -461,7 +461,7 @@ export const UserProfilePopover: Component = () => {
 
             <div class="mx-4 my-2.5 border-t border-border/60" />
 
-            <Show when={subject()?.bot && botApp()?.has_bot}>
+            <Show when={subject()?.bot && botApp()?.has_bot && botApp()?.bot_public}>
               <div class="px-4 pb-3">
                 <button
                   type="button"

@@ -227,6 +227,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
     const s = getSenderDisplay(msg.sender_id, props.participants, currentUserId());
     const items = buildUserMenuItems({
       userId: msg.sender_id,
+      bot: s.bot,
       username: s.username || '',
       displayName: s.name,
       discriminator: s.discriminator,
@@ -825,7 +826,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                       >
                         {sender().name}
                       </span>
-                      <BotTag bot={sender().bot} size="xs" class="ms-0" />
+                      <BotTag bot={sender().bot} size="sm" class="ms-0" />
                       <span class="text-[11px] text-muted-foreground shrink-0">
                         {formatMessageTimestamp(new Date(msg.created_at))}
                       </span>
@@ -889,7 +890,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                         >
                           {sender().name}
                         </span>
-                        <BotTag bot={sender().bot} size="xs" class="ms-0" />
+                        <BotTag bot={sender().bot} size="sm" class="ms-0" />
                         <span class="text-[13px] text-muted-foreground shrink-0">
                           {formatMessageTimestamp(new Date(msg.created_at))}
                         </span>

@@ -35,6 +35,9 @@ export interface RoomMessageInputProps {
   draft: string;
   onInput: (e: InputEvent) => void;
   onSubmit: (e: Event) => void;
+  /** A send is in flight: block a second submit without disabling the textarea. Disabling
+   * it would blur it - and on a phone that closes the keyboard on every message. */
+  sending?: boolean;
   placeholder: string;
   disabled: boolean;
   inputRef: (el: HTMLTextAreaElement | undefined) => void;
@@ -205,7 +208,7 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
   const catalog = () => props.mentionCatalog ?? EMPTY_CATALOG;
   const overlayTokens = createMemo(() => tokenizeDraft(props.draft, catalog()));
   const hasAttachments = () => (props.attachments?.length ?? 0) > 0;
-  const canSend = () => (props.draft.trim().length > 0 || hasAttachments()) && !props.disabled;
+  const canSend = () => (props.draft.trim().length > 0 || hasAttachments()) && !props.disabled && !props.sending;
 
   const completion = createMemo(() => {
     const draft = props.draft;
@@ -426,7 +429,13 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
         }
       >
         <form
-          onSubmit={(e) => props.onSubmit(e)}
+          onSubmit={(e) => {
+            if (props.sending) {
+              e.preventDefault();
+              return;
+            }
+            props.onSubmit(e);
+          }}
           class="relative shrink-0 px-4 pt-2 pb-1.5"
           onDragEnter={(e) => {
             if (!props.onAddFiles || !e.dataTransfer?.types.includes('Files')) return;
@@ -576,7 +585,7 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
                   placeholder={props.placeholder}
                   rows={1}
                   spellcheck={settings.spellcheck}
-                  class={`relative box-border block min-h-12 w-full resize-none overflow-hidden rounded-lg border border-input bg-transparent text-transparent caret-foreground placeholder:text-muted-foreground transition-colors focus:border-ring/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0 disabled:cursor-not-allowed ${composerTextClass} ${
+                  class={`relative box-border block min-h-12 w-full resize-none overflow-hidden rounded-lg border border-input bg-transparent text-transparent caret-foreground placeholder:text-muted-foreground transition-colors focus:border-input focus:outline-none focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed ${composerTextClass} ${
                     hasTopStrip() ? 'rounded-t-none' : ''
                   }`}
                   disabled={props.disabled}

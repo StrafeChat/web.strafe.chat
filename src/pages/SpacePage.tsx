@@ -939,7 +939,8 @@ const SpacePage: Component = () => {
                 onInput={onInput}
                 onSubmit={handleSubmit}
                 placeholder={t('room.messageSpaceRoom', { name: currentRoom()!.name || t('space.defaultRoom') })}
-                disabled={isSending() || !canSendMessages()}
+                disabled={!canSendMessages()}
+                sending={isSending()}
                 inputRef={setInputRef}
                 typingUsers={typingUsers()}
                 participants={visibleMembers()}

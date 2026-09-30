@@ -320,6 +320,7 @@ const MemberRow: Component<{
         ];
         const items = buildUserMenuItems({
           userId: props.p.id,
+          bot: props.p.bot,
           username: props.p.username,
           displayName: displayName(),
           discriminator: props.p.discriminator,

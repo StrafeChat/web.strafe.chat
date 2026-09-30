@@ -547,7 +547,8 @@ const RoomPage: Component = () => {
               onInput={onInput}
               onSubmit={handleSubmit}
               placeholder={inputPlaceholder()}
-              disabled={isSending()}
+              disabled={false}
+              sending={isSending()}
               inputRef={setInputRef}
               typingUsers={typingUsers()}
               participants={room()?.participants}

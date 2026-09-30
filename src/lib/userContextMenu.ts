@@ -1,6 +1,7 @@
 import type { ContextMenuItem } from '../stores/contextMenu';
 import { RelType, relationshipType } from '../stores/relationships';
 import { putRelationship, blockUser, unblockUser } from '../api/relationships';
+import { authorizeUrl } from '../api/developers';
 import { openReportDialog } from '../components/ReportDialog';
 import { confirmDialog } from '../stores/confirmDialog';
 import { t } from '../i18n';
@@ -11,6 +12,8 @@ export interface UserMenuContext {
   displayName: string;
   discriminator?: number;
   currentUserId?: string;
+  /** A bot account: it cannot be friended; the menu offers adding it to a space instead. */
+  bot?: boolean;
   /** Opens a DM with the user. Omitted for self. */
   onMessage?: (userId: string) => void;
   /** Where a report says the user was seen. */
@@ -40,7 +43,15 @@ export function buildUserMenuItems(ctx: UserMenuContext): ContextMenuItem[] {
     items.push({ label: t('friends.actions.message'), icon: 'fa-message', onClick: () => ctx.onMessage!(ctx.userId) });
   }
 
-  if (!isSelf && rel !== RelType.Friend && rel !== RelType.OutgoingRequest && rel !== RelType.Blocked) {
+  if (ctx.bot) {
+    // A bot's user id is its application's client id, so its install link needs nothing
+    // else; the consent page says so if the bot is private.
+    items.push({
+      label: t('profile.addToSpace'),
+      icon: 'fa-robot',
+      onClick: () => window.open(authorizeUrl({ clientId: ctx.userId, scopes: ['bot'] }), '_blank', 'noopener'),
+    });
+  } else if (!isSelf && rel !== RelType.Friend && rel !== RelType.OutgoingRequest && rel !== RelType.Blocked) {
     items.push({
       label: rel === RelType.IncomingRequest ? t('userMenu.acceptFriend') : t('friends.addFriend'),
       icon: 'fa-user-plus',
