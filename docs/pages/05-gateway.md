@@ -111,7 +111,7 @@ Member lists are not in `READY` - fetch `GET /spaces/:id/members` when you need 
 
 The server sends a WebSocket **ping** frame every 54 seconds and closes the connection if nothing (a pong, or any frame) arrives within 60 seconds. Every mainstream WebSocket library answers pings automatically, so a bot has nothing to do. Sending `{"op": 6}` yourself is fine and gets `{"op": 7}` back - useful as a liveness check through proxies.
 
-There is no resume: after a disconnect, reconnect and read `READY` again. Missed messages can be recovered with `GET /rooms/:id/messages?after=…` per room if you track the last id you saw.
+There is no resume: after a disconnect, reconnect and read `READY` again. To recover messages missed while offline, page `GET /rooms/:id/messages` (newest first, `before=` to go back) until you reach the last id you saw.
 
 ## Subscriptions
 
@@ -195,9 +195,17 @@ Room events reach every subscriber of the room; space events reach every subscri
 
 ## Errors
 
+Errors after the handshake arrive as `{"op": 8, "d": {"code", "message"}}` and never close the connection.
+
 | Code | Meaning |
 | --- | --- |
 | `401` (handshake) | Missing, malformed or unknown credential |
-| `4001` (`op 8`) | Malformed frame or unknown opcode |
-| `4003` | A subscribe or send to a channel you cannot access |
-| `4008` | Rate limited (`op 2` bucket exhausted); the frame was dropped |
+| `4000` | The frame was not valid JSON |
+| `4001` | Unknown `op` |
+| `4002` | Invalid subscribe payload |
+| `4003` | Invalid send payload |
+| `4004` | `op 2` without a `space_id` |
+| `4005` | `op 2` to a channel you have not subscribed to |
+| `4403` | A subscribe to a space or room you cannot access |
+
+An `op 2` frame that exceeds the send bucket is dropped without an error.

@@ -93,7 +93,7 @@ Add a user who authorized your application with `spaces.join`: `{"access_token":
 
 ### Bans — *Ban Members*
 
-`POST /spaces/:id/bans/:userId` `{"reason"?}` bans (and removes) the user; `DELETE /spaces/:id/bans/:userId` lifts it; `GET /spaces/:id/bans` lists `[{user_id, reason, banned_by, created_at, user}]`. The owner cannot be kicked or banned, and you cannot act on someone whose highest role is at or above yours.
+`POST /spaces/:id/bans/:userId` `{"reason"?}` bans (and removes) the user; `DELETE /spaces/:id/bans/:userId` lifts it; `GET /spaces/:id/bans` lists the bans (`user_id`, `reason`, `banned_by`, `created_at`) together with the profiles of the users involved. The owner cannot be kicked or banned, and you cannot act on someone whose highest role is at or above yours.
 
 ## Roles
 
@@ -193,7 +193,7 @@ Broadcast a typing indicator (rate limited to one per 5 s per room).
 
 ### `GET` /rooms/:id/messages
 
-`?limit=` (default 50, ≤100) `&before=<message id>` for older history. Newest first. Needs **Read Message History** for anything but the latest messages.
+`?limit=` (default 50, ≤100) `&before=<message id>` for older history. Newest first. Needs **View Room** and **Read Message History** in the room.
 
 ### `GET` /rooms/:id/messages/:msg_id
 
