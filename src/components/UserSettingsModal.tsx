@@ -18,6 +18,7 @@ import {
   KeybindsSettingsPage,
   InstanceSettingsPage,
   DevelopersSettingsPage,
+  AuthorizedAppsSettingsPage,
   type SettingsNavGroup,
 } from './settings';
 import { SearchInput } from './ui/SearchInput';
@@ -174,6 +175,9 @@ export const UserSettingsModal: Component = () => {
           </Show>
           <Show when={section() === 'developers'}>
             <DevelopersSettingsPage />
+          </Show>
+          <Show when={section() === 'authorizedApps'}>
+            <AuthorizedAppsSettingsPage />
           </Show>
           <Show when={section() === 'keybinds'}>
             <KeybindsSettingsPage />

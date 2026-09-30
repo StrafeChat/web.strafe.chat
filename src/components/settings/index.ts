@@ -16,3 +16,4 @@ export { AccessibilitySettingsPage } from './AccessibilitySettingsPage';
 export { KeybindsSettingsPage } from './KeybindsSettingsPage';
 export { InstanceSettingsPage } from './InstanceSettingsPage';
 export { DevelopersSettingsPage } from './DevelopersSettingsPage';
+export { AuthorizedAppsSettingsPage } from './AuthorizedAppsSettingsPage';

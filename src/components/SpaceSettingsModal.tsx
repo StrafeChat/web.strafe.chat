@@ -678,6 +678,15 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                               style={{ 'background-color': intToHex(r.color ?? 0) }}
                             />
                             <span class="truncate">{r.name}</span>
+                            <Show when={r.bot_id}>
+                              <span
+                                class="shrink-0 rounded bg-primary/20 px-1 py-px text-[9px] font-bold uppercase tracking-wide text-primary"
+                                data-tooltip={t('spaceSettings.botRoleHint')}
+                                aria-label={t('spaceSettings.botRole')}
+                              >
+                                <i class="fa-solid fa-robot" aria-hidden="true" />
+                              </span>
+                            </Show>
                             <Show when={!isEveryone}>
                               <span class="ms-auto shrink-0 text-[11px] tabular-nums text-muted-foreground/70">
                                 <i class="fa-solid fa-user me-0.5 text-[9px]" aria-hidden="true" />
@@ -732,7 +741,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                         </h3>
                         <p class="text-sm text-muted-foreground">{t('spaceSettings.editRoleHint')}</p>
                       </div>
-                      <Show when={props.canManageRoles && r().name !== EVERYONE}>
+                      <Show when={props.canManageRoles && r().name !== EVERYONE && !r().bot_id}>
                         <Button
                           type="button"
                           variant="destructive"
@@ -967,7 +976,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                                   {(m) => (
                                     <div class="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 hover:bg-muted/20">
                                       <UserCell size="sm" name={m.display_name || m.username} username={m.username} discriminator={m.discriminator} avatar={m.avatar} />
-                                      <Show when={props.canManageRoles && canAssignTo(m.id) && !roleLockedForViewer(r())}>
+                                      <Show when={props.canManageRoles && canAssignTo(m.id) && !roleLockedForViewer(r()) && !r().bot_id}>
                                         <button
                                           type="button"
                                           class="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/15 hover:text-destructive disabled:opacity-50"
@@ -985,7 +994,10 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                               </div>
                             </Show>
                           </div>
-                          <Show when={props.canManageRoles && !roleLockedForViewer(r())}>
+                          <Show when={r().bot_id}>
+                            <p class="text-sm text-muted-foreground">{t('spaceSettings.botRoleHint')}</p>
+                          </Show>
+                          <Show when={props.canManageRoles && !roleLockedForViewer(r()) && !r().bot_id}>
                             <div>
                               <p class={`mb-2 ${appSectionLabel}`}>{t('spaceSettings.addMembers')}</p>
                               <SearchInput

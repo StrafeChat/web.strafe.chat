@@ -37,6 +37,7 @@ const ACTION_ICON: Record<string, string> = {
   member_ban_add: 'fa-ban',
   member_ban_remove: 'fa-user-check',
   member_roles_update: 'fa-user-tag',
+  bot_add: 'fa-robot',
   invite_create: 'fa-link',
   invite_delete: 'fa-link-slash',
   emoji_create: 'fa-face-smile',
@@ -108,6 +109,7 @@ export const SpaceAuditLogPage: Component<Props> = (props) => {
       case 'member_ban_add':
       case 'member_ban_remove':
       case 'member_roles_update':
+      case 'bot_add':
       case 'member_voice_mute':
       case 'member_voice_deafen':
       case 'member_voice_move':

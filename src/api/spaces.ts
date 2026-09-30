@@ -168,6 +168,9 @@ export interface SpaceRole {
   color: number;
   hoist: boolean;
   mentionable: boolean;
+  /** Set when a bot install created the role (the bot's user id): it can be edited but
+   * not deleted or given to anyone else, and it leaves with the bot. */
+  bot_id?: string;
   created_at: string;
   updated_at: string;
 }
@@ -237,6 +240,7 @@ export type AuditActionType =
   | 'member_ban_add'
   | 'member_ban_remove'
   | 'member_roles_update'
+  | 'bot_add'
   | 'invite_create'
   | 'invite_delete'
   | 'emoji_create'
@@ -261,6 +265,7 @@ export const AUDIT_ACTION_TYPES: AuditActionType[] = [
   'member_ban_add',
   'member_ban_remove',
   'member_roles_update',
+  'bot_add',
   'invite_create',
   'invite_delete',
   'emoji_create',

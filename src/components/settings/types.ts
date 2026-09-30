@@ -3,6 +3,7 @@ import { t } from '../../i18n';
 export type SectionId =
   | 'account'
   | 'devices'
+  | 'authorizedApps'
   | 'appearance'
   | 'accessibility'
   | 'voice'
@@ -22,6 +23,7 @@ export interface SettingsNavItem {
 export const ACCOUNT_ITEMS: SettingsNavItem[] = [
   { id: 'account', labelKey: 'settings.sections.account.title', icon: 'fa-user' },
   { id: 'devices', labelKey: 'settings.sections.devices.title', icon: 'fa-shield-halved' },
+  { id: 'authorizedApps', labelKey: 'settings.sections.authorizedApps.title', icon: 'fa-plug' },
 ];
 
 /**

@@ -1,5 +1,5 @@
 import type { Component } from 'solid-js';
-import { createSignal, onMount, For, Show, batch } from 'solid-js';
+import { createSignal, createMemo, onMount, For, Show, batch } from 'solid-js';
 import {
   listApplications,
   createApplication,
@@ -9,12 +9,20 @@ import {
   resetApplicationSecret,
   addBot,
   resetBotToken,
+  authorizeUrl,
+  scopeKey,
+  OAUTH_SCOPES,
   type Application,
+  type OAuthScope,
 } from '../../api/developers';
 import { confirmDialog } from '../../stores/confirmDialog';
+import { PermAdministrator, SPACE_ROLE_PERM_GROUPS } from '../../lib/spacePermissions';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
+import { Select } from '../ui/Select';
+import { Checkbox } from '../ui/Checkbox';
+import { Toggle } from '../ui/Toggle';
 import { ResponsiveDialog } from '../ui/ResponsiveDialog';
 import { MessageAvatar } from '../messageList/MessageAvatar';
 import { formatDiscriminator } from './types.js';
@@ -27,11 +35,16 @@ interface Secret {
   value: string;
 }
 
+/** Where the developer documentation lives on this instance (built into the web image). */
+export const DOCS_URL = '/docs/';
+
 /**
  * The Developers section: an account's OAuth2 applications and their bots. The list opens
  * into a per-app detail where name, description and redirect URIs are edited, the client
- * secret is reset, and a bot user is attached. Client secrets and bot tokens are shown
- * exactly once (right after they are minted) - the server never returns them again.
+ * secret is reset, a bot user is attached (with its public/private switch and an "add to a
+ * space" shortcut), and an OAuth2 URL generator builds authorization links from scopes and
+ * bot permissions. Client secrets and bot tokens are shown exactly once (right after they
+ * are minted) - the server never returns them again.
  */
 export const DevelopersSettingsPage: Component = () => {
   const [apps, setApps] = createSignal<Application[]>([]);
@@ -56,6 +69,11 @@ export const DevelopersSettingsPage: Component = () => {
   const [detailBusy, setDetailBusy] = createSignal(false);
   const [detailErr, setDetailErr] = createSignal('');
 
+  // URL generator state.
+  const [genScopes, setGenScopes] = createSignal<Set<OAuthScope>>(new Set(['identify']));
+  const [genPerms, setGenPerms] = createSignal(0);
+  const [genRedirect, setGenRedirect] = createSignal('');
+
   async function refresh() {
     setLoading(true);
     try {
@@ -77,6 +95,9 @@ export const DevelopersSettingsPage: Component = () => {
       setFRedirects(app.redirect_uris.join('\n'));
       setDetailErr('');
       setSecret(freshSecret ?? null);
+      setGenScopes(new Set<OAuthScope>(app.has_bot ? ['bot'] : ['identify']));
+      setGenPerms(0);
+      setGenRedirect(app.redirect_uris[0] ?? '');
     });
   }
 
@@ -127,6 +148,7 @@ export const DevelopersSettingsPage: Component = () => {
       });
       replaceApp(updated);
       setFRedirects(updated.redirect_uris.join('\n'));
+      if (!updated.redirect_uris.includes(genRedirect())) setGenRedirect(updated.redirect_uris[0] ?? '');
     } catch {
       setDetailErr(t('settings.developers.saveFailed'));
     } finally {
@@ -179,8 +201,8 @@ export const DevelopersSettingsPage: Component = () => {
       const bot = await addBot(app.id);
       const updated = await getApplication(app.id);
       replaceApp(updated);
-      setApps((prev) => prev.map((a) => (a.id === updated.id ? updated : a)));
       setSecret({ labelKey: 'settings.developers.botToken', value: bot.token });
+      setGenScopes(new Set<OAuthScope>(['bot']));
     } catch {
       setDetailErr(t('settings.developers.actionFailed'));
     } finally {
@@ -203,6 +225,20 @@ export const DevelopersSettingsPage: Component = () => {
     try {
       const { token } = await resetBotToken(app.id);
       setSecret({ labelKey: 'settings.developers.botToken', value: token });
+    } catch {
+      setDetailErr(t('settings.developers.actionFailed'));
+    } finally {
+      setDetailBusy(false);
+    }
+  }
+
+  async function setBotPublic(on: boolean) {
+    const app = selected();
+    if (!app) return;
+    setDetailBusy(true);
+    setDetailErr('');
+    try {
+      replaceApp(await updateApplication(app.id, { bot_public: on }));
     } catch {
       setDetailErr(t('settings.developers.actionFailed'));
     } finally {
@@ -239,15 +275,58 @@ export const DevelopersSettingsPage: Component = () => {
     });
   }
 
+  // ---- URL generator ----
+  function toggleScope(scope: OAuthScope, on: boolean) {
+    setGenScopes((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(scope);
+      else next.delete(scope);
+      return next;
+    });
+  }
+  function togglePerm(bit: number, on: boolean) {
+    setGenPerms((cur) => (on ? cur | bit : cur & ~bit));
+  }
+  const genHasBot = () => genScopes().has('bot');
+  /** Every scope but a bare `bot` needs somewhere to deliver the code. */
+  const genNeedsRedirect = () => [...genScopes()].some((s) => s !== 'bot');
+  const genRedirectMissing = () => genNeedsRedirect() && !genRedirect();
+  const generatedUrl = createMemo(() => {
+    const app = selected();
+    if (!app || genScopes().size === 0 || genRedirectMissing()) return '';
+    return authorizeUrl({
+      clientId: app.client_id,
+      scopes: OAUTH_SCOPES.filter((s) => genScopes().has(s)),
+      redirectUri: genNeedsRedirect() ? genRedirect() : undefined,
+      permissions: genHasBot() ? genPerms() : undefined,
+    });
+  });
+  /** The quick "add my bot" link: bot scope with the generator's permissions, no redirect. */
+  const installUrl = () => {
+    const app = selected();
+    if (!app?.has_bot) return '';
+    return authorizeUrl({ clientId: app.client_id, scopes: ['bot'], permissions: genPerms() });
+  };
+
   return (
     <Show
       when={selected()}
       fallback={
         <div class="space-y-4">
           <p class="px-0.5 text-sm text-muted-foreground">{t('settings.developers.intro')}</p>
-          <Button onClick={() => setCreateOpen(true)} class="w-full sm:w-auto">
-            <i class="fa-solid fa-plus text-xs" aria-hidden="true" /> {t('settings.developers.newApp')}
-          </Button>
+          <div class="flex flex-wrap items-center gap-2">
+            <Button onClick={() => setCreateOpen(true)} class="w-full sm:w-auto">
+              <i class="fa-solid fa-plus text-xs" aria-hidden="true" /> {t('settings.developers.newApp')}
+            </Button>
+            <a
+              href={DOCS_URL}
+              target="_blank"
+              rel="noopener"
+              class="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/40"
+            >
+              <i class="fa-solid fa-book text-xs" aria-hidden="true" /> {t('settings.developers.docs')}
+            </a>
+          </div>
 
           <Show when={error()}>
             <p class="px-0.5 text-sm text-destructive">{error()}</p>
@@ -323,13 +402,23 @@ export const DevelopersSettingsPage: Component = () => {
     >
       {(app) => (
         <div class="space-y-5">
-          <button
-            type="button"
-            class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-            onClick={closeDetail}
-          >
-            <i class="fa-solid fa-chevron-left text-xs" aria-hidden="true" /> {t('settings.developers.backToApps')}
-          </button>
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <button
+              type="button"
+              class="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
+              onClick={closeDetail}
+            >
+              <i class="fa-solid fa-chevron-left text-xs" aria-hidden="true" /> {t('settings.developers.backToApps')}
+            </button>
+            <a
+              href={DOCS_URL}
+              target="_blank"
+              rel="noopener"
+              class="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+            >
+              <i class="fa-solid fa-book text-[11px]" aria-hidden="true" /> {t('settings.developers.docs')}
+            </a>
+          </div>
 
           <div class="flex items-center gap-3">
             <MessageAvatar name={app().name} avatar={app().icon} class="size-12 text-lg" />
@@ -398,6 +487,72 @@ export const DevelopersSettingsPage: Component = () => {
             </Button>
           </div>
 
+          {/* Bot */}
+          <div class={settingsSectionTitle}>{t('settings.developers.botTitle')}</div>
+          <div class={`${settingsGroupFrame} space-y-4`}>
+            <Show
+              when={app().has_bot}
+              fallback={
+                <div class="flex items-center justify-between gap-3">
+                  <p class="text-sm text-muted-foreground">{t('settings.developers.botHint')}</p>
+                  <Button size="sm" loading={detailBusy()} onClick={() => void attachBot()}>
+                    {t('settings.developers.addBot')}
+                  </Button>
+                </div>
+              }
+            >
+              <div class="flex items-center gap-3">
+                <Show when={app().bot} fallback={<div class={settingsRowIcon}><i class="fa-solid fa-robot" aria-hidden="true" /></div>}>
+                  {(bot) => <MessageAvatar name={bot().display_name || bot().username} avatar={bot().avatar} class="size-10 text-sm" />}
+                </Show>
+                <div class="min-w-0 flex-1">
+                  <div class="flex items-center gap-1.5 text-sm font-medium text-foreground">
+                    <span class="truncate">{app().bot?.display_name || app().bot?.username || t('settings.developers.botActive')}</span>
+                    <span class="shrink-0 rounded bg-primary/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-primary">
+                      {t('badges.botTag')}
+                    </span>
+                  </div>
+                  <div class="truncate font-mono text-xs text-muted-foreground">
+                    <Show when={app().bot} fallback={t('settings.developers.botActiveHint')}>
+                      {(bot) => `${bot().username}#${formatDiscriminator(Number(bot().discriminator))} · ${bot().id}`}
+                    </Show>
+                  </div>
+                </div>
+                <Button size="sm" variant="ghost" loading={detailBusy()} onClick={() => void regenBotToken()}>
+                  {t('settings.developers.resetToken')}
+                </Button>
+              </div>
+
+              <div class="flex items-center justify-between gap-3 border-t border-border/60 pt-4">
+                <div class="min-w-0">
+                  <div class="text-sm font-medium text-foreground">{t('settings.developers.publicBot')}</div>
+                  <div class="text-xs text-muted-foreground">{t('settings.developers.publicBotHint')}</div>
+                </div>
+                <Toggle
+                  checked={app().bot_public}
+                  disabled={detailBusy()}
+                  label={t('settings.developers.publicBot')}
+                  onChange={(on) => void setBotPublic(on)}
+                />
+              </div>
+
+              <div class="flex items-center justify-between gap-3 border-t border-border/60 pt-4">
+                <div class="min-w-0">
+                  <div class="text-sm font-medium text-foreground">{t('settings.developers.addToSpace')}</div>
+                  <div class="text-xs text-muted-foreground">{t('settings.developers.addToSpaceHint')}</div>
+                </div>
+                <a
+                  href={installUrl()}
+                  target="_blank"
+                  rel="noopener"
+                  class="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
+                >
+                  <i class="fa-solid fa-plus text-[10px]" aria-hidden="true" /> {t('settings.developers.addToSpace')}
+                </a>
+              </div>
+            </Show>
+          </div>
+
           {/* OAuth2 credentials */}
           <div class={settingsSectionTitle}>{t('settings.developers.oauthTitle')}</div>
           <div class={`${settingsGroupFrame} space-y-3`}>
@@ -423,31 +578,99 @@ export const DevelopersSettingsPage: Component = () => {
             </div>
           </div>
 
-          {/* Bot */}
-          <div class={settingsSectionTitle}>{t('settings.developers.botTitle')}</div>
-          <div class={`${settingsGroupFrame} space-y-3`}>
-            <Show
-              when={app().has_bot}
-              fallback={
-                <div class="flex items-center justify-between gap-3">
-                  <p class="text-sm text-muted-foreground">{t('settings.developers.botHint')}</p>
-                  <Button size="sm" loading={detailBusy()} onClick={() => void attachBot()}>
-                    {t('settings.developers.addBot')}
-                  </Button>
+          {/* URL generator */}
+          <div class={settingsSectionTitle}>{t('settings.developers.urlGenerator')}</div>
+          <div class={`${settingsGroupFrame} space-y-4`}>
+            <p class="text-xs text-muted-foreground">{t('settings.developers.urlGeneratorHint')}</p>
+
+            <div>
+              <div class="mb-2 text-xs font-medium text-muted-foreground">{t('settings.developers.scopes')}</div>
+              <div class="grid gap-2 sm:grid-cols-2">
+                <For each={OAUTH_SCOPES}>
+                  {(scope) => (
+                    <Checkbox
+                      checked={genScopes().has(scope)}
+                      disabled={scope === 'bot' && !app().has_bot}
+                      onChange={(on) => toggleScope(scope, on)}
+                      label={<span class="font-mono text-xs">{scope}</span>}
+                      description={
+                        scope === 'bot' && !app().has_bot
+                          ? t('settings.developers.botScopeNeedsBot')
+                          : t(`oauth.scopes.${scopeKey(scope)}`)
+                      }
+                    />
+                  )}
+                </For>
+              </div>
+            </div>
+
+            <Show when={genHasBot()}>
+              <div>
+                <div class="mb-2 flex flex-wrap items-baseline justify-between gap-2">
+                  <span class="text-xs font-medium text-muted-foreground">{t('settings.developers.botPermissions')}</span>
+                  <span class="font-mono text-xs text-muted-foreground">
+                    {t('settings.developers.permissionsValue', { value: String(genPerms()) })}
+                  </span>
                 </div>
-              }
-            >
-              <div class="flex items-center gap-3">
-                <div class={settingsRowIcon}><i class="fa-solid fa-robot" aria-hidden="true" /></div>
-                <div class="min-w-0 flex-1">
-                  <div class="text-sm font-medium text-foreground">{t('settings.developers.botActive')}</div>
-                  <div class="truncate text-xs text-muted-foreground">{t('settings.developers.botActiveHint')}</div>
+                <div class="grid gap-x-4 gap-y-3 sm:grid-cols-2">
+                  <For each={SPACE_ROLE_PERM_GROUPS}>
+                    {(group) => (
+                      <div class="space-y-1.5">
+                        <div class="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground/80">{group.category}</div>
+                        <For each={group.rows}>
+                          {(r) => (
+                            <Checkbox
+                              checked={(genPerms() & r.bit) !== 0}
+                              onChange={(on) => togglePerm(r.bit, on)}
+                              label={r.label}
+                            />
+                          )}
+                        </For>
+                      </div>
+                    )}
+                  </For>
                 </div>
-                <Button size="sm" variant="ghost" loading={detailBusy()} onClick={() => void regenBotToken()}>
-                  {t('settings.developers.resetToken')}
-                </Button>
+                <Show when={(genPerms() & PermAdministrator) !== 0}>
+                  <p class="mt-2 text-xs text-destructive">{t('settings.developers.administratorWarning')}</p>
+                </Show>
               </div>
             </Show>
+
+            <Show when={genNeedsRedirect()}>
+              <Show
+                when={app().redirect_uris.length > 0}
+                fallback={<p class="text-xs text-destructive">{t('settings.developers.redirectRequired')}</p>}
+              >
+                <Select label={t('settings.developers.redirectUri')} value={genRedirect()} onValueChange={setGenRedirect}>
+                  <For each={app().redirect_uris}>{(u) => <option value={u}>{u}</option>}</For>
+                </Select>
+              </Show>
+            </Show>
+
+            <div class="space-y-1.5">
+              <div class="text-xs font-medium text-muted-foreground">{t('settings.developers.generatedUrl')}</div>
+              <Show
+                when={generatedUrl()}
+                fallback={<p class="text-xs text-muted-foreground">{t('settings.developers.generatedUrlEmpty')}</p>}
+              >
+                <div class="flex items-center gap-2">
+                  <code class="min-w-0 flex-1 truncate rounded-md bg-background/70 px-3 py-2 font-mono text-xs text-foreground">
+                    {generatedUrl()}
+                  </code>
+                  <Button size="sm" variant="secondary" onClick={() => copy('url', generatedUrl())}>
+                    {copied() === 'url' ? t('common.copied') : t('settings.developers.copyUrl')}
+                  </Button>
+                  <a
+                    href={generatedUrl()}
+                    target="_blank"
+                    rel="noopener"
+                    class="inline-flex h-8 shrink-0 items-center rounded-lg border border-border px-3 text-xs font-medium text-foreground hover:bg-muted/40"
+                  >
+                    {t('settings.developers.openUrl')}
+                  </a>
+                </div>
+              </Show>
+            </div>
           </div>
 
           {/* Danger */}

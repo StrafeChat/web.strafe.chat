@@ -1,11 +1,12 @@
 import type { Component } from 'solid-js';
-import { Show, For, onMount, onCleanup, createEffect, createSignal, createMemo } from 'solid-js';
+import { Show, For, onMount, onCleanup, createEffect, createSignal, createMemo, createResource } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { MessageAvatar } from './messageList/MessageAvatar';
 import { UserBadges } from './UserBadges';
 import { MessageBody } from './messageList/MessageBody';
 import { PresenceDot } from './PresenceDot';
 import { createPM } from '../api/rooms';
+import { authorizeUrl, getPublicApplication } from '../api/developers';
 import { sendMessage } from '../stores/messages';
 import {
   closeUserProfilePopover,
@@ -61,6 +62,20 @@ export const UserProfilePopover: Component = () => {
   const [quickDraft, setQuickDraft] = createSignal('');
   const [quickSending, setQuickSending] = createSignal(false);
   const [quickError, setQuickError] = createSignal('');
+
+  // A bot's user id is its application's client id, so its install link needs only the
+  // id - but only offer the button once the application resolves (a bot from before ids
+  // were shared, or whose application was deleted, has no consent page to open).
+  const [botApp] = createResource(
+    () => (userProfilePopover.open && subject()?.bot ? subject()!.userId : null),
+    (id) => getPublicApplication(id).catch(() => null),
+  );
+  function addBotToSpace() {
+    const s = subject();
+    if (!s) return;
+    window.open(authorizeUrl({ clientId: s.userId, scopes: ['bot'] }), '_blank', 'noopener');
+    closeUserProfilePopover();
+  }
   const [rootRef, setRootRef] = createSignal<HTMLDivElement>();
 
   const subject = () => userProfilePopover.subject;
@@ -199,7 +214,7 @@ export const UserProfilePopover: Component = () => {
     const ctx = roleEditCtx();
     if (!ctx) return [];
     return ctx.spaceRoles
-      .filter((r) => r.name !== EVERYONE_ROLE_NAME && !pickedCustomRoleIds().has(r.id) && !roleLocked(r))
+      .filter((r) => r.name !== EVERYONE_ROLE_NAME && !r.bot_id && !pickedCustomRoleIds().has(r.id) && !roleLocked(r))
       .sort((a, b) => b.position - a.position);
   });
 
@@ -444,6 +459,19 @@ export const UserProfilePopover: Component = () => {
 
             <div class="mx-4 my-2.5 border-t border-border/60" />
 
+            <Show when={subject()?.bot && botApp()?.has_bot}>
+              <div class="px-4 pb-3">
+                <button
+                  type="button"
+                  onClick={addBotToSpace}
+                  class="flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-3 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
+                >
+                  <i class="fa-solid fa-plus text-xs" aria-hidden="true" />
+                  {t('profile.addToSpace')}
+                </button>
+              </div>
+            </Show>
+
             <Show when={subject()?.aboutMe?.trim()}>
               <div class="px-4 pb-3">
                 <p class={`mb-1.5 ${appSectionLabel}`}>{t('settings.profile.aboutMe')}</p>
@@ -461,7 +489,7 @@ export const UserProfilePopover: Component = () => {
                     <p class={`mb-1.5 ${appSectionLabel}`}>{t('profile.roles')}</p>
                     <div class="flex flex-wrap items-center gap-1.5">
                       <For each={visibleRoleChips()}>
-                        {(role) => <RoleChip role={role} showRemove={canEditMemberRoles() && !roleLocked(role)} />}
+                        {(role) => <RoleChip role={role} showRemove={canEditMemberRoles() && !roleLocked(role) && !role.bot_id} />}
                       </For>
                       <Show when={hiddenRoleChipCount() > 0}>
                         <span

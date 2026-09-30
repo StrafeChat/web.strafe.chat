@@ -36,9 +36,9 @@ export async function api<T>(
   });
 
   if (!res.ok) {
-    const err = (await res.json().catch(() => ({}))) as { error?: string };
+    const err = (await res.json().catch(() => ({}))) as { error?: string; error_description?: string };
     const message = err.error ?? `HTTP ${res.status}`;
-    throw new ApiError(message, res.status);
+    throw new ApiError(message, res.status, err.error_description);
   }
 
   if (res.status === 204) return undefined as T;

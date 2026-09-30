@@ -5,6 +5,7 @@ export type UserSettingsSection =
   | 'instance'
   | 'account'
   | 'devices'
+  | 'authorizedApps'
   | 'appearance'
   | 'accessibility'
   | 'voice'

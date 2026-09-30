@@ -145,6 +145,7 @@ function roleFromPayload(d: Record<string, unknown>): SpaceRole | null {
     color: typeof d.color === 'number' ? d.color : 0,
     hoist: d.hoist === true,
     mentionable: d.mentionable === true,
+    bot_id: d.bot_id != null ? String(d.bot_id) : undefined,
     created_at: d.created_at != null ? String(d.created_at) : '',
     updated_at: d.updated_at != null ? String(d.updated_at) : '',
   };
