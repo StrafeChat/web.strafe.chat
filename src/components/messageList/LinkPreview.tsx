@@ -181,7 +181,7 @@ const Card: Component<{ d: LinkMetadata; fallbackUrl: string }> = (props) => {
 
   return (
     <div
-      class="mt-1.5 w-fit max-w-md overflow-hidden rounded-md border border-s-[3px] border-border/60 bg-card/40"
+      class="link-preview-in mt-1.5 w-fit max-w-md overflow-hidden rounded-md border border-s-[3px] border-border/60 bg-card/40"
       style={{ 'border-inline-start-color': props.d.color || 'var(--color-primary)' }}
     >
       <Show

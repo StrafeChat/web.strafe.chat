@@ -9,8 +9,9 @@ import { SpaceInviteLinkEmbed } from '../SpaceInviteLinkEmbed';
 import { LinkPreview } from './LinkPreview';
 import { VideoPlayer } from '../media';
 import { fitWithin } from '../../lib/attachments/format';
-import { getMediaDimensions, recordMediaDimensions } from '../../lib/mediaDimensions';
+import { getMediaDimensions, recordMediaDimensions, hasRecentMediaFailure, recordMediaFailure } from '../../lib/mediaDimensions';
 import { mediaKind, type MediaKind } from '../../lib/gif/providers';
+import { previewUrlsFor } from '../../lib/linkPreviewUrls';
 import { isExternalLink, requestOpenExternalLink } from '../../stores/externalLink';
 import { spaces } from '../../stores/spaces';
 import type { RoomParticipant } from '../../api/rooms';
@@ -84,7 +85,10 @@ function mediaFilename(href: string): string {
 const MediaEmbed: Component<{ href: string; kind: MediaKind; allowLinkPreviews?: boolean; showLinkOnFail?: boolean }> = (
   props
 ) => {
-  const [failed, setFailed] = createSignal(false);
+  // A link that failed to load recently skips the attempt and goes straight to the fallback,
+  // so it doesn't reflow the conversation again a few seconds after the message appears.
+  // eslint-disable-next-line solid/reactivity -- href is fixed for the life of this embed (keyed by it)
+  const [failed, setFailed] = createSignal(hasRecentMediaFailure(props.href));
   const [shown, setShown] = createSignal(false);
   let imgEl: HTMLImageElement | undefined;
   let ready = false; // set once the media actually loads (img onload, or the player's onReady)
@@ -95,6 +99,9 @@ const MediaEmbed: Component<{ href: string; kind: MediaKind; allowLinkPreviews?:
   const box = cached ? fitWithin(cached.width, cached.height, 400, 320) : null;
   const isReady = () => ready || !!(imgEl?.complete && imgEl.naturalWidth > 0);
   onMount(() => {
+    if (failed()) return;
+    // A timeout is not remembered: a slow connection must not turn a working image into a
+    // card for the next ten minutes. Only a real load error (onFail) is.
     timer = window.setTimeout(() => {
       if (!isReady()) setFailed(true);
     }, MEDIA_LOAD_TIMEOUT_MS);
@@ -108,6 +115,7 @@ const MediaEmbed: Component<{ href: string; kind: MediaKind; allowLinkPreviews?:
   };
   const onFail = () => {
     clearTimeout(timer);
+    recordMediaFailure(props.href);
     setFailed(true);
   };
   return (
@@ -207,20 +215,7 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
 
   // Distinct http(s) links worth a preview card - not inline media (GIF/image/video, rendered
   // directly) or space invites (their own embed). Capped so a link-dump doesn't fill the screen.
-  const previewUrls = createMemo(() => {
-    if (!props.allowLinkPreviews) return [];
-    const seen = new Set<string>();
-    const out: string[] = [];
-    for (const s of segments()) {
-      if (s.type !== 'link') continue;
-      if (mediaKind(s.href) || extractSpaceInviteCodeFromUrl(s.href)) continue;
-      if (!/^https?:\/\//i.test(s.href) || seen.has(s.href)) continue;
-      seen.add(s.href);
-      out.push(s.href);
-      if (out.length >= 4) break;
-    }
-    return out;
-  });
+  const previewUrls = createMemo(() => (props.allowLinkPreviews ? previewUrlsFor(props.text) : []));
 
   return (
     <div class={props.class}>

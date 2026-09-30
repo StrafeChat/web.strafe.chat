@@ -1,3 +1,5 @@
+import { previewUrlsFor } from '../lib/linkPreviewUrls';
+import { warmLinkPreviews } from './linkPreviews';
 import { createStore } from 'solid-js/store';
 import {
   listMessages,
@@ -34,6 +36,7 @@ import { removeTyping } from './typing';
 /** Re-exported: search builds display messages from raw server rows too. */
 export { viewFromServerAttachment };
 import { auth } from './auth';
+import { settings } from './settings';
 import { rooms, updateRoomLastMessage } from './rooms';
 import { updateSpaceRoomLastMessage } from './spaces';
 import { onStargateEvent } from '../services/stargate/client';
@@ -136,6 +139,17 @@ export async function retryPendingDecrypts(): Promise<void> {
   }
 }
 
+/** How long a page of history waits for its link previews before rendering anyway. */
+const PREVIEW_WARM_INITIAL_MS = 1200;
+const PREVIEW_WARM_OLDER_MS = 600;
+
+/** Mirrors MessageList's gate: plain rooms always preview; encrypted rooms only by choice. */
+function linkPreviewsAllowedIn(roomId: string): boolean {
+  const room = rooms.rooms.find((r) => r.id === roomId);
+  if (!room) return false;
+  return room.e2ee_enabled !== true || !!settings.linkPreviewsInEncrypted;
+}
+
 export async function loadMessages(
   roomId: string,
   before?: string,
@@ -172,6 +186,17 @@ export async function loadMessages(
         return { ...m, ...resolved };
       })
     );
+    // Fetch this page's link previews before showing it, so the cards are in place when the
+    // messages appear instead of popping in one by one and shoving the conversation around
+    // (the same page of history would otherwise reflow once per link). Bounded: a slow site
+    // can't hold the room back, its card just arrives late as before.
+    if (linkPreviewsAllowedIn(roomId)) {
+      const urls = new Set<string>();
+      for (const m of decrypted) {
+        if (!m.system_type && m.plaintext) for (const u of previewUrlsFor(m.plaintext)) urls.add(u);
+      }
+      if (urls.size > 0) await warmLinkPreviews(urls, isInitialLoad ? PREVIEW_WARM_INITIAL_MS : PREVIEW_WARM_OLDER_MS);
+    }
     const container = getScrollContainer?.();
     const saved = container
       ? { scrollTop: container.scrollTop, scrollHeight: container.scrollHeight }

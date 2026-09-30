@@ -237,3 +237,13 @@ html.underline-links a {
   text-decoration: underline;
   text-underline-offset: 2px;
 }
+
+/* A preview card that arrives after its message fades in rather than popping (opacity only -
+   never a height animation, which would itself shift the conversation). */
+@keyframes link-preview-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.link-preview-in {
+  animation: link-preview-in 180ms ease-out;
+}
