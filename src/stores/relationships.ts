@@ -121,6 +121,7 @@ function userFromPayload(u: unknown): RelationshipUser | null {
     bio: typeof o.bio === 'string' ? o.bio : undefined,
     about_me: typeof o.about_me === 'string' ? o.about_me : undefined,
     presence: (o.presence as UserPresence) ?? undefined,
+    home_domain: typeof o.home_domain === 'string' && o.home_domain ? o.home_domain : undefined,
   };
 }
 

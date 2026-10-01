@@ -22,6 +22,8 @@ export interface RelationshipUser {
   bio?: string;
   about_me?: string;
   presence?: UserPresence;
+  /** Set for people on another instance; their handle is name#0001@home_domain. */
+  home_domain?: string;
 }
 
 export interface Relationship {
@@ -39,14 +41,12 @@ export function listRelationships() {
   return api<Relationship[]>('/users/@me/relationships');
 }
 
-/** Send a friend request by username and discriminator (e.g. "1234"). */
-export function sendFriendRequest(params: { username: string; discriminator: string }) {
+/** Send a friend request by handle: `name#0001` locally, `name#0001@their.instance` across
+ * federation (their home instance shows them the request). */
+export function sendFriendRequest(handle: string) {
   return api<void>('/users/@me/relationships', {
     method: 'POST',
-    json: {
-      username: params.username.trim(),
-      discriminator: String(params.discriminator).trim(),
-    },
+    json: { handle: handle.trim() },
   });
 }
 

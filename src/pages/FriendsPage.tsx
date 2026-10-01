@@ -14,9 +14,11 @@ import { presence, isVisibleStatus } from '../stores/presence';
 import { PresenceDot } from '../components/PresenceDot';
 import { MessageAvatar } from '../components/messageList/MessageAvatar';
 import { sendFriendRequest, putRelationship, removeRelationship } from '../api/relationships';
-import { createPM, createPMByHandle } from '../api/rooms';
+import { createPM } from '../api/rooms';
 import { addOrUpdateRoom } from '../stores/rooms';
-import { instance } from '../stores/instance';
+import { instance, formatHandle } from '../stores/instance';
+import { auth } from '../stores/auth';
+import { translateCaughtApiError } from '../lib/formatApiError';
 import { Input } from '../components/ui/Input';
 import { Button } from '../components/ui/Button';
 import { Tabs } from '../components/ui/Tabs';
@@ -32,9 +34,13 @@ function friendStatusText(rel: Relationship): string | undefined {
   return presence.byUser[rel.user.id]?.custom_status ?? rel.user.presence?.custom_status;
 }
 
+/** name#0001, plus @domain for someone on another instance. */
 function userTag(rel: Relationship): string {
-  return `${rel.user.username}#${rel.user.discriminator}`;
+  return formatHandle(rel.user);
 }
+
+/** The same grammar equinox accepts: name#0001, optionally @domain[:port]. */
+const HANDLE_RE = /^([A-Za-z0-9_.\-]{2,32})#(\d{1,4})(?:@([A-Za-z0-9.\-]+(?::\d+)?))?$/;
 
 const TAB_IDS: TabId[] = ['online', 'all', 'pending', 'blocked'];
 
@@ -73,58 +79,50 @@ const FriendsPage: Component = () => {
   const navigate = useNavigate();
   const [tab, setTab] = createSignal<TabId>('all');
   const [showAddModal, setShowAddModal] = createSignal(false);
-  const [addUsername, setAddUsername] = createSignal('');
-  const [addDiscriminator, setAddDiscriminator] = createSignal('');
+  const [addHandle, setAddHandle] = createSignal('');
   const [addError, setAddError] = createSignal('');
   const [addLoading, setAddLoading] = createSignal(false);
+  const [copiedHandle, setCopiedHandle] = createSignal(false);
   const [actionLoading, setActionLoading] = createSignal<string | null>(null);
   const [messageLoading, setMessageLoading] = createSignal<string | null>(null);
+
+  /** What to give other people: name#0001, with @domain when this instance federates. */
+  const myHandle = () => {
+    const u = auth.user;
+    if (!u) return '';
+    const base = formatHandle({ username: u.username, discriminator: u.discriminator });
+    return instance.federationEnabled && instance.domain ? `${base}@${instance.domain}` : base;
+  };
+
+  let copiedTimer: ReturnType<typeof setTimeout> | undefined;
+  function copyMyHandle() {
+    void navigator.clipboard?.writeText(myHandle());
+    setCopiedHandle(true);
+    clearTimeout(copiedTimer);
+    copiedTimer = setTimeout(() => setCopiedHandle(false), 1500);
+  }
 
   function closeAddModal() {
     setShowAddModal(false);
     setAddError('');
-    setAddUsername('');
-    setAddDiscriminator('');
+    setAddHandle('');
   }
 
   async function handleAddFriend(e: Event) {
     e.preventDefault();
-    const rawUsername = addUsername().trim();
-    const discriminator = addDiscriminator().trim().replace(/^#/, '');
+    const handle = addHandle().trim().replace(/^@/, '');
     setAddError('');
-    // "name@other.instance" (or a full name#0001@other.instance): friend requests don't
-    // cross instances, so open a direct message with them instead.
-    if (rawUsername.includes('@')) {
-      const handle = rawUsername.includes('#') ? rawUsername : rawUsername.replace('@', `#${discriminator}@`);
-      if (!/#\d{1,4}@/.test(handle)) {
-        setAddError(t('friends.errors.handleFormat'));
-        return;
-      }
-      setAddLoading(true);
-      try {
-        const room = await createPMByHandle(handle);
-        addOrUpdateRoom(room);
-        closeAddModal();
-        navigate(`/rooms/${room.id}`);
-      } catch (err) {
-        setAddError(err instanceof Error ? err.message : t('friends.errors.unreachable'));
-      } finally {
-        setAddLoading(false);
-      }
-      return;
-    }
-    const username = rawUsername;
-    if (!username || !discriminator) {
-      setAddError(t('friends.errors.required'));
+    if (!HANDLE_RE.test(handle)) {
+      setAddError(t(instance.federationEnabled ? 'friends.errors.handleFormatFederated' : 'friends.errors.handleFormat'));
       return;
     }
     setAddLoading(true);
     try {
-      await sendFriendRequest({ username, discriminator });
+      await sendFriendRequest(handle);
       await loadRelationships();
       closeAddModal();
     } catch (err) {
-      setAddError(err instanceof Error ? err.message : t('friends.errors.sendFailed'));
+      setAddError(translateCaughtApiError(err, t).join(' ') || t('friends.errors.sendFailed'));
     } finally {
       setAddLoading(false);
     }
@@ -244,56 +242,46 @@ const FriendsPage: Component = () => {
             onClose={closeAddModal}
             dismissible={!addLoading()}
             title={t('friends.addFriend')}
-            description={
-              <>
-                {t('friends.addHelp')} <span class="font-mono text-foreground">turtle#1234</span>.
-                <Show when={instance.federationEnabled}>
-                  {' '}
-                  {t('friends.addHelpFederated')} <span class="font-mono text-foreground">turtle#1234@their.instance</span>{' '}
-                  {t('friends.addHelpFederatedAfter')}
-                </Show>
-              </>
-            }
+            description={t(instance.federationEnabled ? 'friends.addHelpFederated' : 'friends.addHelp')}
           >
             <form onSubmit={handleAddFriend} class="space-y-4">
-              <div class="grid grid-cols-[1fr_6.5rem] gap-2">
-                <Input
-                  type="text"
-                  label={t('friends.username')}
-                  placeholder={t('friends.usernamePlaceholder')}
-                  value={addUsername()}
-                  onInput={(e) => {
-                    setAddUsername(e.currentTarget.value);
-                    setAddError('');
-                  }}
-                  disabled={addLoading()}
-                  autocomplete="off"
-                  autofocus
-                />
-                <Input
-                  type="text"
-                  label={t('friends.tag')}
-                  placeholder="#1234"
-                  inputmode="numeric"
-                  value={addDiscriminator()}
-                  onInput={(e) => {
-                    setAddDiscriminator(e.currentTarget.value);
-                    setAddError('');
-                  }}
-                  disabled={addLoading()}
-                  error={addError() || undefined}
-                  class="font-mono"
-                />
-              </div>
+              <Input
+                type="text"
+                label={t('friends.username')}
+                placeholder={instance.federationEnabled ? 'turtle#1234@their.instance' : 'turtle#1234'}
+                value={addHandle()}
+                onInput={(e) => {
+                  setAddHandle(e.currentTarget.value);
+                  setAddError('');
+                }}
+                disabled={addLoading()}
+                autocomplete="off"
+                autocapitalize="off"
+                spellcheck={false}
+                autofocus
+                error={addError() || undefined}
+                class="font-mono"
+              />
+              <Show when={myHandle()}>
+                <p class="flex flex-wrap items-center gap-x-1.5 text-xs text-muted-foreground">
+                  <span>{t('friends.yourHandle')}</span>
+                  <button
+                    type="button"
+                    class="inline-flex items-center gap-1.5 rounded font-mono text-foreground hover:underline"
+                    data-tooltip={t('userArea.copyUsername')}
+                    onClick={copyMyHandle}
+                  >
+                    {myHandle()}
+                    <i class={`text-[0.7rem] ${copiedHandle() ? 'fa-solid fa-check text-primary' : 'fa-regular fa-copy'}`} aria-hidden="true" />
+                  </button>
+                  <span class="sr-only" aria-live="polite">{copiedHandle() ? t('friends.copied') : ''}</span>
+                </p>
+              </Show>
               <div class={appDialogActions}>
                 <Button type="button" variant="outline" onClick={closeAddModal} disabled={addLoading()}>
                   {t('common.cancel')}
                 </Button>
-                <Button
-                  type="submit"
-                  loading={addLoading()}
-                  disabled={!addUsername().trim() || (!addDiscriminator().trim() && !/#\d{1,4}@/.test(addUsername()))}
-                >
+                <Button type="submit" loading={addLoading()} disabled={!addHandle().trim()}>
                   {t('friends.sendRequest')}
                 </Button>
               </div>
