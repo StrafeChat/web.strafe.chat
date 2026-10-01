@@ -13,6 +13,7 @@ import {
   authCardHeaderClass,
   authCardShell,
   authPageOuter,
+  authPrimaryLinkClass,
 } from '../components/auth/authLayout';
 import { AuthBrandMark } from '../components/auth/AuthBrandMark';
 import { FormApiErrors } from '../components/auth/FormApiErrors';
@@ -44,7 +45,10 @@ function isAtLeastAge(dob: Date, years: number) {
 export default function Register() {
   const [t] = useReactiveTranslate();
   const navigate = useNavigate();
-  const [step, setStep] = createSignal<1 | 2>(1);
+  // 3 is "check your inbox": shown instead of the login redirect when the instance wants
+  // the address verified before the first sign-in.
+  const [step, setStep] = createSignal<1 | 2 | 3>(1);
+  const [registeredEmail, setRegisteredEmail] = createSignal('');
 
   const [email, setEmail] = createSignal('');
   const [username, setUsername] = createSignal('');
@@ -190,7 +194,7 @@ export default function Register() {
     setLoading(true);
     try {
       const dateOfBirthRFC3339 = `${dobIso}T00:00:00.000Z`;
-      await register({
+      const res = await register({
         email: eVal,
         username: uVal,
         password: pVal,
@@ -198,6 +202,11 @@ export default function Register() {
         ...(captchaToken() ? { captcha_token: captchaToken() } : {}),
         ...(invite().trim() ? { invite: invite().trim() } : {}),
       });
+      if (res.email_verification_required) {
+        setRegisteredEmail(eVal);
+        setStep(3);
+        return;
+      }
       navigate('/login?registered=1', { replace: true });
     } catch (err) {
       setErrorLines(translateCaughtApiError(err, t));
@@ -216,8 +225,12 @@ export default function Register() {
       <div class={authCardShell}>
         <Card class={authCardClass}>
           <CardHeader class={authCardHeaderClass}>
-            <CardTitle class="text-3xl font-bold tracking-tight text-foreground">{t('auth.register.title')}</CardTitle>
-            <CardDescription class="mt-2 text-base leading-relaxed">{t('auth.register.subtitle')}</CardDescription>
+            <CardTitle class="text-3xl font-bold tracking-tight text-foreground">
+              {step() === 3 ? t('auth.register.verify.title') : t('auth.register.title')}
+            </CardTitle>
+            <CardDescription class="mt-2 text-base leading-relaxed">
+              {step() === 3 ? t('auth.register.verify.body', { email: registeredEmail() }) : t('auth.register.subtitle')}
+            </CardDescription>
           </CardHeader>
 
           <Show when={step() === 1}>
@@ -346,6 +359,22 @@ export default function Register() {
                 </A>
               </CardFooter>
             </form>
+          </Show>
+
+          <Show when={step() === 3}>
+            <CardContent class={authCardContentClass}>
+              <div class="flex flex-col items-center gap-3 text-center">
+                <span class="flex size-14 items-center justify-center rounded-full bg-primary/15 text-primary">
+                  <i class="fa-solid fa-envelope-open-text text-2xl" aria-hidden="true" />
+                </span>
+                <p class="text-xs leading-relaxed text-muted-foreground">{t('auth.register.verify.hint')}</p>
+              </div>
+            </CardContent>
+            <CardFooter class={authCardFooterClass}>
+              <A href="/login" class={authPrimaryLinkClass}>
+                {t('auth.register.verify.goToLogin')}
+              </A>
+            </CardFooter>
           </Show>
         </Card>
       </div>

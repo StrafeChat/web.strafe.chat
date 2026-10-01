@@ -46,6 +46,10 @@ export interface RegisterResponse {
   discriminator: number;
   display_name: string;
   created_at: string;
+  /** True when the instance requires a verified address before the account can sign in:
+   * a verification link has just been sent to `email`, and the login page will refuse the
+   * account (code `email_unverified`) until it is opened. */
+  email_verification_required?: boolean;
 }
 
 export function login(input: LoginInput) {
@@ -90,4 +94,21 @@ export function register(input: RegisterInput) {
     method: 'POST',
     json: input,
   });
+}
+
+/** Redeem the token from a verification email's link. No session needed. */
+export function verifyEmail(token: string) {
+  return api<{ ok: true }>('/auth/email/verify', { method: 'POST', json: { token } });
+}
+
+/** Ask for a password-reset link. Always resolves for a well-formed address - the server
+ * never says whether an account exists for it. */
+export function forgotPassword(email: string) {
+  return api<{ ok: true }>('/auth/password/forgot', { method: 'POST', json: { email } });
+}
+
+/** Redeem a reset link's token with the new password. Every session of the account is
+ * revoked by the server on success. */
+export function resetPassword(token: string, password: string) {
+  return api<{ ok: true }>('/auth/password/reset', { method: 'POST', json: { token, password } });
 }

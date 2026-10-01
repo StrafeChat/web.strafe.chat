@@ -1,4 +1,4 @@
-import { createSignal, Show } from 'solid-js';
+import { createSignal, onMount, Show } from 'solid-js';
 import { useNavigate, useSearchParams, A } from '@solidjs/router';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
@@ -21,8 +21,10 @@ import {
   authCardFooterClass,
   authCardHeaderClass,
   authCardShell,
+  authFooterLinkClass,
   authPageOuter,
 } from '../components/auth/authLayout';
+import { instance, loadInstanceInfo } from '../stores/instance';
 import { AuthBrandMark } from '../components/auth/AuthBrandMark';
 import { FormApiErrors } from '../components/auth/FormApiErrors';
 import { AuthLanguageSwitcher, useReactiveTranslate } from '../i18n';
@@ -45,8 +47,15 @@ export default function Login() {
   const [errorLines, setErrorLines] = createSignal<string[]>([]);
   const [loading, setLoading] = createSignal(false);
 
-  // Second factor, once a password check comes back with mfa_required instead of a session.
-  const [step, setStep] = createSignal<'password' | 'mfa'>('password');
+  // Whether this instance can send email decides if "forgot your password?" exists.
+  onMount(() => void loadInstanceInfo());
+
+  // Second factor, once a password check comes back with mfa_required instead of a session;
+  // or 'unverified', when the password was right but the instance wants the address
+  // confirmed first (the server re-sends the link on each such attempt, once a minute).
+  const [step, setStep] = createSignal<'password' | 'mfa' | 'unverified'>('password');
+  const [unverifiedSent, setUnverifiedSent] = createSignal(false);
+  const [resending, setResending] = createSignal(false);
   const [mfaToken, setMfaToken] = createSignal('');
   const [mfaMethods, setMfaMethods] = createSignal<('totp' | 'webauthn')[]>([]);
   const [activeMethod, setActiveMethod] = createSignal<'totp' | 'webauthn'>('totp');
@@ -78,21 +87,48 @@ export default function Login() {
     }
     setLoading(true);
     try {
-      const res = await login({ email: eVal, password: pVal });
-      if (isMFAChallenge(res)) {
-        setMfaToken(res.mfa_token);
-        setMfaMethods(res.methods);
-        setActiveMethod(res.methods.includes('totp') ? 'totp' : 'webauthn');
-        setUseRecovery(false);
-        setMfaCode('');
-        setStep('mfa');
-        return;
-      }
-      completeLogin(res);
+      handleLoginResult(await login({ email: eVal, password: pVal }));
     } catch (err) {
-      setErrorLines(translateCaughtApiError(err, t));
+      if (!handleUnverified(err)) setErrorLines(translateCaughtApiError(err, t));
     } finally {
       setLoading(false);
+    }
+  }
+
+  function handleLoginResult(res: Awaited<ReturnType<typeof login>>) {
+    if (isMFAChallenge(res)) {
+      setMfaToken(res.mfa_token);
+      setMfaMethods(res.methods);
+      setActiveMethod(res.methods.includes('totp') ? 'totp' : 'webauthn');
+      setUseRecovery(false);
+      setMfaCode('');
+      setStep('mfa');
+      return;
+    }
+    completeLogin(res);
+  }
+
+  /** The password was right but the address is not verified: show that state (with whether
+   * a fresh link just went out) instead of an error. Returns false for any other failure. */
+  function handleUnverified(err: unknown): boolean {
+    if (!isApiError(err) || err.code !== 'email_unverified') return false;
+    setUnverifiedSent(err.body?.verification_email_sent === true);
+    setStep('unverified');
+    return true;
+  }
+
+  /** "Send a new link" is simply another sign-in attempt: the server mails again (or says
+   * one went out less than a minute ago), and if the address got verified in the meantime
+   * this attempt signs the person in. */
+  async function resendVerification() {
+    setErrorLines([]);
+    setResending(true);
+    try {
+      handleLoginResult(await login({ email: email().trim(), password: password() }));
+    } catch (err) {
+      if (!handleUnverified(err)) setErrorLines(translateCaughtApiError(err, t));
+    } finally {
+      setResending(false);
     }
   }
 
@@ -155,6 +191,35 @@ export default function Login() {
     }
   }
 
+  const UnverifiedCard = () => (
+    <>
+      <CardHeader class={authCardHeaderClass}>
+        <CardTitle class="text-3xl font-bold tracking-tight text-foreground">{t('auth.login.unverified.title')}</CardTitle>
+        <CardDescription class="mt-2 text-base leading-relaxed">
+          {unverifiedSent()
+            ? t('auth.login.unverified.sent', { email: email().trim() })
+            : t('auth.login.unverified.notSent', { email: email().trim() })}
+        </CardDescription>
+      </CardHeader>
+      <CardContent class={authCardContentClass}>
+        <div class="flex justify-center">
+          <span class="flex size-14 items-center justify-center rounded-full bg-primary/15 text-primary">
+            <i class="fa-solid fa-envelope-open-text text-2xl" aria-hidden="true" />
+          </span>
+        </div>
+        <FormApiErrors messages={errorLines()} id="login-unverified-api-errors" />
+      </CardContent>
+      <CardFooter class={authCardFooterClass}>
+        <Button type="button" class="w-full font-semibold" loading={resending()} onClick={() => void resendVerification()}>
+          {t('auth.login.unverified.resend')}
+        </Button>
+        <Button type="button" variant="outline" class="w-full" disabled={resending()} onClick={backToPassword}>
+          {t('auth.login.unverified.back')}
+        </Button>
+      </CardFooter>
+    </>
+  );
+
   const MfaSwitchLinks = () => (
     <div class="flex flex-col items-center gap-2 text-xs">
       <Show when={!useRecovery() && mfaMethods().length > 1}>
@@ -192,6 +257,7 @@ export default function Login() {
       <AuthLanguageSwitcher />
       <div class={authCardShell}>
         <Card class={authCardClass}>
+          <Show when={step() === 'unverified'} fallback={
           <Show
             when={step() === 'mfa'}
             fallback={
@@ -237,12 +303,14 @@ export default function Login() {
                     <Button type="submit" class="w-full font-semibold" loading={loading()}>
                       {t('auth.login.submit')}
                     </Button>
-                    <A
-                      href="/register"
-                      class="text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 text-start rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0"
-                    >
+                    <A href="/register" class={authFooterLinkClass}>
                       {t('auth.login.registerLink')}
                     </A>
+                    <Show when={instance.email.enabled}>
+                      <A href="/forgot-password" class={authFooterLinkClass}>
+                        {t('auth.login.forgotPassword')}
+                      </A>
+                    </Show>
                   </CardFooter>
                 </form>
               </>
@@ -302,6 +370,9 @@ export default function Login() {
                 <MfaSwitchLinks />
               </CardFooter>
             </Show>
+          </Show>
+          }>
+            <UnverifiedCard />
           </Show>
         </Card>
       </div>

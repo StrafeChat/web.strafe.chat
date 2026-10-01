@@ -13,6 +13,8 @@ import {
   type TwoFactorStatus,
 } from '../../api/twoFactor';
 import { createPasskey, webauthnSupported, isWebauthnCancellation, type PasskeyRegistrationResponse } from '../../lib/webauthn';
+import { getMe, sendVerificationEmail } from '../../api/users';
+import { instance, loadInstanceInfo } from '../../stores/instance';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { EmptyState } from '../ui/EmptyState';
@@ -259,6 +261,35 @@ export const SecuritySettingsPage: Component = () => {
   const [passkeyBusy, setPasskeyBusy] = createSignal(false);
   const [passkeyError, setPasskeyError] = createSignal('');
 
+  // The account's address and whether a link sent to it was ever opened. Shown only when
+  // the instance can send email at all - without that there is nothing to verify against.
+  const [emailInfo, setEmailInfo] = createSignal<{ email: string; verified: boolean } | null>(null);
+  const [sendState, setSendState] = createSignal<'idle' | 'sending' | 'sent'>('idle');
+  const [sendError, setSendError] = createSignal('');
+
+  async function loadEmail() {
+    void loadInstanceInfo();
+    try {
+      const me = await getMe();
+      if (me.email) setEmailInfo({ email: me.email, verified: me.verified_email === true });
+    } catch {
+      // The 2FA sections below do not depend on this; a failed load just hides the row.
+    }
+  }
+  onMount(() => void loadEmail());
+
+  async function handleSendVerification() {
+    setSendError('');
+    setSendState('sending');
+    try {
+      await sendVerificationEmail();
+      setSendState('sent');
+    } catch (err) {
+      setSendError(apiErrorText(err));
+      setSendState('idle');
+    }
+  }
+
   async function refresh() {
     setLoading(true);
     try {
@@ -299,6 +330,51 @@ export const SecuritySettingsPage: Component = () => {
 
   return (
     <div class="space-y-6">
+      <Show when={instance.email.enabled && emailInfo()}>
+        {(info) => (
+          <section class="space-y-2">
+            <h3 class={settingsSectionTitle}>{t('settings.security.email.sectionTitle')}</h3>
+            <div class={settingsRowShell}>
+              <div class={settingsRowIcon}>
+                <i class="fa-solid fa-envelope" aria-hidden="true" />
+              </div>
+              <div class="min-w-0 flex-1">
+                {/* Wrap rather than truncate: the address is the one thing this row is about,
+                    and beside the badge and button a narrow panel would cut it to "opt-17…". */}
+                <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-foreground">
+                  <span class="break-all">{info().email}</span>
+                  <span
+                    class={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                      info().verified ? 'bg-emerald-500/15 text-emerald-500' : 'bg-amber-500/15 text-amber-500'
+                    }`}
+                  >
+                    {info().verified ? t('settings.security.email.verified') : t('settings.security.email.unverified')}
+                  </span>
+                </p>
+                <p class={`text-xs ${sendError() ? 'text-destructive' : 'text-muted-foreground'}`}>
+                  {sendError() ||
+                    (info().verified
+                      ? t('settings.security.email.verifiedHint')
+                      : sendState() === 'sent'
+                        ? t('settings.security.email.sent')
+                        : t('settings.security.email.unverifiedHint'))}
+                </p>
+              </div>
+              <Show when={!info().verified}>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  loading={sendState() === 'sending'}
+                  disabled={sendState() === 'sent'}
+                  onClick={() => void handleSendVerification()}
+                >
+                  {t('settings.security.email.send')}
+                </Button>
+              </Show>
+            </div>
+          </section>
+        )}
+      </Show>
       <Show when={error()}>
         <p class="px-0.5 text-sm text-destructive">{error()}</p>
       </Show>

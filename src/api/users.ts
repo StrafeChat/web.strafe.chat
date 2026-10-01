@@ -5,6 +5,9 @@ import type { User } from '../types/api';
 export interface MeResponse {
   id: string;
   email: string;
+  /** Whether a link sent to `email` was ever opened. Meaningful only on instances that can
+   * send email (`instance.email.enabled`). */
+  verified_email?: boolean;
   username: string;
   discriminator: string; // "0001" format
   display_name: string;
@@ -33,6 +36,11 @@ export interface PatchMeInput {
     status?: 'online' | 'idle' | 'dnd' | 'offline' | 'invisible';
     custom_status?: string;
   };
+}
+
+/** Ask the server for a (new) verification link to the account's address. */
+export function sendVerificationEmail() {
+  return api<{ ok: true }>('/users/@me/email/verification', { method: 'POST' });
 }
 
 export function patchMe(input: PatchMeInput) {

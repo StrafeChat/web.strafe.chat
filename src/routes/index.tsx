@@ -13,6 +13,9 @@ import RoomPage from '../pages/RoomPage';
 import InvitePage from '../pages/InvitePage';
 import AdminPage from '../pages/AdminPage';
 import OAuthAuthorizePage from '../pages/OAuthAuthorizePage';
+import VerifyEmailPage from '../pages/VerifyEmailPage';
+import ForgotPasswordPage from '../pages/ForgotPasswordPage';
+import ResetPasswordPage from '../pages/ResetPasswordPage';
 import { StargateProvider } from '../components/StargateProvider';
 import { ConnectionStatusBanner } from '../components/ConnectionStatusBanner';
 import { UpdateAvailableBanner } from '../components/UpdateAvailableBanner';
@@ -93,6 +96,11 @@ export function AppRouter() {
     <Router root={RootLayout}>
       <Route path="/login" component={Login} />
       <Route path="/register" component={Register} />
+      {/* Where the links in emails land. Top-level, not under Home: the person may well be
+          signed out, or in a different browser than the one they registered in. */}
+      <Route path="/verify-email" component={VerifyEmailPage} />
+      <Route path="/forgot-password" component={ForgotPasswordPage} />
+      <Route path="/reset-password" component={ResetPasswordPage} />
       <Route path="/" component={Home}>
         <Route path="/" component={HomePage} />
         <Route path="/friends" component={FriendsPage} />

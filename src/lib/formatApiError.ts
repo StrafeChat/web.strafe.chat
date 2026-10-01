@@ -31,6 +31,13 @@ const SERVER_MESSAGE_TO_KEY: Record<string, string> = {
   'authenticator app is not enabled': 'errors.api.totpNotEnabled',
   'passkeys are not configured on this instance': 'errors.api.webauthnNotConfigured',
   'passkey not found': 'errors.api.passkeyNotFound',
+  // Email verification / password reset
+  'email not verified': 'errors.api.emailUnverified',
+  'email is not configured on this instance': 'errors.api.emailDisabled',
+  'email is already verified': 'errors.api.emailAlreadyVerified',
+  'please wait a minute before requesting another email': 'errors.api.emailCooldown',
+  'that verification link is not valid or has expired': 'errors.api.emailTokenInvalid',
+  'that password reset link is not valid or has expired': 'errors.api.resetTokenInvalid',
   // Zog login
   'email must be valid': 'errors.validation.emailInvalid',
   'email is required': 'errors.validation.emailRequired',
@@ -94,6 +101,10 @@ export function translateCaughtApiError(err: unknown, t: ErrorTranslateFn): stri
   // branch on the wire code before the status collapses it into the generic rate limit.
   if (isApiError(err) && err.code === 'mfa_too_many_attempts') {
     return [t('errors.api.mfaTooManyAttempts')];
+  }
+  // Likewise a 429 that means "one was just sent", not "slow down".
+  if (isApiError(err) && err.code === 'email_cooldown') {
+    return [t('errors.api.emailCooldown')];
   }
   if (isApiError(err) && err.status === 429) {
     return [t('errors.api.rateLimited')];

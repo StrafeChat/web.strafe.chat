@@ -26,3 +26,13 @@ export const authCardContentClass = 'space-y-5 pt-2 max-sm:p-0 max-sm:pt-0';
 
 export const authCardFooterClass =
   'flex w-full flex-col items-stretch gap-3 pt-2 max-sm:p-0 max-sm:pt-6';
+
+/** The small text link under an auth card's main button ("Need an account?", "Forgot your
+ * password?"). */
+export const authFooterLinkClass =
+  'text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 text-start rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0';
+
+/** A link styled as the card's primary button, for the "go to sign in" step after an
+ * action that ends on this page (an email verified, a password reset). */
+export const authPrimaryLinkClass =
+  'inline-flex h-10 w-full items-center justify-center rounded-lg bg-primary px-4 text-sm font-semibold text-primary-foreground shadow-sm transition-colors hover:bg-primary-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0';

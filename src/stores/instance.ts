@@ -24,6 +24,9 @@ export interface InstanceState {
   /** Registration needs an invite code. The registration form asks for one when this is
    * set; the server still decides, and waives it for the very first account. */
   inviteOnly: boolean;
+  /** Whether the instance can send email at all (forgot-password exists, addresses have a
+   * verification state) and whether a new account must verify before it can sign in. */
+  email: { enabled: boolean; verificationRequired: boolean };
   /** The signed-in account administers this instance. Asked of the server after every
    * connection; false until it answers, which is the safe way to be wrong. */
   instanceAdmin: boolean;
@@ -37,6 +40,7 @@ export const [instance, setInstance] = createStore<InstanceState>({
   captcha: { enabled: false, provider: '', siteKey: '', apiUrl: '' },
   voiceEnabled: false,
   inviteOnly: false,
+  email: { enabled: false, verificationRequired: false },
   instanceAdmin: false,
 });
 
@@ -47,6 +51,7 @@ interface IndexResponse {
     captcha?: { enabled?: boolean; provider?: string; site_key?: string; api_url?: string };
     voice?: { enabled?: boolean };
     invite_only?: { enabled?: boolean };
+    email?: { enabled?: boolean; verification_required?: boolean };
   };
 }
 
@@ -83,6 +88,10 @@ export function loadInstanceInfo(): Promise<void> {
           },
           voiceEnabled: res.features?.voice?.enabled === true,
           inviteOnly: res.features?.invite_only?.enabled === true,
+          email: {
+            enabled: res.features?.email?.enabled === true,
+            verificationRequired: res.features?.email?.enabled === true && res.features?.email?.verification_required === true,
+          },
         });
       })
       .catch((e) => {
