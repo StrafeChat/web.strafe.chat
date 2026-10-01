@@ -195,8 +195,10 @@ export const VoiceStage: Component<VoiceStageProps> = (props) => {
   const unkeyed = createMemo(() => {
     if (!connected() || !s().encrypted) return [] as string[];
     const keyed = new Set(s().keyed);
+    // Match on the identity the server issued: in a room shared with another instance
+    // it is the federated form, not "<user id>.<session id>".
     return states()
-      .filter((st) => st.connected && !keyed.has(`${st.user_id}.${st.session_id}`))
+      .filter((st) => st.connected && !keyed.has(st.identity ?? `${st.user_id}.${st.session_id}`))
       .map((st) => nameOf(st));
   });
   const emptyText = () =>

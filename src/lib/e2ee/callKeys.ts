@@ -31,6 +31,7 @@ import { claimKeys, sendToDevice } from '../../api/devices';
 import { getMachine, getCurrentDeviceId } from './machine';
 import { processOutgoingRequests, onDecryptedToDevice } from './transport';
 import { b64Encode, b64Decode } from './util';
+import { localUserIdFor } from '../../stores/federationIds';
 
 /** 32 bytes of key material; LiveKit runs HKDF over it to derive the frame key. */
 export const MEDIA_KEY_BYTES = 32;
@@ -63,8 +64,18 @@ export function generateMediaKey(): Uint8Array {
   return key;
 }
 
-/** The user id half of a LiveKit participant identity. */
+/**
+ * The local user id behind a LiveKit participant identity. A call shared with another
+ * instance names participants "<federated id>.<session>" so every instance's clients
+ * can tell who they are; the federated id has dots of its own (the domain), so the
+ * session is whatever follows the last one, and the id maps back through the registry
+ * to this instance's row for that person (a shadow for someone remote).
+ */
 export function userIdOfIdentity(identity: string): string {
+  if (identity.startsWith('@')) {
+    const dot = identity.lastIndexOf('.');
+    return localUserIdFor(dot > 0 ? identity.slice(0, dot) : identity);
+  }
   const dot = identity.indexOf('.');
   return dot > 0 ? identity.slice(0, dot) : identity;
 }

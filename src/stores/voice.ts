@@ -37,6 +37,7 @@ import {
   type VoiceState,
 } from '../api/voice';
 import { auth } from './auth';
+import { registerUserIdentity } from './federationIds';
 import { onStargateEvent } from '../services/stargate/client';
 import { audioConstraints, setVoiceSettings, voiceSettings } from './voiceSettings';
 import { comboFromEvent } from './keybinds';
@@ -295,9 +296,7 @@ export function trackFor(sid: string | undefined): Track | undefined {
 }
 
 function userIdOf(p: Participant | string): string {
-  const identity = typeof p === 'string' ? p : p.identity;
-  const dot = identity.indexOf('.');
-  return dot > 0 ? identity.slice(0, dot) : identity;
+  return userIdOfIdentity(typeof p === 'string' ? p : p.identity);
 }
 
 function audioSink(): HTMLElement {
@@ -870,7 +869,9 @@ export async function joinVoiceRoom(roomId: string, opts: { video?: boolean } = 
   const e2eeWorker = createE2EEWorker();
   live.keyProvider = keyProvider;
   live.e2eeWorker = e2eeWorker;
-  live.identity = `${res.state.user_id}.${res.state.session_id}`;
+  // The identity the token was minted for - federated form in a room shared with
+  // another instance - must be what our own media key is published under.
+  live.identity = res.state.identity ?? `${res.state.user_id}.${res.state.session_id}`;
   live.mediaKey = generateMediaKey();
   live.mediaKeyIndex = 0;
   live.keyedMemberSig = '';
@@ -1203,6 +1204,9 @@ export function disconnectMember(spaceId: string, userId: string) {
 // ---- server state ----------------------------------------------------------------------------
 
 function applyStates(states: VoiceState[]) {
+  // A participant from another instance arrives with their federated identity; make
+  // sure the registry can map it back to our row for them before any tile asks.
+  for (const st of states) registerUserIdentity(st.user);
   setVoice(
     produce((s) => {
       for (const st of states) {
@@ -1330,6 +1334,7 @@ export function hydrateVoiceFromReady(states: unknown, calls: unknown): void {
   const byRoom: Record<string, VoiceState[]> = {};
   for (const st of list) {
     if (!st || typeof st !== 'object' || !st.room_id || !st.user_id) continue;
+    registerUserIdentity(st.user);
     (byRoom[st.room_id] ??= []).push(st);
   }
   const callMap: Record<string, VoiceCall> = {};

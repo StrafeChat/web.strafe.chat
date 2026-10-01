@@ -7,6 +7,9 @@ export interface VoiceUserSummary {
   discriminator: number;
   display_name: string;
   avatar?: string;
+  /** Set for someone on another instance (see stores/federationIds). */
+  home_domain?: string;
+  origin_id?: string;
 }
 
 /** One user's presence in one voice room (Discord's VoiceState). */
@@ -15,6 +18,9 @@ export interface VoiceState {
   room_id: string;
   space_id?: string;
   session_id: string;
+  /** The LiveKit participant identity as issued: "<user id>.<session id>", or
+   * "<federated id>.<session id>" in a room shared with another instance. */
+  identity?: string;
   self_mute: boolean;
   self_deaf: boolean;
   /** Imposed by a moderator. */
