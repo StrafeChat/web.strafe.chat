@@ -15,6 +15,11 @@ import { IframeEmbed } from './IframeEmbed';
  */
 const PreviewImage: Component<{ src: string; width?: number; height?: number }> = (props) => {
   const [loaded, setLoaded] = createSignal(false);
+  // An og:image that 404s, is hotlink-blocked, or is refused by a content blocker used to
+  // leave the reserved aspect-ratio box on screen forever as a blank grey slab (the GitHub
+  // opengraph image did exactly that). A card with no picture is just a text card - drop
+  // the box instead of holding space for bytes that are never coming.
+  const [failed, setFailed] = createSignal(false);
   const dims = () => {
     const w = props.width || getMediaDimensions(props.src)?.width;
     const h = props.height || getMediaDimensions(props.src)?.height;
@@ -25,21 +30,24 @@ const PreviewImage: Component<{ src: string; width?: number; height?: number }> 
     recordMediaDimensions(props.src, e.currentTarget.naturalWidth, e.currentTarget.naturalHeight);
   };
   return (
-    <div class="relative w-full overflow-hidden rounded" style={dims() ? { 'aspect-ratio': `${dims()!.w} / ${dims()!.h}`, 'max-height': '20rem' } : undefined}>
-      <Show when={!loaded()}>
-        <div class={`media-skeleton ${dims() ? 'absolute inset-0' : 'h-44 w-full'}`} />
-      </Show>
-      <img
-        src={props.src}
-        alt=""
-        onLoad={onLoad}
-        loading="lazy"
-        decoding="async"
-        class={`rounded object-cover transition-opacity duration-300 ${loaded() ? 'opacity-100' : 'opacity-0'} ${
-          dims() ? 'absolute inset-0 size-full' : loaded() ? 'block max-h-80 w-full' : 'absolute'
-        }`}
-      />
-    </div>
+    <Show when={!failed()}>
+      <div class="relative w-full overflow-hidden rounded" style={dims() ? { 'aspect-ratio': `${dims()!.w} / ${dims()!.h}`, 'max-height': '20rem' } : undefined}>
+        <Show when={!loaded()}>
+          <div class={`media-skeleton ${dims() ? 'absolute inset-0' : 'h-44 w-full'}`} />
+        </Show>
+        <img
+          src={props.src}
+          alt=""
+          onLoad={onLoad}
+          onError={() => setFailed(true)}
+          loading="lazy"
+          decoding="async"
+          class={`rounded object-cover transition-opacity duration-300 ${loaded() ? 'opacity-100' : 'opacity-0'} ${
+            dims() ? 'absolute inset-0 size-full' : loaded() ? 'block max-h-80 w-full' : 'absolute'
+          }`}
+        />
+      </div>
+    </Show>
   );
 };
 

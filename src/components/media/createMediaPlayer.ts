@@ -67,10 +67,25 @@ export function createMediaPlayer(): MediaPlayer {
     setBuffered(end);
   }
 
+  // Chrome's MediaRecorder writes WebM with no duration header, so a recorded voice clip
+  // reports duration = Infinity until the browser has scanned the file - which left the
+  // player stuck on "0:00 / 0:00" with no progress for every clip recorded in Chrome.
+  // Seeking to an absurd time forces that scan; the browser then fires durationchange with
+  // the real value, and the seek is undone. Set while that probe is in flight.
+  let probingDuration = false;
+
   function readDuration() {
     if (!el) return;
     const d = el.duration;
-    setDuration(Number.isFinite(d) ? d : 0);
+    if (!Number.isFinite(d)) {
+      setDuration(0);
+      return;
+    }
+    setDuration(d);
+    if (probingDuration) {
+      probingDuration = false;
+      el.currentTime = 0;
+    }
   }
 
   function tick() {
@@ -123,10 +138,18 @@ export function createMediaPlayer(): MediaPlayer {
       on('timeupdate', () => {
         if (!raf) setCurrentTime(next.currentTime);
       }),
-      on('seeking', () => setCurrentTime(next.currentTime)),
+      // Ignore the duration probe's own jump to 1e101, or the time readout would flash a
+      // nonsense number for the frame before durationchange undoes it.
+      on('seeking', () => {
+        if (!probingDuration) setCurrentTime(next.currentTime);
+      }),
       on('durationchange', readDuration),
       on('loadedmetadata', () => {
         readDuration();
+        if (!Number.isFinite(next.duration) && !probingDuration) {
+          probingDuration = true;
+          next.currentTime = 1e101;
+        }
         setReady(true);
       }),
       on('canplay', () => {

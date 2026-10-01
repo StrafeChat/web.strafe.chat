@@ -214,6 +214,13 @@ const Users: Component<{ focusUser: string | null; onOpenReport: (id: string) =>
   const [searching, setSearching] = createSignal(false);
   const [searchError, setSearchError] = createSignal('');
   const [selected, setSelected] = createSignal<string | null>(props.focusUser);
+  // Follow the prop, not just seed from it: this panel is mounted under a plain <Show> on
+  // the tab, so "open user" from a report while already on the Users tab changes
+  // focusUser without remounting - and the one-shot seed above left the old user selected.
+  createEffect(() => {
+    const id = props.focusUser;
+    if (id) setSelected(id);
+  });
 
   async function search(e?: Event) {
     e?.preventDefault();
@@ -555,6 +562,12 @@ const Reports: Component<{ focusReport: string | null; onOpenUser: (id: string) 
   const [status, setStatus] = createSignal<ReportStatus>('open');
   const [rows, { refetch }] = createResource(status, (s) => listReports(s));
   const [selected, setSelected] = createSignal<string | null>(props.focusReport);
+  // Same shape as Users: the tab's <Show> keeps this mounted, so a later "open report"
+  // changes focusReport without a remount and the one-shot seed would keep the old one.
+  createEffect(() => {
+    const id = props.focusReport;
+    if (id) setSelected(id);
+  });
 
   const targetLabel = (r: ReportRow) =>
     r.report.target_type === 'user' ? nameOf(r.target_user) : r.target_space?.name || t('admin.space.gone');

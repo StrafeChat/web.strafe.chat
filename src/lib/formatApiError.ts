@@ -90,6 +90,11 @@ export function translateApiErrorMessage(raw: string, t: ErrorTranslateFn): stri
 }
 
 export function translateCaughtApiError(err: unknown, t: ErrorTranslateFn): string[] {
+  // A burned pending login is a 429 too, but it means "log in again", not "slow down" -
+  // branch on the wire code before the status collapses it into the generic rate limit.
+  if (isApiError(err) && err.code === 'mfa_too_many_attempts') {
+    return [t('errors.api.mfaTooManyAttempts')];
+  }
   if (isApiError(err) && err.status === 429) {
     return [t('errors.api.rateLimited')];
   }

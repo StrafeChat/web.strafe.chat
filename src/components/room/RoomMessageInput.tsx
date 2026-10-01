@@ -111,8 +111,9 @@ const SPECIALS: Array<{ token: 'everyone' | 'here'; sublabelKey: string }> = [
 const COMPOSER_MAX_HEIGHT_PX = 200;
 
 /** Typography shared by the textarea and its mirror so they stay glyph-aligned. The
- * horizontal padding leaves room for the attach (left) and the GIF+emoji (right) buttons. */
-const composerTextClass = 'pl-12 pr-[5.5rem] py-3 text-sm leading-5';
+ * horizontal padding leaves room for the attach (left) and the GIF, emoji and voice-message
+ * (right) buttons - three size-9 buttons plus their gaps, so the text never runs under them. */
+const composerTextClass = 'pl-12 pr-[8rem] py-3 text-sm leading-5';
 
 function isWordChar(c: string | undefined): boolean {
   return c != null && /[\p{L}\p{N}_]/u.test(c);

@@ -15,7 +15,12 @@ export type PasskeyRegistrationResponse = PublicKeyCredentialJSON;
 export type PasskeyAssertionResponse = PublicKeyCredentialJSON;
 
 export function webauthnSupported(): boolean {
-  return typeof window !== 'undefined' && typeof window.PublicKeyCredential !== 'undefined';
+  if (typeof window === 'undefined' || typeof window.PublicKeyCredential === 'undefined') return false;
+  // The ceremonies below lean on the JSON helpers (Chrome 116+, Safari 18+, Firefox 122+).
+  // A browser that has WebAuthn but not those passed a bare existence check and then threw
+  // a raw TypeError mid-ceremony, so they are part of what "supported" means here.
+  const pkc = window.PublicKeyCredential as unknown as Record<string, unknown>;
+  return typeof pkc.parseCreationOptionsFromJSON === 'function' && typeof pkc.parseRequestOptionsFromJSON === 'function';
 }
 
 /** Runs navigator.credentials.create() against the `publicKey` field of a

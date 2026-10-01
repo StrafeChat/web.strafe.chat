@@ -19,7 +19,6 @@ import {
   AUTOSCROLL_EDGE_PX,
   AUTOSCROLL_MAX_DELTA_PX,
   MIME_STRAFE_ROOM_REORDER,
-  channelParentSectionId,
   computeChannelInsertInScope,
   computeReorderAfterDrop,
   moveIdBefore,
@@ -160,10 +159,6 @@ export function createRoomReorder(deps: RoomReorderDeps) {
   }
 
   const orderedIdsForScope = (scopeKey: string): string[] => deps.orderedIdsForScope(scopeKey);
-
-  type DropInd =
-    | { targetScopeKey: string; beforeId: string; collapsedInsideSectionId?: string }
-    | { targetScopeKey: string; atEnd: true; collapsedInsideSectionId?: string };
 
   function syncReorderLineGeometry() {
     const drag = activeReorderDrag();

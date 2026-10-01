@@ -22,9 +22,13 @@ export interface VoiceRecordingBarProps {
  */
 export const VoiceRecordingBar: Component<VoiceRecordingBarProps> = (props) => {
   // The waveform is a fixed number of slots that fill left to right, so it grows the way
-  // Discord's does instead of rescaling on every sample.
-  const filled = () => Math.min(WAVEFORM_BARS, props.levels.length);
-  const levelAt = (i: number) => props.levels[Math.min(i, props.levels.length - 1)] ?? 0;
+  // Discord's does instead of rescaling on every sample. Once more samples exist than slots
+  // the window slides to the most recent ones: indexing the slots from the *first* samples
+  // meant the "live" waveform froze 3.6 s in (72 bars at one sample per 50 ms) and sat
+  // still for the rest of the recording.
+  const recent = () => props.levels.slice(-WAVEFORM_BARS);
+  const filled = () => recent().length;
+  const levelAt = (i: number) => recent()[i] ?? 0;
   const seconds = () => props.elapsedMs / 1000;
   // Warn only once the cap is close, so the number doesn't sit there nagging all recording.
   const remaining = () => Math.max(0, (props.maxMs - props.elapsedMs) / 1000);

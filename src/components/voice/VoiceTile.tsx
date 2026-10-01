@@ -62,7 +62,7 @@ export const VoiceTile: Component<VoiceTileProps> = (props) => {
         speaking() ? 'ring-emerald-400' : props.focused ? 'ring-primary/60' : 'ring-transparent'
       } ${props.compact ? 'h-24 w-40' : ''} ${props.onClick ? 'cursor-pointer' : ''}`}
       style={props.compact ? undefined : { width: `${props.width ?? 0}px`, height: `${props.height ?? 0}px` }}
-      onClick={props.onClick}
+      onClick={() => props.onClick?.()}
       onKeyDown={(e) => {
         if ((e.key === 'Enter' || e.key === ' ') && props.onClick) {
           e.preventDefault();

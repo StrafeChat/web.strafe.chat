@@ -12,6 +12,7 @@ import {
   finishWebauthnLogin,
   type LoginResponse,
 } from '../api/auth';
+import { isApiError } from '../api/ApiError';
 import { setAuth, setAuthToken } from '../stores/auth';
 import { getPasskeyAssertion, isWebauthnCancellation } from '../lib/webauthn';
 import {
@@ -102,6 +103,22 @@ export default function Login() {
     setErrorLines([]);
   }
 
+  /**
+   * A second-factor attempt failed. Two of the failures mean the pending login is dead -
+   * the mfa_token expired (five minutes) or five wrong codes burned it - and retrying on
+   * the same step can only fail the same way; the server's own message says "log in
+   * again", so go back to the password step and keep that explanation on screen. Every
+   * other failure (a wrong code, a cancelled passkey prompt) stays on the step so the
+   * user can try again.
+   */
+  function failMfa(err: unknown) {
+    const lines = translateCaughtApiError(err, t);
+    if (isApiError(err) && (err.code === 'mfa_token_invalid' || err.code === 'mfa_too_many_attempts')) {
+      backToPassword();
+    }
+    setErrorLines(lines);
+  }
+
   async function handleMfaSubmit(e: Event) {
     e.preventDefault();
     setErrorLines([]);
@@ -117,7 +134,7 @@ export default function Login() {
         : await verifyTotp({ mfa_token: mfaToken(), code });
       completeLogin(res);
     } catch (err) {
-      setErrorLines(translateCaughtApiError(err, t));
+      failMfa(err);
     } finally {
       setLoading(false);
     }
@@ -132,7 +149,7 @@ export default function Login() {
       const res = await finishWebauthnLogin(mfaToken(), credential);
       completeLogin(res);
     } catch (err) {
-      if (!isWebauthnCancellation(err)) setErrorLines(translateCaughtApiError(err, t));
+      if (!isWebauthnCancellation(err)) failMfa(err);
     } finally {
       setWebauthnBusy(false);
     }
