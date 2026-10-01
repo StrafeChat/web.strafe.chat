@@ -35,6 +35,16 @@ export interface Space {
    * GET /spaces, GET /spaces/:id, join) so permissions can be evaluated locally; kept
    * current by SPACE_ROLE_* gateway events. Absent only on the public invite preview. */
   roles?: SpaceRole[];
+  /** Set when another instance hosts the space: this is a mirror kept current by that
+   * instance (the origin). Members here chat in it like any space, but it can only be
+   * managed from the origin. */
+  federation?: SpaceFederation;
+}
+
+/** A mirrored space's origin: the hosting instance and the id it has there. */
+export interface SpaceFederation {
+  origin_domain: string;
+  origin_id: string;
 }
 
 export interface CreateSpaceInput {
@@ -117,6 +127,9 @@ export interface SpaceRoom {
    * so opening a channel never has to fetch them. */
   permission_overrides?: SpaceRoomOverride[];
   user_overrides?: SpaceRoomUserOverride[];
+  /** The room's global identity when its space spans instances (see rooms.federation);
+   * what the E2EE engine keys the channel's Megolm sessions by. */
+  federation?: { origin_domain: string; origin_id: string };
   created_at: string;
   updated_at?: string;
 }
@@ -397,6 +410,30 @@ export function createSpaceInvite(spaceId: string, opts?: CreateInviteInput) {
 export interface InvitePreview {
   space: Space;
   inviter?: { display_name: string };
+  member_count?: number;
+}
+
+/**
+ * An invite code as people share it: the code alone for a space on this instance, or
+ * `code@domain` for one hosted elsewhere (joining goes through that instance). Codes are
+ * passed to the API percent-encoded because of the "@".
+ */
+export function parseInviteCode(raw: string): { code: string; domain: string } | null {
+  const s = raw.trim();
+  const at = s.lastIndexOf('@');
+  const code = at >= 0 ? s.slice(0, at) : s;
+  const domain = at >= 0 ? s.slice(at + 1).toLowerCase() : '';
+  if (!/^[A-Za-z0-9]{1,64}$/.test(code)) return null;
+  if (at >= 0 && !/^[A-Za-z0-9.-]+(?::\d+)?$/.test(domain)) return null;
+  return { code, domain };
+}
+
+/** The invite code inside an invite URL from any Strafe instance, or the raw code typed as-is. */
+export function inviteCodeFromInput(raw: string): string | null {
+  const s = raw.trim();
+  const m = s.match(/\/invite\/([^/?#\s]+)\/?(?:[?#].*)?$/);
+  const candidate = m ? decodeURIComponent(m[1]) : s;
+  return parseInviteCode(candidate) ? candidate : null;
 }
 
 export function getInvitePreview(code: string): Promise<InvitePreview> {
@@ -412,7 +449,7 @@ export function getInvitePreview(code: string): Promise<InvitePreview> {
 }
 
 export function joinSpaceByInvite(code: string) {
-  return api<Space>(`/spaces/invites/${code}/join`, { method: 'POST' });
+  return api<Space>(`/spaces/invites/${encodeURIComponent(code)}/join`, { method: 'POST' });
 }
 
 function getSessionToken(): string | null {

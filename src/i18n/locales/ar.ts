@@ -438,6 +438,7 @@ export default {
   },
   space: {
     unnamed: 'بلا اسم',
+    hostedOn: 'مستضافة على {{domain}}',
     addSpace: 'إضافة مساحة',
     settings: 'إعدادات المساحة',
     invitePeople: 'دعوة أشخاص',
@@ -480,6 +481,10 @@ export default {
     descriptionPlaceholder: 'عمّ تدور هذه المساحة؟',
     submit: 'إنشاء المساحة',
     failed: 'فشل إنشاء المساحة',
+    haveInvite: 'هل لديك دعوة؟',
+    invitePlaceholder: 'رابط دعوة، أو code@instance لمساحة على نسخة أخرى',
+    joinWithInvite: 'الانضمام بالدعوة',
+    invalidInvite: 'لا يبدو هذا رابط دعوة أو رمز دعوة.',
   },
   voice: {
     connected: 'الصوت متصل',
@@ -2054,6 +2059,8 @@ export default {
       federationUnreachable: 'تعذّر الوصول إلى تلك النسخة. حاول لاحقًا.',
       federationRefused: 'رفضت تلك النسخة الطلب.',
       federationPeerNotAllowed: 'هذه النسخة لا تتّحد مع تلك النسخة.',
+      spaceHostedElsewhere: 'هذه المساحة مستضافة على نسخة أخرى ولا يمكن إدارتها إلا من هناك.',
+      spaceOriginUnreachable: 'تعذّر الوصول إلى النسخة التي تستضيف هذه المساحة. حاول لاحقًا.',
       emailUnverified: 'أكّد بريدك الإلكتروني قبل تسجيل الدخول.',
       emailDisabled: 'لا يمكن لهذه النسخة إرسال رسائل بريد إلكتروني حاليًا.',
       emailAlreadyVerified: 'بريدك الإلكتروني مؤكَّد بالفعل.',

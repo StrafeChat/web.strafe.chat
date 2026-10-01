@@ -63,7 +63,7 @@ function sanitizeHref(url: string): string {
   if (
     pathOnly.startsWith('/') &&
     !pathOnly.startsWith('//') &&
-    /^\/invite\/[a-zA-Z0-9]+\/?$/.test(pathOnly)
+    /^\/invite\/[a-zA-Z0-9]+(?:(?:@|%40)[a-zA-Z0-9.\-]+(?:(?::|%3A)\d+)?)?\/?$/.test(pathOnly)
   ) {
     return typeof window !== 'undefined' ? `${window.location.origin}${t}` : t;
   }

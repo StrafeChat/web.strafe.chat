@@ -52,6 +52,10 @@ const SERVER_MESSAGE_TO_KEY: Record<string, string> = {
   'the other instance could not be reached': 'errors.api.federationUnreachable',
   'the other instance refused the request': 'errors.api.federationRefused',
   "that instance is not allowed by this server's federation policy": 'errors.api.federationPeerNotAllowed',
+  // Spaces hosted on another instance
+  'this space is hosted on another instance and can only be managed from there': 'errors.api.spaceHostedElsewhere',
+  'the instance hosting this space could not be reached': 'errors.api.spaceOriginUnreachable',
+  'this instance does not federate with other instances': 'errors.api.federationOff',
   // Zog login
   'email must be valid': 'errors.validation.emailInvalid',
   'email is required': 'errors.validation.emailRequired',

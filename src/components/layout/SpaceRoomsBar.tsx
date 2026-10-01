@@ -422,8 +422,17 @@ export const SpaceRoomsBar: Component = () => {
                 <img src={space()!.icon} alt="" class="size-full object-cover" />
               </Show>
             </span>
-            <span class="text-base font-semibold text-foreground truncate">
-              {space()?.name || t('emoji.picker.space')}
+            <span class="min-w-0 flex-1 flex flex-col">
+              <span class="text-base font-semibold text-foreground truncate">
+                {space()?.name || t('emoji.picker.space')}
+              </span>
+              <Show when={space()?.federation?.origin_domain}>
+                {(domain) => (
+                  <span class="text-[11px] leading-tight text-muted-foreground truncate" data-space-hosted-on>
+                    {t('space.hostedOn', { domain: domain() })}
+                  </span>
+                )}
+              </Show>
             </span>
             <ChevronDownIcon
               class={`size-4 shrink-0 text-muted-foreground transition-transform duration-200 ${

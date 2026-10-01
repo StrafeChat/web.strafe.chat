@@ -415,6 +415,7 @@ export default {
   },
   space: {
     unnamed: 'Sans nom',
+    hostedOn: 'Hébergé sur {{domain}}',
     addSpace: 'Ajouter un espace',
     settings: "Paramètres de l'espace",
     invitePeople: 'Inviter des personnes',
@@ -457,6 +458,10 @@ export default {
     descriptionPlaceholder: 'De quoi parle cet espace ?',
     submit: "Créer l'espace",
     failed: "Échec de la création de l'espace",
+    haveInvite: 'Vous avez une invitation ?',
+    invitePlaceholder: "Lien d'invitation, ou code@instance pour un espace hébergé ailleurs",
+    joinWithInvite: "Rejoindre avec l'invitation",
+    invalidInvite: "Cela ne ressemble pas à un lien ni à un code d'invitation.",
   },
   voice: {
     connected: 'Voix connectée',
@@ -1992,6 +1997,8 @@ export default {
       federationUnreachable: 'Cette instance est injoignable. Réessayez plus tard.',
       federationRefused: 'Cette instance a refusé la demande.',
       federationPeerNotAllowed: 'Cette instance ne fédère pas avec celle-là.',
+      spaceHostedElsewhere: 'Cet espace est hébergé sur une autre instance et ne peut être géré que depuis celle-ci.',
+      spaceOriginUnreachable: "L'instance qui héberge cet espace est injoignable. Réessayez plus tard.",
       emailUnverified: 'Vérifiez votre adresse e-mail avant de vous connecter.',
       emailDisabled: 'Cette instance ne peut pas envoyer d\'e-mails pour le moment.',
       emailAlreadyVerified: 'Votre adresse e-mail est déjà vérifiée.',

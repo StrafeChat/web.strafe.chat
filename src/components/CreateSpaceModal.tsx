@@ -1,7 +1,7 @@
 import type { Component } from 'solid-js';
 import { createSignal, Show } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
-import { createSpace } from '../api/spaces';
+import { createSpace, inviteCodeFromInput } from '../api/spaces';
 import { addOrUpdateSpace } from '../stores/spaces';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
@@ -20,6 +20,23 @@ export const CreateSpaceModal: Component<CreateSpaceModalProps> = (props) => {
   const [description, setDescription] = createSignal('');
   const [loading, setLoading] = createSignal(false);
   const [error, setError] = createSignal('');
+  // "Have an invite?": a code, a code@instance, or a pasted invite link from any Strafe
+  // instance - all land on the invite page, which previews and joins.
+  const [invite, setInvite] = createSignal('');
+  const [inviteError, setInviteError] = createSignal('');
+
+  function handleJoin(e: Event) {
+    e.preventDefault();
+    const code = inviteCodeFromInput(invite());
+    if (!code) {
+      setInviteError(t('createSpace.invalidInvite'));
+      return;
+    }
+    props.onClose();
+    setInvite('');
+    setInviteError('');
+    navigate(`/invite/${encodeURIComponent(code)}`);
+  }
 
   async function handleSubmit(e: Event) {
     e.preventDefault();
@@ -97,6 +114,27 @@ export const CreateSpaceModal: Component<CreateSpaceModalProps> = (props) => {
             </Button>
             <Button type="submit" loading={loading()} disabled={!name().trim()}>
               {t('createSpace.submit')}
+            </Button>
+          </div>
+        </form>
+        <form onSubmit={handleJoin} class="mt-5 flex flex-col gap-2 border-t border-border pt-4">
+          <Input
+            id="join-space-invite"
+            label={t('createSpace.haveInvite')}
+            type="text"
+            value={invite()}
+            onInput={(e) => {
+              setInvite(e.currentTarget.value);
+              setInviteError('');
+            }}
+            placeholder={t('createSpace.invitePlaceholder')}
+            disabled={loading()}
+            error={inviteError() || undefined}
+            autocomplete="off"
+          />
+          <div class="flex justify-end">
+            <Button type="submit" variant="outline" disabled={!invite().trim() || loading()}>
+              {t('createSpace.joinWithInvite')}
             </Button>
           </div>
         </form>

@@ -25,7 +25,15 @@ import { t } from '../i18n';
 const InvitePage: Component = () => {
   const params = useParams<{ code: string }>();
   const navigate = useNavigate();
-  const code = () => params.code;
+  // The segment arrives as typed in the URL: a federated code's "@" may be percent-encoded.
+  const code = () => {
+    const raw = params.code;
+    try {
+      return raw ? decodeURIComponent(raw) : raw;
+    } catch {
+      return raw;
+    }
+  };
 
   const [preview] = createResource(code, (c) => (c ? getInvitePreview(c) : null));
   const [joining, setJoining] = createSignal(false);
@@ -101,6 +109,13 @@ const InvitePage: Component = () => {
                         </CardTitle>
                         <Show when={d.inviter?.display_name}>
                           <CardDescription class="mt-1">{t('invite.invitedBy', { name: d.inviter!.display_name })}</CardDescription>
+                        </Show>
+                        <Show when={d.space.federation?.origin_domain}>
+                          {(domain) => (
+                            <CardDescription class="mt-1" data-invite-hosted-on>
+                              {t('space.hostedOn', { domain: domain() })}
+                            </CardDescription>
+                          )}
                         </Show>
                       </div>
                     </div>

@@ -109,6 +109,11 @@ export const SpaceInviteLinkEmbed: Component<SpaceInviteLinkEmbedProps> = (props
                         {t('invite.invitedBy', { name: d.inviter!.display_name })}
                       </p>
                     </Show>
+                    <Show when={space.federation?.origin_domain}>
+                      {(domain) => (
+                        <p class="text-xs text-muted-foreground leading-snug">{t('space.hostedOn', { domain: domain() })}</p>
+                      )}
+                    </Show>
                   </div>
                 </div>
               </div>

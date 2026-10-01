@@ -408,6 +408,7 @@ export default {
   },
   space: {
     unnamed: 'Unnamed',
+    hostedOn: 'Hosted on {{domain}}',
     addSpace: 'Add a space',
     settings: 'Space settings',
     invitePeople: 'Invite people',
@@ -450,6 +451,10 @@ export default {
     descriptionPlaceholder: "What's this space about?",
     submit: 'Create space',
     failed: 'Failed to create space',
+    haveInvite: 'Have an invite?',
+    invitePlaceholder: 'Invite link, or code@instance for a space elsewhere',
+    joinWithInvite: 'Join with invite',
+    invalidInvite: "That doesn't look like an invite link or code.",
   },
   voice: {
     connected: 'Voice connected',
@@ -1987,6 +1992,8 @@ export default {
       federationUnreachable: "That instance couldn't be reached. Try again later.",
       federationRefused: 'That instance refused the request.',
       federationPeerNotAllowed: "This instance doesn't federate with that one.",
+      spaceHostedElsewhere: 'This space is hosted on another instance and can only be managed from there.',
+      spaceOriginUnreachable: "The instance hosting this space couldn't be reached. Try again later.",
       emailUnverified: 'Verify your email address before signing in.',
       emailDisabled: 'This instance cannot send email right now.',
       emailAlreadyVerified: 'Your email is already verified.',

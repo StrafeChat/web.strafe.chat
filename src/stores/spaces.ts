@@ -10,6 +10,7 @@ import {
   type SpaceRoomUserOverride,
 } from '../api/spaces';
 import { onStargateEvent } from '../services/stargate/client';
+import { registerRoomIdentity } from './federationIds';
 import { setReadStateFromRoom } from './readState';
 
 /**
@@ -306,7 +307,16 @@ function spaceFromPayload(payload: unknown): Space | null {
     ...(d.public_updates_room_id != null && { public_updates_room_id: String(d.public_updates_room_id) }),
     ...(d.everyone_role_id != null && { everyone_role_id: String(d.everyone_role_id) }),
     ...(roles ? { roles } : {}),
+    ...(federationFromPayload(d.federation) ? { federation: federationFromPayload(d.federation)! } : {}),
   };
+}
+
+/** The `federation` field of a space or room payload (a mirror's origin), if well-formed. */
+function federationFromPayload(raw: unknown): { origin_domain: string; origin_id: string } | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const f = raw as Record<string, unknown>;
+  if (typeof f.origin_domain !== 'string' || !f.origin_domain || f.origin_id == null) return null;
+  return { origin_domain: f.origin_domain, origin_id: String(f.origin_id) };
 }
 
 /** Normalize a raw room from READY space_rooms (or a SPACE_ROOM_CREATE event, which uses
@@ -328,9 +338,13 @@ function spaceRoomFromReady(d: Record<string, unknown>): SpaceRoom | null {
       : created_at;
   const permission_overrides = overridesFromPayload(d.permission_overrides);
   const user_overrides = userOverridesFromPayload(d.user_overrides);
+  const federation = federationFromPayload(d.federation);
+  // The E2EE engine keys a federated channel's sessions by its global identity.
+  if (federation) registerRoomIdentity({ id, federation });
   return {
     id,
     type: typeof d.type === 'number' ? d.type : 3,
+    ...(federation ? { federation } : {}),
     name: typeof d.name === 'string' ? d.name : '',
     topic: typeof d.topic === 'string' ? d.topic : undefined,
     position: typeof d.position === 'number' ? d.position : 0,

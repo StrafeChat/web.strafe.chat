@@ -1,6 +1,7 @@
 import { createStore } from 'solid-js/store';
 import { listSpaceMembers, type SpaceMember } from '../api/spaces';
 import { onStargateEvent } from '../services/stargate/client';
+import { registerUserIdentity } from './federationIds';
 import { setUserPresence } from './presence';
 import { stargateEventInnerRecord } from './spaceSync';
 
@@ -47,6 +48,9 @@ export function ensureSpaceMembers(spaceId: string, opts: { force?: boolean } = 
       // the member object's own presence.
       for (const m of list) {
         if (m.presence?.status) setUserPresence(m.id, m.presence);
+        // Members of a space that spans instances carry their home; the E2EE engine
+        // needs it to address their devices.
+        registerUserIdentity(m);
       }
     } finally {
       setSpaceMembers('loading', spaceId, false);
@@ -70,6 +74,7 @@ export function markSpaceMembersStale(): void {
 
 export function upsertSpaceMember(spaceId: string, member: SpaceMember): void {
   if (!spaceId || !member.id) return;
+  registerUserIdentity(member);
   setSpaceMembers('bySpaceId', spaceId, (prev) => {
     const list = prev ?? [];
     const idx = list.findIndex((m) => m.id === member.id);

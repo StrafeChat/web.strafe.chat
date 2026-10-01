@@ -415,6 +415,7 @@ export default {
   },
   space: {
     unnamed: 'Sin nombre',
+    hostedOn: 'Alojado en {{domain}}',
     addSpace: 'Añadir un espacio',
     settings: 'Ajustes del espacio',
     invitePeople: 'Invitar personas',
@@ -457,6 +458,10 @@ export default {
     descriptionPlaceholder: '¿De qué trata este espacio?',
     submit: 'Crear espacio',
     failed: 'No se pudo crear el espacio',
+    haveInvite: '¿Tienes una invitación?',
+    invitePlaceholder: 'Enlace de invitación, o código@instancia para un espacio de otra instancia',
+    joinWithInvite: 'Unirse con invitación',
+    invalidInvite: 'Eso no parece un enlace ni un código de invitación.',
   },
   voice: {
     connected: 'Voz conectada',
@@ -1992,6 +1997,8 @@ export default {
       federationUnreachable: 'No se pudo contactar con esa instancia. Inténtalo más tarde.',
       federationRefused: 'Esa instancia rechazó la solicitud.',
       federationPeerNotAllowed: 'Esta instancia no federa con esa.',
+      spaceHostedElsewhere: 'Este espacio está alojado en otra instancia y solo puede administrarse desde allí.',
+      spaceOriginUnreachable: 'No se pudo contactar la instancia que aloja este espacio. Inténtalo más tarde.',
       emailUnverified: 'Verifica tu correo electrónico antes de iniciar sesión.',
       emailDisabled: 'Esta instancia no puede enviar correos ahora mismo.',
       emailAlreadyVerified: 'Tu correo ya está verificado.',
