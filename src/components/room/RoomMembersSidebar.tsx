@@ -353,7 +353,7 @@ const MemberRow: Component<{
             >
               {displayName()}
             </span>
-            <BotTag bot={props.p.bot} size="xs" />
+            <BotTag bot={props.p.bot} size="xs" class="ms-0" />
             {props.creatorId != null && props.p.id === props.creatorId && (
               <i class="fa-solid fa-crown shrink-0 text-[10px] text-amber-400" title={t('room.members.owner')} aria-hidden="true" />
             )}

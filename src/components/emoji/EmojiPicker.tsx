@@ -186,7 +186,9 @@ export const EmojiPicker: Component<EmojiPickerProps> = (props) => {
       class={
         props.embedded
           ? 'flex min-h-0 flex-1 flex-col overflow-hidden'
-          : `flex h-[26rem] w-[22rem] max-w-full flex-col overflow-hidden ${appMenuPanel} !p-0`
+          : // Standalone (the reaction picker): fills the portal wrapper, which MessageList
+            // sizes and positions (and clamps to the viewport) so the card is never clipped.
+            `flex h-full w-full flex-col overflow-hidden ${appMenuPanel} !p-0`
       }
       role="dialog"
       aria-label={t('emoji.picker.title')}

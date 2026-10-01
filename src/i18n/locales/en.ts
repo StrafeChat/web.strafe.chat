@@ -639,7 +639,7 @@ export default {
   recovery: {
     createTitle: 'Save your recovery code',
     createBody:
-      'This code is the only thing that can read your old messages on a new device. Save it somewhere safe - nobody can look it up for you, this server included.',
+      "This recovery code is the only thing that can unlock your encrypted message history on a new device, or after your browser data is cleared - not even this server can look it up for you. Download it or copy it somewhere safe now; you won't be shown this code again.",
     restoreTitle: 'Restore your messages',
     restoreBody:
       'Enter the recovery code you saved, and the messages already in this account become readable on this device.',
@@ -650,7 +650,8 @@ export default {
     codePlaceholder: 'XXXX-XXXX-XXXX-XXXX-XXXX-XXXX-XXXX',
     codeMalformed: 'That code has a typo in it - check it against the copy you saved.',
     codeIncorrect: "That code doesn't open this account's backup.",
-    codeWarning: 'Anyone who has this code can read your message history. Keep it like a password.',
+    codeWarning:
+      "Treat it like a password - anyone who has it can read your message history. If you close this without saving the code, no backup is kept and a different code is generated next time.",
     codeFileHeading: 'Strafe recovery code. Keep this private - it restores your message history on a new device.',
     savedConfirm: "I've saved my recovery code",
     download: 'Download',

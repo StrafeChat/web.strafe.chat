@@ -52,6 +52,17 @@ import { t } from '../i18n';
 const ATTEMPTS = 3;
 
 /**
+ * A room still loading its history at the instant a restore imports its keys can land those
+ * messages in the store as "waiting for keys" just after the one retry pass below runs -
+ * which is why a restore sometimes left messages unreadable until a reload. One more sweep a
+ * moment later closes that race; retrying is a no-op once nothing is still pending.
+ */
+const DECRYPT_RESWEEP_MS = 2500;
+function scheduleDecryptResweep(): void {
+  setTimeout(() => void retryPendingDecrypts().catch(() => {}), DECRYPT_RESWEEP_MS);
+}
+
+/**
  * Web Crypto is missing, so nothing here can run - typically the app was opened over a LAN
  * address, which is not a secure context. E2eeUnavailableError carries a real explanation
  * and a fix; until now nothing ever surfaced it, so this showed up as "something went wrong"
@@ -154,6 +165,7 @@ export async function restoreWithPrompt(userId: string, version?: string): Promi
       console.info('[e2ee] restored', imported, 'room keys from the key backup');
       // Messages already on screen showing "waiting for keys" can be read now.
       await retryPendingDecrypts();
+      scheduleDecryptResweep();
       return imported;
     } catch (e) {
       if (e instanceof RecoveryPromptCancelled) {
@@ -273,7 +285,10 @@ export async function importLegacyWithPrompt(userId: string): Promise<number | n
       const pin = await promptLegacyPin({ retainSubmitError: attempt > 0 });
       const imported = await importLegacyPinBackup(userId, pin);
       console.info('[e2ee] imported', imported, 'room keys from the old PIN backup');
-      if (imported > 0) await retryPendingDecrypts();
+      if (imported > 0) {
+        await retryPendingDecrypts();
+        scheduleDecryptResweep();
+      }
       return imported;
     } catch (e) {
       if (e instanceof RecoveryPromptCancelled) {

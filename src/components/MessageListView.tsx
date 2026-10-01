@@ -1,5 +1,6 @@
 import type { Component } from 'solid-js';
 import { createEffect, createMemo, createSignal, For, Show, onCleanup, onMount } from 'solid-js';
+import { Portal } from 'solid-js/web';
 import type { DecryptedMessage } from '../stores/messages';
 import { messages, setMessages, editMessage as editMessageInStore, toggleReaction } from '../stores/messages';
 import type { RoomParticipant } from '../api/rooms';
@@ -33,7 +34,7 @@ import {
   MessageReactions,
   MessageEditBox,
 } from './messageList';
-import { appFloatToolbar } from '../theme/appChrome';
+import { appFloatToolbar, zLayer } from '../theme/appChrome';
 import { MessageAttachments } from './messageList/MessageAttachments';
 import { EmojiPicker, type EmojiPick } from './emoji/EmojiPicker';
 import { IconButton } from './ui/IconButton';
@@ -124,6 +125,45 @@ export const MessageList: Component<MessageListProps> = (props) => {
   const [editDraft, setEditDraft] = createSignal('');
   const [pendingDelete, setPendingDelete] = createSignal<{ roomId: string; msgId: string; message: DecryptedMessage } | null>(null);
   const [reactionPickerFor, setReactionPickerFor] = createSignal<string | null>(null);
+  // Reaction picker: portaled to <body> and positioned against the message row, so the room's
+  // overflow-hidden scroll area can't clip the card. It opens downward from the row, flips to
+  // open upward when there isn't room below (a message near the bottom), and shrinks to fit a
+  // short viewport - measured on open and on resize/scroll.
+  const REACTION_PICKER_W = 352; // 22rem
+  const REACTION_PICKER_H = 416; // 26rem
+  const [reactionAnchor, setReactionAnchor] = createSignal<
+    { left: number; top: number; width: number; height: number } | null
+  >(null);
+  const measureReactionAnchor = () => {
+    const id = reactionPickerFor();
+    if (!id) return;
+    const row = document.querySelector(`[data-msg-id="${id}"]`);
+    if (!row) return;
+    const r = row.getBoundingClientRect();
+    const margin = 8;
+    const height = Math.min(REACTION_PICKER_H, window.innerHeight - margin * 2);
+    const width = Math.min(REACTION_PICKER_W, window.innerWidth - margin * 2);
+    let top = r.top;
+    if (top + height > window.innerHeight - margin) top = r.bottom - height; // flip up near the bottom
+    top = Math.max(margin, Math.min(top, window.innerHeight - margin - height));
+    let left = r.right - width; // reactions live at the row's end; right-align, then clamp
+    left = Math.max(margin, Math.min(left, window.innerWidth - margin - width));
+    setReactionAnchor({ left, top, width, height });
+  };
+  createEffect(() => {
+    if (!reactionPickerFor()) {
+      setReactionAnchor(null);
+      return;
+    }
+    measureReactionAnchor();
+    const onReflow = () => measureReactionAnchor();
+    window.addEventListener('resize', onReflow);
+    window.addEventListener('scroll', onReflow, true);
+    onCleanup(() => {
+      window.removeEventListener('resize', onReflow);
+      window.removeEventListener('scroll', onReflow, true);
+    });
+  });
 
   function emojiKeyFromPick(pick: EmojiPick): string {
     return pick.custom ? `custom:${pick.custom.id}` : pick.unicode!;
@@ -826,7 +866,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                       >
                         {sender().name}
                       </span>
-                      <BotTag bot={sender().bot} size="sm" class="ms-0" />
+                      <BotTag bot={sender().bot} size="sm" class="-ms-0.5" />
                       <span class="text-[11px] text-muted-foreground shrink-0">
                         {formatMessageTimestamp(new Date(msg.created_at))}
                       </span>
@@ -890,7 +930,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                         >
                           {sender().name}
                         </span>
-                        <BotTag bot={sender().bot} size="sm" class="ms-0" />
+                        <BotTag bot={sender().bot} size="sm" class="-ms-0.5" />
                         <span class="text-[13px] text-muted-foreground shrink-0">
                           {formatMessageTimestamp(new Date(msg.created_at))}
                         </span>
@@ -1044,10 +1084,22 @@ export const MessageList: Component<MessageListProps> = (props) => {
                     </Tooltip>
                   </Show>
                 </div>
-                <Show when={reactionPickerFor() === msg.id}>
-                  <div class="absolute end-2 top-8 z-30">
-                    <EmojiPicker onClose={() => setReactionPickerFor(null)} onPick={(pick) => pickReaction(msg, pick)} />
-                  </div>
+                <Show when={reactionPickerFor() === msg.id && reactionAnchor()}>
+                  {(anchor) => (
+                    <Portal>
+                      <div
+                        class={`fixed ${zLayer.popover}`}
+                        style={{
+                          left: `${anchor().left}px`,
+                          top: `${anchor().top}px`,
+                          width: `${anchor().width}px`,
+                          height: `${anchor().height}px`,
+                        }}
+                      >
+                        <EmojiPicker onClose={() => setReactionPickerFor(null)} onPick={(pick) => pickReaction(msg, pick)} />
+                      </div>
+                    </Portal>
+                  )}
                 </Show>
               </div>
                 )}
