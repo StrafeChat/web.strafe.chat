@@ -26,12 +26,12 @@
  */
 
 import { OlmMachine, UserId, RequestType } from '@matrix-org/matrix-sdk-crypto-wasm';
-import { toMatrixUserId, TO_DEVICE_CALL_KEY } from './constants';
+import { toMatrixUserId, toMatrixRoomId, TO_DEVICE_CALL_KEY } from './constants';
 import { claimKeys, sendToDevice } from '../../api/devices';
 import { getMachine, getCurrentDeviceId } from './machine';
 import { processOutgoingRequests, onDecryptedToDevice } from './transport';
 import { b64Encode, b64Decode } from './util';
-import { localUserIdFor } from '../../stores/federationIds';
+import { localUserIdFor, localRoomIdFor } from '../../stores/federationIds';
 
 /** 32 bytes of key material; LiveKit runs HKDF over it to derive the frame key. */
 export const MEDIA_KEY_BYTES = 32;
@@ -40,7 +40,12 @@ export const MEDIA_KEY_RING_SIZE = 16;
 
 /** One participant's media key, identified by the LiveKit participant it belongs to. */
 export interface MediaKeyAnnouncement {
-  /** Strafe room id the call is in. */
+  /**
+   * This instance's id for the room the call is in. On the wire it travels as the room's
+   * federated identity (!origin:domain), which is the same on every instance - a PM or a
+   * mirrored channel has a different local id on each one, and a key announced under the
+   * sender's local id would never match the receiver's call.
+   */
   roomId: string;
   /** LiveKit participant identity ("<user id>.<session id>") this key encrypts for. */
   identity: string;
@@ -134,7 +139,10 @@ export async function sendMediaKey(
     targets.map((u) => new UserId(toMatrixUserId(u)))
   );
 
+  // `room` is the room's federated identity, the same on every instance; `room_id` is
+  // this instance's id for it, which an older client on the same instance still reads.
   const content = {
+    room: toMatrixRoomId(announcement.roomId),
     room_id: announcement.roomId,
     identity: announcement.identity,
     key_index: announcement.keyIndex,
@@ -175,7 +183,8 @@ export function onIncomingMediaKey(handler: (key: IncomingMediaKey) => void): ()
   return onDecryptedToDevice((event) => {
     if (event.type !== TO_DEVICE_CALL_KEY) return;
     const c = event.content as Record<string, unknown>;
-    const roomId = c.room_id != null ? String(c.room_id) : '';
+    // Back to our id for the room; an older sender (same instance) names it by id only.
+    const roomId = c.room != null ? localRoomIdFor(String(c.room)) : c.room_id != null ? String(c.room_id) : '';
     const identity = c.identity != null ? String(c.identity) : '';
     const keyIndex = typeof c.key_index === 'number' ? c.key_index : -1;
     const rawKey = typeof c.key === 'string' ? c.key : '';

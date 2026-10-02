@@ -49,6 +49,18 @@ export function roomFederatedId(localRoomId: string): string {
   return `!${localRoomId}:${localServer()}`;
 }
 
+/** Local room id for a federated room id, when this client has seen that room (else the raw id part). */
+export function localRoomIdFor(fid: string): string {
+  const m = /^!([^:]+):(.+)$/.exec(fid);
+  if (!m) return fid;
+  const [, originId, domain] = m;
+  if (domain === localServer() || domain === LEGACY_SERVER) return originId!;
+  for (const [localId, ident] of rooms) {
+    if (ident.originId === originId && ident.domain === domain) return localId;
+  }
+  return originId!;
+}
+
 /** Local user id for a federated id, when this client has seen that user (else the raw id part). */
 export function localUserIdFor(fid: string): string {
   const m = /^@([^:]+):(.+)$/.exec(fid);
