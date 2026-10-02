@@ -10,6 +10,8 @@ export interface Space {
   icon: string;
   banner: string;
   owner_id: string;
+  /** Blessed by an instance admin as part of this instance. */
+  official?: boolean;
   verification_level: number;
   default_message_notifications: number;
   explicit_content_filter: number;

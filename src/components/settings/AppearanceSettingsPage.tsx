@@ -17,7 +17,6 @@ import {
   setFont,
   setFontScale,
   setGlass,
-  setReduceMotion,
   setThemeId,
   setUiDensity,
   setMessageGroupSpacing,
@@ -233,7 +232,7 @@ export const AppearanceSettingsPage: Component = () => {
             }
           />
           <SettingRow
-            icon="fa-vector-square"
+            icon="fa-border-top-left"
             title={t('settings.appearance.corners.title')}
             description={t('settings.appearance.corners.description')}
             control={
@@ -255,12 +254,6 @@ export const AppearanceSettingsPage: Component = () => {
             title={t('settings.appearance.glass.title')}
             description={t('settings.appearance.glass.description')}
             control={<Toggle label={t('settings.appearance.glass.title')} checked={appearance.glass} onChange={setGlass} />}
-          />
-          <SettingRow
-            icon="fa-person-running"
-            title={t('settings.appearance.motion.title')}
-            description={t('settings.appearance.motion.description')}
-            control={<Toggle label={t('settings.appearance.motion.title')} checked={appearance.reduceMotion} onChange={setReduceMotion} />}
           />
         </div>
       </section>

@@ -146,15 +146,18 @@ export const RoomMembersSidebar: Component<RoomMembersSidebarProps> = (props) =>
 
   // Solid's <Show> doesn't narrow unions for TS, so keep explicit helpers
   // to satisfy the linter and avoid accidental property access on the wrong branch.
-  const simpleOnline = createMemo(() => {
-    const p = partitioned();
-    return p.kind === 'simple' ? p.online : ([] as RoomParticipant[]);
-  });
   const spaceOnlineSections = createMemo(() => {
     const p = partitioned();
     return p.kind === 'space'
       ? p.onlineSections
       : ([] as { label: string; members: RoomParticipant[] }[]);
+  });
+
+  // Group DMs (no space roles) show one flat "Members" list, online first then offline
+  // (dimmed) - the Online / Offline sub-headers read as clutter for a handful of people.
+  const simpleMembers = createMemo(() => {
+    const p = partitioned();
+    return p.kind === 'simple' ? [...p.online, ...p.offline] : ([] as RoomParticipant[]);
   });
 
   const rowProps = () => ({
@@ -190,12 +193,9 @@ export const RoomMembersSidebar: Component<RoomMembersSidebarProps> = (props) =>
       </Show>
       <div class={`min-h-0 flex-1 space-y-4 overflow-y-auto p-2 ${showHeader() ? 'pt-3' : 'pt-3'}`}>
         <Show when={partitioned().kind === 'simple'}>
-          <Show when={simpleOnline().length > 0}>
-            <div class="space-y-0.5">
-              <SectionLabel label={t('presence.online')} count={simpleOnline().length} />
-              <For each={simpleOnline()}>{(p) => <MemberRow p={p} {...rowProps()} />}</For>
-            </div>
-          </Show>
+          <div class="space-y-0.5">
+            <For each={simpleMembers()}>{(p) => <MemberRow p={p} {...rowProps()} dim={!isMemberOnline(p)} />}</For>
+          </div>
         </Show>
 
         <Show when={partitioned().kind === 'space'}>
@@ -207,13 +207,12 @@ export const RoomMembersSidebar: Component<RoomMembersSidebarProps> = (props) =>
               </div>
             )}
           </For>
-        </Show>
-
-        <Show when={partitioned().offline.length > 0}>
-          <div class="space-y-0.5">
-            <SectionLabel label={t('presence.offline')} count={partitioned().offline.length} />
-            <For each={partitioned().offline}>{(p) => <MemberRow p={p} {...rowProps()} dim />}</For>
-          </div>
+          <Show when={partitioned().offline.length > 0}>
+            <div class="space-y-0.5">
+              <SectionLabel label={t('presence.offline')} count={partitioned().offline.length} />
+              <For each={partitioned().offline}>{(p) => <MemberRow p={p} {...rowProps()} dim />}</For>
+            </div>
+          </Show>
         </Show>
       </div>
     </aside>

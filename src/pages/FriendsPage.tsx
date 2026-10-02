@@ -10,7 +10,7 @@ import {
   removeRelationshipLocally,
 } from '../stores/relationships';
 import type { Relationship } from '../api/relationships';
-import { presence, isVisibleStatus } from '../stores/presence';
+import { presence, isVisibleStatus, isPresentStatus } from '../stores/presence';
 import { PresenceDot } from '../components/PresenceDot';
 import { MessageAvatar } from '../components/messageList/MessageAvatar';
 import { sendFriendRequest, putRelationship, removeRelationship } from '../api/relationships';
@@ -31,6 +31,10 @@ import { t } from '../i18n';
 type TabId = 'online' | 'all' | 'pending' | 'blocked';
 
 function friendStatusText(rel: Relationship): string | undefined {
+  // Hidden unless they're present (online/idle/dnd) - the same rule the space members list
+  // uses, so an offline friend never shows a stale custom status.
+  const st = presence.byUser[rel.user.id]?.status ?? rel.user.presence?.status;
+  if (!isPresentStatus(st)) return undefined;
   return presence.byUser[rel.user.id]?.custom_status ?? rel.user.presence?.custom_status;
 }
 

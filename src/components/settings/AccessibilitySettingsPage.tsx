@@ -1,10 +1,8 @@
 import type { Component, JSX } from 'solid-js';
 import { Show } from 'solid-js';
-import { appearance, setFontScale, setGlass, setReduceMotion, type FontScale } from '../../stores/appearance';
+import { appearance, setReduceMotion } from '../../stores/appearance';
 import { accessibility, setAccessibility, systemPrefersReducedMotion } from '../../stores/accessibility';
-import { settings, setMessageCompact } from '../../stores/settings';
 import { RangeField } from '../ui/RangeField';
-import { Tabs } from '../ui/Tabs';
 import { Toggle } from '../ui/Toggle';
 import { settingsGroupFrame, settingsRowIcon, settingsRowShell, settingsSectionTitle } from './settingsChrome';
 import { t } from '../../i18n';
@@ -58,46 +56,16 @@ export const AccessibilitySettingsPage: Component = () => (
         />
         <p class="text-xs text-muted-foreground">{t('settings.accessibility.saturationHint')}</p>
       </div>
-      <Row
-        icon="fa-droplet-slash"
-        title={t('settings.accessibility.reduceTransparency')}
-        description={t('settings.accessibility.reduceTransparencyHint')}
-        control={<Toggle checked={!appearance.glass} onChange={(on) => setGlass(!on)} />}
-      />
     </section>
 
     <section class="space-y-3">
       <h3 class={settingsSectionTitle}>{t('settings.accessibility.textTitle')}</h3>
       <div class="space-y-2">
         <Row
-          icon="fa-text-height"
-          title={t('settings.accessibility.textSize')}
-          description={t('settings.accessibility.textSizeHint')}
-          control={
-            <Tabs<FontScale>
-              size="sm"
-              aria-label={t('settings.accessibility.textSize')}
-              value={appearance.fontScale}
-              onChange={setFontScale}
-              items={[
-                { id: 'sm', label: t('settings.accessibility.sizeSmall') },
-                { id: 'md', label: t('settings.accessibility.sizeDefault') },
-                { id: 'lg', label: t('settings.accessibility.sizeLarge') },
-              ]}
-            />
-          }
-        />
-        <Row
           icon="fa-link"
           title={t('settings.accessibility.underlineLinks')}
           description={t('settings.accessibility.underlineLinksHint')}
           control={<Toggle checked={accessibility.underlineLinks} onChange={(on) => setAccessibility({ underlineLinks: on })} />}
-        />
-        <Row
-          icon="fa-compress"
-          title={t('settings.accessibility.compact')}
-          description={t('settings.accessibility.compactHint')}
-          control={<Toggle checked={settings.messageCompact} onChange={setMessageCompact} />}
         />
       </div>
       <Show when={accessibility.followSystemMotion}>

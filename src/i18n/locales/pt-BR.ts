@@ -416,6 +416,7 @@ export default {
   space: {
     unnamed: 'Sem nome',
     hostedOn: 'Hospedado em {{domain}}',
+    official: 'Espaço oficial',
     addSpace: 'Adicionar um espaço',
     settings: 'Configurações do espaço',
     invitePeople: 'Convidar pessoas',
@@ -1472,6 +1473,8 @@ export default {
       takeDownTitle: 'Remover "{{name}}"?',
       takeDownBody: 'Todas as salas e mensagens serão removidas para todos os membros. Isso não pode ser desfeito.',
       takeDownHint: 'Isso remove o espaço para todo mundo. Use com espaços que existem para quebrar as regras, não por causa de uma sala problemática.',
+      official: 'Espaço oficial',
+      officialHint: 'Marque este espaço como parte desta instância. Ele recebe um selo oficial para todos.',
       takeDownReason: 'Motivo (para o registro de auditoria)',
     },
   },

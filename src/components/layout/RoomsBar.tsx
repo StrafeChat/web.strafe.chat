@@ -6,7 +6,7 @@ import { VoiceDock } from '../voice/VoiceDock';
 import { CreateGroupModal } from '../CreateGroupModal';
 import { rooms, roomDisplayName, isNotesRoom, sortRoomsByLastMessage } from '../../stores/rooms';
 import { auth } from '../../stores/auth';
-import { presence } from '../../stores/presence';
+import { presence, isPresentStatus } from '../../stores/presence';
 import { getUnreadCountForDisplay, ackRoomOptimistic } from '../../stores/readState';
 import { messages } from '../../stores/messages';
 import { PresenceDot } from '../PresenceDot';
@@ -245,6 +245,10 @@ export const RoomsBar: Component = () => {
                 const subtitle = () => {
                   const other = otherParticipant();
                   if (!other) return undefined;
+                  // Only while they're present: a custom status under an offline user reads
+                  // as if they're around (the space members list already hides it offline).
+                  const st = presence.byUser[other.id]?.status ?? other.presence?.status;
+                  if (!isPresentStatus(st)) return undefined;
                   return presence.byUser[other.id]?.custom_status ?? other.presence?.custom_status ?? undefined;
                 };
                 return (

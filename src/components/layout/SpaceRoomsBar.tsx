@@ -423,8 +423,17 @@ export const SpaceRoomsBar: Component = () => {
               </Show>
             </span>
             <span class="min-w-0 flex-1 flex flex-col">
-              <span class="text-base font-semibold text-foreground truncate">
-                {space()?.name || t('emoji.picker.space')}
+              <span class="flex min-w-0 items-center gap-1.5">
+                <span class="truncate text-base font-semibold text-foreground">
+                  {space()?.name || t('emoji.picker.space')}
+                </span>
+                <Show when={space()?.official}>
+                  <i
+                    class="fa-solid fa-circle-check shrink-0 text-sm text-primary"
+                    data-tooltip={t('space.official')}
+                    aria-label={t('space.official')}
+                  />
+                </Show>
               </span>
               <Show when={space()?.federation?.origin_domain}>
                 {(domain) => (

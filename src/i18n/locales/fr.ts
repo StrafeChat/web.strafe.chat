@@ -416,6 +416,7 @@ export default {
   space: {
     unnamed: 'Sans nom',
     hostedOn: 'Hébergé sur {{domain}}',
+    official: 'Espace officiel',
     addSpace: 'Ajouter un espace',
     settings: "Paramètres de l'espace",
     invitePeople: 'Inviter des personnes',
@@ -1472,6 +1473,8 @@ export default {
       takeDownTitle: 'Retirer « {{name}} » ?',
       takeDownBody: 'Tous ses salons et messages seront supprimés pour tous ses membres. Cette action est irréversible.',
       takeDownHint: "Cela supprime l'espace pour tout le monde. À réserver aux espaces qui existent pour enfreindre les règles, pas à un salon problématique.",
+      official: 'Espace officiel',
+      officialHint: 'Marquer cet espace comme faisant partie de cette instance. Il reçoit un badge officiel visible par tous.',
       takeDownReason: "Motif (pour le journal d'audit)",
     },
   },

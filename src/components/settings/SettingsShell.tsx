@@ -133,7 +133,7 @@ export function SettingsNav<T extends string = string>(props: SettingsNavProps<T
   const mobile = useSettingsMobileView();
   return (
     <nav
-      class={`flex shrink-0 flex-col overflow-hidden md:w-60 md:border-r ${appSettingsSidebar} bg-black/15 max-md:min-h-0 max-md:flex-1 ${
+      class={`flex shrink-0 flex-col overflow-hidden md:w-60 md:border-r md:border-border/50 ${appSettingsSidebar} bg-black/15 max-md:min-h-0 max-md:flex-1 ${
         mobile.view() === 'panel' ? 'max-md:hidden' : ''
       }`}
       aria-label={props.title}

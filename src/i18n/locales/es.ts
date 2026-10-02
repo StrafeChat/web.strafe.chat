@@ -416,6 +416,7 @@ export default {
   space: {
     unnamed: 'Sin nombre',
     hostedOn: 'Alojado en {{domain}}',
+    official: 'Espacio oficial',
     addSpace: 'Añadir un espacio',
     settings: 'Ajustes del espacio',
     invitePeople: 'Invitar personas',
@@ -1472,6 +1473,8 @@ export default {
       takeDownTitle: '¿Retirar "{{name}}"?',
       takeDownBody: 'Todas sus salas y mensajes se eliminarán para todos sus miembros. Esto no se puede deshacer.',
       takeDownHint: 'Esto elimina el espacio para todos. Úsalo con espacios que existen para saltarse las normas, no por una sala problemática.',
+      official: 'Espacio oficial',
+      officialHint: 'Marca este espacio como parte de esta instancia. Mostrará una insignia oficial para todos.',
       takeDownReason: 'Motivo (para el registro de auditoría)',
     },
   },

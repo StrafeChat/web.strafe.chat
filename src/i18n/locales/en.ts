@@ -409,6 +409,7 @@ export default {
   space: {
     unnamed: 'Unnamed',
     hostedOn: 'Hosted on {{domain}}',
+    official: 'Official space',
     addSpace: 'Add a space',
     settings: 'Space settings',
     invitePeople: 'Invite people',
@@ -1466,6 +1467,8 @@ export default {
       takeDownTitle: 'Take down "{{name}}"?',
       takeDownBody: 'Every room and message in it is removed for all of its members. This cannot be undone.',
       takeDownHint: 'This removes the space for everyone. Use it for spaces that exist to break the rules, not for one bad room.',
+      official: 'Official space',
+      officialHint: 'Mark this space as part of this instance. It gets an official badge for everyone.',
       takeDownReason: 'Reason (for the audit log)',
     },
   },

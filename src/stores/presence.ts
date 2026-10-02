@@ -33,6 +33,13 @@ export function isVisibleStatus(status: string | undefined): boolean {
   return status === 'online' || status === 'idle';
 }
 
+/** True when the status counts as "present" - online, idle or dnd. offline / invisible /
+ * unknown are not present, and a status line (custom status or label) is hidden for them,
+ * matching how the space members list already behaves. */
+export function isPresentStatus(status: string | undefined): boolean {
+  return status === 'online' || status === 'idle' || status === 'dnd';
+}
+
 /** The current user's own presence status ('offline' when unknown). Reactive: reads the
  * presence store, so callers inside effects/JSX re-run when the user changes their status. */
 export function selfStatus(): UserPresence['status'] {

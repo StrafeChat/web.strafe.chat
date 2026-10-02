@@ -24,10 +24,12 @@ import {
   type ResolveAction,
   type SpaceDetail,
   type UserDetail,
-  setUserBadges,} from '../api/instance';
+  setUserBadges,
+  setSpaceOfficial,} from '../api/instance';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { DiscoverQueue } from '../components/admin/DiscoverQueue';
 import { Button } from '../components/ui/Button';
+import { Toggle } from '../components/ui/Toggle';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ResponsiveDialog } from '../components/ui/ResponsiveDialog';
 import { SearchInput } from '../components/ui/SearchInput';
@@ -282,7 +284,7 @@ const Users: Component<{ focusUser: string | null; onOpenReport: (id: string) =>
         </div>
       </div>
       <div>
-        <Show when={selected()} fallback={<EmptyState icon="fa-user-magnifying-glass" title={t('admin.users.pickOne')} size="inline" />}>
+        <Show when={selected()} fallback={<EmptyState icon="fa-users-viewfinder" title={t('admin.users.pickOne')} size="inline" />}>
           {(id) => <UserPanel userId={id()} onOpenReport={props.onOpenReport} onOpenSpace={props.onOpenSpace} />}
         </Show>
       </div>
@@ -875,6 +877,25 @@ const SpaceDrawer: Component<{ spaceId: string | null; onClose: () => void; onOp
   const [reason, setReason] = createSignal('');
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal('');
+  const [official, setOfficial] = createSignal(false);
+  createEffect(() => {
+    const d = detail();
+    if (d) setOfficial(d.space.official === true);
+  });
+  async function toggleOfficial(on: boolean) {
+    const d = detail();
+    if (!d) return;
+    setBusy(true);
+    setError('');
+    try {
+      const res = await setSpaceOfficial(d.space.id, on);
+      setOfficial(res.official);
+    } catch {
+      setError(t('admin.actionFailed'));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function takeDown(d: SpaceDetail) {
     const ok = await confirmDialog({
@@ -923,6 +944,13 @@ const SpaceDrawer: Component<{ spaceId: string | null; onClose: () => void; onOp
                   </For>
                 </div>
               </Show>
+              <div class={`${settingsGroupFrame} flex items-center justify-between gap-3`}>
+                <div class="min-w-0">
+                  <div class="text-sm font-medium text-foreground">{t('admin.space.official')}</div>
+                  <p class="text-xs text-muted-foreground">{t('admin.space.officialHint')}</p>
+                </div>
+                <Toggle checked={official()} disabled={busy()} onChange={(on) => void toggleOfficial(on)} />
+              </div>
               <div class={`${settingsGroupFrame} space-y-3 border-destructive/40`}>
                 <div class="text-sm font-medium text-destructive">{t('admin.space.takeDown')}</div>
                 <p class="text-xs text-muted-foreground">{t('admin.space.takeDownHint')}</p>

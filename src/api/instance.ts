@@ -72,6 +72,7 @@ export interface AdminSpace {
   name: string;
   icon?: string;
   owner_id: string;
+  official?: boolean;
   created_at: string;
 }
 
@@ -219,6 +220,14 @@ export function listBans() {
 
 export function getSpaceDetail(spaceId: string) {
   return api<SpaceDetail>(`/instance/spaces/${encodeURIComponent(spaceId)}`);
+}
+
+/** Mark a space as official (part of this instance) or clear it. Admin only. */
+export function setSpaceOfficial(spaceId: string, official: boolean) {
+  return api<{ official: boolean }>(`/instance/spaces/${encodeURIComponent(spaceId)}/official`, {
+    method: 'PATCH',
+    json: { official },
+  });
 }
 
 export function takeDownSpace(spaceId: string, reason: string) {

@@ -409,6 +409,7 @@ export default {
   space: {
     unnamed: 'Unbenannt',
     hostedOn: 'Gehostet auf {{domain}}',
+    official: 'Offizieller Space',
     addSpace: 'Space hinzufügen',
     settings: 'Space-Einstellungen',
     invitePeople: 'Personen einladen',
@@ -1463,6 +1464,8 @@ export default {
       takeDownTitle: '„{{name}}“ entfernen?',
       takeDownBody: 'Alle Räume und Nachrichten darin werden für alle Mitglieder entfernt. Das lässt sich nicht rückgängig machen.',
       takeDownHint: 'Das entfernt den Space für alle. Für Spaces, die nur existieren, um Regeln zu brechen – nicht wegen eines einzelnen Raums.',
+      official: 'Offizieller Space',
+      officialHint: 'Markiere diesen Space als Teil dieser Instanz. Er erhält für alle ein offizielles Abzeichen.',
       takeDownReason: 'Grund (für das Audit-Log)',
     },
   },

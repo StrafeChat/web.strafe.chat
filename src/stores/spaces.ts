@@ -285,6 +285,7 @@ function spaceFromPayload(payload: unknown): Space | null {
     icon: typeof d.icon === 'string' ? d.icon : '',
     banner: typeof d.banner === 'string' ? d.banner : '',
     owner_id: d.owner_id != null ? String(d.owner_id) : '',
+    official: d.official === true,
     verification_level: typeof d.verification_level === 'number' ? d.verification_level : 0,
     default_message_notifications:
       typeof d.default_message_notifications === 'number' ? d.default_message_notifications : 0,
