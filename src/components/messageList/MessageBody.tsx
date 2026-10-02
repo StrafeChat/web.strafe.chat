@@ -11,6 +11,7 @@ import { VideoPlayer } from '../media';
 import { fitWithin } from '../../lib/attachments/format';
 import { getMediaDimensions, recordMediaDimensions, hasRecentMediaFailure, recordMediaFailure } from '../../lib/mediaDimensions';
 import { mediaKind, type MediaKind } from '../../lib/gif/providers';
+import { openMediaViewer } from '../../stores/mediaViewer';
 import { previewUrlsFor } from '../../lib/linkPreviewUrls';
 import { isExternalLink, requestOpenExternalLink } from '../../stores/externalLink';
 import { spaces } from '../../stores/spaces';
@@ -145,13 +146,20 @@ const MediaEmbed: Component<{ href: string; kind: MediaKind; allowLinkPreviews?:
       <Show
         when={props.kind === 'video'}
         fallback={
-          <a
-            href={props.href}
-            target="_blank"
-            rel="noopener noreferrer"
-            class="relative my-1.5 block w-fit max-w-full overflow-hidden rounded-lg border border-border/50 bg-muted/30"
+          <button
+            type="button"
+            class="relative my-1.5 block w-fit max-w-full cursor-zoom-in overflow-hidden rounded-lg border border-border/50 bg-muted/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             style={box ? { width: `${box.width}px`, height: `${box.height}px` } : undefined}
-            onClick={guardClick(props.href)}
+            onClick={() =>
+              openMediaViewer([
+                {
+                  url: props.href,
+                  filename: mediaFilename(props.href),
+                  width: imgEl?.naturalWidth || box?.width,
+                  height: imgEl?.naturalHeight || box?.height,
+                },
+              ])
+            }
           >
             <Show when={!shown()}>
               <div class={`media-skeleton ${box ? 'absolute inset-0' : 'h-44 w-64 max-w-full'} rounded-lg`} />
@@ -168,7 +176,7 @@ const MediaEmbed: Component<{ href: string; kind: MediaKind; allowLinkPreviews?:
                 box ? 'absolute inset-0 size-full object-contain' : shown() ? 'block max-h-80 max-w-full object-contain' : 'absolute'
               }`}
             />
-          </a>
+          </button>
         }
       >
         <VideoPlayer

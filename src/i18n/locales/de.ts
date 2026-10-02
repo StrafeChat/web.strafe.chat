@@ -359,6 +359,15 @@ export default {
     notConfiguredBody: 'Für diese Instanz wurde noch kein GIF-API-Schlüssel hinterlegt. Bitte den Administrator, einen einzurichten.',
   },
   attachments: {
+    viewer: {
+      label: 'Bildansicht',
+      previous: 'Vorheriges Bild',
+      next: 'Nächstes Bild',
+      zoomIn: 'Vergrößern',
+      zoomOut: 'Verkleinern',
+      position: '{{current}} / {{total}}',
+      failed: 'Dieses Bild konnte nicht geladen werden.',
+    },
     download: 'Herunterladen',
     downloadNamed: '{{name}} herunterladen',
     openOriginal: 'Original öffnen',

@@ -1,8 +1,8 @@
 import type { Component } from 'solid-js';
 import { Show, For, createMemo } from 'solid-js';
 import { MessageAvatar } from './messageList/MessageAvatar';
-import { UserBadges } from './UserBadges';
-import { BotTag } from './BotTag';
+import { ProfileIdentity } from './ProfileIdentity';
+import { RolePill } from './RolePill';
 import { PresenceDot } from './PresenceDot';
 import { IconButton } from './ui/IconButton';
 import { openReportDialog } from './ReportDialog';
@@ -130,24 +130,19 @@ export const UserProfileFullModal: Component = () => {
         <div class="px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-3 md:pb-6">
           <div class="flex flex-col gap-4">
             <div>
-              <div class="flex flex-wrap items-center gap-2">
-                <h2
-                  id="user-profile-full-title"
-                  class="break-words text-xl font-semibold leading-tight text-foreground"
-                >
-                  {subject()!.displayName}
-                  <BotTag bot={subject()!.bot} size="md" class="relative -top-0.5" />
-                </h2>
-                <UserBadges flags={subject()!.publicFlags} size={16} />
-              </div>
-              <button
-                type="button"
-                onClick={copyTag}
-                class="mt-1 flex items-center gap-1.5 rounded-sm text-sm text-muted-foreground hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {subject()!.username}#{formatDiscriminator(subject()!.discriminator)}
-                <i class="fa-regular fa-copy text-[11px]" aria-hidden="true" />
-              </button>
+              <ProfileIdentity
+                headingLevel="h2"
+                id="user-profile-full-title"
+                displayName={subject()!.displayName}
+                username={subject()!.username}
+                discriminator={subject()!.discriminator}
+                homeDomain={subject()!.homeDomain}
+                bot={subject()!.bot}
+                publicFlags={subject()!.publicFlags}
+                pronouns={subject()!.pronouns}
+                nameColor={subject()!.nameColor}
+                onCopyTag={copyTag}
+              />
             </div>
 
             <Show when={bioHtml()}>
@@ -167,17 +162,11 @@ export const UserProfileFullModal: Component = () => {
               </div>
             </Show>
 
-            <Show when={subject()?.spaceRoleNames?.length}>
+            <Show when={subject()?.spaceRoles?.length}>
               <div class="border-t border-border pt-4">
                 <p class={`mb-2 ${appSectionLabel}`}>{t('profile.roles')}</p>
                 <div class="flex flex-wrap gap-1.5">
-                  <For each={subject()!.spaceRoleNames!}>
-                    {(name) => (
-                      <span class="rounded-full bg-muted/60 px-2.5 py-1 text-xs font-medium text-foreground">
-                        {name}
-                      </span>
-                    )}
-                  </For>
+                  <For each={subject()!.spaceRoles!}>{(role) => <RolePill role={role} />}</For>
                 </div>
               </div>
             </Show>

@@ -4,7 +4,6 @@ import {
   createResource,
   createEffect,
   createSignal,
-  on,
   onCleanup,
   Show,
   untrack,
@@ -176,18 +175,22 @@ const SpacePage: Component = () => {
   // SpaceRoom object on every incoming message, and re-running this per message pushed the
   // page-load read snapshot back into the store each time (addOrUpdateRoom syncs read
   // state), fighting the live viewport ack.
-  createEffect(
-    on(
-      () => [currentRoom()?.id, currentRoom()?.type, spaceId(), currentRoom()?.e2ee_enabled] as const,
-      ([id, type, sid]) => {
-        if (!id || !sid || type !== ROOM_TYPE_TEXT) return;
-        const room = untrack(() => currentRoom());
-        if (!room) return;
-        addOrUpdateRoom(spaceRoomToRoom(room, sid));
-        lastSpaceRoom.set(sid, room.id);
-      }
-    )
-  );
+  //
+  // The effect tracks currentRoom() so a room or E2EE-flag change still re-runs it, then
+  // compares a joined key before doing anything - `on` cannot do that comparison for us, it
+  // only narrows what a tracked scope reads, which is why the per-message storm it was meant
+  // to stop was still happening.
+  let lastSpaceRoomSync = '';
+  createEffect(() => {
+    const room = currentRoom();
+    const sid = spaceId();
+    const key = `${room?.id ?? ''}|${room?.type ?? ''}|${room?.e2ee_enabled ? 1 : 0}|${sid ?? ''}`;
+    if (key === lastSpaceRoomSync) return;
+    lastSpaceRoomSync = key;
+    if (!room || !sid || room.type !== ROOM_TYPE_TEXT) return;
+    addOrUpdateRoom(spaceRoomToRoom(room, sid));
+    lastSpaceRoom.set(sid, room.id);
+  });
 
   const [draft, setDraft] = createSignal('');
   const attachmentDraft = createAttachmentDraft();

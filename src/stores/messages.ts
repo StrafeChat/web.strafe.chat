@@ -1,6 +1,6 @@
 import { previewUrlsFor } from '../lib/linkPreviewUrls';
 import { warmLinkPreviews } from './linkPreviews';
-import { createStore } from 'solid-js/store';
+import { createStore, produce } from 'solid-js/store';
 import {
   listMessages,
   createMessage,
@@ -528,33 +528,49 @@ export function removeMessageFromEvent(roomId: string, messageId: string) {
  * add/remove goes through toggleReaction below, which applies its own optimistic delta and
  * then reconciles from the REST response's authoritative summary; applying this same delta
  * again from that action's own MESSAGE_REACTION_ADD/REMOVE echo would double-count it.
+ *
+ * Written with `produce`, not `list.map((m, i) => i === idx ? { ...m, reactions } : m)`.
+ * The message list is rendered through `<For>`, which keys rows by object identity, so
+ * handing it a fresh message object (even with an untouched `attachments` array copied
+ * across) disposes that row and builds a new one. Every attachment inside it remounts, its
+ * resource refetches, its skeleton comes back and the `<img>` is recreated - so adding a
+ * reaction to a message with a photo made the photo visibly reload. Mutating only the
+ * `reactions` field leaves the message (and its attachments) identical by reference, and the
+ * row is updated instead of rebuilt.
  */
 function patchReaction(roomId: string, messageId: string, emoji: string, userId: string, added: boolean) {
   const currentUserId = auth.user?.id;
-  setMessages('byRoom', roomId, (prev) => {
-    const list = prev ?? [];
-    const idx = list.findIndex((m) => m.id === messageId);
-    if (idx < 0) return prev;
-    const msg = list[idx]!;
-    const reactions = msg.reactions ?? [];
-    const ri = reactions.findIndex((r) => r.emoji === emoji);
-    let next: MessageReaction[];
-    if (added) {
-      next =
-        ri >= 0
-          ? reactions.map((r, i) => (i === ri ? { ...r, count: r.count + 1, me: r.me || userId === currentUserId } : r))
-          : [...reactions, { emoji, count: 1, me: userId === currentUserId }];
-    } else {
-      if (ri < 0) return prev;
-      const r = reactions[ri]!;
-      const count = r.count - 1;
-      next =
-        count <= 0
-          ? reactions.filter((_, i) => i !== ri)
-          : reactions.map((rr, i) => (i === ri ? { ...rr, count, me: userId === currentUserId ? false : rr.me } : rr));
-    }
-    return list.map((m, i) => (i === idx ? { ...m, reactions: next } : m));
-  });
+  setMessages(
+    'byRoom',
+    roomId,
+    produce((prev) => {
+      const list = prev ?? [];
+      const idx = list.findIndex((m) => m.id === messageId);
+      if (idx < 0) return;
+      const msg = list[idx]!;
+      const reactions = msg.reactions ?? [];
+      const ri = reactions.findIndex((r) => r.emoji === emoji);
+      if (added) {
+        if (ri >= 0) {
+          const r = reactions[ri]!;
+          r.count += 1;
+          if (userId === currentUserId) r.me = true;
+        } else {
+          msg.reactions = [...reactions, { emoji, count: 1, me: userId === currentUserId }];
+        }
+      } else {
+        if (ri < 0) return;
+        const r = reactions[ri]!;
+        const count = r.count - 1;
+        if (count <= 0) {
+          msg.reactions = reactions.filter((_, i) => i !== ri);
+        } else {
+          r.count = count;
+          if (userId === currentUserId) r.me = false;
+        }
+      }
+    })
+  );
 }
 
 /**
@@ -570,12 +586,18 @@ export async function toggleReaction(roomId: string, messageId: string, emoji: s
     const res = currentlyMine
       ? await removeReactionApi(roomId, messageId, emoji)
       : await addReactionApi(roomId, messageId, emoji);
-    setMessages('byRoom', roomId, (prev) => {
-      const list = prev ?? [];
-      const idx = list.findIndex((m) => m.id === messageId);
-      if (idx < 0) return prev;
-      return list.map((m, i) => (i === idx ? { ...m, reactions: res.reactions } : m));
-    });
+    // Same reasoning as patchReaction: write just the `reactions` field so the message row
+    // is patched in place rather than remounted.
+    setMessages(
+      'byRoom',
+      roomId,
+      produce((prev) => {
+        const list = prev ?? [];
+        const idx = list.findIndex((m) => m.id === messageId);
+        if (idx < 0) return;
+        list[idx]!.reactions = res.reactions;
+      })
+    );
   } catch (err) {
     patchReaction(roomId, messageId, emoji, currentUserId, currentlyMine);
     throw err;

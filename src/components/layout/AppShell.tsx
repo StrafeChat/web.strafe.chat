@@ -11,6 +11,7 @@ import { ContextMenu } from '../ContextMenu';
 import { UserProfilePopover } from '../UserProfilePopover';
 import { ReportDialog } from '../ReportDialog';
 import { UserProfileFullModal } from '../UserProfileFullModal';
+import { MediaViewer } from '../media/MediaViewer';
 import { IncomingCallModal, ScreenShareDialog, VoiceDock, VoiceStatsPopover, VoiceUserMenu } from '../voice';
 import { leaveVoiceRoom, toggleDeafen, toggleMute } from '../../stores/voice';
 import { lastVisited } from '../../stores/lastVisited';
@@ -264,6 +265,7 @@ export const AppShell: Component<AppShellProps> = (props) => {
       <UserProfileFullModal />
       <IncomingCallModal />
       <ReportDialog />
+      <MediaViewer />
     </div>
   );
 };

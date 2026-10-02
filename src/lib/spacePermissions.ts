@@ -286,6 +286,37 @@ export function highestHoistedRole(
   return hoisted.reduce((a, b) => (b.position > a.position ? b : a));
 }
 
+/**
+ * The colour a member's name is drawn in on every surface that shows one: chat sender names,
+ * the member list, and profile headers. Undefined when they have no coloured role, which
+ * callers render as the normal foreground.
+ *
+ * One helper because these three surfaces were each rolling their own version of "the colour
+ * of my role", and they disagreed: chat drew no colour at all, and the member list only
+ * coloured people who happened to be online.
+ *
+ * Resolution order: the highest *hoisted* coloured role (Discord's rule), then - if the
+ * member has no hoisted role with a colour - their highest coloured role by position. The
+ * fallback is deliberate. Strictly following Discord means a role someone gave a colour to
+ * but forgot to hoist shows that colour nowhere, which reads as the feature being broken;
+ * hoisting still wins whenever it's set, so the ordering people actually configure is
+ * preserved. `memberRoleIds` comes off the participant, never off presence, so an offline
+ * member's name stays coloured exactly like an online one.
+ */
+export function memberNameColorHex(
+  memberRoleIds: string[] | undefined,
+  roles: SpaceRole[] | undefined
+): string | undefined {
+  if (!memberRoleIds?.length || !roles?.length) return undefined;
+  const held = roles.filter((r) => memberRoleIds.includes(r.id) && r.color);
+  if (!held.length) return undefined;
+  const byPosition = (a: SpaceRole, b: SpaceRole) => b.position - a.position;
+  const pick = held.filter((r) => r.hoist).sort(byPosition)[0] ?? held.sort(byPosition)[0];
+  if (!pick) return undefined;
+  const hex = spaceRoleColorHex(pick.color);
+  return hex === '#000000' ? undefined : hex;
+}
+
 function memberEffectivePermBase(
   space: { owner_id: string; everyone_role_id?: string } | undefined,
   roles: SpaceRole[] | undefined,

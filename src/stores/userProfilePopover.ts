@@ -17,6 +17,17 @@ export type SpaceMemberRoleEditContext = {
   onMemberRolesUpdated?: () => void;
 };
 
+/**
+ * A role as a profile surface needs it: name and colour, no permissions, no ids it has to
+ * reconcile. `color` is the 24-bit value the API sends - run it through
+ * `spaceRoleColorHex` before it reaches CSS.
+ */
+export type ProfileRole = {
+  id: string;
+  name: string;
+  color: number;
+};
+
 export type UserProfilePopoverSubject = {
   userId: string;
   displayName: string;
@@ -30,7 +41,17 @@ export type UserProfilePopoverSubject = {
   aboutMe?: string;
   /** Full bio (markdown + sanitized HTML); open “View full profile” to read. */
   bio?: string;
-  spaceRoleNames?: string[];
+  /** Shown next to the display name. */
+  pronouns?: string;
+  /** Assignable roles (never @everyone), highest position first. */
+  spaceRoles?: ProfileRole[];
+  /**
+   * The colour the display name is drawn in: that of the member's highest hoisted role that
+   * has one. Undefined leaves the name in the normal foreground colour. Kept separate from
+   * `spaceRoles` because hoisting is a property of the space, not of the profile - a role you
+   * can be assigned is not necessarily one that colours your name.
+   */
+  nameColor?: string;
   joinedAtLabel?: string;
   /** Profile-badge bitfield and bot flag, for the badge row. */
   publicFlags?: number;

@@ -392,6 +392,15 @@ export default {
       unavailable: 'No microphone was found, or another app is using it.',
       failed: "Recording didn't work. Please try again.",
     },
+    viewer: {
+      label: 'Image viewer',
+      previous: 'Previous image',
+      next: 'Next image',
+      zoomIn: 'Zoom in',
+      zoomOut: 'Zoom out',
+      position: '{{current}} / {{total}}',
+      failed: 'This image could not be loaded.',
+    },
   },
   intro: {
     pmEncrypted: 'Messages are end-to-end encrypted. No one outside of this conversation, not even Strafe, can read your messages.',

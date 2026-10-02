@@ -1,7 +1,8 @@
 import type { RoomParticipant } from '../api/rooms';
 import type { SpaceMember, SpaceRole } from '../api/spaces';
 import type { SenderDisplay } from '../components/messageList/utils';
-import type { UserProfilePopoverSubject } from '../stores/userProfilePopover';
+import type { ProfileRole, UserProfilePopoverSubject } from '../stores/userProfilePopover';
+import { memberNameColorHex as sharedMemberNameColorHex } from './spacePermissions';
 import { formatLongDate } from './utils/datetime';
 import { t } from '../i18n';
 
@@ -25,22 +26,33 @@ export function rolesForMemberChips(
   return out;
 }
 
-export function roleNamesForMember(
+/**
+ * The same list, narrowed to what a profile surface needs: name and colour, no permissions
+ * and no ids to keep in sync. Returns undefined (rather than []) when the member has none, so
+ * the "Roles" section simply doesn't render.
+ *
+ * One resolver for both profile surfaces on purpose. The popover has live role chips with
+ * remove buttons and the full modal has a read-only list, and when each resolved roles its
+ * own way the same person could be shown with different roles depending on which one opened.
+ */
+export function rolesForMemberProfile(
   roleIds: string[] | undefined,
   spaceRoles: SpaceRole[] | undefined
-): string[] | undefined {
-  if (!spaceRoles?.length || !roleIds?.length) return undefined;
-  const byId = new Map(spaceRoles.map((r) => [r.id, r]));
-  // Every member always has @everyone implicitly - showing it as a "role" badge is
-  // meaningless (it doesn't distinguish anyone) and, before this filter, made the read-only
-  // display (used by the full profile modal) disagree with the popover's own role-chip path
-  // (rolesForMemberChips), which already excluded it - same member, two different answers.
-  const resolved = roleIds
-    .map((id) => byId.get(id))
-    .filter((r): r is SpaceRole => !!r && r.name !== EVERYONE_ROLE);
-  if (!resolved.length) return undefined;
-  resolved.sort((a, b) => b.position - a.position);
-  return resolved.map((r) => r.name);
+): ProfileRole[] | undefined {
+  const rows = rolesForMemberChips(roleIds, spaceRoles);
+  if (!rows.length) return undefined;
+  return rows.map((r) => ({ id: r.id, name: r.name, color: r.color ?? 0 }));
+}
+
+/**
+ * The colour a member's name is drawn in. Delegates to the shared `memberNameColorHex` in
+ * spacePermissions so profiles, chat and the member list can't drift apart on it.
+ */
+export function memberNameColorHex(
+  roleIds: string[] | undefined,
+  spaceRoles: SpaceRole[] | undefined
+): string | undefined {
+  return sharedMemberNameColorHex(roleIds, spaceRoles);
 }
 
 export function spaceJoinedLabel(member: RoomParticipant): string | undefined {
@@ -72,7 +84,8 @@ export function popoverSubjectFromParticipant(
     banner: p.banner,
     aboutMe: p.about_me,
     bio: p.bio,
-    spaceRoleNames: roleNamesForMember(participantRoleIds(p), spaceRoles),
+    spaceRoles: rolesForMemberProfile(participantRoleIds(p), spaceRoles),
+    nameColor: memberNameColorHex(participantRoleIds(p), spaceRoles),
     joinedAtLabel: spaceJoinedLabel(p),
     publicFlags: p.public_flags,
     bot: p.bot,
@@ -100,7 +113,8 @@ export function popoverSubjectFromSender(
     banner: s.banner,
     aboutMe: s.aboutMe,
     bio: s.bio,
-    spaceRoleNames: roleNamesForMember(p ? participantRoleIds(p) : undefined, opts?.spaceRoles),
+    spaceRoles: rolesForMemberProfile(p ? participantRoleIds(p) : undefined, opts?.spaceRoles),
+    nameColor: memberNameColorHex(p ? participantRoleIds(p) : undefined, opts?.spaceRoles),
     joinedAtLabel: p ? spaceJoinedLabel(p) : undefined,
     publicFlags: s.publicFlags,
     bot: s.bot,

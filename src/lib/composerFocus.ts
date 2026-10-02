@@ -7,7 +7,7 @@
  * copies had already drifted - space rooms had neither half.
  */
 
-import { createEffect, on, onCleanup, onMount } from 'solid-js';
+import { createEffect, onCleanup, onMount } from 'solid-js';
 
 export interface ComposerAutoFocusOptions {
   /** The composer textarea, once it is mounted. Undefined while it isn't (e.g. no send permission). */
@@ -35,7 +35,7 @@ function shouldRedirectKey(e: KeyboardEvent): boolean {
   }
   // Anything modal owns the keyboard while it is open - including when focus has landed on
   // the body rather than inside the dialog, which the per-target check alone missed.
-  if (document.querySelector('[role="dialog"], [data-modal]')) return false;
+  if (modalOpen()) return false;
   return true;
 }
 
@@ -44,19 +44,56 @@ function shouldRedirectKey(e: KeyboardEvent): boolean {
 // exactly what "the textbox keeps popping up" was.
 const coarsePointer = () => typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
 
+/**
+ * Anything modal owns the keyboard while it is open, including when focus has landed on the
+ * body rather than inside the dialog - which a per-target check alone misses.
+ */
+function modalOpen(): boolean {
+  return typeof document !== 'undefined' && !!document.querySelector('[role="dialog"], [data-modal]');
+}
+
+/**
+ * True when something in the page already holds focus, so the composer must not take it.
+ *
+ * Focus inside the app chrome - a header search box, a filter field, a picker search - is as
+ * legitimate as focus inside a dialog, and stealing it is the same bug.
+ */
+function focusHeld(): boolean {
+  const active = typeof document !== 'undefined' ? document.activeElement : null;
+  return !!active && active !== document.body && active instanceof HTMLElement;
+}
+
+/**
+ * Re-focus whenever the room on screen changes, and when the composer first mounts.
+ *
+ * Deliberately compares by hand rather than leaning on `on(deps, fn)` to do it: `on` only
+ * narrows what a tracked scope reads, it does not compare anything. Without a comparison this
+ * effect re-runs on every notification of the room store, which a new message triggers
+ * (`updateRoomLastMessage` replaces the room object) - so every incoming message yanked the
+ * caret out of whatever field you were typing in and back down to the composer.
+ */
 export function createComposerAutoFocus(opts: ComposerAutoFocusOptions): void {
   const enabled = () => opts.enabled?.() ?? true;
 
-  // Focus on entering a room, and when the composer first mounts - but NOT when the room
-  // object merely updates (a new message, a presence change). `on` compares the focus key,
-  // so re-reading room state that returns the same room id does not re-fire this; a plain
-  // createEffect did, silently refocusing on desktop and popping the keyboard on mobile.
-  createEffect(
-    on([opts.focusKey, opts.inputRef], ([key, el]) => {
-      if (!key || !el || !enabled() || coarsePointer()) return;
-      queueMicrotask(() => el.focus());
-    })
-  );
+  let lastKey: string | undefined;
+  let lastEl: HTMLTextAreaElement | undefined;
+  createEffect(() => {
+    const key = opts.focusKey();
+    const el = opts.inputRef();
+    if (key === lastKey && el === lastEl) return;
+    lastKey = key;
+    lastEl = el;
+    if (!key || !el || !enabled() || coarsePointer()) return;
+    // A modal is open, or the page already holds focus somewhere: this is a room change
+    // underneath an active conversation, not someone asking for the composer.
+    if (modalOpen() || focusHeld()) return;
+    queueMicrotask(() => {
+      // Re-check at the point of the focus call: a dialog can open between the effect and
+      // the microtask, and taking focus then is the exact bug being fixed.
+      if (modalOpen()) return;
+      el.focus({ preventScroll: true });
+    });
+  });
 
   onMount(() => {
     function handleKeyDown(e: KeyboardEvent) {
