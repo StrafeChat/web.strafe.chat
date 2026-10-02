@@ -626,6 +626,11 @@ export default {
     goToSpace: 'Zum Space',
     alreadyMember: 'Du bist bereits Mitglied dieses Space.',
     openSpace: 'Space öffnen',
+    otherInstanceTitle: 'Hast du ein Konto auf einer anderen Instanz?',
+    otherInstanceBody: 'Gib ihre Adresse ein, um mit deinem bestehenden Konto beizutreten. Du wirst dorthin weitergeleitet.',
+    instancePlaceholder: 'chat.beispiel.de',
+    continueOnInstance: 'Auf deiner Instanz fortfahren',
+    invalidInstance: 'Gib eine Instanzadresse wie chat.beispiel.de ein.',
   },
   externalLink: {
     title: 'Du verlässt Strafe',

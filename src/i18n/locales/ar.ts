@@ -660,6 +660,11 @@ export default {
     goToSpace: 'الذهاب إلى المساحة',
     alreadyMember: 'أنت عضو بالفعل في هذه المساحة.',
     openSpace: 'فتح المساحة',
+    otherInstanceTitle: 'هل لديك حساب على نسخة أخرى؟',
+    otherInstanceBody: 'أدخل عنوانها للانضمام بالحساب الذي لديك بالفعل. سيتم نقلك إلى هناك للمتابعة.',
+    instancePlaceholder: 'chat.example.com',
+    continueOnInstance: 'المتابعة على نسختك',
+    invalidInstance: 'أدخل عنوان نسخة مثل chat.example.com.',
   },
   externalLink: {
     title: 'أنت تغادر Strafe',

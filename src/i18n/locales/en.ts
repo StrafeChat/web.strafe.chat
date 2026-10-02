@@ -627,6 +627,11 @@ export default {
     goToSpace: 'Go to space',
     alreadyMember: "You're already a member of this space.",
     openSpace: 'Open space',
+    otherInstanceTitle: 'Have an account on another instance?',
+    otherInstanceBody: 'Enter its address to join from the account you already have. You will be taken there to continue.',
+    instancePlaceholder: 'chat.example.com',
+    continueOnInstance: 'Continue on your instance',
+    invalidInstance: 'Enter an instance address like chat.example.com.',
   },
   externalLink: {
     title: 'Leaving Strafe',

@@ -1,10 +1,14 @@
 import type { Component } from 'solid-js';
 import { createSignal, createResource, Show } from 'solid-js';
 import { useParams, useNavigate, A } from '@solidjs/router';
-import { getInvitePreview, joinSpaceByInvite } from '../api/spaces';
+import { getInvitePreview, joinSpaceByInvite, parseInviteCode } from '../api/spaces';
+import type { InvitePreview } from '../api/spaces';
 import { auth } from '../stores/auth';
+import { instance } from '../stores/instance';
 import { spaces, addOrUpdateSpace } from '../stores/spaces';
+import { instanceBaseUrl } from '../lib/utils/spaceInviteLink';
 import { Button } from '../components/ui/Button';
+import { Input } from '../components/ui/Input';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/Card';
 import {
   authCardClass,
@@ -17,6 +21,17 @@ import {
 import { AuthBrandMark } from '../components/auth/AuthBrandMark';
 import { FormApiErrors } from '../components/auth/FormApiErrors';
 import { t } from '../i18n';
+
+/** Where the visitor last said their account lives, so the next invite is one click. */
+const HOME_INSTANCE_KEY = 'strafe_home_instance';
+
+function rememberedInstance(): string {
+  try {
+    return localStorage.getItem(HOME_INSTANCE_KEY) ?? '';
+  } catch {
+    return '';
+  }
+}
 
 /**
  * Public invite landing page. Uses the auth-page layout so it sits above the fixed app
@@ -38,6 +53,41 @@ const InvitePage: Component = () => {
   const [preview] = createResource(code, (c) => (c ? getInvitePreview(c) : null));
   const [joining, setJoining] = createSignal(false);
   const [error, setError] = createSignal('');
+  const [homeInstance, setHomeInstance] = createSignal(rememberedInstance());
+  const [instanceError, setInstanceError] = createSignal('');
+
+  /**
+   * The instance hosting the space, as a link from anywhere must name it: the origin for
+   * a space mirrored here, this instance otherwise ('' when federation is off, and then
+   * nobody from elsewhere can join anyway).
+   */
+  const originDomain = (d: InvitePreview) => d.space.federation?.origin_domain || instance.domain;
+
+  /**
+   * Someone whose account lives on another instance landed on this one's invite page:
+   * send them to the same invite on their own instance, where they are logged in. The
+   * code travels as code@origin so that instance knows where the space is hosted.
+   */
+  function continueOnInstance(d: InvitePreview) {
+    const raw = homeInstance();
+    const base = instanceBaseUrl(raw);
+    const parsed = parseInviteCode(code() ?? '');
+    const origin = originDomain(d);
+    if (!base || !parsed || !origin) {
+      setInstanceError(t('invite.invalidInstance'));
+      return;
+    }
+    try {
+      localStorage.setItem(HOME_INSTANCE_KEY, raw.trim());
+    } catch {
+      // ignore
+    }
+    if (base === window.location.origin) {
+      navigate(`/login?redirect=${encodeURIComponent('/invite/' + code())}`);
+      return;
+    }
+    window.location.assign(`${base}/invite/${encodeURIComponent(`${parsed.code}@${origin}`)}`);
+  }
 
   async function handleJoin() {
     const c = code();
@@ -146,6 +196,36 @@ const InvitePage: Component = () => {
                           >
                             {t('auth.login.registerLink')}
                           </A>
+                          <Show when={originDomain(d)}>
+                            <form
+                              class="mt-2 w-full rounded-lg border border-border bg-muted/30 p-3 text-start"
+                              data-invite-other-instance
+                              onSubmit={(e) => {
+                                e.preventDefault();
+                                continueOnInstance(d);
+                              }}
+                            >
+                              <p class="text-sm font-medium text-foreground">{t('invite.otherInstanceTitle')}</p>
+                              <p class="mt-1 text-xs leading-relaxed text-muted-foreground">{t('invite.otherInstanceBody')}</p>
+                              <div class="mt-2 flex flex-col gap-2 sm:flex-row sm:items-start">
+                                <Input
+                                  value={homeInstance()}
+                                  placeholder={t('invite.instancePlaceholder')}
+                                  autocomplete="url"
+                                  spellcheck={false}
+                                  aria-label={t('invite.otherInstanceTitle')}
+                                  error={instanceError()}
+                                  onInput={(e) => {
+                                    setHomeInstance(e.currentTarget.value);
+                                    setInstanceError('');
+                                  }}
+                                />
+                                <Button variant="outline" class="shrink-0" onClick={() => continueOnInstance(d)}>
+                                  {t('invite.continueOnInstance')}
+                                </Button>
+                              </div>
+                            </form>
+                          </Show>
                         </>
                       }
                     >

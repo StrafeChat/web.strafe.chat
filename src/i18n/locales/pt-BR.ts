@@ -633,6 +633,11 @@ export default {
     goToSpace: 'Ir para o espaço',
     alreadyMember: 'Você já é membro deste espaço.',
     openSpace: 'Abrir espaço',
+    otherInstanceTitle: 'Tem uma conta em outra instância?',
+    otherInstanceBody: 'Digite o endereço dela para entrar com a conta que você já tem. Você será levado até lá para continuar.',
+    instancePlaceholder: 'chat.exemplo.com',
+    continueOnInstance: 'Continuar na sua instância',
+    invalidInstance: 'Digite um endereço de instância como chat.exemplo.com.',
   },
   externalLink: {
     title: 'Saindo do Strafe',
