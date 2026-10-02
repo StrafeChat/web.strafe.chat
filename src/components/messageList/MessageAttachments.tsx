@@ -1,13 +1,13 @@
 import type { Component } from 'solid-js';
-import { For, Show, createEffect, createMemo, createResource, createSignal, onCleanup } from 'solid-js';
-import { Portal } from 'solid-js/web';
+import { For, Show, createMemo, createResource, createSignal } from 'solid-js';
 import type { AttachmentView } from '../../lib/attachments/types';
 import { decryptAttachment } from '../../lib/attachments/crypto';
 import { attachmentKind, fileIcon, fitWithin, formatFileSize, isVoiceMessage } from '../../lib/attachments/format';
 import { getMediaDimensions, recordMediaDimensions } from '../../lib/mediaDimensions';
-import { IconButton } from '../ui/IconButton';
+import { typedClipUrl } from '../../lib/media/clipFormat';
+import { openMediaViewer } from '../../stores/mediaViewer';
+import type { MediaViewerItem } from '../../stores/mediaViewer';
 import { AudioPlayer, VideoPlayer, VoiceMessagePlayer, videoPlayerBox } from '../media';
-import { zLayer } from '../../theme/appChrome';
 import { t } from '../../i18n';
 
 const MAX_W = 400;
@@ -19,14 +19,27 @@ const MAX_H = 300;
  * entries are revoked once the cache grows past a few dozen.
  */
 const decryptedUrls = new Map<string, Promise<string>>();
+/**
+ * The resolved object URLs, kept alongside the promises so an already-decrypted attachment can
+ * be looked up synchronously. The viewer builds its whole item list in one go when you click,
+ * and anything you can click has already rendered once, so its blob URL is in here.
+ */
+const decryptedUrlSync = new Map<string, string>();
+
+function decryptedKey(att: AttachmentView): string {
+  return `${att.id}:${att.encryption!.iv}`;
+}
+
 function decryptedUrlFor(att: AttachmentView): Promise<string> {
-  const key = `${att.id}:${att.encryption!.iv}`;
+  const key = decryptedKey(att);
   let p = decryptedUrls.get(key);
   if (!p) {
     p = fetch(att.url).then(async (res) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const blob = await decryptAttachment(await res.arrayBuffer(), att.encryption!, att.contentType);
-      return URL.createObjectURL(blob);
+      const u = URL.createObjectURL(blob);
+      decryptedUrlSync.set(key, u);
+      return u;
     });
     p.catch(() => decryptedUrls.delete(key));
     while (decryptedUrls.size >= 60) {
@@ -34,10 +47,18 @@ function decryptedUrlFor(att: AttachmentView): Promise<string> {
       if (!oldest) break;
       decryptedUrls.get(oldest)?.then((u) => URL.revokeObjectURL(u), () => undefined);
       decryptedUrls.delete(oldest);
+      decryptedUrlSync.delete(oldest);
     }
     decryptedUrls.set(key, p);
   }
   return p;
+}
+
+/** The URL to show for an attachment, synchronously - '' while an E2EE blob is still decrypting. */
+function displayUrlFor(att: AttachmentView): string {
+  if (att.previewUrl) return att.previewUrl;
+  if (att.encryption) return decryptedUrlSync.get(decryptedKey(att)) ?? '';
+  return att.url;
 }
 
 /** The URL to actually show: local preview while sending, decrypted blob for E2EE, else the CDN. */
@@ -48,6 +69,38 @@ function useDisplayUrl(att: () => AttachmentView) {
     return a.url;
   });
   return url;
+}
+
+/**
+ * The URL a media player should load.
+ *
+ * Audio is the one kind that gets re-typed from its own bytes first. A media element decides
+ * whether it can play a file from the MIME type it is handed, so a clip whose stored
+ * `content_type` describes a different container than the file actually holds - the shape
+ * Firefox's MediaRecorder produces when it is asked for WebM and writes Ogg - is refused
+ * outright ("This file can't be played in your browser") even though the audio is fine. Reading
+ * the magic number and hand-building the blob removes the served Content-Type from the
+ * decision, and it fixes clips uploaded before the recorder started naming them honestly.
+ * Images and video are left alone: they are streamed by the browser off a real URL, and the
+ * bytes are already reachable there.
+ */
+function usePlayableUrl(att: () => AttachmentView) {
+  const display = useDisplayUrl(att);
+  // Keyed on a string, not an object: createResource refetches whenever the source's value
+  // fails an === check, and a fresh object literal fails it on every notification.
+  const key = createMemo(() => {
+    const a = att();
+    const url = display();
+    if (!url || a.previewUrl || a.encryption) return null;
+    return attachmentKind(a.contentType, a.filename) === 'audio' ? `${a.id}:${url}` : null;
+  });
+  const [retyped] = createResource(key, async (_key) => {
+    const a = att();
+    const url = display() ?? '';
+    const fixed = await typedClipUrl(url, a.contentType, a.filename);
+    return fixed ?? url;
+  });
+  return () => retyped() ?? display();
 }
 
 const UploadProgress: Component<{ att: AttachmentView }> = (props) => (
@@ -131,7 +184,7 @@ const VideoAttachment: Component<{ att: AttachmentView }> = (props) => {
 };
 
 const AudioAttachment: Component<{ att: AttachmentView }> = (props) => {
-  const url = useDisplayUrl(() => props.att);
+  const url = usePlayableUrl(() => props.att);
   return (
     <Show when={url()} fallback={<div class="media-skeleton h-20 w-full max-w-md rounded-lg" />}>
       <AudioPlayer
@@ -147,7 +200,7 @@ const AudioAttachment: Component<{ att: AttachmentView }> = (props) => {
 };
 
 const VoiceMessageAttachment: Component<{ att: AttachmentView }> = (props) => {
-  const url = useDisplayUrl(() => props.att);
+  const url = usePlayableUrl(() => props.att);
   return (
     <Show when={url()} fallback={<div class="media-skeleton h-16 w-full max-w-sm rounded-lg" />}>
       <VoiceMessagePlayer
@@ -203,63 +256,29 @@ const FileCard: Component<{ att: AttachmentView; children?: import('solid-js').J
   );
 };
 
-const Lightbox: Component<{ url: string; att: AttachmentView; onClose: () => void }> = (props) => {
-  const onKey = (e: KeyboardEvent) => {
-    if (e.key === 'Escape') props.onClose();
-  };
-  document.addEventListener('keydown', onKey);
-  onCleanup(() => document.removeEventListener('keydown', onKey));
-  return (
-    <Portal mount={document.body}>
-      <div
-        class={`fixed inset-0 ${zLayer.lightbox} flex flex-col items-center justify-center bg-black/85 p-4 backdrop-blur-sm`}
-        role="dialog"
-        aria-modal="true"
-        aria-label={props.att.filename}
-        onClick={() => props.onClose()}
-      >
-        <div class="absolute end-3 top-3">
-          <IconButton icon="fa-solid fa-xmark" label={t('common.close')} tone="overlay" onClick={() => props.onClose()} />
-        </div>
-        <img
-          src={props.url}
-          alt={props.att.filename}
-          class="max-h-[85vh] max-w-[92vw] rounded-lg object-contain shadow-2xl"
-          onClick={(e) => e.stopPropagation()}
-        />
-        <div class="mt-3 flex items-center gap-3 text-xs text-white/80" onClick={(e) => e.stopPropagation()}>
-          <span class="max-w-[60vw] truncate">{props.att.filename}</span>
-          <span>{formatFileSize(props.att.size)}</span>
-          <Show when={(props.att.width ?? 0) > 0}>
-            <span>
-              {props.att.width}×{props.att.height}
-            </span>
-          </Show>
-          <a
-            href={props.url}
-            download={props.att.filename}
-            target="_blank"
-            rel="noopener noreferrer"
-            class="rounded px-2 py-1 font-medium text-white underline-offset-2 hover:underline"
-          >
-            {t('attachments.openOriginal')}
-          </a>
-        </div>
-      </div>
-    </Portal>
-  );
-};
-
 /** Renders a message's attachments below its text: images and video inline, audio with a
  * player, everything else as a download card. A voice message gets the compact
  * play/waveform shape instead of the full audio player. */
 export const MessageAttachments: Component<{ attachments: AttachmentView[] }> = (props) => {
-  const [lightbox, setLightbox] = createSignal<{ url: string; att: AttachmentView } | null>(null);
-  // Close the lightbox if the message (and its object URLs) goes away underneath it.
-  createEffect(() => {
-    const lb = lightbox();
-    if (lb && !props.attachments.some((a) => a.id === lb.att.id)) setLightbox(null);
-  });
+  // Images open the app-wide viewer (mounted in AppShell) rather than a lightbox owned by
+  // this component. That viewer takes the whole message's images as a list, so the arrows
+  // walk between them, and it lives above the message list instead of inside one row - which
+  // is what let you open the last image of a message and have the viewer vanish when that
+  // row scrolled out of view or the list virtualised it away.
+  const images = createMemo<MediaViewerItem[]>(() =>
+    props.attachments
+      .filter((a) => attachmentKind(a.contentType, a.filename) === 'image' && !a.uploading)
+      .map((a) => ({
+        url: displayUrlFor(a),
+        filename: a.filename,
+        contentType: a.contentType,
+        size: a.size,
+        width: a.width,
+        height: a.height,
+      }))
+      .filter((i) => !!i.url)
+  );
+
   return (
     <div class="mt-1 flex max-w-full flex-wrap gap-2">
       <For each={props.attachments}>
@@ -289,12 +308,18 @@ export const MessageAttachments: Component<{ attachments: AttachmentView[] }> = 
                 </Show>
               }
             >
-              <ImageAttachment att={att} onOpen={(url) => setLightbox({ url, att })} />
+              <ImageAttachment
+                att={att}
+                onOpen={() => {
+                  const list = images();
+                  const i = list.findIndex((x) => x.url === displayUrlFor(att));
+                  if (i >= 0) openMediaViewer(list, i);
+                }}
+              />
             </Show>
           );
         }}
       </For>
-      <Show when={lightbox()}>{(lb) => <Lightbox url={lb().url} att={lb().att} onClose={() => setLightbox(null)} />}</Show>
     </div>
   );
 };

@@ -2,8 +2,8 @@ import type { Component } from 'solid-js';
 import { Show, For, onMount, onCleanup, createEffect, createSignal, createMemo, createResource } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { MessageAvatar } from './messageList/MessageAvatar';
-import { UserBadges } from './UserBadges';
-import { BotTag } from './BotTag';
+import { ProfileIdentity } from './ProfileIdentity';
+import { RolePill } from './RolePill';
 import { MessageBody } from './messageList/MessageBody';
 import { PresenceDot } from './PresenceDot';
 import { createPM } from '../api/rooms';
@@ -15,10 +15,9 @@ import {
   setUserProfilePopover,
   userProfilePopover,
 } from '../stores/userProfilePopover';
-import { roleNamesForMember, rolesForMemberChips } from '../lib/userProfilePopoverHelpers';
+import { memberNameColorHex, rolesForMemberChips, rolesForMemberProfile } from '../lib/userProfilePopoverHelpers';
 import { openUserProfileFullModal } from '../stores/userProfileFullModal';
 import { openSafetyNumberModal } from '../stores/safetyNumberModal';
-import { isRemoteUser } from '../stores/instance';
 import { setMemberSpaceRoles } from '../api/spaces';
 import type { SpaceRole } from '../api/spaces';
 import { spaceRoleColorHex } from '../lib/spacePermissions';
@@ -235,7 +234,8 @@ export const UserProfilePopover: Component = () => {
         if (!merged.includes(id)) merged.push(id);
       }
       setUserProfilePopover('spaceRoleContext', 'subjectRoleIds', merged);
-      setUserProfilePopover('subject', 'spaceRoleNames', roleNamesForMember(merged, ctx.spaceRoles));
+      setUserProfilePopover('subject', 'spaceRoles', rolesForMemberProfile(merged, ctx.spaceRoles));
+      setUserProfilePopover('subject', 'nameColor', memberNameColorHex(merged, ctx.spaceRoles));
       ctx.onMemberRolesUpdated?.();
     } catch (e) {
       setRoleSaveErr(e instanceof Error ? e.message : t('profile.rolesUpdateFailed'));
@@ -267,7 +267,7 @@ export const UserProfilePopover: Component = () => {
     () =>
       !!subject()?.joinedAtLabel ||
       showSpaceRolesRow() ||
-      !!(subject()?.spaceRoleNames?.length && !roleEditCtx()),
+      !!(subject()?.spaceRoles?.length && !roleEditCtx()),
   );
 
   function copyTag() {
@@ -295,7 +295,9 @@ export const UserProfilePopover: Component = () => {
         banner: s.banner,
         bio: s.bio,
         aboutMe: s.aboutMe,
-        spaceRoleNames: s.spaceRoleNames,
+        spaceRoles: s.spaceRoles,
+        nameColor: s.nameColor,
+        pronouns: s.pronouns,
         joinedAtLabel: s.joinedAtLabel,
         publicFlags: s.publicFlags,
         bot: s.bot,
@@ -331,28 +333,12 @@ export const UserProfilePopover: Component = () => {
     role: SpaceRole;
     showRemove: boolean;
   }> = (p) => (
-    <span class="inline-flex max-w-full items-center gap-1.5 rounded-full border border-border/80 bg-muted/30 py-1 ps-2.5 pe-1 text-xs font-medium text-foreground shadow-sm">
-      <span
-        class="size-2 shrink-0 rounded-full ring-1 ring-border/40"
-        style={{ 'background-color': spaceRoleColorHex(p.role.color) }}
-      />
-      <span class="min-w-0 truncate">{p.role.name}</span>
-      <Show when={p.showRemove}>
-        <button
-          type="button"
-          disabled={roleSaveBusy()}
-          class="flex size-5 shrink-0 items-center justify-center rounded-full text-muted-foreground transition hover:bg-destructive/15 hover:text-destructive disabled:opacity-40"
-          title={t('profile.removeRole', { name: p.role.name })}
-          aria-label={t('profile.removeRole', { name: p.role.name })}
-          onClick={(e) => {
-            e.stopPropagation();
-            void removeMemberRole(p.role.id);
-          }}
-        >
-          <i class="fa-solid fa-xmark text-[10px]" />
-        </button>
-      </Show>
-    </span>
+    <RolePill
+      role={{ id: p.role.id, name: p.role.name, color: p.role.color ?? 0 }}
+      onRemove={p.showRemove ? () => void removeMemberRole(p.role.id) : undefined}
+      removeLabel={t('profile.removeRole', { name: p.role.name })}
+      disabled={roleSaveBusy()}
+    />
   );
 
   return (
@@ -439,24 +425,19 @@ export const UserProfilePopover: Component = () => {
             </div>
 
             <div class="px-4 pb-1 pt-2.5">
-              <div class="flex items-center gap-1.5">
-                <h3 class="min-w-0 flex-1 text-lg font-semibold leading-tight text-foreground break-words">
-                  {subject()!.displayName}
-                  <BotTag bot={subject()!.bot} size="sm" class="relative -top-px" />
-                </h3>
-                <UserBadges flags={subject()!.publicFlags} size={14} class="shrink-0" />
-              </div>
-              <button
-                type="button"
-                onClick={copyTag}
-                class="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
-              >
-                {subject()!.username}#{formatDiscriminator(subject()!.discriminator)}
-                <Show when={isRemoteUser({ home_domain: subject()!.homeDomain })}>
-                  <span class="text-primary">@{subject()!.homeDomain}</span>
-                </Show>
-                <i class="fa-regular fa-copy text-[10px]" />
-              </button>
+              <ProfileIdentity
+                headingLevel="h3"
+                compact
+                displayName={subject()!.displayName}
+                username={subject()!.username}
+                discriminator={subject()!.discriminator}
+                homeDomain={subject()!.homeDomain}
+                bot={subject()!.bot}
+                publicFlags={subject()!.publicFlags}
+                pronouns={subject()!.pronouns}
+                nameColor={subject()!.nameColor}
+                onCopyTag={copyTag}
+              />
             </div>
 
             <div class="mx-4 my-2.5 border-t border-border/60" />
@@ -560,15 +541,11 @@ export const UserProfilePopover: Component = () => {
                   </div>
                 </Show>
 
-                <Show when={!showSpaceRolesRow() && subject()?.spaceRoleNames?.length}>
+                <Show when={!showSpaceRolesRow() && subject()?.spaceRoles?.length}>
                   <div>
                     <p class={`mb-1.5 ${appSectionLabel}`}>{t('profile.roles')}</p>
                     <div class="flex flex-wrap gap-1.5">
-                      {subject()!.spaceRoleNames!.map((name) => (
-                        <span class="rounded-full bg-muted/60 px-2.5 py-1 text-xs font-medium text-foreground">
-                          {name}
-                        </span>
-                      ))}
+                      <For each={subject()!.spaceRoles!}>{(role) => <RolePill role={role} />}</For>
                     </div>
                   </div>
                 </Show>

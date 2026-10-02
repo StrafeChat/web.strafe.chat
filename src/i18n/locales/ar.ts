@@ -389,6 +389,15 @@ export default {
     notConfiguredBody: 'لم تُضِف هذه المنصة مفتاح واجهة برمجة GIF بعد. اطلب من المسؤول تهيئته.',
   },
   attachments: {
+    viewer: {
+      label: 'عارض الصور',
+      previous: 'الصورة السابقة',
+      next: 'الصورة التالية',
+      zoomIn: 'تكبير',
+      zoomOut: 'تصغير',
+      position: '{{current}} / {{total}}',
+      failed: 'تعذّر تحميل هذه الصورة.',
+    },
     download: 'تنزيل',
     downloadNamed: 'تنزيل {{name}}',
     openOriginal: 'فتح الأصل',

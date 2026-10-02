@@ -366,6 +366,15 @@ export default {
     notConfiguredBody: 'Esta instancia aún no tiene una clave de API de GIF. Pide al administrador que configure una.',
   },
   attachments: {
+    viewer: {
+      label: 'Visor de imágenes',
+      previous: 'Imagen anterior',
+      next: 'Imagen siguiente',
+      zoomIn: 'Acercar',
+      zoomOut: 'Alejar',
+      position: '{{current}} / {{total}}',
+      failed: 'No se pudo cargar esta imagen.',
+    },
     download: 'Descargar',
     downloadNamed: 'Descargar {{name}}',
     openOriginal: 'Abrir original',

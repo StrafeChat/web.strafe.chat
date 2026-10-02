@@ -3,6 +3,7 @@ import { Show, createMemo, createSignal, onMount } from 'solid-js';
 import { ensureLinkPreview, linkPreviews } from '../../stores/linkPreviews';
 import type { LinkMetadata } from '../../api/unfurl';
 import { isExternalLink, requestOpenExternalLink } from '../../stores/externalLink';
+import { openMediaViewer } from '../../stores/mediaViewer';
 import { VideoPlayer } from '../media';
 import { getMediaDimensions, recordMediaDimensions } from '../../lib/mediaDimensions';
 import { videoEmbed } from '../../lib/embeds/providers';
@@ -110,6 +111,18 @@ const Card: Component<{ d: LinkMetadata; fallbackUrl: string }> = (props) => {
   const bigMedia = () => !!video() || !!embed() || (!!image() && !!props.d.image_large);
   const thumbnail = () => !video() && !embed() && !!image() && !props.d.image_large;
 
+  /**
+   * A preview image opens the app-wide viewer instead of the link. Clicking a picture in a card
+   * is a request to look at the picture, not to be thrown out to the site; the title and the
+   * play poster still go to the source, so navigating stays a deliberate, labelled action.
+   */
+  const openImage = (img: NonNullable<LinkMetadata['image']>) =>
+    openMediaViewer(
+      [{ url: img.url, filename: props.d.title || img.url, width: img.width, height: img.height }],
+      0,
+      props.d.site_name || undefined
+    );
+
   const textBlock = (): JSX.Element => (
     <>
       <Show when={props.d.site_name || props.d.icon}>
@@ -179,11 +192,18 @@ const Card: Component<{ d: LinkMetadata; fallbackUrl: string }> = (props) => {
         </a>
       );
     }
-    // Otherwise a plain image.
+    // Otherwise a plain image, which opens the viewer rather than the site.
+    const img = image();
     return (
-      <a href={href()} target="_blank" rel="noopener noreferrer" onClick={openGuarded} class="mt-2 block overflow-hidden rounded">
-        <PreviewImage src={image()!.url} width={image()!.width} height={image()!.height} />
-      </a>
+      <Show when={img}>
+        <button
+          type="button"
+          onClick={() => img && openImage(img)}
+          class="mt-2 block w-full cursor-zoom-in overflow-hidden rounded focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+        >
+          <PreviewImage src={img!.url} width={img!.width} height={img!.height} />
+        </button>
+      </Show>
     );
   };
 
@@ -203,8 +223,20 @@ const Card: Component<{ d: LinkMetadata; fallbackUrl: string }> = (props) => {
       >
         <div class="flex">
           <div class="min-w-0 flex-1 p-3">{textBlock()}</div>
-          <a href={href()} target="_blank" rel="noopener noreferrer" onClick={openGuarded} class="shrink-0 self-stretch">
-            <img src={image()!.url} alt="" class="h-full w-20 object-cover" loading="lazy" draggable={false} />
+          <a href={href()} target="_blank" rel="noopener noreferrer" onClick={openGuarded} class="shrink-0 cursor-zoom-in self-stretch">
+            <img
+              src={image()!.url}
+              alt=""
+              class="h-full w-20 object-cover"
+              loading="lazy"
+              draggable={false}
+              onClick={(e) => {
+                const img = image();
+                if (!img) return;
+                e.preventDefault();
+                openImage(img);
+              }}
+            />
           </a>
         </div>
       </Show>

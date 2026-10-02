@@ -352,20 +352,21 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
         candidates.push({ kind: 'channel', key: `channel:${r.id}`, label: r.name, insertText: `#${r.name} ` });
       }
     } else {
-      const currentUserId = props.currentUserId;
-      const others = currentUserId
-        ? (props.participants ?? []).filter((p) => p.id !== currentUserId)
-        : props.participants ?? [];
-      for (const p of others) {
+      // Including yourself: mentioning yourself is legitimate and Discord allows it, but the
+      // list used to filter the current user out, so typing your own name after `@` produced
+      // nothing at all. Self is flagged instead, so the row is identifiable rather than just
+      // mysteriously present.
+      for (const p of props.participants ?? []) {
         const name = participantDisplayName(p);
         const username = p.username ?? '';
         if (!username) continue;
         if (q !== '' && !name.toLowerCase().startsWith(q) && !username.toLowerCase().startsWith(q)) continue;
+        const isSelf = p.id === props.currentUserId;
         candidates.push({
           kind: 'user',
           key: `user:${p.id}`,
           label: name,
-          sublabel: `@${username}`,
+          sublabel: isSelf ? t('presence.you') : `@${username}`,
           insertText: `@${username} `,
           participant: p,
         });

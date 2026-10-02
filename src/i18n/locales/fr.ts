@@ -366,6 +366,15 @@ export default {
     notConfiguredBody: 'Cette instance n’a pas encore de clé d’API GIF. Demandez à l’administrateur d’en configurer une.',
   },
   attachments: {
+    viewer: {
+      label: "Visionneuse d'images",
+      previous: 'Image précédente',
+      next: 'Image suivante',
+      zoomIn: 'Zoom avant',
+      zoomOut: 'Zoom arrière',
+      position: '{{current}} / {{total}}',
+      failed: "Cette image n'a pas pu être chargée.",
+    },
     download: 'Télécharger',
     downloadNamed: 'Télécharger {{name}}',
     openOriginal: "Ouvrir l'original",

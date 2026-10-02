@@ -1,15 +1,23 @@
 import { createStore } from 'solid-js/store';
+import type { ProfileRole } from './userProfilePopover';
 
 export type UserProfileFullSubject = {
   userId: string;
   displayName: string;
   username: string;
   discriminator: number;
+  /** Federation: the user's home instance, shown after the tag when it isn't this one. */
+  homeDomain?: string;
   avatar?: string;
   banner?: string;
   bio?: string;
   aboutMe?: string;
-  spaceRoleNames?: string[];
+  /** Shown under the name. */
+  pronouns?: string;
+  /** Assignable roles (never @everyone), highest position first. */
+  spaceRoles?: ProfileRole[];
+  /** The member's highest hoisted role colour, or undefined if they have none. */
+  nameColor?: string;
   joinedAtLabel?: string;
   publicFlags?: number;
   bot?: boolean;

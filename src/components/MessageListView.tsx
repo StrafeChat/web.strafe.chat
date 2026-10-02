@@ -41,7 +41,7 @@ import { IconButton } from './ui/IconButton';
 import { isMessagePinned, pinMessage, unpinMessage } from '../stores/pinnedMessages';
 import { openUserProfilePopover } from '../stores/userProfilePopover';
 import { popoverSubjectFromSender } from '../lib/userProfilePopoverHelpers';
-import { viewerRoleCeiling } from '../lib/spacePermissions';
+import { memberNameColorHex, viewerRoleCeiling } from '../lib/spacePermissions';
 
 const MESSAGE_GROUP_THRESHOLD_MS = 5 * 60 * 1000;
 /** Treat as “at bottom” if within this many px. */
@@ -614,6 +614,22 @@ export const MessageList: Component<MessageListProps> = (props) => {
             const needsDateHeader = () => shouldShowDateHeader(msg, prev());
             const sender = () =>
               getSenderDisplay(msg.sender_id, props.participants, currentUserId());
+            /**
+             * Discord-style: the sender's name takes their highest hoisted role's colour.
+             * Read off the participant's roles, never presence, so an author's colour in
+             * history doesn't depend on whether they're online right now.
+             */
+            const senderNameColor = () => {
+              const p = props.participants?.find((x) => x.id === msg.sender_id);
+              return memberNameColorHex((p as { roles?: string[] } | undefined)?.roles, props.spaceRoles);
+            };
+            /** `text-foreground` must yield to the role colour, not fight it. */
+            const senderNameClass = () =>
+              `shrink-0 cursor-pointer rounded px-0.5 -mx-0.5 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+                senderNameColor() ? '' : 'text-foreground'
+              }`;
+            const senderNameStyle = () =>
+              senderNameColor() ? { color: senderNameColor() } : undefined;
 
             const showUnreadHeader = () => isFirstUnreadMessage(msg, i());
             const showDateHeader = () => needsDateHeader();
@@ -850,7 +866,8 @@ export const MessageList: Component<MessageListProps> = (props) => {
                       <span
                         role="button"
                         tabIndex={0}
-                        class="text-sm font-semibold text-foreground shrink-0 cursor-pointer rounded px-0.5 -mx-0.5 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        class={`text-sm font-semibold ${senderNameClass()}`}
+                        style={senderNameStyle()}
                         onClick={(e) => {
                           e.stopPropagation();
                           openAuthorProfile(msg, e.currentTarget);
@@ -913,23 +930,24 @@ export const MessageList: Component<MessageListProps> = (props) => {
                       <div class="flex items-baseline gap-2 flex-wrap mb-0.5">
                         <span
                           role="button"
-                          tabIndex={0}
-                          class="text-sm font-semibold text-foreground shrink-0 truncate cursor-pointer rounded px-0.5 -mx-0.5 hover:underline outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                          onClick={(e) => {
+                        tabIndex={0}
+                        class={`text-sm font-semibold truncate ${senderNameClass()}`}
+                        style={senderNameStyle()}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          openAuthorProfile(msg, e.currentTarget);
+                        }}
+                        onContextMenu={(e) => openAuthorMenu(msg, e)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
                             e.stopPropagation();
                             openAuthorProfile(msg, e.currentTarget);
-                          }}
-                          onContextMenu={(e) => openAuthorMenu(msg, e)}
-                          onKeyDown={(e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              e.stopPropagation();
-                              openAuthorProfile(msg, e.currentTarget);
-                            }
-                          }}
-                        >
-                          {sender().name}
-                        </span>
+                          }
+                        }}
+                      >
+                        {sender().name}
+                      </span>
                         <BotTag bot={sender().bot} size="sm" class="-ms-0.5" />
                         <span class="text-[13px] text-muted-foreground shrink-0">
                           {formatMessageTimestamp(new Date(msg.created_at))}

@@ -8,7 +8,11 @@ import { presence } from '../../stores/presence';
 import { showContextMenu, type ContextMenuItem } from '../../stores/contextMenu';
 import { buildUserMenuItems } from '../../lib/userContextMenu';
 import { appActivityRail, appSectionLabel } from '../../theme/appChrome';
-import { highestHoistedRole, memberHighestRolePosition, spaceRoleColorHex } from '../../lib/spacePermissions';
+import {
+  highestHoistedRole,
+  memberHighestRolePosition,
+  memberNameColorHex,
+} from '../../lib/spacePermissions';
 import { openUserProfileFromParticipant } from '../../stores/userProfilePopover';
 import { IconButton } from '../ui/IconButton';
 import { t } from '../../i18n';
@@ -203,7 +207,7 @@ export const RoomMembersSidebar: Component<RoomMembersSidebarProps> = (props) =>
             {(sec) => (
               <div class="space-y-0.5">
                 <SectionLabel label={sec.label} count={sec.members.length} />
-                <For each={sec.members}>{(p) => <MemberRow p={p} {...rowProps()} colorNameFromHoistedRole />}</For>
+                <For each={sec.members}>{(p) => <MemberRow p={p} {...rowProps()} />}</For>
               </div>
             )}
           </For>
@@ -226,9 +230,9 @@ const MemberRow: Component<{
   onMessageUser: (userId: string) => void;
   onRemoveMember?: (userId: string) => void;
   isCreator: boolean;
-  /** When set with spaceRoles, tint display name with highest hoisted role color (Discord-style). */
+  /** With spaceRoles, the display name takes its highest hoisted role's colour. Always on:
+   *  a role is a property of the membership, so an offline member's name is coloured too. */
   spaceRoles?: SpaceRole[];
-  colorNameFromHoistedRole?: boolean;
   /** Offline rows render slightly faded, like Discord. */
   dim?: boolean;
   spaceId?: string;
@@ -258,11 +262,9 @@ const MemberRow: Component<{
   const canBan = () =>
     props.spaceId != null && props.canBanMembers === true && !isSelf() && !isSpaceOwnerTarget() && outranksTarget();
 
-  const nameColorHex = createMemo(() => {
-    if (!props.colorNameFromHoistedRole || !props.spaceRoles?.length) return undefined;
-    const hr = highestHoistedRole(getMemberRoleIds(props.p), props.spaceRoles);
-    return hr ? spaceRoleColorHex(hr.color) : undefined;
-  });
+  const nameColorHex = createMemo(() =>
+    memberNameColorHex(getMemberRoleIds(props.p), props.spaceRoles)
+  );
 
   // Mirror the user area under the avatar: the member's custom status if set, otherwise the
   // status label ("Online" / "Idle" / …). Nothing when offline - a status line reads wrong

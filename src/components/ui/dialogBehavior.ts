@@ -36,6 +36,12 @@ export function createDialogBehavior(opts: DialogBehaviorOptions): { onKeyDown: 
   const token = Symbol('dialog');
   const opener = typeof document !== 'undefined' ? (document.activeElement as HTMLElement | null) : null;
 
+  /** Focus the panel's own autofocus target, or the panel itself when it has none. */
+  function focusIntoPanel(panel: HTMLElement, into?: HTMLElement) {
+    const target = into ?? panel.querySelector<HTMLElement>('[autofocus], [data-autofocus]') ?? panel;
+    target.focus({ preventScroll: true });
+  }
+
   onMount(() => {
     openDialogs.push(token);
 
@@ -52,10 +58,14 @@ export function createDialogBehavior(opts: DialogBehaviorOptions): { onKeyDown: 
     const raf = requestAnimationFrame(() => {
       const panel = opts.panel();
       if (!panel || panel.contains(document.activeElement)) return;
-      const target = panel.querySelector<HTMLElement>('[autofocus], [data-autofocus]') ?? panel;
-      target.focus({ preventScroll: true });
+      focusIntoPanel(panel);
     });
 
+    // No `focusin` trap here on purpose. Popovers that live outside the panel in the DOM (the
+    // emoji picker, mention list, tooltips, dropdowns) are portals, so trapping document-level
+    // focus would yank the caret out of the moment you clicked into one and the text you typed
+    // would go nowhere. Tab cycling below handles the keyboard case, and the composer check in
+    // composerFocus.ts handles the one programmatic steal this was originally added for.
     onCleanup(() => {
       cancelAnimationFrame(raf);
       window.removeEventListener('keydown', onEscape);

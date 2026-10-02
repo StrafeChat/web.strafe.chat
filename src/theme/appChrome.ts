@@ -105,6 +105,10 @@ export const appMenuSeparator = 'my-1 border-t border-border/60';
 /** Small uppercase group label: sidebar sections, member buckets, settings sections. */
 export const appSectionLabel = 'text-[11px] font-semibold uppercase tracking-wider text-muted-foreground';
 
+/** The `@name#0001` handle under a display name, everywhere one is shown. */
+export const appNameTagLine =
+  'text-xs font-normal text-muted-foreground transition-colors hover:text-foreground';
+
 /** Interactive list rows (sidebar nav, conversations, members). Compose with a state below.
  * Vertical padding is driven by the UI-density appearance setting (--density-row-py). */
 export const appListRow =

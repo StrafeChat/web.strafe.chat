@@ -1,4 +1,6 @@
 import { voiceMessageFilename } from './attachments/format';
+import { bareMediaType, readHead, sniffClipFormat } from './media/clipFormat';
+import type { ClipFormat } from './media/clipFormat';
 
 /**
  * Voice-message recording. Deliberately independent of Solid and of the composer: this is
@@ -22,16 +24,23 @@ export const VOICE_MESSAGE_MIN_MS = 500;
 const SAMPLE_MS = 50;
 
 /**
- * Containers to try, best first. Opus-in-WebM is what Chrome/Firefox/Edge record; Safari
- * only offers MP4. The extension has to match the container or the name lies about the
- * bytes, which would break playback for everyone else.
+ * Containers to try, best first. Opus-in-WebM is what Chrome/Edge record and every
+ * mainstream browser decodes; Safari only offers MP4; older Firefox offers Opus-in-Ogg.
+ *
+ * Order matters for interop, not just preference: Opus-in-Ogg is a Firefox-only outcome on
+ * the desktop, and a clip in it is the one recording shape that regularly reaches a recipient
+ * whose browser sniffs the container and gives up. So WebM is asked for first and MP4 is
+ * preferred over Ogg - an MP4 clip plays everywhere, an Ogg one does not.
  */
 const CONTAINERS: ReadonlyArray<{ mime: string; ext: string }> = [
   { mime: 'audio/webm;codecs=opus', ext: 'webm' },
-  { mime: 'audio/ogg;codecs=opus', ext: 'ogg' },
+  { mime: 'audio/mp4;codecs=mp4a.40.2', ext: 'm4a' },
   { mime: 'audio/webm', ext: 'webm' },
   { mime: 'audio/mp4', ext: 'm4a' },
+  { mime: 'audio/ogg;codecs=opus', ext: 'ogg' },
 ];
+
+
 
 export type VoiceRecorderErrorReason = 'unsupported' | 'denied' | 'unavailable' | 'failed' | 'tooShort';
 
@@ -71,25 +80,31 @@ export function isVoiceRecordingSupported(): boolean {
   );
 }
 
-function pickContainer(): { mime: string; ext: string } {
+function pickContainer(): { mime: string; format: ClipFormat } {
   for (const c of CONTAINERS) {
     try {
-      if (MediaRecorder.isTypeSupported(c.mime)) return c;
+      if (MediaRecorder.isTypeSupported(c.mime)) {
+        return { mime: c.mime, format: { ext: c.ext, type: bareMediaType(c.mime, `audio/${c.ext === 'm4a' ? 'mp4' : c.ext}`) } };
+      }
     } catch {
       // isTypeSupported is absent on some older Safari builds; fall through.
     }
   }
   // Let the browser choose and infer the extension from what it reports back.
-  return { mime: '', ext: 'webm' };
+  return { mime: '', format: { ext: 'webm', type: 'audio/webm' } };
 }
 
-/** The file extension implied by what MediaRecorder actually produced. */
-function extensionFor(recorder: MediaRecorder, fallbackExt: string): string {
+/**
+ * The format of the finished clip: what the bytes say, with the recorder's own report as a
+ * fallback. Always prefer the sniffed container - see `sniffFormat`.
+ */
+async function formatFor(recorder: MediaRecorder, chunks: Blob[], fallback: ClipFormat): Promise<ClipFormat> {
+  const first = chunks.find((c) => c.size > 0);
+  const sniffed = first ? sniffClipFormat(await readHead(first)) : null;
+  if (sniffed) return sniffed;
   const type = (recorder.mimeType || '').toLowerCase();
-  if (type.includes('mp4')) return 'm4a';
-  if (type.includes('ogg')) return 'ogg';
-  if (type.includes('webm')) return 'webm';
-  return fallbackExt;
+  const ext = type.includes('mp4') ? 'm4a' : type.includes('ogg') ? 'ogg' : type.includes('webm') ? 'webm' : fallback.ext;
+  return { ext, type: bareMediaType(recorder.mimeType, `audio/${ext === 'm4a' ? 'mp4' : ext}`) };
 }
 
 /** Drop the mic and close the graph after a failure, when there is no recorder to stop. */
@@ -222,10 +237,15 @@ export async function startVoiceRecording(): Promise<VoiceRecorderHandle> {
             resolve(null);
             return;
           }
-          const ext = extensionFor(recorder, container.ext);
-          const type = recorder.mimeType || `audio/${ext === 'm4a' ? 'mp4' : ext}`;
-          const file = new File(chunks, voiceMessageFilename(ext), { type });
-          resolve({ file, durationMs });
+          // Name the clip after what the recorder actually wrote, not what it said it would
+          // write - see sniffFormat. The upload's Content-Type follows the same value, so the
+          // name and the bytes it describes can never drift apart in transit.
+          void formatFor(recorder, chunks, container.format)
+            .then((format) => {
+              const file = new File(chunks, voiceMessageFilename(format.ext), { type: format.type });
+              resolve({ file, durationMs });
+            })
+            .catch(() => resolve(null));
         };
         recorder.onerror = () => {
           teardown();
