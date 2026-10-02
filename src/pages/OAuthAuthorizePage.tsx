@@ -275,12 +275,21 @@ const OAuthAuthorizePage: Component = () => {
                                   <div class="min-w-0">
                                     <div class="text-xs text-muted-foreground">{t('oauth.addToSpace')}</div>
                                     <div class="truncate text-sm font-medium text-foreground">{selectedTarget()?.name}</div>
+                                    <Show when={selectedTarget()?.hosted_on}>
+                                      {(domain) => <div class="truncate text-xs text-muted-foreground">{t('space.hostedOn', { domain: domain() })}</div>}
+                                    </Show>
                                   </div>
                                 </div>
                               }
                             >
                               <Select label={t('oauth.addToSpace')} value={spaceId()} onValueChange={setSpaceId}>
-                                <For each={targets()}>{(s) => <option value={s.id}>{s.name}</option>}</For>
+                                <For each={targets()}>
+                                  {(s) => (
+                                    <option value={s.id}>
+                                      {s.hosted_on ? `${s.name} · ${t('space.hostedOn', { domain: s.hosted_on })}` : s.name}
+                                    </option>
+                                  )}
+                                </For>
                               </Select>
                             </Show>
                             <p class="text-xs text-muted-foreground">{t('oauth.requiresManage')}</p>

@@ -146,6 +146,8 @@ export interface InstallTarget {
   name_acronym: string;
   icon: string;
   grantable_permissions: number;
+  /** The instance hosting the space when it is not this one: the bot is added through it. */
+  hosted_on?: string;
 }
 
 export interface AuthorizeInfo {
