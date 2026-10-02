@@ -75,6 +75,10 @@ What happens on approval:
 
 The **Add to a space** button on the application page is the same thing with the permissions currently selected in the URL generator, for adding your own bot to a space you manage.
 
+## Listing a bot on Discover
+
+Every instance has a Discover page where people browse the spaces and bots listed there. To put your bot on it, open the application in **Settings → Developers**, scroll to **Discover**, write a one-line tagline and up to five tags, and apply. An instance administrator reviews the application; until they approve it the bot is not shown, and if they decline it their note appears in the same place so you can adjust and apply again. Only a **public** bot can be listed (see above), and the listing is per instance - a bot registered on another instance is listed there, not here. A listed bot's card opens its install page, so the permissions in your install link are what people will grant.
+
 ## Deleting an application
 
 **Delete Application** removes the application, its client secret and its bot token. The bot account stays a member of the spaces it was added to until someone kicks it, but it can no longer authenticate, so it goes offline for good. Tokens people authorized for the application stop working.

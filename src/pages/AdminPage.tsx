@@ -26,6 +26,7 @@ import {
   type UserDetail,
   setUserBadges,} from '../api/instance';
 import { ProtectedRoute } from '../components/ProtectedRoute';
+import { DiscoverQueue } from '../components/admin/DiscoverQueue';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ResponsiveDialog } from '../components/ui/ResponsiveDialog';
@@ -39,7 +40,7 @@ import { settingsGroupFrame, settingsRowIcon, settingsRowShell, settingsSectionT
 import { appDialogActions, zLayer } from '../theme/appChrome';
 import { formatDate, t } from '../i18n';
 
-type Tab = 'overview' | 'users' | 'reports' | 'bans' | 'audit';
+type Tab = 'overview' | 'users' | 'reports' | 'bans' | 'discover' | 'audit';
 
 const DAY = 24 * 60 * 60;
 /** Ban lengths. Matches the server's cap of a year. */
@@ -133,6 +134,7 @@ const Dashboard: Component = () => {
               { id: 'users', label: t('admin.tabs.users') },
               { id: 'reports', label: t('admin.tabs.reports') },
               { id: 'bans', label: t('admin.tabs.bans') },
+              { id: 'discover', label: t('admin.tabs.discover') },
               { id: 'audit', label: t('admin.tabs.audit') },
             ]}
           />
@@ -150,6 +152,9 @@ const Dashboard: Component = () => {
         </Show>
         <Show when={tab() === 'bans'}>
           <Bans onOpenUser={goUser} />
+        </Show>
+        <Show when={tab() === 'discover'}>
+          <DiscoverQueue onOpenUser={goUser} onOpenSpace={goSpace} />
         </Show>
         <Show when={tab() === 'audit'}>
           <Audit onOpenUser={goUser} />
@@ -823,6 +828,9 @@ const AUDIT_ICON: Record<string, string> = {
   report_dismiss: 'fa-xmark',
   invite_create: 'fa-ticket',
   invite_revoke: 'fa-ticket',
+  discover_approve: 'fa-compass',
+  discover_deny: 'fa-compass',
+  discover_remove: 'fa-compass',
 };
 
 const Audit: Component<{ onOpenUser: (id: string) => void }> = (props) => {

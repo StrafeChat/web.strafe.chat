@@ -50,6 +50,7 @@ import { SpaceEmojiSettings } from './settings/SpaceEmojiSettings';
 import {
   SpaceAuditLogPage,
   SpaceBansPage,
+  SpaceDiscoverPage,
   SpaceInvitesPage,
   SpaceMembersPage,
   SpaceOverviewPage,
@@ -79,7 +80,7 @@ function hexToInt(h: string): number {
   return Number.isNaN(n) ? 0 : n & 0xffffff;
 }
 
-type SpaceSettingsSection = 'general' | 'system' | 'roles' | 'emojis' | 'members' | 'invites' | 'bans' | 'audit';
+type SpaceSettingsSection = 'general' | 'system' | 'discover' | 'roles' | 'emojis' | 'members' | 'invites' | 'bans' | 'audit';
 type RolesSubTab = 'display' | 'permissions' | 'members' | 'channel';
 
 interface SpaceSettingsModalProps {
@@ -154,6 +155,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
     switch (id) {
       case 'general':
       case 'system':
+      case 'discover':
       case 'invites':
       case 'audit':
         return canManageSpace();
@@ -172,6 +174,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
     const general: SettingsNavItemDef<SpaceSettingsSection>[] = [];
     if (allowed('general')) general.push({ id: 'general', label: t('spaceSettings.pages.general.title'), icon: 'fa-sliders' });
     if (allowed('system')) general.push({ id: 'system', label: t('spaceSettings.pages.system.title'), icon: 'fa-bullhorn' });
+    if (allowed('discover')) general.push({ id: 'discover', label: t('spaceSettings.pages.discover.title'), icon: 'fa-compass' });
     if (allowed('roles')) general.push({ id: 'roles', label: t('spaceSettings.rolesPerms'), icon: 'fa-shield-halved' });
     if (allowed('emojis')) general.push({ id: 'emojis', label: t('spaceSettings.emojis'), icon: 'fa-face-smile' });
     const moderation: SettingsNavItemDef<SpaceSettingsSection>[] = [];
@@ -597,6 +600,10 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
 
         <Show when={nav() === 'invites' && canManageSpace()}>
           <SpaceInvitesPage spaceId={props.spaceId} canManage={canManageSpace()} onError={setErr} />
+        </Show>
+
+        <Show when={nav() === 'discover' && canManageSpace() && props.space}>
+          {(space) => <SpaceDiscoverPage spaceId={props.spaceId} space={space()} onError={setErr} />}
         </Show>
 
         <Show when={nav() === 'bans' && canBan()}>

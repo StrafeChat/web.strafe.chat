@@ -8,6 +8,7 @@ import Main from '../pages/Main';
 import HomePage from '../pages/HomePage';
 import FriendsPage from '../pages/FriendsPage';
 import NotesPage from '../pages/NotesPage';
+import DiscoverPage from '../pages/DiscoverPage';
 import SpacePage from '../pages/SpacePage';
 import RoomPage from '../pages/RoomPage';
 import InvitePage from '../pages/InvitePage';
@@ -105,6 +106,7 @@ export function AppRouter() {
         <Route path="/" component={HomePage} />
         <Route path="/friends" component={FriendsPage} />
         <Route path="/notes" component={NotesPage} />
+        <Route path="/discover" component={DiscoverPage} />
         <Route path="/rooms/:roomId" component={RoomPage} />
         <Route path="/spaces/:spaceId" component={SpacePage} />
         <Route path="/spaces/:spaceId/rooms/:roomId" component={SpacePage} />

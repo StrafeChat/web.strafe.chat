@@ -5,3 +5,4 @@ export { SpaceInvitesPage } from './SpaceInvitesPage';
 export { SpaceBansPage } from './SpaceBansPage';
 export { SpaceAuditLogPage } from './SpaceAuditLogPage';
 export { SpaceDangerZone } from './SpaceDangerZone';
+export { SpaceDiscoverPage } from './SpaceDiscoverPage';

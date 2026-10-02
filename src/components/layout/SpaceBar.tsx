@@ -354,6 +354,30 @@ export const SpaceBar: Component = () => {
           </button>
         </div>
       </Tooltip>
+      <Tooltip label={t('discover.title')}>
+        <div class="group relative w-full flex items-center justify-center min-h-12">
+          <Show
+            when={location.pathname === '/discover'}
+            fallback={
+              <div class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full bg-foreground opacity-0 transition-opacity duration-200 group-hover:opacity-100 pointer-events-none" />
+            }
+          >
+            <div class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-12 rounded-r-full bg-foreground pointer-events-none" />
+          </Show>
+          <A
+            href="/discover"
+            aria-label={t('discover.title')}
+            data-space-bar-discover
+            class={`relative flex items-center justify-center size-12 transition-all duration-200 ${
+              location.pathname === '/discover'
+                ? 'text-foreground bg-primary/30 rounded-[16px]'
+                : 'text-muted-foreground hover:text-foreground hover:bg-primary/20 rounded-[24px] hover:rounded-[16px]'
+            }`}
+          >
+            <i class="fa-solid fa-compass text-xl" aria-hidden="true" />
+          </A>
+        </div>
+      </Tooltip>
     </aside>
   );
 };

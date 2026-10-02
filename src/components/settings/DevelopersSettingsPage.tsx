@@ -32,6 +32,7 @@ import { ResponsiveDialog } from '../ui/ResponsiveDialog';
 import { MessageAvatar } from '../messageList/MessageAvatar';
 import { formatDiscriminator } from './types.js';
 import { settingsGroupFrame, settingsRowIcon, settingsRowShell, settingsSectionTitle } from './settingsChrome';
+import { BotDiscoverSection } from './BotDiscoverSection';
 import { formatDate, t } from '../../i18n';
 
 /** A client secret or bot token the server returned once; kept in memory only until dismissed. */
@@ -632,6 +633,13 @@ export const DevelopersSettingsPage: Component = () => {
               </div>
             </Show>
           </div>
+
+          {/* Discover: list the bot on this instance's directory. */}
+          <Show when={app().has_bot}>
+            <div class={settingsGroupFrame}>
+              <BotDiscoverSection app={app()} />
+            </div>
+          </Show>
 
           {/* Bot profile: how the bot looks to everyone. */}
           <Show when={app().bot}>
