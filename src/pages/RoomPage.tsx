@@ -9,6 +9,10 @@ import {
   setMessages,
   loadMessages,
   loadOlderMessages,
+  loadNewerMessages,
+  jumpToPresent,
+  jumpToMessage,
+  hasPendingJump,
   sendMessage,
   type DecryptedMessage,
 } from '../stores/messages';
@@ -242,11 +246,16 @@ const RoomPage: Component = () => {
     if (!roomId) return;
     const cached = messages.byRoom[roomId];
     if (cached === undefined) {
+      // A jump to a specific message (reply/search) is loading a window around it; don't also
+      // fire the normal tail-load - it would race the around-load and drop us at the bottom.
+      if (hasPendingJump(roomId)) return;
       loadMessages(roomId);
       return;
     }
     if (cached.length > 0) {
-      if ((messages.scrollToBottomTick[roomId] ?? 0) === 0) {
+      // Don't force-scroll to the bottom for a window loaded by a jump (hasMoreNewer): the
+      // jump scrolls to its own target, and the bottom isn't the live present anyway.
+      if ((messages.scrollToBottomTick[roomId] ?? 0) === 0 && messages.hasMoreNewer[roomId] !== true) {
         setMessages('scrollToBottomTick', roomId, (t) => (t ?? 0) + 1);
       }
       if (messages.hasMoreOlder[roomId] === undefined) {
@@ -370,7 +379,7 @@ const RoomPage: Component = () => {
   }
 
   function handleSelectSearchedMessage(messageId: string) {
-    scrollToMessage(messageId);
+    void jumpToMessage(params.roomId, messageId);
   }
 
   function handleSearchSubmit(raw: string) {
@@ -390,7 +399,7 @@ const RoomPage: Component = () => {
   }
 
   function handleSelectPinnedMessage(messageId: string) {
-    scrollToMessage(messageId);
+    void jumpToMessage(params.roomId, messageId);
   }
 
   function handleTogglePinned() {
@@ -532,6 +541,10 @@ const RoomPage: Component = () => {
                 loadingOlder={messages.loadingOlder[params.roomId]}
                 hasMoreOlder={messages.hasMoreOlder[params.roomId]}
                 onLoadOlder={(getScroll) => loadOlderMessages(params.roomId, getScroll)}
+                hasMoreNewer={messages.hasMoreNewer[params.roomId]}
+                loadingNewer={messages.loadingNewer[params.roomId]}
+                onLoadNewer={() => void loadNewerMessages(params.roomId)}
+                onJumpToPresent={() => void jumpToPresent(params.roomId)}
                 lastReadMessageId={lastReadMessageIdWhenEntered()}
                 maxMessageIdWhenEntered={maxMessageIdWhenEntered()}
                 onReply={handleReplyToMessage}

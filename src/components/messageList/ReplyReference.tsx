@@ -4,12 +4,15 @@ import type { DecryptedMessage } from '../../stores/messages';
 import type { RoomParticipant } from '../../api/rooms';
 import { getMessageBodyText, getSenderDisplay, messagePreviewText } from './utils';
 import { MessageAvatar } from './MessageAvatar';
-import { scrollToMessage } from '../../lib/utils/messages';
+import { jumpToMessage } from '../../stores/messages';
 import { t } from '../../i18n';
 import { BotTag } from '../BotTag';
 
 export interface ReplyReferenceProps {
   replyToId: string;
+  /** Room the reply lives in - lets the jump load a window around the target when it isn't
+   * in the loaded history (older than the current page). */
+  roomId?: string;
   messages: DecryptedMessage[];
   /** The replied-to message embedded on the parent (server `referenced_message`), used when it
    * isn't in the loaded list - so a reply to older history still shows author + preview instead
@@ -63,7 +66,7 @@ export const ReplyReference: Component<ReplyReferenceProps> = (props) => {
           title={t('messages.replyJump')}
           onClick={(e) => {
             e.stopPropagation();
-            scrollToMessage(props.replyToId);
+            if (props.roomId) void jumpToMessage(props.roomId, props.replyToId);
           }}
         >
           <MessageAvatar name={sender()!.name} avatar={sender()!.avatar} class="size-4 text-[9px] ring-0" />

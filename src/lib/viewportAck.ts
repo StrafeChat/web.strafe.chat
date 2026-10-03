@@ -79,8 +79,17 @@ export function createViewportAck(roomId: Accessor<string | undefined>) {
     // the acked message is the newest one actually loaded (you're at the live tail) but the room
     // still claims a higher last_message_id, advance the cursor all the way to it so the phantom
     // clears for good. At the tail this is also just Discord's "ack the channel's last message".
+    // Not while reading a jumped-to window (hasMoreNewer): there the "newest loaded" is the
+    // window's newest, not the live tail, so healing up to last_message_id would wrongly mark
+    // the whole room read before the user has scrolled down to the real newest.
     const roomLast = room?.last_message_id;
-    if (roomLast && /^\d+$/.test(roomLast) && messageIdGt(roomLast, ackID) && ackID === newestLoadedMessageId(id)) {
+    if (
+      roomLast &&
+      /^\d+$/.test(roomLast) &&
+      messages.hasMoreNewer[id] !== true &&
+      messageIdGt(roomLast, ackID) &&
+      ackID === newestLoadedMessageId(id)
+    ) {
       ackID = roomLast;
     }
     const lastRead =

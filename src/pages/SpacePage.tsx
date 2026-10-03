@@ -22,6 +22,10 @@ import {
   setMessages,
   loadMessages,
   loadOlderMessages,
+  loadNewerMessages,
+  jumpToPresent,
+  jumpToMessage,
+  hasPendingJump,
   sendMessage,
   type DecryptedMessage,
 } from '../stores/messages';
@@ -55,7 +59,7 @@ import { pinnedMessages } from '../stores/pinnedMessages';
 import { settings, setMembersPanelOpen } from '../stores/settings';
 import type { SettingsData } from '../stores/settings';
 import { createComposerAutoFocus } from '../lib/composerFocus';
-import { scrollToMessage, scrollToMessageWhenReady } from '../lib/utils/messages';
+import { scrollToMessage } from '../lib/utils/messages';
 import { appPageHeader, appPageTitle, zLayer } from '../theme/appChrome';
 import { confirmDialog } from '../stores/confirmDialog';
 import { createAttachmentDraft } from '../lib/attachments/draft';
@@ -252,13 +256,18 @@ const SpacePage: Component = () => {
     if (!id) return;
     const cached = messages.byRoom[id];
     if (cached === undefined) {
+      // A jump to a specific message (reply/search, possibly in another channel) is loading a
+      // window around it; skip the normal tail-load so it doesn't race and win.
+      if (hasPendingJump(id)) return;
       loadMessages(id);
       // Reset \"NEW messages\" header visibility when entering a channel.
       clearNewHeaderDismissed(id);
       return;
     }
     if (cached.length > 0) {
-      if ((messages.scrollToBottomTick[id] ?? 0) === 0) {
+      // Don't force-scroll to the bottom for a window loaded by a jump (hasMoreNewer): the jump
+      // scrolls to its own target, and the window's bottom isn't the live present anyway.
+      if ((messages.scrollToBottomTick[id] ?? 0) === 0 && messages.hasMoreNewer[id] !== true) {
         setMessages('scrollToBottomTick', id, (t) => (t ?? 0) + 1);
       }
       if (messages.hasMoreOlder[id] === undefined) {
@@ -775,14 +784,16 @@ const SpacePage: Component = () => {
   function handleSelectSearchedMessage(messageId: string, hitRoomId: string) {
     if (hitRoomId && hitRoomId !== roomId()) {
       navigate(`/spaces/${spaceId()}/rooms/${hitRoomId}`);
-      scrollToMessageWhenReady(messageId);
+      // jumpToMessage loads a window around the hit (the new channel's tail-load is deferred via
+      // hasPendingJump) and scrolls to it once rendered.
+      void jumpToMessage(hitRoomId, messageId);
       return;
     }
-    scrollToMessage(messageId);
+    void jumpToMessage(roomId()!, messageId);
   }
 
   function handleSelectPinnedMessage(messageId: string) {
-    scrollToMessage(messageId);
+    void jumpToMessage(roomId()!, messageId);
   }
 
   return (
@@ -926,6 +937,10 @@ const SpacePage: Component = () => {
                   loadingOlder={messages.loadingOlder[roomId()!]}
                   hasMoreOlder={messages.hasMoreOlder[roomId()!]}
                   onLoadOlder={(getScroll) => loadOlderMessages(roomId()!, getScroll)}
+                  hasMoreNewer={messages.hasMoreNewer[roomId()!]}
+                  loadingNewer={messages.loadingNewer[roomId()!]}
+                  onLoadNewer={() => void loadNewerMessages(roomId()!)}
+                  onJumpToPresent={() => void jumpToPresent(roomId()!)}
                   lastReadMessageId={lastReadMessageIdWhenEntered()}
                   maxMessageIdWhenEntered={maxMessageIdWhenEntered()}
                   onReply={handleReplyToMessage}

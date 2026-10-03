@@ -48,6 +48,7 @@ const MESSAGE_GROUP_THRESHOLD_MS = 5 * 60 * 1000;
 /** Treat as “at bottom” if within this many px. */
 const BOTTOM_THRESHOLD_PX = 24;
 const SCROLL_LOAD_OLDER_THRESHOLD = 100;
+const SCROLL_LOAD_NEWER_THRESHOLD = 150;
 const USER_SCROLL_IDLE_MS = 120;
 const SCROLL_TO_BOTTOM_DELAY_MS = 100;
 const IO_OBSERVE_DELAY_MS = 0;
@@ -77,6 +78,15 @@ export interface MessageListProps {
   loadingOlder?: boolean;
   hasMoreOlder?: boolean;
   onLoadOlder?: (getScrollContainer: () => HTMLDivElement | undefined) => void;
+  /** True when there are newer messages below the loaded window - set after a jump to older
+   * history (reply target / search hit). Drives downward infinite scroll and keeps the
+   * jump-to-present affordance visible even when sitting at the window's bottom. */
+  hasMoreNewer?: boolean;
+  loadingNewer?: boolean;
+  /** Page in the next batch of newer messages (downward infinite scroll out of a jump). */
+  onLoadNewer?: () => void;
+  /** Reload the live tail, replacing a jumped-to window (the "jump to present" action). */
+  onJumpToPresent?: () => void;
   /** Last read message ID - NEW header shown above first unread (from others, id > this) */
   lastReadMessageId?: string | null;
   /** Max message ID when we entered - don't show NEW for messages that arrived while viewing (id > this) */
@@ -113,6 +123,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
   const listRef = createSignal<HTMLDivElement>();
   const contentRef = createSignal<HTMLDivElement>();
   const sentinelRef = createSignal<HTMLDivElement>();
+  const bottomSentinelRef = createSignal<HTMLDivElement>();
   const isNearBottom = createSignal(true);
   /** True shortly after the user moves the scroll viewport (don’t auto-scroll over them). */
   const [isUserScrolling, setIsUserScrolling] = createSignal(false);
@@ -391,6 +402,14 @@ export const MessageList: Component<MessageListProps> = (props) => {
       ) {
         onLoad(getScrollContainer);
       }
+      // Downward infinite scroll: when reading out of a jumped-to window toward the present,
+      // page in newer messages as the bottom approaches (symmetric to loadOlder above).
+      const hasNewer = messages.hasMoreNewer[roomId] ?? false;
+      const loadingNewer = messages.loadingNewer[roomId] ?? false;
+      const distToBottom = scrollHeight - scrollTop - clientHeight;
+      if (hasNewer && !loadingNewer && distToBottom < SCROLL_LOAD_NEWER_THRESHOLD && props.messages.length > 0) {
+        props.onLoadNewer?.();
+      }
       queuePublishBottomVisible();
     };
     el.addEventListener('scroll', onScroll, { passive: true });
@@ -499,6 +518,31 @@ export const MessageList: Component<MessageListProps> = (props) => {
     });
   });
 
+  // IntersectionObserver: load newer when the bottom sentinel scrolls into view - only while a
+  // jumped-to window still has newer messages to page in. Gated on hasMoreNewer so the sentinel,
+  // which sits at the live bottom in a normal room, doesn't fire constantly. Mirrors the loader above.
+  createEffect(() => {
+    const roomId = props.roomId;
+    const sentinel = bottomSentinelRef[0]?.();
+    const listEl = listRef[0]?.();
+    const hasNewer = roomId ? (messages.hasMoreNewer[roomId] ?? false) : false;
+    const loading = roomId ? (messages.loadingNewer[roomId] ?? false) : false;
+    if (!roomId || !sentinel || !listEl || !hasNewer || loading) return;
+    const io = new IntersectionObserver(
+      (entries) => {
+        const e = entries[0];
+        if (!e?.isIntersecting) return;
+        if (props.messages.length > 0) props.onLoadNewer?.();
+      },
+      { root: listEl, rootMargin: '0px 0px 100px 0px', threshold: 0 }
+    );
+    const t = setTimeout(() => io.observe(sentinel), IO_OBSERVE_DELAY_MS);
+    onCleanup(() => {
+      clearTimeout(t);
+      io.disconnect();
+    });
+  });
+
   function shouldShowHeader(msg: DecryptedMessage, prev: DecryptedMessage | undefined): boolean {
     // Replies always start a new visual block
     if (msg.reply_to_id) return true;
@@ -581,6 +625,13 @@ export const MessageList: Component<MessageListProps> = (props) => {
   const firstE2EEMessageIndex = () => e2eeHeaderIndices().firstE2EEAfterPlaintext;
 
   function scrollToPresent() {
+    const roomId = props.roomId;
+    // In a jumped-to window the window's own bottom isn't the live present - reload the tail
+    // (the parent replaces the window and scrolls to bottom) rather than scrolling within it.
+    if (roomId && (messages.hasMoreNewer[roomId] ?? false)) {
+      props.onJumpToPresent?.();
+      return;
+    }
     const el = listRef[0]?.();
     if (!el) return;
     el.scrollTo({ top: el.scrollHeight, behavior: 'smooth' });
@@ -861,6 +912,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                     {(replyToId) => (
                       <ReplyReference
                         replyToId={replyToId()}
+                        roomId={props.roomId}
                         messages={props.messages}
                         referenced={msg.referenced_message as DecryptedMessage | undefined}
                         participants={resolvedParticipants()}
@@ -1144,9 +1196,13 @@ export const MessageList: Component<MessageListProps> = (props) => {
             );
           }}
         </For>
+        {/* Bottom sentinel for downward infinite scroll: when the viewer is in a jumped-to
+            window, scrolling it into view pages in newer messages (the observer is gated on
+            hasMoreNewer so it's inert in a normal room sitting at the live tail). */}
+        <div ref={(el) => bottomSentinelRef[1](el)} aria-hidden="true" />
       </div>
     </div>
-    <Show when={!isNearBottom[0]()}>
+    <Show when={!isNearBottom[0]() || (props.roomId ? (messages.hasMoreNewer[props.roomId] ?? false) : false)}>
       <button
         type="button"
         onClick={scrollToPresent}

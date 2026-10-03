@@ -32,6 +32,7 @@ import {
   type ResolvedFields,
 } from '../lib/messageWireFormat';
 import { removeTyping } from './typing';
+import { scrollToMessageWhenReady } from '../lib/utils/messages';
 
 /** Re-exported: search builds display messages from raw server rows too. */
 export { viewFromServerAttachment };
@@ -41,7 +42,7 @@ import { rooms, updateRoomLastMessage } from './rooms';
 import { updateSpaceRoomLastMessage } from './spaces';
 import { onStargateEvent } from '../services/stargate/client';
 import { maybeNotifyMessage } from '../lib/notifications';
-import { setReadState, extractMentionedUserIds, extractMentionedRoleIds, mentionsEveryone } from './readState';
+import { setReadState, extractMentionedUserIds, extractMentionedRoleIds, mentionsEveryone, messageIdGt } from './readState';
 
 /** Sort messages by created_at ascending (oldest first) */
 function sortByCreatedAt<T extends { created_at: string }>(list: T[]): T[] {
@@ -53,6 +54,49 @@ function sortByCreatedAt<T extends { created_at: string }>(list: T[]): T[] {
 /** Generate a unique temp ID for optimistic messages */
 function createTempId(): string {
   return `temp-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+/** Newest real (snowflake) message id loaded for a room - the cursor for "load newer". */
+function newestRealId(list: DecryptedMessage[]): string | undefined {
+  for (let i = list.length - 1; i >= 0; i--) {
+    if (/^\d+$/.test(list[i]!.id)) return list[i]!.id;
+  }
+  return undefined;
+}
+
+/** Decrypt (or pass through plaintext) a page of raw server messages into display messages. */
+async function decryptPage(list: Message[], currentUserId: string): Promise<DecryptedMessage[]> {
+  return Promise.all(
+    list.map(async (m): Promise<DecryptedMessage> => {
+      if (m.system_type) return { ...m, plaintext: '', attachments: [] };
+      const resolved = await resolvePlaintext(currentUserId, m);
+      return { ...m, ...resolved };
+    })
+  );
+}
+
+/** Warm this page's link-preview cards before it renders, so they don't pop in and reflow. */
+async function warmPagePreviews(roomId: string, decrypted: DecryptedMessage[], ms: number): Promise<void> {
+  if (!linkPreviewsAllowedIn(roomId)) return;
+  const urls = new Set<string>();
+  for (const m of decrypted) {
+    if (!m.system_type && m.plaintext) for (const u of previewUrlsFor(m.plaintext)) urls.add(u);
+  }
+  if (urls.size > 0) await warmLinkPreviews(urls, ms);
+}
+
+/** Merge new messages into a room's list by id (dedup), kept sorted oldest-first. */
+function mergeMessages(existing: DecryptedMessage[] | undefined, incoming: DecryptedMessage[]): DecryptedMessage[] {
+  const base = existing ?? [];
+  const ids = new Set(base.map((x) => x.id));
+  const merged = [...base];
+  for (const m of incoming) {
+    if (!ids.has(m.id)) {
+      ids.add(m.id);
+      merged.push(m);
+    }
+  }
+  return sortByCreatedAt(merged);
 }
 
 export interface DecryptedMessage extends Omit<Message, 'attachments'> {
@@ -79,6 +123,12 @@ export interface MessagesState {
   loading: Record<string, boolean>;
   loadingOlder: Record<string, boolean>;
   hasMoreOlder: Record<string, boolean>;
+  /** True when the loaded window is NOT the live tail - i.e. the user jumped to an older
+   * message (via a reply/search) and there are newer messages below the window to page in.
+   * False for a normal room (its newest page always includes the live tail). Gates whether a
+   * live MESSAGE_CREATE is appended and whether "load newer" / "jump to present" do anything. */
+  hasMoreNewer: Record<string, boolean>;
+  loadingNewer: Record<string, boolean>;
   sending: Record<string, boolean>;
   scrollToBottomTick: Record<string, number>;
 }
@@ -88,9 +138,24 @@ export const [messages, setMessages] = createStore<MessagesState>({
   loading: {},
   loadingOlder: {},
   hasMoreOlder: {},
+  hasMoreNewer: {},
+  loadingNewer: {},
   sending: {},
   scrollToBottomTick: {},
 });
+
+/**
+ * Rooms with a jump-to-message in flight. When you jump to a message that isn't loaded the
+ * window is replaced by one centred on it (loadMessagesAround); for a jump into a DIFFERENT
+ * room the page's room-change effect must NOT also fire its normal "load the tail" - that
+ * would race the around-load and usually win, dropping you at the bottom instead of on the
+ * target. The page checks hasPendingJump() and defers to the around-load. Not reactive - it's
+ * read once when the room changes.
+ */
+const pendingJumps = new Set<string>();
+export function hasPendingJump(roomId: string): boolean {
+  return pendingJumps.has(roomId);
+}
 
 const MESSAGES_PAGE_SIZE = 30;
 
@@ -160,6 +225,9 @@ export async function loadMessages(
   if (isInitialLoad) {
     setMessages('loading', roomId, true);
     setMessages('hasMoreOlder', roomId, true);
+    // A fresh (tail) load always ends at the live newest, so there is nothing newer to page in
+    // and live MESSAGE_CREATEs append normally. loadMessagesAround flips this back on.
+    setMessages('hasMoreNewer', roomId, false);
   } else {
     setMessages('loadingOlder', roomId, true);
   }
@@ -251,6 +319,125 @@ export async function loadOlderMessages(
   return true;
 }
 
+/**
+ * Load a window of history centred on `messageId` (server `around=`), REPLACING the loaded
+ * window. The around-window is disjoint from whatever was loaded (usually the live tail), so
+ * merging would splice two non-contiguous ranges and render a silent gap. Sets hasMoreOlder /
+ * hasMoreNewer so infinite scroll resumes in both directions - scrolling down from here pages
+ * newer until it reconnects to the live tail (hasMoreNewer -> false). Used by jumpToMessage.
+ */
+export async function loadMessagesAround(roomId: string, messageId: string): Promise<boolean> {
+  const currentUserId = auth.user?.id;
+  if (!currentUserId) return false;
+  pendingJumps.add(roomId);
+  setMessages('loading', roomId, true);
+  try {
+    try {
+      await ensureDevice(currentUserId);
+    } catch (e) {
+      console.warn('ensureDevice failed, decryption may fail:', e);
+    }
+    const list = await listMessages(roomId, { around: messageId, limit: MESSAGES_PAGE_SIZE });
+    const decrypted = await decryptPage(list, currentUserId);
+    await warmPagePreviews(roomId, decrypted, PREVIEW_WARM_INITIAL_MS);
+    const sorted = sortByCreatedAt(decrypted);
+    setMessages('byRoom', roomId, sorted);
+    // A full half on a side implies there is more that way. hasMoreNewer also trusts the room's
+    // last_message_id when known (the window may already include the live tail).
+    const half = Math.floor(MESSAGES_PAGE_SIZE / 2);
+    let olderCount = 0;
+    let newerCount = 0;
+    for (const m of sorted) {
+      if (!/^\d+$/.test(m.id) || m.id === messageId) continue;
+      if (messageIdGt(messageId, m.id)) olderCount++;
+      else newerCount++;
+    }
+    setMessages('hasMoreOlder', roomId, olderCount >= half);
+    const lastMsgId = rooms.rooms.find((r) => r.id === roomId)?.last_message_id;
+    const newestLoaded = newestRealId(sorted);
+    const reachedTail = !!lastMsgId && !!newestLoaded && !messageIdGt(lastMsgId, newestLoaded);
+    const moreNewer = reachedTail ? false : lastMsgId ? true : newerCount >= half;
+    setMessages('hasMoreNewer', roomId, moreNewer);
+    return true;
+  } finally {
+    setMessages('loading', roomId, false);
+    pendingJumps.delete(roomId);
+  }
+}
+
+/**
+ * Load newer messages (infinite scroll DOWN out of a jumped-to window). Uses the newest loaded
+ * id as the `after` cursor; adding below the viewport doesn't shift scroll, so no anchoring.
+ * When the page comes back short we've reconnected to the live tail, so hasMoreNewer flips off
+ * and live MESSAGE_CREATEs resume appending.
+ */
+export async function loadNewerMessages(roomId: string): Promise<boolean> {
+  const list = messages.byRoom[roomId] ?? [];
+  if (list.length === 0 || messages.loadingNewer[roomId]) return false;
+  if (messages.hasMoreNewer[roomId] !== true) return false;
+  const after = newestRealId(list);
+  if (!after) return false;
+  const currentUserId = auth.user?.id;
+  if (!currentUserId) return false;
+  setMessages('loadingNewer', roomId, true);
+  try {
+    const fetched = await listMessages(roomId, { after, limit: MESSAGES_PAGE_SIZE });
+    const decrypted = await decryptPage(fetched, currentUserId);
+    await warmPagePreviews(roomId, decrypted, PREVIEW_WARM_OLDER_MS);
+    setMessages('hasMoreNewer', roomId, fetched.length >= MESSAGES_PAGE_SIZE);
+    setMessages('byRoom', roomId, (prev) => mergeMessages(prev, decrypted));
+    return true;
+  } finally {
+    setMessages('loadingNewer', roomId, false);
+  }
+}
+
+/**
+ * Scroll to a message, loading a window around it first when it isn't in the loaded range (a
+ * reply target or search hit from before the loaded history) and then resuming infinite scroll
+ * from there. Safe for the current room or one just navigated to - the page defers its own
+ * tail-load via hasPendingJump while the around-load runs.
+ */
+export async function jumpToMessage(roomId: string, messageId: string): Promise<void> {
+  if (!roomId || !messageId) return;
+  // scrollToMessageWhenReady (polls the DOM briefly) rather than scrollToMessage, so it also
+  // works when the target is already loaded but its row hasn't rendered yet - e.g. jumping into
+  // a different channel that is still mounting.
+  if (messages.byRoom[roomId]?.some((m) => m.id === messageId)) {
+    scrollToMessageWhenReady(messageId);
+    return;
+  }
+  const ok = await loadMessagesAround(roomId, messageId);
+  if (ok) scrollToMessageWhenReady(messageId);
+}
+
+/**
+ * Return to the live tail from a jumped-to window, REPLACING the loaded messages with a fresh
+ * newest page (a merge would splice the disjoint window onto the tail and leave a gap). No-op
+ * when already at the tail. Backs the "jump to present" button and send-while-reading-history.
+ */
+export async function jumpToPresent(roomId: string): Promise<void> {
+  const currentUserId = auth.user?.id;
+  if (!currentUserId || messages.hasMoreNewer[roomId] !== true) return;
+  setMessages('loading', roomId, true);
+  try {
+    try {
+      await ensureDevice(currentUserId);
+    } catch (e) {
+      console.warn('ensureDevice failed, decryption may fail:', e);
+    }
+    const list = await listMessages(roomId, { limit: MESSAGES_PAGE_SIZE });
+    const decrypted = await decryptPage(list, currentUserId);
+    await warmPagePreviews(roomId, decrypted, PREVIEW_WARM_INITIAL_MS);
+    setMessages('byRoom', roomId, sortByCreatedAt(decrypted));
+    setMessages('hasMoreOlder', roomId, list.length >= MESSAGES_PAGE_SIZE);
+    setMessages('hasMoreNewer', roomId, false);
+    setMessages('scrollToBottomTick', roomId, (t) => (t ?? 0) + 1);
+  } finally {
+    setMessages('loading', roomId, false);
+  }
+}
+
 export async function sendMessage(
   roomId: string,
   plaintext: string,
@@ -268,6 +455,13 @@ export async function sendMessage(
   const isGroupRoom = room.type === 2 && participants.length >= 2;
   const isSpaceTextRoom = room.type === 3;
   if (!otherParticipant && !isNotesRoom && !isGroupRoom && !isSpaceTextRoom) return null;
+
+  // Sending while reading older history jumps back to the live tail first (Discord's behaviour),
+  // so the optimistic message lands at the present and its server echo - gated on hasMoreNewer -
+  // actually confirms it instead of being dropped as belonging to the unloaded tail.
+  if (messages.hasMoreNewer[roomId] === true) {
+    await jumpToPresent(roomId);
+  }
 
   const nonce = createTempId();
   const now = new Date().toISOString();
@@ -408,8 +602,14 @@ export async function sendMessage(
 export function clearMessages(roomId?: string) {
   if (roomId) {
     setMessages('byRoom', roomId, []);
+    // Don't leave a stale "viewing an old window" flag behind, or live messages would stop
+    // appending to the reloaded room.
+    setMessages('hasMoreNewer', roomId, false);
+    setMessages('loadingNewer', roomId, false);
   } else {
     setMessages('byRoom', {});
+    setMessages('hasMoreNewer', {});
+    setMessages('loadingNewer', {});
   }
 }
 
@@ -429,6 +629,11 @@ export async function addMessageFromEvent(payload: {
   updated_at: string;
 }) {
   const roomId = payload.room_id;
+  // The viewer has jumped to an older window (newer messages aren't loaded): a live message
+  // belongs to the unloaded tail, so appending it here would splice a gap. It loads when they
+  // scroll down to the tail or hit "jump to present". The handler still runs unread/notification
+  // bookkeeping, so the sidebar badge and notifications are unaffected.
+  if (messages.hasMoreNewer[roomId] === true) return;
   if (payload.system_type) {
     const msg: DecryptedMessage = {
       ...payload,

@@ -142,9 +142,16 @@ export function uploadAttachment(roomId: string, file: Blob, opts: UploadAttachm
   });
 }
 
-export function listMessages(roomId: string, params?: { before?: string; limit?: number }) {
+export function listMessages(
+  roomId: string,
+  params?: { before?: string; after?: string; around?: string; limit?: number }
+) {
   const search = new URLSearchParams();
-  if (params?.before) search.set('before', params.before);
+  // Mutually exclusive cursors (Discord-style): before = older, after = newer (oldest-first),
+  // around = a window centred on a message id (jump to an unloaded reply target / search hit).
+  if (params?.around) search.set('around', params.around);
+  else if (params?.after) search.set('after', params.after);
+  else if (params?.before) search.set('before', params.before);
   if (params?.limit != null) search.set('limit', String(params.limit));
   const q = search.toString();
   return api<Message[]>(`/rooms/${roomId}/messages${q ? `?${q}` : ''}`);
