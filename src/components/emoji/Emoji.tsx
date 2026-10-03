@@ -11,6 +11,9 @@ export interface EmojiProps {
   jumbo?: boolean;
   class?: string;
   title?: string;
+  /** Render without any `title` - for when a wrapping <Tooltip> supplies the label instead,
+   * so the auto `:shortcode:` title doesn't get adopted and win over it (e.g. reaction pills). */
+  noTitle?: boolean;
 }
 
 /**
@@ -27,6 +30,7 @@ export const Emoji: Component<EmojiProps> = (props) => {
   // A different provider may well have the image the last one lacked.
   createEffect(on(url, () => setFailed(false), { defer: true }));
   const title = () => {
+    if (props.noTitle) return undefined;
     if (props.title) return props.title;
     const code = shortcodeFor(props.emoji);
     return code ? `:${code}:` : undefined;

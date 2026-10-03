@@ -60,12 +60,11 @@ const ReactionPill: Component<{
               ? 'border-border/70 bg-card/40 text-foreground hover:bg-accent/60'
               : 'cursor-not-allowed border-border/50 bg-card/20 text-muted-foreground'
         }`}
-        title={`:${emojiName()}:`}
         onClick={() => canClick() && props.onToggle(props.reaction.emoji, props.reaction.me)}
         onMouseEnter={loadReactors}
         onFocus={loadReactors}
       >
-        <Show when={isCustom()} fallback={<Emoji emoji={props.reaction.emoji} class="!m-0 !size-3.5" />}>
+        <Show when={isCustom()} fallback={<Emoji emoji={props.reaction.emoji} noTitle class="!m-0 !size-3.5" />}>
           <Show when={customEmoji()} fallback={<span class="size-3.5" />}>
             <img src={customEmoji()!.url} alt={emojiName()} class="size-3.5 object-contain" draggable={false} loading="lazy" />
           </Show>

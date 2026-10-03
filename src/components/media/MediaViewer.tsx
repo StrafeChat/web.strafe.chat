@@ -194,8 +194,15 @@ const MediaViewerFrame: Component = () => {
             <IconButton icon="fa-solid fa-xmark" label={t('common.close')} tone="overlay" onClick={closeMediaViewer} />
           </div>
 
-          {/* Stage: the image, or the per-image error notice. Clicking the backdrop closes. */}
-          <div class="relative flex min-h-0 flex-1 items-center justify-center overflow-auto p-3 sm:p-6">
+          {/* Stage: the image, or the per-image error notice. The panel fills the overlay, so
+              the overlay's own click-to-close never gets hit - this stage is the real "blank
+              space" around the image, and clicking it (but not the image or the arrows) closes. */}
+          <div
+            class="relative flex min-h-0 flex-1 items-center justify-center overflow-auto p-3 sm:p-6"
+            onClick={(e) => {
+              if (e.target === e.currentTarget) closeMediaViewer();
+            }}
+          >
             {navButton('prev')}
             <Show
               when={current()}

@@ -1,8 +1,23 @@
 import { createEffect, createSignal, onCleanup, onMount, type Accessor } from 'solid-js';
 import { ackRoomOptimistic, messageIdGt, readState } from '../stores/readState';
 import { rooms } from '../stores/rooms';
+import { messages } from '../stores/messages';
 import { clearPendingAck, getPendingAck, setPendingAck } from '../stores/pendingAck';
 import { ackRoomKeepalive } from '../api/rooms';
+
+/** Newest real (snowflake) message id loaded for a room, skipping optimistic temp ids. The
+ * list is time-ordered, but a just-sent pending message can sit at the tail, so scan for the
+ * max rather than trusting the last element. */
+function newestLoadedMessageId(roomId: string): string | null {
+  const list = messages.byRoom[roomId];
+  if (!list) return null;
+  let best: string | null = null;
+  for (const m of list) {
+    if (!/^\d+$/.test(m.id)) continue;
+    if (best == null || messageIdGt(m.id, best)) best = m.id;
+  }
+  return best;
+}
 
 /**
  * Viewport-driven read cursor for whichever room a page is showing. MessageList reports
@@ -52,14 +67,25 @@ export function createViewportAck(roomId: Accessor<string | undefined>) {
   createEffect(() => {
     visibilityTick();
     const id = roomId();
-    const ackID = bottomVisibleMessageId();
+    let ackID = bottomVisibleMessageId();
     if (!id || !ackID || !/^\d+$/.test(ackID)) {
       clearPendingAck();
       return;
     }
+    const room = rooms.rooms.find((r) => r.id === id);
+    // Heal a dangling last_message_id: when the room's newest message is deleted the server
+    // leaves last_message_id pointing at the gone row, and the cursor can never reach it - the
+    // sidebar then shows a permanent unread that only clears while you're inside the room. If
+    // the acked message is the newest one actually loaded (you're at the live tail) but the room
+    // still claims a higher last_message_id, advance the cursor all the way to it so the phantom
+    // clears for good. At the tail this is also just Discord's "ack the channel's last message".
+    const roomLast = room?.last_message_id;
+    if (roomLast && /^\d+$/.test(roomLast) && messageIdGt(roomLast, ackID) && ackID === newestLoadedMessageId(id)) {
+      ackID = roomLast;
+    }
     const lastRead =
       readState.byRoom[id]?.lastReadMessageId ??
-      rooms.rooms.find((r) => r.id === id)?.last_read_message_id ??
+      room?.last_read_message_id ??
       null;
     if (lastRead && !messageIdGt(ackID, lastRead)) return;
     setPendingAck(id, ackID);

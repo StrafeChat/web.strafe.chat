@@ -94,6 +94,9 @@ export const TooltipHost: Component = () => {
   let bubbleEl: HTMLDivElement | undefined;
   let target: HTMLElement | null = null;
   let openTimer: number | undefined;
+  // Watches the open target's `data-tooltip` so a reactive label (e.g. a reaction pill whose
+  // "who reacted" list resolves after the bubble already opened) updates in place.
+  let labelObserver: MutationObserver | undefined;
 
   function place() {
     if (!target || !bubbleEl || !target.isConnected) return;
@@ -127,11 +130,17 @@ export const TooltipHost: Component = () => {
     setPlacement({ top, left: clamp(left, EDGE, Math.max(EDGE, vw - w - EDGE)), side, arrow });
   }
 
+  function stopObserving() {
+    labelObserver?.disconnect();
+    labelObserver = undefined;
+  }
+
   function hide() {
     if (openTimer) {
       clearTimeout(openTimer);
       openTimer = undefined;
     }
+    stopObserving();
     target = null;
     setLabel('');
     setPlacement(null);
@@ -144,14 +153,28 @@ export const TooltipHost: Component = () => {
       return;
     }
     if (openTimer) clearTimeout(openTimer);
+    stopObserving();
     target = el;
     openTimer = window.setTimeout(() => {
       openTimer = undefined;
       if (!target || !target.isConnected) return;
       setPlacement(null);
-      setLabel(text);
+      setLabel(target.getAttribute('data-tooltip') || text);
       // Bubble must exist before it can be measured; one frame lets layout settle.
       requestAnimationFrame(place);
+      // A reactive label can change while the bubble is open (reaction pills fetch who
+      // reacted lazily); mirror it and re-measure so the text and its position stay right.
+      labelObserver = new MutationObserver(() => {
+        if (!target) return;
+        const next = target.getAttribute('data-tooltip') ?? '';
+        if (!next) {
+          hide();
+          return;
+        }
+        setLabel(next);
+        requestAnimationFrame(place);
+      });
+      labelObserver.observe(target, { attributes: true, attributeFilter: ['data-tooltip'] });
     }, OPEN_DELAY_MS);
   }
 
@@ -228,6 +251,7 @@ export const TooltipHost: Component = () => {
       window.removeEventListener('scroll', onScroll, true);
       window.removeEventListener('resize', onScroll);
       if (openTimer) clearTimeout(openTimer);
+      stopObserving();
     });
   });
 

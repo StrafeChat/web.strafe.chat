@@ -191,12 +191,14 @@ export const MessageList: Component<MessageListProps> = (props) => {
 
   const getScrollContainer = () => listRef[0]?.();
   const currentUserId = () => auth.user?.id;
-  // Whether a message pings the current user - mirrors the server-authoritative signal the
-  // mention badge uses (mention_everyone / the resolved `mentions` list), so a message is
-  // highlighted iff it actually bumped your mention count. Own messages never highlight.
+  // Whether a message pings the current user - reads the server-authoritative signal
+  // (mention_everyone / the resolved `mentions` list, which includes the author's own id when
+  // they @mention themselves). Your own messages highlight too when they actually mention you
+  // (`@you` or `@everyone`), matching what you'd see from anyone else - the mention *count*
+  // still excludes your own messages, that's a separate server-side concern.
   const mentionsCurrentUser = (msg: DecryptedMessage): boolean => {
     const uid = currentUserId();
-    if (!uid || msg.sender_id === uid) return false;
+    if (!uid) return false;
     if (msg.mention_everyone === true) return true;
     return msg.mentions?.some((m) => String(m) === uid) ?? false;
   };
