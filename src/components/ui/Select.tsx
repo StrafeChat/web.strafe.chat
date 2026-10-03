@@ -1,5 +1,5 @@
 import type { Component, JSX } from 'solid-js';
-import { createEffect, createUniqueId, splitProps } from 'solid-js';
+import { children, createEffect, createUniqueId, splitProps } from 'solid-js';
 import { fieldLabelClass, inputBaseClass } from './Input';
 
 interface SelectProps extends Omit<JSX.SelectHTMLAttributes<HTMLSelectElement>, 'onChange'> {
@@ -16,12 +16,19 @@ export const Select: Component<SelectProps> = (props) => {
   const [local, rest] = splitProps(props, ['label', 'value', 'onValueChange', 'class', 'children', 'id']);
   const id = () => local.id ?? uniqueId;
   let el: HTMLSelectElement | undefined;
-  // The `value` property is applied before the <option> children exist, so a value other
-  // than the first option is lost on mount (and whenever the option list is re-rendered).
-  // Re-assert it after render.
+  // Resolve children through `children()` so this component actually tracks when the <option>
+  // set changes. The `value` property is applied before the options exist (and whenever the
+  // list is rebuilt - e.g. device selects whose options arrive asynchronously after
+  // enumerateDevices resolves), so a value other than the first option would otherwise be lost
+  // on mount and never re-applied. A bare `void local.children` did NOT work: a <For> reads its
+  // source signal in its own scope, so the effect never re-ran when the options loaded, and the
+  // select silently fell back to its first option (e.g. a saved mic/speaker reverting to
+  // "Default" every time you re-opened Voice & Video). Depending on the resolved children makes
+  // the effect re-assert `value` the moment the real options appear.
+  const resolved = children(() => local.children);
   createEffect(() => {
     const v = local.value;
-    void local.children;
+    resolved();
     if (el && el.value !== v) el.value = v;
   });
   return (
@@ -42,7 +49,7 @@ export const Select: Component<SelectProps> = (props) => {
           class={`${inputBaseClass} h-10 cursor-pointer appearance-none pl-3 pr-9 ${local.class ?? ''}`}
           {...rest}
         >
-          {local.children}
+          {resolved()}
         </select>
         <i
           class="fa-solid fa-chevron-down pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[11px] text-muted-foreground"
