@@ -252,15 +252,10 @@ const RoomPage: Component = () => {
       loadMessages(roomId);
       return;
     }
-    if (cached.length > 0) {
-      // Don't force-scroll to the bottom for a window loaded by a jump (hasMoreNewer): the
-      // jump scrolls to its own target, and the bottom isn't the live present anyway.
-      if ((messages.scrollToBottomTick[roomId] ?? 0) === 0 && messages.hasMoreNewer[roomId] !== true) {
-        setMessages('scrollToBottomTick', roomId, (t) => (t ?? 0) + 1);
-      }
-      if (messages.hasMoreOlder[roomId] === undefined) {
-        setMessages('hasMoreOlder', roomId, true);
-      }
+    // Entering a cached room: the list lands itself (saved spot, unread divider or the
+    // bottom) when the room changes under it, so there is nothing to trigger here.
+    if (cached.length > 0 && messages.hasMoreOlder[roomId] === undefined) {
+      setMessages('hasMoreOlder', roomId, true);
     }
   });
 
@@ -538,12 +533,10 @@ const RoomPage: Component = () => {
                     .then((r) => navigate(`/rooms/${r.id}`))
                     .catch((err) => console.error(err));
                 }}
-                loadingOlder={messages.loadingOlder[params.roomId]}
                 hasMoreOlder={messages.hasMoreOlder[params.roomId]}
                 onLoadOlder={(getScroll) => loadOlderMessages(params.roomId, getScroll)}
                 hasMoreNewer={messages.hasMoreNewer[params.roomId]}
-                loadingNewer={messages.loadingNewer[params.roomId]}
-                onLoadNewer={() => void loadNewerMessages(params.roomId)}
+                onLoadNewer={(getScroll) => void loadNewerMessages(params.roomId, getScroll)}
                 onJumpToPresent={() => void jumpToPresent(params.roomId)}
                 lastReadMessageId={lastReadMessageIdWhenEntered()}
                 maxMessageIdWhenEntered={maxMessageIdWhenEntered()}

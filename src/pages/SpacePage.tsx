@@ -264,15 +264,10 @@ const SpacePage: Component = () => {
       clearNewHeaderDismissed(id);
       return;
     }
-    if (cached.length > 0) {
-      // Don't force-scroll to the bottom for a window loaded by a jump (hasMoreNewer): the jump
-      // scrolls to its own target, and the window's bottom isn't the live present anyway.
-      if ((messages.scrollToBottomTick[id] ?? 0) === 0 && messages.hasMoreNewer[id] !== true) {
-        setMessages('scrollToBottomTick', id, (t) => (t ?? 0) + 1);
-      }
-      if (messages.hasMoreOlder[id] === undefined) {
-        setMessages('hasMoreOlder', id, true);
-      }
+    // Entering a cached channel: the list lands itself (saved spot, unread divider or the
+    // bottom) when the room changes under it, so there is nothing to trigger here.
+    if (cached.length > 0 && messages.hasMoreOlder[id] === undefined) {
+      setMessages('hasMoreOlder', id, true);
     }
   });
 
@@ -934,12 +929,10 @@ const SpacePage: Component = () => {
                       .then((r) => navigate(`/rooms/${r.id}`))
                       .catch((err) => console.error('Failed to open DM:', err));
                   }}
-                  loadingOlder={messages.loadingOlder[roomId()!]}
                   hasMoreOlder={messages.hasMoreOlder[roomId()!]}
                   onLoadOlder={(getScroll) => loadOlderMessages(roomId()!, getScroll)}
                   hasMoreNewer={messages.hasMoreNewer[roomId()!]}
-                  loadingNewer={messages.loadingNewer[roomId()!]}
-                  onLoadNewer={() => void loadNewerMessages(roomId()!)}
+                  onLoadNewer={(getScroll) => void loadNewerMessages(roomId()!, getScroll)}
                   onJumpToPresent={() => void jumpToPresent(roomId()!)}
                   lastReadMessageId={lastReadMessageIdWhenEntered()}
                   maxMessageIdWhenEntered={maxMessageIdWhenEntered()}

@@ -312,7 +312,7 @@ export default {
     edited: '(معدّلة)',
     editedAt: 'عُدّلت {{time}}',
     jumpToPresent: 'الانتقال إلى الأحدث',
-    loadOlder: 'تحميل الرسائل الأقدم',
+    viewingOlder: 'أنت تعرض رسائل أقدم',
     replyMissing: 'الرسالة الأصلية حُذفت أو غير محمّلة',
     replyJump: 'الانتقال إلى الرسالة المُجاب عليها',
     noText: '(بلا نص)',

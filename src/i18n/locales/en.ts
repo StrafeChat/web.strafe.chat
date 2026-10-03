@@ -286,7 +286,7 @@ export default {
     edited: '(edited)',
     editedAt: 'Edited {{time}}',
     jumpToPresent: 'Jump to present',
-    loadOlder: 'Load older messages',
+    viewingOlder: "You're viewing older messages",
     replyMissing: "Original message was deleted or isn't loaded",
     replyJump: 'Jump to the replied message',
     noText: '(no text)',

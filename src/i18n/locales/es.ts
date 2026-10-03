@@ -293,7 +293,7 @@ export default {
     edited: '(editado)',
     editedAt: 'Editado {{time}}',
     jumpToPresent: 'Ir al presente',
-    loadOlder: 'Cargar mensajes anteriores',
+    viewingOlder: 'Estás viendo mensajes anteriores',
     replyMissing: 'El mensaje original se eliminó o no está cargado',
     replyJump: 'Ir al mensaje respondido',
     noText: '(sin texto)',

@@ -293,7 +293,7 @@ export default {
     edited: '(modifié)',
     editedAt: 'Modifié {{time}}',
     jumpToPresent: 'Aller au présent',
-    loadOlder: 'Charger les messages précédents',
+    viewingOlder: 'Vous consultez des messages plus anciens',
     replyMissing: "Le message d'origine a été supprimé ou n'est pas chargé",
     replyJump: 'Aller au message cité',
     noText: '(sans texte)',

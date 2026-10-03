@@ -1,5 +1,6 @@
 import { previewUrlsFor } from '../lib/linkPreviewUrls';
 import { warmLinkPreviews } from './linkPreviews';
+import { batch } from 'solid-js';
 import { createStore, produce } from 'solid-js/store';
 import {
   listMessages,
@@ -32,17 +33,18 @@ import {
   type ResolvedFields,
 } from '../lib/messageWireFormat';
 import { removeTyping } from './typing';
-import { scrollToMessageWhenReady } from '../lib/utils/messages';
+import { captureScrollAnchor, restoreScrollAnchor, rowIsAboveViewport, rowIsBelowViewport } from '../lib/scrollAnchor';
+import { forgetScrollPosition } from '../lib/scrollPositions';
 
 /** Re-exported: search builds display messages from raw server rows too. */
 export { viewFromServerAttachment };
 import { auth } from './auth';
 import { settings } from './settings';
 import { rooms, updateRoomLastMessage } from './rooms';
-import { updateSpaceRoomLastMessage } from './spaces';
+import { spaces, updateSpaceRoomLastMessage } from './spaces';
 import { onStargateEvent } from '../services/stargate/client';
 import { maybeNotifyMessage } from '../lib/notifications';
-import { setReadState, extractMentionedUserIds, extractMentionedRoleIds, mentionsEveryone, messageIdGt } from './readState';
+import { setReadState, extractMentionedUserIds, extractMentionedRoleIds, mentionsEveryone, messageIdGt, isSnowflake } from './readState';
 
 /** Sort messages by created_at ascending (oldest first) */
 function sortByCreatedAt<T extends { created_at: string }>(list: T[]): T[] {
@@ -130,7 +132,23 @@ export interface MessagesState {
   hasMoreNewer: Record<string, boolean>;
   loadingNewer: Record<string, boolean>;
   sending: Record<string, boolean>;
+  /** Bumped when a message is appended at the live bottom; the list follows it only if the
+   * viewer was already there. */
   scrollToBottomTick: Record<string, number>;
+  /** Bumped to take the viewer to the live bottom wherever they are - their own send, "jump
+   * to present". */
+  scrollToBottomForce: Record<string, number>;
+  /** A message the list should scroll to as soon as its row exists (a jump); consumed by the
+   * list, which clears it. */
+  jumpTarget: Record<string, JumpTarget | null>;
+}
+
+export interface JumpTarget {
+  id: string;
+  /** Distinguishes two jumps to the same message. */
+  nonce: number;
+  /** Animate when the row is already on the page; a freshly loaded window always snaps. */
+  smooth: boolean;
 }
 
 export const [messages, setMessages] = createStore<MessagesState>({
@@ -142,6 +160,8 @@ export const [messages, setMessages] = createStore<MessagesState>({
   loadingNewer: {},
   sending: {},
   scrollToBottomTick: {},
+  scrollToBottomForce: {},
+  jumpTarget: {},
 });
 
 /**
@@ -157,7 +177,16 @@ export function hasPendingJump(roomId: string): boolean {
   return pendingJumps.has(roomId);
 }
 
-const MESSAGES_PAGE_SIZE = 30;
+const MESSAGES_PAGE_SIZE = 50;
+/**
+ * The loaded window is bounded, as in Discord: paging history in one direction drops rows
+ * from the far end once the list grows past this, and the dropped side is paged back in on
+ * the way back (hasMoreOlder / hasMoreNewer flip on). Keeps the DOM flat no matter how far
+ * back someone reads. Only rows well outside the viewport are ever dropped.
+ */
+const MAX_LOADED_MESSAGES = 300;
+const TRIM_MARGIN_PX = 400;
+let jumpNonce = 0;
 
 function setTempAttachmentProgress(roomId: string, tempId: string, localId: string, progress: number) {
   setMessages('byRoom', roomId, (prev) =>
@@ -215,18 +244,46 @@ function linkPreviewsAllowedIn(roomId: string): boolean {
   return room.e2ee_enabled !== true || !!settings.linkPreviewsInEncrypted;
 }
 
+/** Newest message the server reported for a room (PM list or a space's channel list), if cached. */
+function roomLastMessageId(roomId: string): string | undefined {
+  const pm = rooms.rooms.find((r) => r.id === roomId);
+  if (pm?.last_message_id) return pm.last_message_id;
+  for (const list of Object.values(spaces.spaceRoomsBySpaceId)) {
+    const r = list.find((x) => x.id === roomId);
+    if (r?.last_message_id) return r.last_message_id;
+  }
+  return undefined;
+}
+
+/** True when the room has messages newer than the newest one loaded - the window isn't the live tail. */
+function tailBehind(roomId: string, newestLoaded: string | undefined): boolean {
+  const last = roomLastMessageId(roomId);
+  return !!last && !!newestLoaded && messageIdGt(last, newestLoaded);
+}
+
+/**
+ * Load the newest page of a room (no `before`), or the page before `before` for upward
+ * infinite scroll. Older pages prepend under the viewer: the row they were looking at is
+ * anchored across the change (prepended rows, the top skeleton, a trimmed tail) so nothing
+ * moves on screen. Entering a room doesn't scroll from here - the list lands itself.
+ */
 export async function loadMessages(
   roomId: string,
   before?: string,
   getScrollContainer?: () => HTMLDivElement | undefined,
   opts?: { quiet?: boolean }
 ) {
+  void opts;
   const isInitialLoad = !before;
   if (isInitialLoad) {
-    setMessages('loading', roomId, true);
+    // Someone reading an older window (jumped to a message, or scrolled far enough up that
+    // the tail was dropped) keeps it: merging the live tail into it would splice two
+    // non-contiguous ranges. Whatever they missed pages in as they scroll down.
+    if (messages.hasMoreNewer[roomId] === true) return;
+    // The page swaps the list for a skeleton while `loading` is set, so only raise it when
+    // there is nothing on screen yet; a refresh of an open room merges in place.
+    if ((messages.byRoom[roomId]?.length ?? 0) === 0) setMessages('loading', roomId, true);
     setMessages('hasMoreOlder', roomId, true);
-    // A fresh (tail) load always ends at the live newest, so there is nothing newer to page in
-    // and live MESSAGE_CREATEs append normally. loadMessagesAround flips this back on.
     setMessages('hasMoreNewer', roomId, false);
   } else {
     setMessages('loadingOlder', roomId, true);
@@ -245,57 +302,45 @@ export async function loadMessages(
       console.warn('ensureDevice failed, decryption may fail:', e);
     }
     const list = await listMessages(roomId, { before, limit: MESSAGES_PAGE_SIZE });
-    const decrypted = await Promise.all(
-      list.map(async (m): Promise<DecryptedMessage> => {
-        if (m.system_type) {
-          return { ...m, plaintext: '', attachments: [] };
-        }
-        const resolved = await resolvePlaintext(currentUserId, m);
-        return { ...m, ...resolved };
-      })
-    );
+    const decrypted = await decryptPage(list, currentUserId);
     // Fetch this page's link previews before showing it, so the cards are in place when the
     // messages appear instead of popping in one by one and shoving the conversation around
     // (the same page of history would otherwise reflow once per link). Bounded: a slow site
     // can't hold the room back, its card just arrives late as before.
-    if (linkPreviewsAllowedIn(roomId)) {
-      const urls = new Set<string>();
-      for (const m of decrypted) {
-        if (!m.system_type && m.plaintext) for (const u of previewUrlsFor(m.plaintext)) urls.add(u);
+    await warmPagePreviews(roomId, decrypted, isInitialLoad ? PREVIEW_WARM_INITIAL_MS : PREVIEW_WARM_OLDER_MS);
+
+    const existing = messages.byRoom[roomId] ?? [];
+    if (isInitialLoad && existing.length > 0 && list.length >= MESSAGES_PAGE_SIZE) {
+      // A refresh (reconnect) whose newest page doesn't reach back to what is loaded: more
+      // than a page arrived meanwhile. Keep the window and let the gap page in from the
+      // bottom rather than splice the tail onto it.
+      const oldestFetched = sortByCreatedAt(decrypted)[0]?.id;
+      const newestExisting = newestRealId(existing);
+      if (oldestFetched && newestExisting && isSnowflake(oldestFetched) && messageIdGt(oldestFetched, newestExisting)) {
+        setMessages('hasMoreNewer', roomId, true);
+        return;
       }
-      if (urls.size > 0) await warmLinkPreviews(urls, isInitialLoad ? PREVIEW_WARM_INITIAL_MS : PREVIEW_WARM_OLDER_MS);
     }
+
     const container = getScrollContainer?.();
-    const saved = container
-      ? { scrollTop: container.scrollTop, scrollHeight: container.scrollHeight }
-      : null;
-    setMessages('hasMoreOlder', roomId, list.length >= MESSAGES_PAGE_SIZE);
-    setMessages('byRoom', roomId, (prev) => {
-      const existing = prev ?? [];
-      const ids = new Set(existing.map((x) => x.id));
-      const merged = [...existing];
-      for (const m of decrypted) {
-        if (!ids.has(m.id)) {
-          ids.add(m.id);
-          merged.push(m);
-        }
+    const anchor = container ? captureScrollAnchor(container) : null;
+    let merged = mergeMessages(existing, decrypted);
+    let droppedTail = false;
+    if (!isInitialLoad && container && merged.length > MAX_LOADED_MESSAGES) {
+      const tail = merged.slice(MAX_LOADED_MESSAGES);
+      if (!tail.some((m) => m.pending) && rowIsBelowViewport(container, tail[0]!.id, TRIM_MARGIN_PX)) {
+        merged = merged.slice(0, MAX_LOADED_MESSAGES);
+        droppedTail = true;
       }
-      return sortByCreatedAt(merged);
+    }
+    batch(() => {
+      setMessages('byRoom', roomId, merged);
+      setMessages('hasMoreOlder', roomId, list.length >= MESSAGES_PAGE_SIZE);
+      if (droppedTail) setMessages('hasMoreNewer', roomId, true);
+      if (isInitialLoad) setMessages('loading', roomId, false);
+      else setMessages('loadingOlder', roomId, false);
     });
-    if (isInitialLoad && decrypted.length > 0 && !opts?.quiet) {
-      setMessages('scrollToBottomTick', roomId, (t) => (t ?? 0) + 1);
-    }
-    if (!isInitialLoad && saved && container) {
-      const restore = () => {
-        const heightAdded = container.scrollHeight - saved.scrollHeight;
-        if (heightAdded > 0) {
-          container.scrollTop = saved.scrollTop + heightAdded;
-          return true;
-        }
-        return false;
-      };
-      if (!restore()) requestAnimationFrame(restore);
-    }
+    if (!isInitialLoad && container && anchor) restoreScrollAnchor(container, anchor);
   } finally {
     if (isInitialLoad) {
       setMessages('loading', roomId, false);
@@ -324,13 +369,17 @@ export async function loadOlderMessages(
  * window. The around-window is disjoint from whatever was loaded (usually the live tail), so
  * merging would splice two non-contiguous ranges and render a silent gap. Sets hasMoreOlder /
  * hasMoreNewer so infinite scroll resumes in both directions - scrolling down from here pages
- * newer until it reconnects to the live tail (hasMoreNewer -> false). Used by jumpToMessage.
+ * newer until it reconnects to the live tail (hasMoreNewer -> false) - and hands the list a
+ * jump target to centre once the rows exist. Used by jumpToMessage.
  */
 export async function loadMessagesAround(roomId: string, messageId: string): Promise<boolean> {
   const currentUserId = auth.user?.id;
   if (!currentUserId) return false;
   pendingJumps.add(roomId);
-  setMessages('loading', roomId, true);
+  // The skeleton only when nothing is on screen (a jump into a channel never opened); an
+  // open list stays mounted and has its window swapped underneath - unmounting it would
+  // throw away its scroll state and land the remount at the bottom.
+  if ((messages.byRoom[roomId]?.length ?? 0) === 0) setMessages('loading', roomId, true);
   try {
     try {
       await ensureDevice(currentUserId);
@@ -341,23 +390,26 @@ export async function loadMessagesAround(roomId: string, messageId: string): Pro
     const decrypted = await decryptPage(list, currentUserId);
     await warmPagePreviews(roomId, decrypted, PREVIEW_WARM_INITIAL_MS);
     const sorted = sortByCreatedAt(decrypted);
-    setMessages('byRoom', roomId, sorted);
-    // A full half on a side implies there is more that way. hasMoreNewer also trusts the room's
-    // last_message_id when known (the window may already include the live tail).
+    // A full half on a side implies there is more that way; the room's last_message_id, when
+    // known, also says whether the window already reaches the live tail.
     const half = Math.floor(MESSAGES_PAGE_SIZE / 2);
     let olderCount = 0;
     let newerCount = 0;
     for (const m of sorted) {
-      if (!/^\d+$/.test(m.id) || m.id === messageId) continue;
+      if (!isSnowflake(m.id) || m.id === messageId) continue;
       if (messageIdGt(messageId, m.id)) olderCount++;
       else newerCount++;
     }
-    setMessages('hasMoreOlder', roomId, olderCount >= half);
-    const lastMsgId = rooms.rooms.find((r) => r.id === roomId)?.last_message_id;
-    const newestLoaded = newestRealId(sorted);
-    const reachedTail = !!lastMsgId && !!newestLoaded && !messageIdGt(lastMsgId, newestLoaded);
-    const moreNewer = reachedTail ? false : lastMsgId ? true : newerCount >= half;
-    setMessages('hasMoreNewer', roomId, moreNewer);
+    forgetScrollPosition(roomId);
+    batch(() => {
+      setMessages('byRoom', roomId, sorted);
+      setMessages('hasMoreOlder', roomId, olderCount >= half);
+      setMessages('hasMoreNewer', roomId, newerCount >= half || tailBehind(roomId, newestRealId(sorted)));
+      setMessages('loadingOlder', roomId, false);
+      setMessages('loadingNewer', roomId, false);
+      setMessages('jumpTarget', roomId, { id: messageId, nonce: ++jumpNonce, smooth: false });
+      setMessages('loading', roomId, false);
+    });
     return true;
   } finally {
     setMessages('loading', roomId, false);
@@ -367,11 +419,15 @@ export async function loadMessagesAround(roomId: string, messageId: string): Pro
 
 /**
  * Load newer messages (infinite scroll DOWN out of a jumped-to window). Uses the newest loaded
- * id as the `after` cursor; adding below the viewport doesn't shift scroll, so no anchoring.
- * When the page comes back short we've reconnected to the live tail, so hasMoreNewer flips off
- * and live MESSAGE_CREATEs resume appending.
+ * id as the `after` cursor. Appending below the viewport doesn't move it, but a trimmed head
+ * does, so the viewer's row is anchored across the change like an older page is. When the page
+ * comes back short and nothing newer arrived meanwhile, the window has reconnected with the
+ * live tail: hasMoreNewer flips off and live MESSAGE_CREATEs resume appending.
  */
-export async function loadNewerMessages(roomId: string): Promise<boolean> {
+export async function loadNewerMessages(
+  roomId: string,
+  getScrollContainer?: () => HTMLDivElement | undefined
+): Promise<boolean> {
   const list = messages.byRoom[roomId] ?? [];
   if (list.length === 0 || messages.loadingNewer[roomId]) return false;
   if (messages.hasMoreNewer[roomId] !== true) return false;
@@ -381,11 +437,33 @@ export async function loadNewerMessages(roomId: string): Promise<boolean> {
   if (!currentUserId) return false;
   setMessages('loadingNewer', roomId, true);
   try {
+    // Compared after the fetch: a changed last_message_id means something arrived while the
+    // page was in flight and is not in it. Comparing against the stale value instead would
+    // loop forever when the room's last message is one that no longer lists (deleted).
+    const lastBefore = roomLastMessageId(roomId);
     const fetched = await listMessages(roomId, { after, limit: MESSAGES_PAGE_SIZE });
     const decrypted = await decryptPage(fetched, currentUserId);
     await warmPagePreviews(roomId, decrypted, PREVIEW_WARM_OLDER_MS);
-    setMessages('hasMoreNewer', roomId, fetched.length >= MESSAGES_PAGE_SIZE);
-    setMessages('byRoom', roomId, (prev) => mergeMessages(prev, decrypted));
+    const container = getScrollContainer?.();
+    const anchor = container ? captureScrollAnchor(container) : null;
+    let merged = mergeMessages(messages.byRoom[roomId], decrypted);
+    let droppedHead = false;
+    if (container && merged.length > MAX_LOADED_MESSAGES) {
+      const cut = merged.length - MAX_LOADED_MESSAGES;
+      if (rowIsAboveViewport(container, merged[cut - 1]!.id, TRIM_MARGIN_PX)) {
+        merged = merged.slice(cut);
+        droppedHead = true;
+      }
+    }
+    const arrivedMeanwhile = roomLastMessageId(roomId) !== lastBefore;
+    const moreNewer = fetched.length >= MESSAGES_PAGE_SIZE || (arrivedMeanwhile && tailBehind(roomId, newestRealId(merged)));
+    batch(() => {
+      setMessages('byRoom', roomId, merged);
+      if (droppedHead) setMessages('hasMoreOlder', roomId, true);
+      setMessages('hasMoreNewer', roomId, moreNewer);
+      setMessages('loadingNewer', roomId, false);
+    });
+    if (container && anchor) restoreScrollAnchor(container, anchor);
     return true;
   } finally {
     setMessages('loadingNewer', roomId, false);
@@ -396,30 +474,29 @@ export async function loadNewerMessages(roomId: string): Promise<boolean> {
  * Scroll to a message, loading a window around it first when it isn't in the loaded range (a
  * reply target or search hit from before the loaded history) and then resuming infinite scroll
  * from there. Safe for the current room or one just navigated to - the page defers its own
- * tail-load via hasPendingJump while the around-load runs.
+ * tail-load via hasPendingJump while the around-load runs, and the list applies the target
+ * when it lands in the room.
  */
 export async function jumpToMessage(roomId: string, messageId: string): Promise<void> {
   if (!roomId || !messageId) return;
-  // scrollToMessageWhenReady (polls the DOM briefly) rather than scrollToMessage, so it also
-  // works when the target is already loaded but its row hasn't rendered yet - e.g. jumping into
-  // a different channel that is still mounting.
   if (messages.byRoom[roomId]?.some((m) => m.id === messageId)) {
-    scrollToMessageWhenReady(messageId);
+    setMessages('jumpTarget', roomId, { id: messageId, nonce: ++jumpNonce, smooth: true });
     return;
   }
-  const ok = await loadMessagesAround(roomId, messageId);
-  if (ok) scrollToMessageWhenReady(messageId);
+  if (pendingJumps.has(roomId)) return;
+  await loadMessagesAround(roomId, messageId);
 }
 
 /**
  * Return to the live tail from a jumped-to window, REPLACING the loaded messages with a fresh
  * newest page (a merge would splice the disjoint window onto the tail and leave a gap). No-op
- * when already at the tail. Backs the "jump to present" button and send-while-reading-history.
+ * when already at the tail. Backs the "jump to present" bar and send-while-reading-history.
  */
 export async function jumpToPresent(roomId: string): Promise<void> {
   const currentUserId = auth.user?.id;
   if (!currentUserId || messages.hasMoreNewer[roomId] !== true) return;
-  setMessages('loading', roomId, true);
+  // Live messages append from here on; they join the tail fetched below.
+  setMessages('hasMoreNewer', roomId, false);
   try {
     try {
       await ensureDevice(currentUserId);
@@ -429,12 +506,24 @@ export async function jumpToPresent(roomId: string): Promise<void> {
     const list = await listMessages(roomId, { limit: MESSAGES_PAGE_SIZE });
     const decrypted = await decryptPage(list, currentUserId);
     await warmPagePreviews(roomId, decrypted, PREVIEW_WARM_INITIAL_MS);
-    setMessages('byRoom', roomId, sortByCreatedAt(decrypted));
-    setMessages('hasMoreOlder', roomId, list.length >= MESSAGES_PAGE_SIZE);
-    setMessages('hasMoreNewer', roomId, false);
-    setMessages('scrollToBottomTick', roomId, (t) => (t ?? 0) + 1);
-  } finally {
-    setMessages('loading', roomId, false);
+    const newest = newestRealId(decrypted);
+    forgetScrollPosition(roomId);
+    batch(() => {
+      setMessages('byRoom', roomId, (prev) => {
+        // Keep what arrived live while the tail was fetched, and own sends in flight; the
+        // rest of the old window is disjoint from the tail and would leave a gap.
+        const live = (prev ?? []).filter(
+          (m) => m.pending || (newest != null && isSnowflake(m.id) && messageIdGt(m.id, newest))
+        );
+        return mergeMessages(decrypted, live);
+      });
+      setMessages('hasMoreOlder', roomId, list.length >= MESSAGES_PAGE_SIZE);
+      setMessages('loadingNewer', roomId, false);
+      setMessages('scrollToBottomForce', roomId, (t) => (t ?? 0) + 1);
+    });
+  } catch (err) {
+    setMessages('hasMoreNewer', roomId, true);
+    throw err;
   }
 }
 
@@ -493,7 +582,8 @@ export async function sendMessage(
   };
 
   setMessages('byRoom', roomId, (prev) => sortByCreatedAt([...(prev ?? []), tempMsg]));
-  setMessages('scrollToBottomTick', roomId, (t) => (t ?? 0) + 1);
+  // Your own message always takes you to it, wherever you were reading (Discord's behaviour).
+  setMessages('scrollToBottomForce', roomId, (t) => (t ?? 0) + 1);
 
   setMessages('sending', roomId, true);
   try {
@@ -588,7 +678,7 @@ export async function sendMessage(
       return sortByCreatedAt([...list, confirmed]);
     });
     if (!didReplaceInPlace) {
-      setMessages('scrollToBottomTick', roomId, (t) => (t ?? 0) + 1);
+      setMessages('scrollToBottomForce', roomId, (t) => (t ?? 0) + 1);
     }
     return msg;
   } catch (err) {
@@ -606,10 +696,13 @@ export function clearMessages(roomId?: string) {
     // appending to the reloaded room.
     setMessages('hasMoreNewer', roomId, false);
     setMessages('loadingNewer', roomId, false);
+    setMessages('jumpTarget', roomId, null);
+    forgetScrollPosition(roomId);
   } else {
     setMessages('byRoom', {});
     setMessages('hasMoreNewer', {});
     setMessages('loadingNewer', {});
+    setMessages('jumpTarget', {});
   }
 }
 

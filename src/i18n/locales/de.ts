@@ -286,7 +286,7 @@ export default {
     edited: '(bearbeitet)',
     editedAt: 'Bearbeitet {{time}}',
     jumpToPresent: 'Zum Ende springen',
-    loadOlder: 'Ältere Nachrichten laden',
+    viewingOlder: 'Du siehst ältere Nachrichten',
     replyMissing: 'Die ursprüngliche Nachricht wurde gelöscht oder ist nicht geladen',
     replyJump: 'Zur beantworteten Nachricht springen',
     noText: '(kein Text)',

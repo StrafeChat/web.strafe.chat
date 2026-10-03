@@ -1,8 +1,8 @@
 import type { Component } from 'solid-js';
-import { createEffect, createMemo, createSignal, For, Show, onCleanup, onMount } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, Show, on, onCleanup, onMount, untrack } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import type { DecryptedMessage } from '../stores/messages';
-import { messages, setMessages, editMessage as editMessageInStore, toggleReaction } from '../stores/messages';
+import { messages, setMessages, editMessage as editMessageInStore, toggleReaction, type JumpTarget } from '../stores/messages';
 import type { RoomParticipant } from '../api/rooms';
 import type { SpaceRole } from '../api/spaces';
 import { auth } from '../stores/auth';
@@ -30,7 +30,7 @@ import {
   MessageBody,
   DeleteMessageModal,
   MessageListIntro,
-  LoadOlderBlock,
+  HistoryEdge,
   ReplyReference,
   MessageReactions,
   MessageEditBox,
@@ -43,12 +43,17 @@ import { isMessagePinned, pinMessage, unpinMessage } from '../stores/pinnedMessa
 import { openUserProfilePopover } from '../stores/userProfilePopover';
 import { popoverSubjectFromSender } from '../lib/userProfilePopoverHelpers';
 import { memberNameColorHex, viewerRoleCeiling } from '../lib/spacePermissions';
+import { flashMessageRow } from '../lib/utils/messages';
+import { captureScrollAnchor } from '../lib/scrollAnchor';
+import { recallScrollPosition, rememberScrollPosition, type SavedScrollPosition } from '../lib/scrollPositions';
 
 const MESSAGE_GROUP_THRESHOLD_MS = 5 * 60 * 1000;
 /** Treat as “at bottom” if within this many px. */
 const BOTTOM_THRESHOLD_PX = 24;
-const SCROLL_LOAD_OLDER_THRESHOLD = 100;
-const SCROLL_LOAD_NEWER_THRESHOLD = 150;
+/** Page in the next batch once the edge of the loaded window is within this of the viewport. */
+const EDGE_LOAD_MARGIN_PX = 400;
+/** How long a jump waits for its row to appear before giving up. */
+const JUMP_ROW_WAIT_MS = 2000;
 const USER_SCROLL_IDLE_MS = 120;
 const SCROLL_TO_BOTTOM_DELAY_MS = 100;
 const IO_OBSERVE_DELAY_MS = 0;
@@ -75,16 +80,14 @@ export interface MessageListProps {
   roomName?: string;
   participants?: RoomParticipant[];
   compact?: boolean;
-  loadingOlder?: boolean;
   hasMoreOlder?: boolean;
   onLoadOlder?: (getScrollContainer: () => HTMLDivElement | undefined) => void;
   /** True when there are newer messages below the loaded window - set after a jump to older
    * history (reply target / search hit). Drives downward infinite scroll and keeps the
    * jump-to-present affordance visible even when sitting at the window's bottom. */
   hasMoreNewer?: boolean;
-  loadingNewer?: boolean;
   /** Page in the next batch of newer messages (downward infinite scroll out of a jump). */
-  onLoadNewer?: () => void;
+  onLoadNewer?: (getScrollContainer: () => HTMLDivElement | undefined) => void;
   /** Reload the live tail, replacing a jumped-to window (the "jump to present" action). */
   onJumpToPresent?: () => void;
   /** Last read message ID - NEW header shown above first unread (from others, id > this) */
@@ -246,6 +249,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
       }
     }
     props.onBottomVisibleMessageChange?.(bestId);
+    stashPosition();
   }
   function queuePublishBottomVisible() {
     if (publishTimer) clearTimeout(publishTimer);
@@ -369,47 +373,135 @@ export const MessageList: Component<MessageListProps> = (props) => {
     return -1;
   };
 
-  // Track scroll position for auto-scroll and load older
+  /** Scroll the viewport ourselves without it reading as a user scroll (which re-aims stickToBottom). */
+  function programmatic(run: () => void) {
+    programmaticScrollRef.current = true;
+    run();
+    requestAnimationFrame(() => {
+      programmaticScrollRef.current = false;
+    });
+  }
+  /** Reduced motion turns every animated scroll into a snap. */
+  const scrollBehavior = (): ScrollBehavior =>
+    document.documentElement.classList.contains('reduce-motion') ? 'auto' : 'smooth';
+  const distanceToBottom = (el: HTMLDivElement) => el.scrollHeight - el.scrollTop - el.clientHeight;
+  function syncNearBottom(el: HTMLDivElement) {
+    const near = distanceToBottom(el) <= BOTTOM_THRESHOLD_PX;
+    isNearBottom[1](near);
+    props.onNearBottomChange?.(near);
+  }
+  /** The list runs under the floating composer; the usable viewport ends above it. */
+  function visibleViewportHeight(el: HTMLDivElement): number {
+    const content = contentRef[0]?.();
+    const pad = content ? parseFloat(getComputedStyle(content).paddingBottom) || 0 : 0;
+    return Math.max(0, el.clientHeight - pad);
+  }
+  /** scrollTop that puts `row` in the middle of the usable viewport. */
+  function centeredScrollTop(el: HTMLDivElement, row: HTMLElement): number {
+    const rowTop = row.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
+    const free = Math.max(0, visibleViewportHeight(el) - row.offsetHeight);
+    return Math.max(0, rowTop - free / 2);
+  }
+  /** Pending re-snaps from the last landing / forced scroll; cancelled by the next one. */
+  let settle: (() => void) | null = null;
+  onCleanup(() => settle?.());
+  /** Snap to the newest message now, then again as late layout (images, previews) settles. */
+  function scrollToBottomSettled(el: HTMLDivElement) {
+    settle?.();
+    const snap = () => programmatic(() => el.scrollTo({ top: el.scrollHeight, behavior: 'auto' }));
+    snap();
+    const rafId = requestAnimationFrame(snap);
+    const timeoutId = setTimeout(snap, SCROLL_TO_BOTTOM_DELAY_MS);
+    settle = () => {
+      cancelAnimationFrame(rafId);
+      clearTimeout(timeoutId);
+      settle = null;
+    };
+  }
+  /** Scroll so `row` sits `offset` px below the top, now and once more after layout settles. */
+  function scrollRowToTop(el: HTMLDivElement, row: HTMLElement, offset: number) {
+    settle?.();
+    const place = () =>
+      programmatic(() => {
+        const relativeTop = row.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
+        el.scrollTo({ top: Math.max(0, relativeTop - offset), behavior: 'auto' });
+      });
+    place();
+    const rafId = requestAnimationFrame(place);
+    settle = () => {
+      cancelAnimationFrame(rafId);
+      settle = null;
+    };
+  }
+
+  /** Last known place in the viewport, refreshed on scroll idle and content changes; it is
+   * what a later visit to this room comes back to. */
+  let positionStash: SavedScrollPosition | null = null;
+  function stashPosition() {
+    const el = listRef[0]?.();
+    if (!el || !props.roomId || landedRoom !== props.roomId) return;
+    const anchor = captureScrollAnchor(el);
+    positionStash = { anchorId: anchor.id, top: anchor.top, atBottom: stickToBottom.current };
+  }
+  // Saved on the way out (room switch or unmount) so coming back lands on the same row.
+  createEffect(() => {
+    const roomId = props.roomId;
+    positionStash = null;
+    if (!roomId) return;
+    onCleanup(() => {
+      if (positionStash) rememberScrollPosition(roomId, positionStash);
+    });
+  });
+
+  /** Page in at whichever edge the viewport is approaching. The observers below do the same;
+   * this also covers a scroll that stops inside the margin without crossing into view. */
+  function maybeLoadEdges(el: HTMLDivElement, roomId: string) {
+    if (props.messages.length === 0) return;
+    const rect = el.getBoundingClientRect();
+    const top = sentinelRef[0]?.();
+    if (
+      top?.isConnected &&
+      props.onLoadOlder &&
+      (messages.hasMoreOlder[roomId] ?? true) &&
+      !(messages.loadingOlder[roomId] ?? false) &&
+      top.getBoundingClientRect().bottom - rect.top > -EDGE_LOAD_MARGIN_PX
+    ) {
+      props.onLoadOlder(getScrollContainer);
+    }
+    const bottom = bottomSentinelRef[0]?.();
+    if (
+      bottom?.isConnected &&
+      props.onLoadNewer &&
+      (messages.hasMoreNewer[roomId] ?? false) &&
+      !(messages.loadingNewer[roomId] ?? false) &&
+      bottom.getBoundingClientRect().top - rect.bottom < EDGE_LOAD_MARGIN_PX
+    ) {
+      props.onLoadNewer(getScrollContainer);
+    }
+  }
+
+  // Scroll tracking: user vs. our own scrolls, near-bottom state, paging at either edge.
   createEffect(() => {
     const el = listRef[0]?.();
     const roomId = props.roomId;
-    const onLoad = props.onLoadOlder;
-    if (!el || !roomId || !onLoad) return;
+    if (!el || !roomId) return;
     let userScrollIdleTimer: ReturnType<typeof setTimeout> | null = null;
     const onScroll = () => {
-      const { scrollTop, clientHeight, scrollHeight } = el;
-      const near =
-        scrollHeight - scrollTop - clientHeight <= BOTTOM_THRESHOLD_PX;
+      const near = distanceToBottom(el) <= BOTTOM_THRESHOLD_PX;
       if (!programmaticScrollRef.current) {
         setIsUserScrolling(true);
         if (userScrollIdleTimer) clearTimeout(userScrollIdleTimer);
         userScrollIdleTimer = setTimeout(() => {
           userScrollIdleTimer = null;
           setIsUserScrolling(false);
+          stashPosition();
         }, USER_SCROLL_IDLE_MS);
         // A user scroll is the only thing that starts or stops "follow the newest message".
         stickToBottom.current = near;
       }
       isNearBottom[1](near);
       props.onNearBottomChange?.(near);
-      const hasMore = messages.hasMoreOlder[roomId] ?? true;
-      const loading = messages.loadingOlder[roomId] ?? false;
-      if (
-        hasMore &&
-        !loading &&
-        scrollTop < SCROLL_LOAD_OLDER_THRESHOLD &&
-        props.messages.length > 0
-      ) {
-        onLoad(getScrollContainer);
-      }
-      // Downward infinite scroll: when reading out of a jumped-to window toward the present,
-      // page in newer messages as the bottom approaches (symmetric to loadOlder above).
-      const hasNewer = messages.hasMoreNewer[roomId] ?? false;
-      const loadingNewer = messages.loadingNewer[roomId] ?? false;
-      const distToBottom = scrollHeight - scrollTop - clientHeight;
-      if (hasNewer && !loadingNewer && distToBottom < SCROLL_LOAD_NEWER_THRESHOLD && props.messages.length > 0) {
-        props.onLoadNewer?.();
-      }
+      maybeLoadEdges(el, roomId);
       queuePublishBottomVisible();
     };
     el.addEventListener('scroll', onScroll, { passive: true });
@@ -422,53 +514,140 @@ export const MessageList: Component<MessageListProps> = (props) => {
     });
   });
 
-  // Scroll to bottom when new messages arrive – only if at bottom and user isn’t actively scrolling.
-  // The FIRST time this room's content is actually shown this session, land on the
-  // first-unread divider instead of always dropping straight to the bottom past it. Every
-  // later run (new message arrives, own message sent, etc.) keeps plain scroll-to-bottom.
-  // Deliberately keyed off roomsWithInitialScrollDone, not scrollToBottomTick === 1: the tick
-  // also bumps for messages received while this room isn't even open, so a room that racked
-  // up a backlog in the background would already be past tick 1 by the time it's first
-  // opened, and the old check would skip straight to the bottom past all of it.
+  /** The row for `id`, or failing that (deleted, filtered out) the nearest one by id. */
+  function rowFor(el: HTMLDivElement, id: string): { row: HTMLElement; exact: boolean } | null {
+    const exact = el.querySelector<HTMLElement>(`[data-msg-id="${id}"]`);
+    if (exact) return { row: exact, exact: true };
+    const rows = Array.from(el.querySelectorAll<HTMLElement>('[data-msg-id]'));
+    const after = rows.find((r) => messageIdGt(r.getAttribute('data-msg-id') ?? '', id));
+    const row = after ?? rows[rows.length - 1];
+    return row ? { row, exact: false } : null;
+  }
+
+  /**
+   * Centre a jumped-to message and flash it. The target is consumed first so nothing else
+   * acts on it; the row is polled for briefly in case it hasn't rendered yet (a window that
+   * just arrived for another channel). Only a target already on the page animates.
+   */
+  function applyJump(el: HTMLDivElement, roomId: string, target: JumpTarget, allowSmooth: boolean) {
+    setMessages('jumpTarget', roomId, null);
+    settle?.();
+    stickToBottom.current = false;
+    const started = Date.now();
+    const attempt = () => {
+      if (props.roomId !== roomId) return;
+      const hit = rowFor(el, target.id);
+      if (!hit) {
+        if (Date.now() - started < JUMP_ROW_WAIT_MS) setTimeout(attempt, 100);
+        return;
+      }
+      const top = centeredScrollTop(el, hit.row);
+      if (allowSmooth && target.smooth) {
+        // Reads as a user scroll on purpose: it moves "follow the newest" to wherever it ends.
+        el.scrollTo({ top, behavior: scrollBehavior() });
+      } else {
+        programmatic(() => el.scrollTo({ top, behavior: 'auto' }));
+      }
+      syncNearBottom(el);
+      if (hit.exact) flashMessageRow(hit.row);
+    };
+    attempt();
+  }
+
+  /**
+   * Where to start when a room's content first shows: a pending jump target; else the spot
+   * the viewer left this room at (Discord keeps it for the session); else, the first time
+   * this room is shown this session, the first-unread divider instead of straight to the
+   * bottom past it; else the bottom. Only a landing at the bottom follows new messages.
+   */
+  function land(el: HTMLDivElement, roomId: string) {
+    const target = messages.jumpTarget[roomId];
+    if (target) {
+      applyJump(el, roomId, target, false);
+      return;
+    }
+    const saved = recallScrollPosition(roomId);
+    if (saved && !saved.atBottom && saved.anchorId) {
+      const row = el.querySelector<HTMLElement>(`[data-msg-id="${saved.anchorId}"]`);
+      if (row) {
+        stickToBottom.current = false;
+        scrollRowToTop(el, row, saved.top);
+        syncNearBottom(el);
+        return;
+      }
+    }
+    const isInitialView = !roomsWithInitialScrollDone.has(roomId);
+    roomsWithInitialScrollDone.add(roomId);
+    const unreadIdx = isInitialView ? firstUnreadIndex() : -1;
+    const unread = unreadIdx !== -1 ? props.messages[unreadIdx] : undefined;
+    const unreadRow = unread ? el.querySelector<HTMLElement>(`[data-msg-id="${unread.id}"]`) : null;
+    if (unreadRow) {
+      stickToBottom.current = false;
+      scrollRowToTop(el, unreadRow, 96);
+      syncNearBottom(el);
+      return;
+    }
+    stickToBottom.current = true;
+    scrollToBottomSettled(el);
+    isNearBottom[1](true);
+    props.onNearBottomChange?.(true);
+  }
+
+  // Land once per room entry, as soon as its rows exist. Tracks the message count only so a
+  // room whose first page arrives after mount still lands; later changes don't re-land.
+  let landedRoom: string | undefined;
   createEffect(() => {
     const roomId = props.roomId;
-    const tick = roomId ? messages.scrollToBottomTick[roomId] ?? 0 : 0;
     const el = listRef[0]?.();
-    const nearBottom = isNearBottom[0]();
-    const userSc = isUserScrolling();
-    if (!el || !roomId || tick === 0) return;
-    if (!nearBottom || userSc) return;
-    const isInitialView = !roomsWithInitialScrollDone.has(roomId);
-    if (isInitialView) roomsWithInitialScrollDone.add(roomId);
-    const unreadIdx = isInitialView ? firstUnreadIndex() : -1;
-    // Landing on the unread divider means we're deliberately above the bottom, so don't glue
-    // to it; landing at the bottom does.
-    stickToBottom.current = unreadIdx === -1;
-    const scrollToTarget = () => {
-      const target = unreadIdx !== -1 ? props.messages[unreadIdx] : undefined;
-      const node = target ? el.querySelector<HTMLElement>(`[data-msg-id="${target.id}"]`) : null;
-      if (node) {
-        const relativeTop = node.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop;
-        el.scrollTo({ top: Math.max(0, relativeTop - 96), behavior: 'auto' });
-      } else {
-        el.scrollTo({ top: el.scrollHeight, behavior: 'auto' });
-      }
-    };
-    programmaticScrollRef.current = true;
-    scrollToTarget();
-    const rafId = requestAnimationFrame(scrollToTarget);
-    const timeoutId = setTimeout(() => {
-      scrollToTarget();
-      requestAnimationFrame(() => {
-        programmaticScrollRef.current = false;
-      });
-    }, SCROLL_TO_BOTTOM_DELAY_MS);
-    onCleanup(() => {
-      cancelAnimationFrame(rafId);
-      clearTimeout(timeoutId);
-      programmaticScrollRef.current = false;
-    });
+    const count = props.messages.length;
+    if (!el || !roomId || count === 0 || landedRoom === roomId) return;
+    landedRoom = roomId;
+    untrack(() => land(el, roomId));
   });
+
+  // A jump while already in the room (reply reference, search hit, pinned message). On entry
+  // the landing above consumes the target first, so this sees nothing to do.
+  createEffect(() => {
+    const roomId = props.roomId;
+    const el = listRef[0]?.();
+    const target = roomId ? messages.jumpTarget[roomId] : null;
+    if (!roomId || !el || !target || landedRoom !== roomId) return;
+    untrack(() => applyJump(el, roomId, target, true));
+  });
+
+  // The two tick effects below only act on a bump within the current room: the first run
+  // (prev undefined) and a run caused by the room changing just record the new baseline. Not
+  // `defer: true` - on() doesn't record its input on a deferred first run, so the guard would
+  // also swallow the first real bump after entering a room.
+
+  // A message appended at the live bottom: follow it only if the viewer was already there and
+  // isn't mid-scroll. (The ResizeObserver below covers the same ground for content growth.)
+  createEffect(
+    on(
+      () => [props.roomId, props.roomId ? messages.scrollToBottomTick[props.roomId] ?? 0 : 0] as const,
+      ([roomId, tick], prev) => {
+        const el = listRef[0]?.();
+        if (!el || !roomId || !tick || !prev || prev[0] !== roomId || landedRoom !== roomId) return;
+        if (!stickToBottom.current || isUserScrolling()) return;
+        programmatic(() => el.scrollTo({ top: el.scrollHeight, behavior: 'auto' }));
+      }
+    )
+  );
+
+  // Taken to the live bottom regardless: own send, "jump to present".
+  createEffect(
+    on(
+      () => [props.roomId, props.roomId ? messages.scrollToBottomForce[props.roomId] ?? 0 : 0] as const,
+      ([roomId, tick], prev) => {
+        const el = listRef[0]?.();
+        if (!el || !roomId || !tick || !prev || prev[0] !== roomId) return;
+        stickToBottom.current = true;
+        scrollToBottomSettled(el);
+        isNearBottom[1](true);
+        props.onNearBottomChange?.(true);
+      }
+    )
+  );
 
   // Re-pin to the true bottom as late content (images, GIFs, avatars, emoji) finishes loading
   // and grows the list. The initial scroll-to-bottom measures scrollHeight before those load,
@@ -509,7 +688,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
         if (!e?.isIntersecting) return;
         if (props.messages.length > 0) onLoad(getScrollContainer);
       },
-      { root: listEl, rootMargin: '100px 0px 0px 0px', threshold: 0 }
+      { root: listEl, rootMargin: `${EDGE_LOAD_MARGIN_PX}px 0px 0px 0px`, threshold: 0 }
     );
     const t = setTimeout(() => io.observe(sentinel), IO_OBSERVE_DELAY_MS);
     onCleanup(() => {
@@ -532,9 +711,9 @@ export const MessageList: Component<MessageListProps> = (props) => {
       (entries) => {
         const e = entries[0];
         if (!e?.isIntersecting) return;
-        if (props.messages.length > 0) props.onLoadNewer?.();
+        if (props.messages.length > 0) props.onLoadNewer?.(getScrollContainer);
       },
-      { root: listEl, rootMargin: '0px 0px 100px 0px', threshold: 0 }
+      { root: listEl, rootMargin: `0px 0px ${EDGE_LOAD_MARGIN_PX}px 0px`, threshold: 0 }
     );
     const t = setTimeout(() => io.observe(sentinel), IO_OBSERVE_DELAY_MS);
     onCleanup(() => {
@@ -650,20 +829,21 @@ export const MessageList: Component<MessageListProps> = (props) => {
         ref={(el) => contentRef[1](el)}
         class="flex flex-col p-4 gap-2 min-h-full justify-end pb-[calc(var(--composer-height,0px)+0.25rem)]"
       >
-        <MessageListIntro
-          roomType={props.roomType}
-          roomName={props.roomName}
-          pmOther={pmOther()}
-          isNotes={!!isNotes()}
-          e2eeEnabled={props.e2eeEnabled}
-        />
-        <LoadOlderBlock
-          hasMessages={props.messages.length > 0}
-          hasMoreOlder={props.hasMoreOlder ?? true}
-          loadingOlder={props.loadingOlder ?? false}
+        {/* The room's beginning only once history is exhausted; above an unfinished window
+            the skeleton edge stands in for the pages still to come. */}
+        <Show when={props.messages.length === 0 || !(props.hasMoreOlder ?? true)}>
+          <MessageListIntro
+            roomType={props.roomType}
+            roomName={props.roomName}
+            pmOther={pmOther()}
+            isNotes={!!isNotes()}
+            e2eeEnabled={props.e2eeEnabled}
+          />
+        </Show>
+        <HistoryEdge
+          more={props.messages.length > 0 && (props.hasMoreOlder ?? true)}
+          side="older"
           sentinelRef={(el) => sentinelRef[1](el)}
-          onLoadOlder={props.onLoadOlder ?? (() => {})}
-          getScrollContainer={getScrollContainer}
         />
         <For each={visibleMessages()}>
           {(msg, i) => {
@@ -1196,13 +1376,34 @@ export const MessageList: Component<MessageListProps> = (props) => {
             );
           }}
         </For>
-        {/* Bottom sentinel for downward infinite scroll: when the viewer is in a jumped-to
-            window, scrolling it into view pages in newer messages (the observer is gated on
-            hasMoreNewer so it's inert in a normal room sitting at the live tail). */}
-        <div ref={(el) => bottomSentinelRef[1](el)} aria-hidden="true" />
+        {/* Past the newest loaded row while the window hasn't reconnected with the live tail:
+            scrolling toward it pages newer messages in. Absent in a room sitting at the tail. */}
+        <HistoryEdge
+          more={props.messages.length > 0 && (props.hasMoreNewer ?? false)}
+          side="newer"
+          sentinelRef={(el) => bottomSentinelRef[1](el)}
+        />
       </div>
     </div>
-    <Show when={!isNearBottom[0]() || (props.roomId ? (messages.hasMoreNewer[props.roomId] ?? false) : false)}>
+    {/* Reading an older window (a jump, or history read far enough back that the tail was
+        unloaded): Discord's bar above the composer, with the way back to the present. */}
+    <Show when={props.hasMoreNewer}>
+      <div
+        class="absolute inset-x-4 z-10 flex items-center justify-between gap-3 rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-lg shadow-black/20 bottom-[calc(var(--composer-height,0px)+0.75rem)]"
+        data-viewing-older
+      >
+        <span class="min-w-0 truncate">{t('messages.viewingOlder')}</span>
+        <button
+          type="button"
+          onClick={scrollToPresent}
+          class="flex shrink-0 items-center gap-1.5 rounded px-1 py-0.5 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-foreground/60"
+        >
+          {t('messages.jumpToPresent')}
+          <i class="fa-solid fa-arrow-down text-[10px]" aria-hidden="true" />
+        </button>
+      </div>
+    </Show>
+    <Show when={!isNearBottom[0]() && !props.hasMoreNewer}>
       <button
         type="button"
         onClick={scrollToPresent}

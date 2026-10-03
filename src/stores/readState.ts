@@ -40,7 +40,7 @@ export function ackRoomOptimistic(roomId: string, messageId: string): void {
 }
 
 /** Returns true if a is a valid snowflake (numeric string) and a > b. Temp IDs are skipped. */
-function isSnowflake(id: string): boolean {
+export function isSnowflake(id: string): boolean {
   return /^\d+$/.test(id);
 }
 
