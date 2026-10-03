@@ -11,6 +11,11 @@ import { BotTag } from '../BotTag';
 export interface ReplyReferenceProps {
   replyToId: string;
   messages: DecryptedMessage[];
+  /** The replied-to message embedded on the parent (server `referenced_message`), used when it
+   * isn't in the loaded list - so a reply to older history still shows author + preview instead
+   * of "original unavailable". For an E2EE room it carries ciphertext only, so the text falls
+   * back to the loading placeholder; the author still resolves. */
+  referenced?: DecryptedMessage;
   participants?: RoomParticipant[];
   currentUserId?: string;
   /** Compact mode has no avatar gutter, so show a reply glyph instead of relying on the spine. */
@@ -25,7 +30,7 @@ const PREVIEW_MAX = 90;
  * drawn by the message row itself, in the avatar gutter.
  */
 export const ReplyReference: Component<ReplyReferenceProps> = (props) => {
-  const replied = createMemo(() => props.messages.find((m) => m.id === props.replyToId));
+  const replied = createMemo(() => props.messages.find((m) => m.id === props.replyToId) ?? props.referenced);
   const sender = createMemo(() => {
     const r = replied();
     return r ? getSenderDisplay(r.sender_id, props.participants, props.currentUserId) : null;

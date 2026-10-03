@@ -11,6 +11,36 @@ export function decryptErrorPlaceholder(): string {
   return t('messages.decryptFailed');
 }
 
+/**
+ * The room's participants plus any users embedded on the messages themselves - a message's
+ * `author`, its `mention_users`, and a reply's `referenced_message.author`. The server now
+ * embeds those (Discord-style) so a sender/mention the client never cached still resolves to a
+ * name + avatar; folding them into the participant pool lets every existing lookup
+ * (getSenderDisplay, mention pills, reply references) find them with no other change. Returns
+ * the original array unchanged when nothing new is added (the common case - authors are
+ * usually already members), so it doesn't churn a fresh array on every render.
+ */
+export function augmentParticipants(
+  participants: RoomParticipant[] | undefined,
+  messages: DecryptedMessage[]
+): RoomParticipant[] {
+  const base = participants ?? [];
+  const seen = new Set(base.map((p) => p.id));
+  const extra: RoomParticipant[] = [];
+  const add = (u?: RoomParticipant | null) => {
+    if (u && u.id && !seen.has(u.id)) {
+      seen.add(u.id);
+      extra.push(u);
+    }
+  };
+  for (const m of messages) {
+    add(m.author);
+    if (m.mention_users) for (const u of m.mention_users) add(u);
+    add(m.referenced_message?.author);
+  }
+  return extra.length ? [...base, ...extra] : base;
+}
+
 export function getMessageBodyText(msg: DecryptedMessage): string {
   // A failed decrypt leaves plaintext as '' (not null), so this has to win over the
   // plaintext check or the message renders as a blank line with no explanation.

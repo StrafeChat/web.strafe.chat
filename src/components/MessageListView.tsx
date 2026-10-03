@@ -23,6 +23,7 @@ import {
   getMessageBodyText,
   isEdited,
   getSenderDisplay,
+  augmentParticipants,
   isSystemMessage,
   formatSystemMessageText,
   MessageAvatar,
@@ -191,6 +192,10 @@ export const MessageList: Component<MessageListProps> = (props) => {
 
   const getScrollContainer = () => listRef[0]?.();
   const currentUserId = () => auth.user?.id;
+  // Room participants plus any users the messages embed (author / mention_users /
+  // referenced_message.author), so a sender or mention the client never cached still
+  // resolves to a name + avatar. Same reference when nothing new is added.
+  const resolvedParticipants = createMemo(() => augmentParticipants(props.participants, props.messages));
   // Whether a message pings the current user - reads the server-authoritative signal
   // (mention_everyone / the resolved `mentions` list, which includes the author's own id when
   // they @mention themselves). Your own messages highlight too when they actually mention you
@@ -266,7 +271,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
 
   /** Right-clicking a message author gives the same user menu as a member row. */
   function openAuthorMenu(msg: DecryptedMessage, e: MouseEvent) {
-    const s = getSenderDisplay(msg.sender_id, props.participants, currentUserId());
+    const s = getSenderDisplay(msg.sender_id, resolvedParticipants(), currentUserId());
     const items = buildUserMenuItems({
       userId: msg.sender_id,
       bot: s.bot,
@@ -289,8 +294,8 @@ export const MessageList: Component<MessageListProps> = (props) => {
   /** Profile card for any user id in this room - message authors and @mention pills alike. */
   function openProfileForUser(userId: string, anchor: HTMLElement) {
     const uid = currentUserId();
-    const s = getSenderDisplay(userId, props.participants, uid);
-    const p = props.participants?.find((x) => x.id === userId);
+    const s = getSenderDisplay(userId, resolvedParticipants(), uid);
+    const p = resolvedParticipants()?.find((x) => x.id === userId);
     const spaceRoleContext =
       props.spaceId &&
       props.spaceRoles != null &&
@@ -301,7 +306,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
             subjectRoleIds: [...((p as { roles?: string[] } | undefined)?.roles ?? [])],
             spaceRoles: props.spaceRoles,
             canManageMemberRoles: props.canManageMemberRoles === true,
-            viewerHighestPosition: viewerRoleCeiling(props.spaceOwnerId, uid, props.spaceRoles, props.participants),
+            viewerHighestPosition: viewerRoleCeiling(props.spaceOwnerId, uid, props.spaceRoles, resolvedParticipants()),
             onMemberRolesUpdated: props.onSpaceMemberRolesUpdated,
           }
         : null;
@@ -534,16 +539,16 @@ export const MessageList: Component<MessageListProps> = (props) => {
 
   /** For PM (type 1): the other participant. */
   const pmOther = () => {
-    if (props.roomType !== 1 || !currentUserId() || !props.participants?.length) return undefined;
-    return props.participants.find((p) => p.id !== currentUserId());
+    if (props.roomType !== 1 || !currentUserId() || !resolvedParticipants()?.length) return undefined;
+    return resolvedParticipants().find((p) => p.id !== currentUserId());
   };
 
   /** True if this is the current user's notes room (self-PM). */
   const isNotes = () =>
     props.roomType === 1 &&
-    props.participants?.length === 1 &&
+    resolvedParticipants()?.length === 1 &&
     currentUserId() &&
-    props.participants[0]?.id === currentUserId();
+    resolvedParticipants()[0]?.id === currentUserId();
 
   /** Body is a decrypt-state placeholder ("waiting for key", legacy scheme, failure), not
    * real content - rendered muted/italic so it reads as a status line, not a message. */
@@ -615,14 +620,14 @@ export const MessageList: Component<MessageListProps> = (props) => {
             const showHeader = () => shouldShowHeader(msg, prev());
             const needsDateHeader = () => shouldShowDateHeader(msg, prev());
             const sender = () =>
-              getSenderDisplay(msg.sender_id, props.participants, currentUserId());
+              getSenderDisplay(msg.sender_id, resolvedParticipants(), currentUserId());
             /**
              * Discord-style: the sender's name takes their highest hoisted role's colour.
              * Read off the participant's roles, never presence, so an author's colour in
              * history doesn't depend on whether they're online right now.
              */
             const senderNameColor = () => {
-              const p = props.participants?.find((x) => x.id === msg.sender_id);
+              const p = resolvedParticipants()?.find((x) => x.id === msg.sender_id);
               return memberNameColorHex((p as { roles?: string[] } | undefined)?.roles, props.spaceRoles);
             };
             /** `text-foreground` must yield to the role colour, not fight it. */
@@ -751,7 +756,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                               icon: 'fa-flag',
                               danger: true,
                               onClick: () => {
-                                const s = getSenderDisplay(msg.sender_id, props.participants, currentUserId());
+                                const s = getSenderDisplay(msg.sender_id, resolvedParticipants(), currentUserId());
                                 openReportDialog({
                                   targetType: 'user',
                                   targetId: msg.sender_id,
@@ -857,7 +862,8 @@ export const MessageList: Component<MessageListProps> = (props) => {
                       <ReplyReference
                         replyToId={replyToId()}
                         messages={props.messages}
-                        participants={props.participants}
+                        referenced={msg.referenced_message as DecryptedMessage | undefined}
+                        participants={resolvedParticipants()}
                         currentUserId={currentUserId()}
                         compact={compact()}
                       />
@@ -897,7 +903,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                       >
                         <MessageBody
                           text={getMessageBodyText(msg)}
-                          participants={props.participants}
+                          participants={resolvedParticipants()}
                           spaceRoles={props.spaceRoles}
                           onMentionClick={openProfileForUser}
                           allowLinkPreviews={allowLinkPreviews()}
@@ -963,7 +969,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                     >
                       <MessageBody
                         text={getMessageBodyText(msg)}
-                        participants={props.participants}
+                        participants={resolvedParticipants()}
                         spaceRoles={props.spaceRoles}
                         onMentionClick={openProfileForUser}
                         allowLinkPreviews={allowLinkPreviews()}
@@ -1128,7 +1134,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                   <span class="text-xs text-muted-foreground">
                     {formatSystemMessageText(
                       msg as DecryptedMessage & { system_type: string; system_payload: string },
-                      props.participants,
+                      resolvedParticipants(),
                       currentUserId()
                     )}
                   </span>
@@ -1155,7 +1161,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
 
     <DeleteMessageModal
       pending={pendingDelete()}
-      participants={props.participants}
+      participants={resolvedParticipants()}
       currentUserId={currentUserId()}
       onConfirm={doDelete}
       onCancel={() => setPendingDelete(null)}

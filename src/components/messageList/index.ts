@@ -2,6 +2,7 @@ export {
   getMessageBodyText,
   isEdited,
   getSenderDisplay,
+  augmentParticipants,
   type SenderDisplay,
   isSystemMessage,
   formatSystemMessageText,

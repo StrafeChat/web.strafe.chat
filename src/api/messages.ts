@@ -1,4 +1,5 @@
 import { api, getApiUrl, ApiError } from './client';
+import type { RoomParticipant } from './rooms';
 
 /**
  * A file attached to a message. In E2EE rooms the server-side copy only has id/url/size
@@ -49,6 +50,15 @@ export interface Message {
   mentions?: string[];
   mention_everyone?: boolean;
   mention_roles?: string[];
+  /** Full author user object, embedded Discord-style so a sender the client never cached
+   * (left the space, a bot, an uncached member in a large space) still resolves to a name
+   * and avatar instead of "Unknown". Supplements `sender_id`, which stays. */
+  author?: RoomParticipant;
+  /** Full user objects for the ids in `mentions`, so an @mention of an uncached user renders. */
+  mention_users?: RoomParticipant[];
+  /** The message this one replies to, embedded (Discord's `referenced_message`) so the reply
+   * preview renders even when the original isn't in the loaded history. */
+  referenced_message?: Message;
   system_type?: string;
   system_payload?: string;
   attachments?: Attachment[];
