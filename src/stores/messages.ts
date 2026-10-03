@@ -179,14 +179,47 @@ export function hasPendingJump(roomId: string): boolean {
 
 const MESSAGES_PAGE_SIZE = 50;
 /**
- * The loaded window is bounded, as in Discord: paging history in one direction drops rows
- * from the far end once the list grows past this, and the dropped side is paged back in on
- * the way back (hasMoreOlder / hasMoreNewer flip on). Keeps the DOM flat no matter how far
- * back someone reads. Only rows well outside the viewport are ever dropped.
+ * A room's cache is bounded, as in Discord. On screen it holds at most this many rows: paging
+ * or live appends past it drop rows from the far end (only ones well outside the viewport, the
+ * viewer's row anchored across the change), and the dropped side is paged back in on the way
+ * back (hasMoreOlder / hasMoreNewer flip on). Keeps the DOM flat however far back someone reads
+ * and however busy the room is.
  */
-const MAX_LOADED_MESSAGES = 300;
+const MAX_LOADED_MESSAGES = 200;
+/** Once the viewer leaves a room it keeps one page, around where they were. */
+const MAX_IDLE_MESSAGES = 50;
 const TRIM_MARGIN_PX = 400;
 let jumpNonce = 0;
+
+/**
+ * The on-screen room's view, registered by the list (there is at most one shown). A trim
+ * triggered from the store - a live message arriving - anchors the viewer's row exactly like
+ * paging does, and must run its scroll-restore through the list's programmatic wrapper or the
+ * list reads it as a user scroll and stops following the newest message. A room with no view
+ * registered isn't shown, and trims freely (no scrolling involved).
+ */
+interface RoomView {
+  container: () => HTMLDivElement | undefined;
+  /** Run a scroll-mutating callback so the list's onScroll treats it as its own, not the user's. */
+  programmatic: (run: () => void) => void;
+}
+const roomViews = new Map<string, RoomView>();
+
+export function enterRoomView(roomId: string, view: RoomView): void {
+  roomViews.set(roomId, view);
+}
+
+/**
+ * The viewer left a room: stop anchoring it and shrink its cache to one page around where
+ * they were (the newest page when they were at the bottom), the way Discord unloads a
+ * channel's history on leaving it. The row kept for restoring their position survives; the
+ * dropped sides page back in when they return. Deferred a tick so it never runs inside the
+ * list's own disposal.
+ */
+export function leaveRoomView(roomId: string, around: { anchorId: string | null; atBottom: boolean } | null): void {
+  roomViews.delete(roomId);
+  queueMicrotask(() => trimIdleRoom(roomId, around));
+}
 
 function setTempAttachmentProgress(roomId: string, tempId: string, localId: string, progress: number) {
   setMessages('byRoom', roomId, (prev) =>
@@ -259,6 +292,58 @@ function roomLastMessageId(roomId: string): string | undefined {
 function tailBehind(roomId: string, newestLoaded: string | undefined): boolean {
   const last = roomLastMessageId(roomId);
   return !!last && !!newestLoaded && messageIdGt(last, newestLoaded);
+}
+
+/**
+ * Keep a room's cache bounded as messages append at the live end: drop the oldest rows past
+ * the cap and mark that there is older history to page back in. On screen only rows well
+ * above the viewport go, with the viewer's row anchored; off screen the cache is one page.
+ */
+function trimHead(roomId: string): void {
+  const list = messages.byRoom[roomId];
+  if (!list) return;
+  const view = roomViews.get(roomId);
+  const cap = view ? MAX_LOADED_MESSAGES : MAX_IDLE_MESSAGES;
+  if (list.length <= cap) return;
+  const cut = list.length - cap;
+  if (list.slice(0, cut).some((m) => m.pending)) return;
+  const container = view?.container();
+  if (view && !container) return;
+  // On screen, only drop rows well above the viewport, and keep the viewer's row pinned across
+  // the change. Off screen (idle cache), just slice.
+  if (container && !rowIsAboveViewport(container, list[cut - 1]!.id, TRIM_MARGIN_PX)) return;
+  const apply = () => {
+    const anchor = container ? captureScrollAnchor(container) : null;
+    batch(() => {
+      setMessages('byRoom', roomId, list.slice(cut));
+      setMessages('hasMoreOlder', roomId, true);
+    });
+    if (container && anchor) restoreScrollAnchor(container, anchor);
+  };
+  if (view && container) view.programmatic(apply);
+  else apply();
+}
+
+function trimIdleRoom(roomId: string, around: { anchorId: string | null; atBottom: boolean } | null): void {
+  if (roomViews.has(roomId)) return; // came straight back
+  const list = messages.byRoom[roomId];
+  if (!list || list.length <= MAX_IDLE_MESSAGES) return;
+  let start = list.length - MAX_IDLE_MESSAGES;
+  let end = list.length;
+  if (around && !around.atBottom && around.anchorId) {
+    const idx = list.findIndex((m) => m.id === around.anchorId);
+    if (idx >= 0) {
+      end = Math.min(list.length, idx + Math.ceil(MAX_IDLE_MESSAGES / 2));
+      start = Math.max(0, end - MAX_IDLE_MESSAGES);
+    }
+  }
+  // Own sends still in flight stay regardless of where they fall.
+  const kept = list.filter((m, i) => (i >= start && i < end) || m.pending);
+  batch(() => {
+    setMessages('byRoom', roomId, kept);
+    if (start > 0) setMessages('hasMoreOlder', roomId, true);
+    if (end < list.length) setMessages('hasMoreNewer', roomId, true);
+  });
 }
 
 /**
@@ -341,6 +426,7 @@ export async function loadMessages(
       else setMessages('loadingOlder', roomId, false);
     });
     if (!isInitialLoad && container && anchor) restoreScrollAnchor(container, anchor);
+    if (isInitialLoad) trimHead(roomId);
   } finally {
     if (isInitialLoad) {
       setMessages('loading', roomId, false);
@@ -584,6 +670,7 @@ export async function sendMessage(
   setMessages('byRoom', roomId, (prev) => sortByCreatedAt([...(prev ?? []), tempMsg]));
   // Your own message always takes you to it, wherever you were reading (Discord's behaviour).
   setMessages('scrollToBottomForce', roomId, (t) => (t ?? 0) + 1);
+  trimHead(roomId);
 
   setMessages('sending', roomId, true);
   try {
@@ -679,6 +766,7 @@ export async function sendMessage(
     });
     if (!didReplaceInPlace) {
       setMessages('scrollToBottomForce', roomId, (t) => (t ?? 0) + 1);
+      trimHead(roomId);
     }
     return msg;
   } catch (err) {
@@ -742,6 +830,7 @@ export async function addMessageFromEvent(payload: {
     });
     if (didAppend) {
       setMessages('scrollToBottomTick', roomId, (t) => (t ?? 0) + 1);
+      trimHead(roomId);
     }
     return;
   }
@@ -784,6 +873,7 @@ export async function addMessageFromEvent(payload: {
   });
   if (!didReplaceInPlace) {
     setMessages('scrollToBottomTick', roomId, (t) => (t ?? 0) + 1);
+    trimHead(roomId);
   }
 }
 

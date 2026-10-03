@@ -80,13 +80,21 @@
   background: transparent;
 }
 
-/* Message jumped to via a reply reference / pinned panel / search result */
-@keyframes msg-jump-flash {
-  0% { background-color: color-mix(in srgb, var(--color-primary) 22%, transparent); }
-  100% { background-color: transparent; }
+/* Message jumped to via a reply reference / pinned panel / search result: a tinted row with
+   an accent bar down its start edge, held for a beat and then faded out (Discord's
+   highlight). The highlight is the class's own style and only the fade is animated, so under
+   reduce-motion it still shows for the hold and then snaps off. The class is removed once the
+   fade is over so a mention row gets its own bar back. */
+@keyframes msg-jump-fade {
+  to {
+    background-color: transparent;
+    box-shadow: inset 3px 0 0 0 transparent;
+  }
 }
 .msg-jump-flash {
-  animation: msg-jump-flash 1.6s ease-out forwards;
+  background-color: color-mix(in srgb, var(--color-primary) 28%, transparent);
+  box-shadow: inset 3px 0 0 0 var(--color-primary);
+  animation: msg-jump-fade 2s ease-out 1.2s forwards;
 }
 
 /* Media placeholder: a soft shimmer in a reserved box, shown until an image/video's bytes load,

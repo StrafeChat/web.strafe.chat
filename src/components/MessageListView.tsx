@@ -2,7 +2,15 @@ import type { Component } from 'solid-js';
 import { createEffect, createMemo, createSignal, For, Show, on, onCleanup, onMount, untrack } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import type { DecryptedMessage } from '../stores/messages';
-import { messages, setMessages, editMessage as editMessageInStore, toggleReaction, type JumpTarget } from '../stores/messages';
+import {
+  messages,
+  setMessages,
+  editMessage as editMessageInStore,
+  toggleReaction,
+  enterRoomView,
+  leaveRoomView,
+  type JumpTarget,
+} from '../stores/messages';
 import type { RoomParticipant } from '../api/rooms';
 import type { SpaceRole } from '../api/spaces';
 import { auth } from '../stores/auth';
@@ -373,10 +381,37 @@ export const MessageList: Component<MessageListProps> = (props) => {
     return -1;
   };
 
+  /**
+   * Scroll positions we set ourselves and haven't yet seen echoed back as a scroll event.
+   * onScroll tells our own scrolls from the user's by where they land, not by a timer: setting
+   * scrollTop (especially right after removing rows during a trim) can emit its scroll event a
+   * frame after the rAF that would clear a boolean guard, which is exactly when a live-tail trim
+   * would otherwise be mistaken for the user scrolling and stop the view following new messages.
+   */
+  const ownScrolls: Array<{ top: number; t: number }> = [];
+  function noteOwnScroll(el: HTMLDivElement | undefined) {
+    if (!el) return;
+    const now = performance.now();
+    while (ownScrolls.length && now - ownScrolls[0]!.t > 1000) ownScrolls.shift();
+    ownScrolls.push({ top: Math.round(el.scrollTop), t: now });
+    if (ownScrolls.length > 8) ownScrolls.shift();
+  }
+  /** True if `scrollTop` is a position we just set ourselves (consumes the match). */
+  function isOwnScroll(scrollTop: number): boolean {
+    const now = performance.now();
+    for (let i = 0; i < ownScrolls.length; i++) {
+      if (now - ownScrolls[i]!.t <= 1000 && Math.abs(ownScrolls[i]!.top - scrollTop) <= 2) {
+        ownScrolls.splice(i, 1);
+        return true;
+      }
+    }
+    return false;
+  }
   /** Scroll the viewport ourselves without it reading as a user scroll (which re-aims stickToBottom). */
   function programmatic(run: () => void) {
     programmaticScrollRef.current = true;
     run();
+    noteOwnScroll(listRef[0]?.());
     requestAnimationFrame(() => {
       programmaticScrollRef.current = false;
     });
@@ -443,13 +478,17 @@ export const MessageList: Component<MessageListProps> = (props) => {
     const anchor = captureScrollAnchor(el);
     positionStash = { anchorId: anchor.id, top: anchor.top, atBottom: stickToBottom.current };
   }
-  // Saved on the way out (room switch or unmount) so coming back lands on the same row.
+  // The store anchors this room's trims through our container while it is on screen. On the
+  // way out (room switch or unmount) the position is saved so coming back lands on the same
+  // row, and the store shrinks the room's cache around it.
   createEffect(() => {
     const roomId = props.roomId;
     positionStash = null;
     if (!roomId) return;
+    enterRoomView(roomId, { container: getScrollContainer, programmatic });
     onCleanup(() => {
       if (positionStash) rememberScrollPosition(roomId, positionStash);
+      leaveRoomView(roomId, positionStash);
     });
   });
 
@@ -488,7 +527,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
     let userScrollIdleTimer: ReturnType<typeof setTimeout> | null = null;
     const onScroll = () => {
       const near = distanceToBottom(el) <= BOTTOM_THRESHOLD_PX;
-      if (!programmaticScrollRef.current) {
+      if (!programmaticScrollRef.current && !isOwnScroll(el.scrollTop)) {
         setIsUserScrolling(true);
         if (userScrollIdleTimer) clearTimeout(userScrollIdleTimer);
         userScrollIdleTimer = setTimeout(() => {
@@ -661,10 +700,8 @@ export const MessageList: Component<MessageListProps> = (props) => {
     const repin = () => {
       if (!stickToBottom.current || isUserScrolling()) return;
       if (el.scrollHeight - el.scrollTop - el.clientHeight <= 1) return; // already exactly there
-      programmaticScrollRef.current = true;
-      el.scrollTop = el.scrollHeight;
-      requestAnimationFrame(() => {
-        programmaticScrollRef.current = false;
+      programmatic(() => {
+        el.scrollTop = el.scrollHeight;
       });
     };
     const ro = new ResizeObserver(repin);

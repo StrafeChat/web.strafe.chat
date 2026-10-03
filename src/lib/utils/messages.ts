@@ -1,5 +1,6 @@
 const FLASH_CLASS = 'msg-jump-flash';
-const FLASH_MS = 1600;
+/** Hold + fade of .msg-jump-flash in index.css; the class comes off once the fade is done. */
+const FLASH_MS = 3300;
 
 /** Briefly highlight a message row so the eye lands on it after a jump. */
 export function flashMessageRow(el: HTMLElement) {
