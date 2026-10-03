@@ -32,6 +32,7 @@ import {
   memberCanManageRooms,
   memberCanManageRoles,
   memberCanManageSpace,
+  canViewSpaceChannel,
 } from '../../lib/spacePermissions';
 import { SpaceRoomSettingsModal } from '../SpaceRoomSettingsModal';
 import { InviteSpaceModal } from '../InviteSpaceModal';
@@ -161,6 +162,21 @@ export const SpaceRoomsBar: Component = () => {
   const canManageRooms = createMemo(() =>
     memberCanManageRooms(space(), rolesRes(), currentMember(), auth.user?.id)
   );
+  /** Hide private channels and private categories (Discord-style). Managers see everything so
+   * they can administer them; everyone else only sees what they can view. A synced channel
+   * inherits its category's View grant, so a private category hides all its synced channels. */
+  const canViewRoom = (room: SpaceRoom): boolean => {
+    if (canManageRooms()) return true;
+    return canViewSpaceChannel({
+      room,
+      allRooms: spaceRooms(),
+      memberUserId: auth.user?.id,
+      ownerId: space()?.owner_id,
+      everyoneRoleId: space()?.everyone_role_id,
+      memberRoleIds: (currentMember() as { roles?: string[] } | undefined)?.roles,
+      roles: rolesRes(),
+    });
+  };
   const canCreateInvite = createMemo(() =>
     memberCanCreateInvite(space(), rolesRes(), currentMember(), auth.user?.id)
   );
@@ -183,7 +199,8 @@ export const SpaceRoomsBar: Component = () => {
       .filter(
         (r) =>
           (r.type === ROOM_TYPE_TEXT || r.type === ROOM_TYPE_VOICE) &&
-          (!r.parent_id || !sectionIds().has(r.parent_id))
+          (!r.parent_id || !sectionIds().has(r.parent_id)) &&
+          canViewRoom(r)
       )
       .sort((a, b) => a.position - b.position)
   );
@@ -204,7 +221,7 @@ export const SpaceRoomsBar: Component = () => {
 
   function childrenOf(section: SpaceRoom) {
     return spaceRooms()
-      .filter((r) => r.parent_id === section.id)
+      .filter((r) => r.parent_id === section.id && canViewRoom(r))
       .sort((a, b) => a.position - b.position);
   }
 
@@ -307,6 +324,87 @@ export const SpaceRoomsBar: Component = () => {
         },
       },
     ]);
+  }
+
+  /** Right-click a category header: create a channel in it, mark it read, mute it, edit its
+   * settings/permissions, copy its id, or delete it (Discord-style). */
+  function openSectionMenu(e: MouseEvent, section: SpaceRoom) {
+    e.preventDefault();
+    const sid = spaceId();
+    if (!sid) return;
+    const uid = auth.user?.id ?? '';
+    const kids = spaceRooms().filter((r) => r.parent_id === section.id);
+    const textKids = kids.filter((r) => r.type === ROOM_TYPE_TEXT);
+    const hasUnread = textKids.some(
+      (r) =>
+        r.id !== activeRoomId() &&
+        ((readState.byRoom[r.id]?.mentionCount ?? 0) > 0 ||
+          getUnreadCountForDisplay(r.id, { ...r, space_id: r.space_id ?? sid }, messages.byRoom[r.id] ?? [], uid) > 0)
+    );
+    const anyUnmuted = kids.some((r) => !isRoomMuted(r));
+    const items = [];
+    if (canManageRooms()) {
+      items.push({
+        label: t('space.createRoomIn', { name: section.name || t('space.section') }),
+        icon: 'fa-plus',
+        onClick: () => {
+          setCreateRoomParentSectionId(section.id);
+          setCreateRoomOpen(true);
+        },
+      });
+    }
+    if (hasUnread) {
+      items.push({
+        label: t('contextMenu.markAsRead'),
+        icon: 'fa-check-double',
+        onClick: () => {
+          for (const r of textKids) {
+            if (r.last_message_id) ackRoomOptimistic(r.id, r.last_message_id);
+          }
+        },
+      });
+    }
+    items.push({
+      label: anyUnmuted ? t('contextMenu.muteCategory') : t('contextMenu.unmuteCategory'),
+      icon: anyUnmuted ? 'fa-bell-slash' : 'fa-bell',
+      onClick: () => {
+        for (const r of kids) {
+          void (anyUnmuted ? muteRoom(r.id, null) : unmuteRoom(r.id)).catch((err) =>
+            console.error('Toggle category mute failed:', err)
+          );
+        }
+      },
+    });
+    if (canManageRooms()) {
+      items.push({ label: t('space.categorySettings'), icon: 'fa-gear', onClick: () => setEditingRoom(section) });
+    }
+    items.push({
+      label: t('contextMenu.copyCategoryId'),
+      icon: 'fa-copy',
+      onClick: () => navigator.clipboard.writeText(section.id),
+    });
+    if (canManageRooms()) {
+      items.push({
+        label: t('space.deleteCategory'),
+        icon: 'fa-trash',
+        danger: true,
+        onClick: async () => {
+          const ok = await confirmDialog({
+            title: t('space.deleteCategory'),
+            body: t('space.deleteCategoryConfirm', { name: section.name || t('space.section') }),
+            confirmLabel: t('space.deleteCategory'),
+            tone: 'danger',
+            icon: 'fa-solid fa-trash',
+          });
+          if (!ok) return;
+          await deleteSpaceRoom(sid, section.id);
+          // The channels inside move to the top level - the server sends their parent-cleared
+          // updates; drop just the section here so it disappears immediately.
+          setSpaceRooms(sid, spaceRooms().filter((r) => r.id !== section.id));
+        },
+      });
+    }
+    showContextMenu(e, items);
   }
 
   function updateSpaceMenuPosition() {
@@ -639,11 +737,13 @@ export const SpaceRoomsBar: Component = () => {
                 });
               };
               return (
+                <Show when={canViewRoom(section)}>
                 <div class="mb-2">
                   <div
                     data-section-header={section.id}
                     data-reorder-anchor="sections"
                     data-reorder-id={section.id}
+                    onContextMenu={(e) => openSectionMenu(e, section)}
                     class={`relative flex w-full items-center gap-0.5 rounded-md px-1 ${
                       activeReorderDrag()?.kind === 'section' &&
                       activeReorderDrag()?.scopeKey === 'sections' &&
@@ -730,6 +830,7 @@ export const SpaceRoomsBar: Component = () => {
                     </div>
                   </Show>
                 </div>
+                </Show>
               );
             }}
           </For>

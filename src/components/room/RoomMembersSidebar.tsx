@@ -6,11 +6,10 @@ import { PresenceDot, presenceStatusLabel } from '../PresenceDot';
 import { MessageAvatar } from '../messageList/MessageAvatar';
 import { presence } from '../../stores/presence';
 import { showContextMenu, type ContextMenuItem } from '../../stores/contextMenu';
-import { buildUserMenuItems } from '../../lib/userContextMenu';
+import { buildUserMenuItems, buildSpaceModerationItems } from '../../lib/userContextMenu';
 import { appActivityRail, appSectionLabel } from '../../theme/appChrome';
 import {
   highestHoistedRole,
-  memberHighestRolePosition,
   memberNameColorHex,
 } from '../../lib/spacePermissions';
 import { openUserProfileFromParticipant } from '../../stores/userProfilePopover';
@@ -249,18 +248,6 @@ const MemberRow: Component<{
 }> = (props) => {
   const displayName = () => props.p.display_name || props.p.username || t('common.unknown');
   const isSelf = () => props.p.id === props.currentUserId;
-  const isSpaceOwnerTarget = () => props.spaceOwnerId != null && props.p.id === props.spaceOwnerId;
-  /** Discord-style hierarchy: can only kick/ban a member whose highest role is below ours. */
-  const outranksTarget = createMemo(() => {
-    const targetHighest = memberHighestRolePosition(undefined, props.spaceRoles, {
-      roles: getMemberRoleIds(props.p),
-    });
-    return targetHighest < (props.viewerHighestRolePosition ?? -1);
-  });
-  const canKick = () =>
-    props.spaceId != null && props.canKickMembers === true && !isSelf() && !isSpaceOwnerTarget() && outranksTarget();
-  const canBan = () =>
-    props.spaceId != null && props.canBanMembers === true && !isSelf() && !isSpaceOwnerTarget() && outranksTarget();
 
   const nameColorHex = createMemo(() =>
     memberNameColorHex(getMemberRoleIds(props.p), props.spaceRoles)
@@ -308,17 +295,21 @@ const MemberRow: Component<{
         props.dim ? 'opacity-60 hover:opacity-100' : ''
       }`}
       onContextMenu={(e) => {
-        const extraItems: ContextMenuItem[] = [
-          ...(props.isCreator && !isSelf() && props.onRemoveMember
-            ? [{ label: t('room.members.removeFromGroup'), icon: 'fa-user-minus', danger: true, onClick: () => props.onRemoveMember?.(props.p.id) }]
-            : []),
-          ...(canKick() && props.onKickMember
-            ? [{ label: t('room.members.kick'), icon: 'fa-user-minus', danger: true, onClick: () => props.onKickMember?.(props.p.id) }]
-            : []),
-          ...(canBan() && props.onBanMember
-            ? [{ label: t('room.members.ban'), icon: 'fa-gavel', danger: true, onClick: () => props.onBanMember?.(props.p.id) }]
-            : []),
-        ];
+        const extraItems = buildSpaceModerationItems({
+          spaceId: props.spaceId,
+          targetUserId: props.p.id,
+          targetRoleIds: getMemberRoleIds(props.p),
+          currentUserId: props.currentUserId,
+          spaceOwnerId: props.spaceOwnerId,
+          spaceRoles: props.spaceRoles,
+          viewerHighestRolePosition: props.viewerHighestRolePosition,
+          canKickMembers: props.canKickMembers,
+          canBanMembers: props.canBanMembers,
+          onKick: props.onKickMember,
+          onBan: props.onBanMember,
+          canRemoveFromGroup: props.isCreator && !isSelf(),
+          onRemoveFromGroup: props.onRemoveMember,
+        });
         const items = buildUserMenuItems({
           userId: props.p.id,
           bot: props.p.bot,

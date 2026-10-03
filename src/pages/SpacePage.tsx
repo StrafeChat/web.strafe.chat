@@ -76,6 +76,7 @@ import type { ReplyTarget, TypingPerson } from '../components/room';
 import {
   canSendMessagesInChannel,
   effectiveChannelPermissionsForMember,
+  channelOverridesSource,
   hasPerm,
   memberCanBanMembers,
   memberCanKickMembers,
@@ -454,12 +455,12 @@ const SpacePage: Component = () => {
   const roomOverridesRes = createMemo(() => {
     const r = currentRoom();
     if (!r || r.type !== ROOM_TYPE_TEXT) return undefined;
-    return r.permission_overrides;
+    return channelOverridesSource(r, spaceRooms()).overrides;
   });
   const roomUserOverridesRes = createMemo(() => {
     const r = currentRoom();
     if (!r || r.type !== ROOM_TYPE_TEXT) return undefined;
-    return r.user_overrides;
+    return channelOverridesSource(r, spaceRooms()).userOverrides;
   });
   const refreshedForMissingOverrides = new Set<string>();
   createEffect(() => {
@@ -939,6 +940,11 @@ const SpacePage: Component = () => {
                   onReply={handleReplyToMessage}
                   canReply={canSendMessages()}
                   canManageMessages={canManageMessagesInRoom()}
+                  canKickMembers={canKickMembers()}
+                  canBanMembers={canBanMembers()}
+                  viewerHighestRolePosition={viewerHighestRolePosition()}
+                  onKickMember={handleKickMember}
+                  onBanMember={handleBanMember}
                   canReact={canReact()}
                 onBottomVisibleMessageChange={viewportAck.setBottomVisibleMessageId}
                 onNearBottomChange={setIsNearBottom}

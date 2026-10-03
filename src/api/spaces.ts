@@ -119,6 +119,9 @@ export interface SpaceRoom {
   /** Text rooms only. Off by default for spaces; when on, messages are Megolm-encrypted
    * client-side and the server only ever stores ciphertext. */
   e2ee_enabled?: boolean;
+  /** A text/voice channel follows its parent section's permission overrides (Discord category
+   * sync) instead of its own. Resolved client-side in spacePermissions.channelOverridesSource. */
+  permissions_synced?: boolean;
   /** Voice rooms only: connection cap (0 = unlimited) and audio bitrate in bits per
    * second (0 = the 64 kbps default). */
   user_limit?: number;
@@ -577,7 +580,7 @@ export function deleteRoomUserPermissionOverride(spaceId: string, roomId: string
 export function patchSpaceRoom(
   spaceId: string,
   roomId: string,
-  body: { name?: string; topic?: string; slowmode_seconds?: number; e2ee_enabled?: boolean; user_limit?: number; bitrate?: number }
+  body: { name?: string; topic?: string; slowmode_seconds?: number; e2ee_enabled?: boolean; user_limit?: number; bitrate?: number; permissions_synced?: boolean }
 ) {
   return api<void>(`/spaces/${spaceId}/rooms/${roomId}`, { method: 'PATCH', json: body });
 }

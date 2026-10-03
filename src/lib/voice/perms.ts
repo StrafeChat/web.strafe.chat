@@ -1,4 +1,4 @@
-import { effectiveChannelPermissionsForMember, voicePermsFromMask, type VoicePerms } from '../spacePermissions';
+import { effectiveChannelPermissionsForMember, channelOverridesSource, voicePermsFromMask, type VoicePerms } from '../spacePermissions';
 import { spaces } from '../../stores/spaces';
 import { spaceMembers } from '../../stores/spaceMembers';
 import type { SpaceMember } from '../../api/spaces';
@@ -12,8 +12,10 @@ export function voicePermsFor(userId: string | undefined, spaceId: string | unde
   if (!userId || !spaceId || !roomId) return voicePermsFromMask(null);
   const sp = spaces.spaces.find((s) => s.id === spaceId);
   const roles = sp?.roles;
-  const room = spaces.spaceRoomsBySpaceId[spaceId]?.find((r) => r.id === roomId);
-  if (!sp || !roles || !room || room.permission_overrides === undefined || room.user_overrides === undefined) {
+  const allRooms = spaces.spaceRoomsBySpaceId[spaceId];
+  const room = allRooms?.find((r) => r.id === roomId);
+  const { overrides, userOverrides } = channelOverridesSource(room, allRooms);
+  if (!sp || !roles || !room || overrides === undefined || userOverrides === undefined) {
     return voicePermsFromMask(null);
   }
   const member = spaceMembers.bySpaceId[spaceId]?.find((m) => m.id === userId) as SpaceMember | undefined;
@@ -23,8 +25,8 @@ export function voicePermsFor(userId: string | undefined, spaceId: string | unde
     everyoneRoleId: sp.everyone_role_id,
     memberRoleIds: member?.roles,
     roles,
-    overrides: room.permission_overrides,
-    userOverrides: room.user_overrides,
+    overrides,
+    userOverrides,
   });
   return voicePermsFromMask(mask);
 }

@@ -270,6 +270,70 @@ export function effectiveChannelPermissionsForMember(input: EffectiveChannelPerm
 }
 
 /** 24-bit RGB role color for CSS. */
+/**
+ * The permission overrides that actually apply to a channel: its parent section's when the
+ * channel is synced to it (Discord category sync), otherwise its own. Mirrors the server's
+ * spaces.Snapshot.EffectiveRoomOverrides so client-side permission checks agree with the
+ * server's. `allRooms` is the space's room list (sections included).
+ */
+export function channelOverridesSource(
+  room:
+    | {
+        permission_overrides?: SpaceRoomOverride[];
+        user_overrides?: SpaceRoomUserOverride[];
+        permissions_synced?: boolean;
+        parent_id?: string;
+      }
+    | undefined,
+  allRooms:
+    | { id: string; permission_overrides?: SpaceRoomOverride[]; user_overrides?: SpaceRoomUserOverride[] }[]
+    | undefined
+): { overrides: SpaceRoomOverride[] | undefined; userOverrides: SpaceRoomUserOverride[] | undefined } {
+  if (!room) return { overrides: undefined, userOverrides: undefined };
+  if (room.permissions_synced && room.parent_id && allRooms) {
+    const parent = allRooms.find((r) => r.id === room.parent_id);
+    if (parent) return { overrides: parent.permission_overrides, userOverrides: parent.user_overrides };
+  }
+  return { overrides: room.permission_overrides, userOverrides: room.user_overrides };
+}
+
+/**
+ * Whether a member can see a space channel - used to hide private channels (and private
+ * categories, via sync) from the sidebar, the way Discord does. Permissive (true) until the
+ * roles/overrides needed to decide are loaded, so nothing flickers out during hydration.
+ */
+export function canViewSpaceChannel(input: {
+  room: {
+    id: string;
+    type?: number;
+    permission_overrides?: SpaceRoomOverride[];
+    user_overrides?: SpaceRoomUserOverride[];
+    permissions_synced?: boolean;
+    parent_id?: string;
+  };
+  allRooms: { id: string; permission_overrides?: SpaceRoomOverride[]; user_overrides?: SpaceRoomUserOverride[] }[] | undefined;
+  memberUserId: string | undefined;
+  ownerId: string | undefined;
+  everyoneRoleId: string | undefined;
+  memberRoleIds: string[] | undefined;
+  roles: SpaceRole[] | undefined;
+}): boolean {
+  if (!input.memberUserId || !input.roles) return true;
+  const { overrides, userOverrides } = channelOverridesSource(input.room, input.allRooms);
+  if (overrides === undefined) return true;
+  const mask = effectiveChannelPermissionsForMember({
+    memberUserId: input.memberUserId,
+    ownerId: input.ownerId ?? "",
+    everyoneRoleId: input.everyoneRoleId,
+    memberRoleIds: input.memberRoleIds,
+    roles: input.roles,
+    overrides,
+    userOverrides,
+  });
+  if (mask === null) return true;
+  return hasPerm(mask, PermViewChannel);
+}
+
 export function spaceRoleColorHex(c: number): string {
   const u = c >>> 0;
   return `#${(u & 0xffffff).toString(16).padStart(6, '0')}`;

@@ -9,7 +9,7 @@ import {
   type SpaceMember,
   type SpaceRoom,
 } from '../api/spaces';
-import { hasPerm, ROOM_OVERRIDE_PERM_ROWS, VOICE_ROOM_OVERRIDE_PERM_ROWS } from '../lib/spacePermissions';
+import { hasPerm, PermViewChannel, ROOM_OVERRIDE_PERM_ROWS, VOICE_ROOM_OVERRIDE_PERM_ROWS } from '../lib/spacePermissions';
 import {
   applyRoomRoleOverride,
   applyRoomUserOverride,
@@ -34,6 +34,7 @@ type Page = 'general' | 'encryption' | 'voice' | 'overrides';
 
 const ROOM_TYPE_TEXT = 3;
 const ROOM_TYPE_VOICE = 4;
+const ROOM_TYPE_SECTION = 5;
 
 /** Bitrate presets in bits per second (Discord's slider spans the same range). */
 const BITRATE_OPTIONS = [8_000, 16_000, 32_000, 64_000, 96_000, 128_000, 256_000, 384_000];
@@ -93,6 +94,73 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
   const isVoiceRoom = () => props.room?.type === ROOM_TYPE_VOICE;
   const overrideRows = () => (isVoiceRoom() ? VOICE_ROOM_OVERRIDE_PERM_ROWS : ROOM_OVERRIDE_PERM_ROWS);
   const voiceDirty = () => (props.room?.user_limit ?? 0) !== userLimit() || (props.room?.bitrate || 64_000) !== bitrate();
+
+  const isSection = () => props.room?.type === ROOM_TYPE_SECTION;
+  /** A channel that sits inside a category, so it can sync its permissions to that category. */
+  const isChannelInCategory = () => !isSection() && !!liveRoom()?.parent_id;
+  const synced = () => liveRoom()?.permissions_synced === true;
+  /** While a channel is synced its overrides mirror the category's and are read-only here. */
+  const syncLocked = () => isChannelInCategory() && synced();
+
+  const everyoneRoleId = () =>
+    spaces.spaces.find((sp) => sp.id === props.spaceId)?.everyone_role_id ??
+    (roles() ?? []).find((r) => r.name === '@everyone')?.id ??
+    '';
+
+  /** A category is "private" when @everyone is denied View on it. Its synced channels inherit that. */
+  const isPrivateCategory = () => {
+    const eid = everyoneRoleId();
+    const ov = roleOverrides()?.find((o) => o.role_id === eid);
+    return !!ov && (ov.deny & PermViewChannel) !== 0;
+  };
+
+  async function togglePrivateCategory(next: boolean) {
+    const room = props.room;
+    const eid = everyoneRoleId();
+    if (!room || !props.canManageRooms || !eid) return;
+    setBusy(true);
+    setErr('');
+    try {
+      const existing = roleOverrides()?.find((o) => o.role_id === eid);
+      const now = new Date().toISOString();
+      if (next) {
+        const allow = (existing?.allow ?? 0) & ~PermViewChannel;
+        const deny = (existing?.deny ?? 0) | PermViewChannel;
+        await putRoomPermissionOverride(props.spaceId, room.id, eid, { allow, deny });
+        applyRoomRoleOverride(props.spaceId, room.id, { role_id: eid, allow, deny, created_at: now, updated_at: now });
+      } else {
+        const allow = (existing?.allow ?? 0) & ~PermViewChannel;
+        const deny = (existing?.deny ?? 0) & ~PermViewChannel;
+        if (allow === 0 && deny === 0) {
+          await deleteRoomPermissionOverride(props.spaceId, room.id, eid);
+          removeRoomRoleOverride(props.spaceId, room.id, eid);
+        } else {
+          await putRoomPermissionOverride(props.spaceId, room.id, eid, { allow, deny });
+          applyRoomRoleOverride(props.spaceId, room.id, { role_id: eid, allow, deny, created_at: now, updated_at: now });
+        }
+      }
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : t('roomSettings.overrideSaveFailed'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function toggleSync(next: boolean) {
+    const room = props.room;
+    if (!room || !props.canManageRooms) return;
+    setBusy(true);
+    setErr('');
+    try {
+      // The server clears or materializes the channel's overrides and emits the events that
+      // update the store; the synced flag arrives on the room-update event.
+      await patchSpaceRoom(props.spaceId, room.id, { permissions_synced: next });
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : t('roomSettings.overrideSaveFailed'));
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function saveVoice() {
     if (!props.room || !props.canManageRooms || !voiceDirty()) return;
@@ -238,7 +306,10 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
     }
   }
 
-  const roomLabel = () => `${isVoiceRoom() ? '🔊 ' : '#'}${props.room?.name || t('intro.roomFallback')}`;
+  const roomLabel = () =>
+    isSection()
+      ? props.room?.name || t('space.section')
+      : `${isVoiceRoom() ? '🔊 ' : '#'}${props.room?.name || t('intro.roomFallback')}`;
 
   return (
     <SettingsShell open={props.open && !!props.room} onClose={props.onClose} zClass={zLayer.modalStacked} labelledBy="room-settings-title">
@@ -278,7 +349,7 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
               onInput={(e) => setName(e.currentTarget.value)}
               disabled={!props.canManageRooms || busy()}
             />
-            <Show when={!isVoiceRoom()}>
+            <Show when={isTextRoom()}>
               <Input
                 label={t('roomSettings.topic')}
                 value={topic()}
@@ -390,6 +461,33 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
 
         <Show when={page() === 'overrides'}>
           <div class="max-w-2xl space-y-4">
+            <Show when={isSection()}>
+              <div class="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-card/10 px-4 py-3">
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-foreground">{t('roomSettings.privateCategory')}</p>
+                  <p class="text-xs text-muted-foreground">{t('roomSettings.privateCategoryHelp')}</p>
+                </div>
+                <Toggle
+                  checked={isPrivateCategory()}
+                  disabled={!props.canManageRooms || busy()}
+                  onChange={(v) => void togglePrivateCategory(v)}
+                />
+              </div>
+            </Show>
+            <Show when={isChannelInCategory()}>
+              <div class="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-card/10 px-4 py-3">
+                <div class="min-w-0">
+                  <p class="text-sm font-medium text-foreground">{t('roomSettings.syncCategory')}</p>
+                  <p class="text-xs text-muted-foreground">{t('roomSettings.syncCategoryHelp')}</p>
+                </div>
+                <Toggle checked={synced()} disabled={!props.canManageRooms || busy()} onChange={(v) => void toggleSync(v)} />
+              </div>
+              <Show when={syncLocked()}>
+                <p class="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-foreground/90">
+                  {t('roomSettings.syncedNote')}
+                </p>
+              </Show>
+            </Show>
             <Tabs
               size="sm"
               aria-label={t('roomSettings.overrideTarget')}
@@ -430,7 +528,7 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
                     </div>
                     <TriStateToggle
                       state={overrideState(row.bit)}
-                      disabled={!props.canManageRooms || busy()}
+                      disabled={!props.canManageRooms || busy() || syncLocked()}
                       onChange={(next) => setOverrideState(row.bit, next)}
                     />
                   </div>
@@ -438,10 +536,10 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
               </For>
             </div>
             <div class="flex flex-wrap gap-2">
-              <Button type="button" onClick={() => saveOverride()} disabled={!props.canManageRooms || busy()} loading={busy()}>
+              <Button type="button" onClick={() => saveOverride()} disabled={!props.canManageRooms || busy() || syncLocked()} loading={busy()}>
                 {t('roomSettings.saveOverride')}
               </Button>
-              <Button type="button" variant="outline" onClick={() => clearOverride()} disabled={!props.canManageRooms || busy()}>
+              <Button type="button" variant="outline" onClick={() => clearOverride()} disabled={!props.canManageRooms || busy() || syncLocked()}>
                 {t('roomSettings.clearOverride')}
               </Button>
             </div>

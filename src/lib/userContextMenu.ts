@@ -5,6 +5,8 @@ import { authorizeUrl } from '../api/developers';
 import { openReportDialog } from '../components/ReportDialog';
 import { confirmDialog } from '../stores/confirmDialog';
 import { t } from '../i18n';
+import { memberHighestRolePosition } from './spacePermissions';
+import type { SpaceRole } from '../api/spaces';
 
 export interface UserMenuContext {
   userId: string;
@@ -100,5 +102,58 @@ export function buildUserMenuItems(ctx: UserMenuContext): ContextMenuItem[] {
   }
 
   if (ctx.extraItems?.length) items.push(...ctx.extraItems);
+  return items;
+}
+
+
+export interface SpaceModerationContext {
+  /** The space the target is being moderated in. Without it, only the group-DM remove applies. */
+  spaceId?: string;
+  targetUserId: string;
+  /** The target's role ids, for the outranks check. */
+  targetRoleIds?: string[];
+  currentUserId?: string;
+  spaceOwnerId?: string;
+  spaceRoles?: SpaceRole[];
+  /** Viewer's highest role position; kick/ban is offered only against a lower-ranked member. */
+  viewerHighestRolePosition?: number;
+  canKickMembers?: boolean;
+  canBanMembers?: boolean;
+  onKick?: (userId: string) => void;
+  onBan?: (userId: string) => void;
+  /** Group-DM creator removing a member (no space involved). */
+  canRemoveFromGroup?: boolean;
+  onRemoveFromGroup?: (userId: string) => void;
+}
+
+/**
+ * Kick / ban / remove-from-group items, shared by member rows and message authors so both
+ * menus offer the same moderation actions. The hierarchy rules mirror the server: never
+ * yourself or the space owner, and only a member whose highest role sits below yours.
+ */
+export function buildSpaceModerationItems(ctx: SpaceModerationContext): ContextMenuItem[] {
+  const items: ContextMenuItem[] = [];
+  const isSelf = !!ctx.currentUserId && ctx.targetUserId === ctx.currentUserId;
+
+  if (ctx.canRemoveFromGroup && !isSelf && ctx.onRemoveFromGroup) {
+    items.push({
+      label: t('room.members.removeFromGroup'),
+      icon: 'fa-user-minus',
+      danger: true,
+      onClick: () => ctx.onRemoveFromGroup!(ctx.targetUserId),
+    });
+  }
+
+  if (ctx.spaceId == null || isSelf) return items;
+  if (ctx.spaceOwnerId != null && ctx.targetUserId === ctx.spaceOwnerId) return items;
+  const targetHighest = memberHighestRolePosition(undefined, ctx.spaceRoles, { roles: ctx.targetRoleIds });
+  if (targetHighest >= (ctx.viewerHighestRolePosition ?? -1)) return items;
+
+  if (ctx.canKickMembers && ctx.onKick) {
+    items.push({ label: t('room.members.kick'), icon: 'fa-user-minus', danger: true, onClick: () => ctx.onKick!(ctx.targetUserId) });
+  }
+  if (ctx.canBanMembers && ctx.onBan) {
+    items.push({ label: t('room.members.ban'), icon: 'fa-gavel', danger: true, onClick: () => ctx.onBan!(ctx.targetUserId) });
+  }
   return items;
 }

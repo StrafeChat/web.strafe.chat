@@ -22,7 +22,7 @@ import { t } from '../i18n';
 import { BotTag } from './BotTag';
 import { showContextMenu } from '../stores/contextMenu';
 import { onEditLastMessageRequest } from '../lib/chatShortcuts';
-import { buildUserMenuItems } from '../lib/userContextMenu';
+import { buildUserMenuItems, buildSpaceModerationItems } from '../lib/userContextMenu';
 import { isBlocked } from '../stores/relationships';
 import { openReportDialog } from './ReportDialog';
 import { deleteMessage as deleteMessageApi } from '../api/messages';
@@ -126,6 +126,13 @@ export interface MessageListProps {
   spaceOwnerId?: string;
   canManageMemberRoles?: boolean;
   onSpaceMemberRolesUpdated?: () => void;
+  /** Space moderation, mirrored from the member list so the author menu offers the same
+   * kick/ban actions. Omitted in DMs/groups, where kick/ban don't apply. */
+  canKickMembers?: boolean;
+  canBanMembers?: boolean;
+  viewerHighestRolePosition?: number;
+  onKickMember?: (userId: string) => void;
+  onBanMember?: (userId: string) => void;
   /** Open DM with user (profile popover). */
   onMessageUser?: (userId: string) => void;
 }
@@ -295,6 +302,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
   /** Right-clicking a message author gives the same user menu as a member row. */
   function openAuthorMenu(msg: DecryptedMessage, e: MouseEvent) {
     const s = getSenderDisplay(msg.sender_id, resolvedParticipants(), currentUserId());
+    const participant = resolvedParticipants()?.find((x) => x.id === msg.sender_id);
     const items = buildUserMenuItems({
       userId: msg.sender_id,
       bot: s.bot,
@@ -305,6 +313,19 @@ export const MessageList: Component<MessageListProps> = (props) => {
       onMessage: props.onMessageUser,
       spaceId: props.spaceId,
       roomId: props.roomId,
+      extraItems: buildSpaceModerationItems({
+        spaceId: props.spaceId,
+        targetUserId: msg.sender_id,
+        targetRoleIds: (participant as { roles?: string[] } | undefined)?.roles,
+        currentUserId: currentUserId(),
+        spaceOwnerId: props.spaceOwnerId,
+        spaceRoles: props.spaceRoles,
+        viewerHighestRolePosition: props.viewerHighestRolePosition,
+        canKickMembers: props.canKickMembers,
+        canBanMembers: props.canBanMembers,
+        onKick: props.onKickMember,
+        onBan: props.onBanMember,
+      }),
     });
     if (items.length) showContextMenu(e, items);
   }
