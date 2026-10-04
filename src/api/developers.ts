@@ -166,6 +166,11 @@ export interface AuthorizeQuery {
   scope: string;
   state?: string;
   permissions?: string;
+  /** PKCE (RFC 7636), optional: forwarded untouched from the authorization URL to the
+   * consent POST; the server stores the challenge with the code and the client proves the
+   * verifier at the token endpoint. Only S256 is accepted. */
+  code_challenge?: string;
+  code_challenge_method?: string;
 }
 
 export function getAuthorizeInfo(q: AuthorizeQuery) {

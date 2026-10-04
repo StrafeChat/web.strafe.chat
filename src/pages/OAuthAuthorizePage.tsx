@@ -47,6 +47,8 @@ const OAuthAuthorizePage: Component = () => {
     permissions?: string;
     space_id?: string;
     disable_space_select?: string;
+    code_challenge?: string;
+    code_challenge_method?: string;
   }>();
 
   const query = () => ({
@@ -56,6 +58,8 @@ const OAuthAuthorizePage: Component = () => {
     scope: params.scope ?? '',
     state: params.state,
     permissions: params.permissions,
+    code_challenge: params.code_challenge,
+    code_challenge_method: params.code_challenge_method,
   });
 
   const [info] = createResource(
