@@ -27,6 +27,8 @@ export const PermDeafenMembers = 1 << 19;
 export const PermMoveMembers = 1 << 20;
 export const PermUseVAD = 1 << 21;
 export const PermPrioritySpeaker = 1 << 22;
+/** Appended after voice (bit positions are permanent): upload files and images with a message. */
+export const PermAttachFiles = 1 << 23;
 
 export const AllVoicePermMask =
   PermConnect |
@@ -83,6 +85,7 @@ export const SPACE_ROLE_PERM_GROUPS: { category: string; rows: PermRow[] }[] = [
   group('text', [
     row(PermViewChannel, 'viewRoom'),
     row(PermSendMessages, 'sendMessages'),
+    row(PermAttachFiles, 'attachFiles'),
     row(PermReadMessageHistory, 'readMessageHistory'),
     row(PermAddReactions, 'addReactions'),
     row(PermUseExternalEmojis, 'useExternalEmojis'),
@@ -109,6 +112,7 @@ export const SPACE_ROLE_PERM_ROWS: PermRow[] = SPACE_ROLE_PERM_GROUPS.flatMap((g
 export const ROOM_OVERRIDE_PERM_ROWS: PermRow[] = [
   row(PermViewChannel, 'viewRoom', 'roomRows'),
   row(PermSendMessages, 'sendMessages', 'roomRows'),
+  row(PermAttachFiles, 'attachFiles', 'roomRows'),
   row(PermReadMessageHistory, 'readMessageHistory', 'roomRows'),
   row(PermAddReactions, 'addReactions', 'roomRows'),
   row(PermUseExternalEmojis, 'useExternalEmojis', 'roomRows'),
@@ -167,6 +171,13 @@ export function hasPerm(mask: number, bit: number): boolean {
 export function canSendMessagesInChannel(mask: number | null): boolean {
   if (mask === null) return true;
   return hasPerm(mask, PermViewChannel) && hasPerm(mask, PermSendMessages);
+}
+
+/** Attach Files is its own bit on top of Send Messages, so the attach button, drops and
+ * pastes go away when it is denied - matching the server, which refuses the upload. */
+export function canAttachFilesInChannel(mask: number | null): boolean {
+  if (mask === null) return true;
+  return canSendMessagesInChannel(mask) && hasPerm(mask, PermAttachFiles);
 }
 
 export function togglePerm(mask: number, bit: number, on: boolean): number {

@@ -794,6 +794,7 @@ export default {
       banMembers: { label: 'حظر الأعضاء', description: 'إزالة الأعضاء ومنعهم من العودة حتى يُرفع الحظر.' },
       viewRoom: { label: 'عرض الغرف', description: 'رؤية الغرف افتراضيًا وقراءة أسمائها.' },
       sendMessages: { label: 'إرسال الرسائل', description: 'إرسال الرسائل في الغرف النصية.' },
+      attachFiles: { label: 'Attach files', description: 'Upload files and images with messages in text rooms.' },
       readMessageHistory: { label: 'قراءة سجل الرسائل', description: 'قراءة الرسائل المرسلة قبل الانضمام أو قبل فتح الغرفة.' },
       addReactions: { label: 'إضافة تفاعلات', description: 'إضافة تفاعلات إيموجي على الرسائل.' },
       useExternalEmojis: { label: 'استخدام إيموجي خارجية', description: 'استخدام إيموجي من خوادم أخرى أو من يونيكود.' },
@@ -811,6 +812,7 @@ export default {
     roomRows: {
       viewRoom: { label: 'عرض الغرفة', description: 'رؤية هذه الغرفة في قائمة الغرف.' },
       sendMessages: { label: 'إرسال الرسائل', description: 'إرسال الرسائل في هذه الغرفة.' },
+      attachFiles: { label: 'Attach files', description: 'Upload files and images in this room.' },
       readMessageHistory: { label: 'قراءة سجل الرسائل', description: 'قراءة الرسائل السابقة في هذه الغرفة.' },
       addReactions: { label: 'إضافة تفاعلات', description: 'إضافة تفاعلات إيموجي في هذه الغرفة.' },
       useExternalEmojis: { label: 'استخدام إيموجي خارجية', description: 'استخدام إيموجي خارجية في هذه الغرفة.' },

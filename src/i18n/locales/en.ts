@@ -759,6 +759,7 @@ export default {
       banMembers: { label: 'Ban members', description: 'Remove members and block them from rejoining until unbanned.' },
       viewRoom: { label: 'View rooms', description: 'See rooms by default and read their names.' },
       sendMessages: { label: 'Send messages', description: 'Send messages in text rooms.' },
+      attachFiles: { label: 'Attach files', description: 'Upload files and images with messages in text rooms.' },
       readMessageHistory: { label: 'Read message history', description: 'Read messages sent before joining or opening a room.' },
       addReactions: { label: 'Add reactions', description: 'Add emoji reactions to messages.' },
       useExternalEmojis: { label: 'Use external emojis', description: 'Use emojis from other servers or Unicode.' },
@@ -776,6 +777,7 @@ export default {
     roomRows: {
       viewRoom: { label: 'View room', description: 'See this room in the room list.' },
       sendMessages: { label: 'Send messages', description: 'Send messages in this room.' },
+      attachFiles: { label: 'Attach files', description: 'Upload files and images in this room.' },
       readMessageHistory: { label: 'Read message history', description: 'Read previous messages in this room.' },
       addReactions: { label: 'Add reactions', description: 'Add emoji reactions in this room.' },
       useExternalEmojis: { label: 'Use external emojis', description: 'Use external emojis in this room.' },

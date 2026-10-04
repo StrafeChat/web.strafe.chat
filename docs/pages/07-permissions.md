@@ -36,6 +36,7 @@ Add the values of the bits you need to build a mask; test a bit with `(mask & bi
 | 20 | `1048576` | Move Members | room | Move or disconnect others |
 | 21 | `2097152` | Use Voice Activity | room | Talk without push-to-talk |
 | 22 | `4194304` | Priority Speaker | room | Lower everyone else while speaking |
+| 23 | `8388608` | Attach Files | room | Upload files and images with a message |
 
 New permissions are only ever appended; existing values never change meaning.
 
@@ -44,9 +45,9 @@ New permissions are only ever appended; existing values never change meaning.
 | Mask | Value |
 | --- | --- |
 | Read and post (View Room + Send Messages + Read Message History) | `7` |
-| `@everyone` in a new space (read, post, react, external emoji, invite, join and talk in voice) | `2334751` |
-| Every room-scoped bit | `8355967` |
-| Every bit | `8388607` |
+| `@everyone` in a new space (read, post, attach files, react, external emoji, invite, join and talk in voice) | `10723359` |
+| Every room-scoped bit | `16744575` |
+| Every bit | `16777215` |
 
 ## How permissions resolve
 
@@ -61,7 +62,7 @@ For a member in a space:
 
 ## Room overrides
 
-A room can allow or deny room-scoped bits per role or per member, independent of the space-wide mask. Each override is `{allow, deny}`; a bit in `deny` removes the permission for that role in that room, a bit in `allow` grants it, and a bit in neither leaves the space-wide value. Text rooms accept the text bits (0–6); voice rooms accept View Room and the voice bits (15–22). Managing overrides needs **Manage Roles**, and you cannot grant through an override what you do not hold yourself.
+A room can allow or deny room-scoped bits per role or per member, independent of the space-wide mask. Each override is `{allow, deny}`; a bit in `deny` removes the permission for that role in that room, a bit in `allow` grants it, and a bit in neither leaves the space-wide value. Text rooms accept the text bits (0–6 and 23); voice rooms accept View Room and the voice bits (15–22). Managing overrides needs **Manage Roles**, and you cannot grant through an override what you do not hold yourself.
 
 ## Hierarchy
 

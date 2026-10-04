@@ -74,6 +74,7 @@ import {
 import { buildMentionCatalog, serializeDraft } from '../lib/utils/mentions';
 import type { ReplyTarget, TypingPerson } from '../components/room';
 import {
+  canAttachFilesInChannel,
   canSendMessagesInChannel,
   effectiveChannelPermissionsForMember,
   channelOverridesSource,
@@ -535,19 +536,21 @@ const SpacePage: Component = () => {
     };
   });
 
-  const canSendMessages = createMemo(() => {
+  /** This member's effective permission mask in the open text channel, or null while the
+   * roles/overrides are still loading (null reads as permissive so nothing flickers off). */
+  const myChannelMask = createMemo<number | null>(() => {
     const uid = auth.user?.id;
-    if (!uid || !isTextChannel()) return true;
+    if (!uid || !isTextChannel()) return null;
     const sid = spaceId();
     const rid = roomId();
     const sp = space();
-    if (!sid || !rid || !sp) return true;
+    if (!sid || !rid || !sp) return null;
     const roles = spaceRolesRes();
     const ovs = roomOverridesRes();
     const userOvs = roomUserOverridesRes();
-    if (roles === undefined || ovs === undefined || userOvs === undefined) return true;
+    if (roles === undefined || ovs === undefined || userOvs === undefined) return null;
     const me = spaceMembers.bySpaceId[sid]?.find((m) => m.id === uid);
-    const mask = effectiveChannelPermissionsForMember({
+    return effectiveChannelPermissionsForMember({
       memberUserId: uid,
       ownerId: sp.owner_id,
       everyoneRoleId: sp.everyone_role_id,
@@ -556,8 +559,11 @@ const SpacePage: Component = () => {
       overrides: ovs,
       userOverrides: userOvs,
     });
-    return canSendMessagesInChannel(mask);
   });
+  const canSendMessages = createMemo(() => canSendMessagesInChannel(myChannelMask()));
+  /** Attach Files is its own bit: without it the attach button, drag-and-drop and
+   * paste-to-attach are off, matching the server's refusal. */
+  const canAttachFiles = createMemo(() => canAttachFilesInChannel(myChannelMask()));
 
   /** Gates whether @everyone/@here are offered in the mention dropdown - matches the
    * backend's own PermMentionEveryone check, so the dropdown never promises a mass-notify
@@ -971,7 +977,7 @@ const SpacePage: Component = () => {
                 mentionCatalog={mentionCatalog()}
                 replyTo={canSendMessages() ? replyTarget() : null}
                 attachments={attachmentDraft.items()}
-                onAddFiles={(files) => void attachmentDraft.addFiles(files)}
+                onAddFiles={canAttachFiles() ? (files) => void attachmentDraft.addFiles(files) : undefined}
                 onRemoveAttachment={attachmentDraft.remove}
                 attachmentError={attachmentDraft.error()}
                 customEmojis={allCustomEmojis()}
