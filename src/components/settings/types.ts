@@ -64,7 +64,3 @@ export function sectionTitle(id: SectionId): string {
 export function sectionDescription(id: SectionId): string {
   return t(`settings.sections.${id}.description`);
 }
-
-export function formatDiscriminator(d: number): string {
-  return String(d).padStart(4, '0');
-}

@@ -9,7 +9,6 @@ export interface MeResponse {
    * send email (`instance.email.enabled`). */
   verified_email?: boolean;
   username: string;
-  discriminator: string; // "0001" format
   display_name: string;
   bio?: string;
   about_me?: string;
@@ -60,7 +59,7 @@ export function patchMe(input: PatchMeInput) {
 
 export function toAuthUser(
   me: MeResponse,
-): Pick<User, 'id' | 'username' | 'discriminator' | 'display_name'> & {
+): Pick<User, 'id' | 'username' | 'display_name'> & {
   avatar?: string;
   banner?: string;
   bio?: string;
@@ -71,11 +70,9 @@ export function toAuthUser(
   public_flags?: number;
   bot?: boolean;
 } {
-  const d = parseInt(me.discriminator, 10);
   return {
     id: me.id,
     username: me.username,
-    discriminator: isNaN(d) ? 0 : d,
     display_name: me.display_name,
     ...(me.avatar ? { avatar: me.avatar } : {}),
     ...(me.banner ? { banner: me.banner } : {}),

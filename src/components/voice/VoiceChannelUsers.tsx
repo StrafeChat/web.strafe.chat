@@ -32,7 +32,6 @@ export const VoiceChannelUsers: Component<VoiceChannelUsersProps> = (props) => {
       id: st.user_id,
       username: st.user?.username ?? '',
       display_name: st.user?.display_name ?? '',
-      discriminator: st.user?.discriminator,
       avatar: st.user?.avatar,
     };
     openUserProfileFromParticipant({

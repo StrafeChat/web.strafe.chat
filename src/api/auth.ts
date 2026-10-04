@@ -9,7 +9,7 @@ export interface LoginInput {
 
 export interface LoginResponse {
   token: string;
-  user: Pick<User, 'id' | 'username' | 'discriminator' | 'display_name'>;
+  user: Pick<User, 'id' | 'username' | 'display_name'>;
 }
 
 /** What POST /auth/login returns instead of a session when the account has a second factor
@@ -31,7 +31,6 @@ export interface RegisterInput {
   username: string;
   password: string;
   date_of_birth: string;
-  discriminator?: number;
   /** Challenge response; required only by instances that enabled a captcha. */
   captcha_token?: string;
   /** Instance invite code. Required only by invite-only instances, and not even then for
@@ -43,7 +42,6 @@ export interface RegisterResponse {
   id: string;
   email: string;
   username: string;
-  discriminator: number;
   display_name: string;
   created_at: string;
   /** True when the instance requires a verified address before the account can sign in:

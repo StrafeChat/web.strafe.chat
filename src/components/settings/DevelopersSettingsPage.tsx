@@ -30,7 +30,6 @@ import { Checkbox } from '../ui/Checkbox';
 import { Toggle } from '../ui/Toggle';
 import { ResponsiveDialog } from '../ui/ResponsiveDialog';
 import { MessageAvatar } from '../messageList/MessageAvatar';
-import { formatDiscriminator } from './types.js';
 import { settingsGroupFrame, settingsRowIcon, settingsRowShell, settingsSectionTitle } from './settingsChrome';
 import { BotDiscoverSection } from './BotDiscoverSection';
 import { formatDate, t } from '../../i18n';
@@ -595,7 +594,7 @@ export const DevelopersSettingsPage: Component = () => {
                   </div>
                   <div class="truncate font-mono text-xs text-muted-foreground">
                     <Show when={app().bot} fallback={t('settings.developers.botActiveHint')}>
-                      {(bot) => `${bot().username}#${formatDiscriminator(Number(bot().discriminator))} · ${bot().id}`}
+                      {(bot) => `@${bot().username} · ${bot().id}`}
                     </Show>
                   </div>
                 </div>

@@ -16,10 +16,7 @@ import {
 import { openSafetyNumberModal } from '../stores/safetyNumberModal';
 import { appSectionLabel } from '../theme/appChrome';
 import { t } from '../i18n';
-
-function formatDiscriminator(d: number): string {
-  return String(d).padStart(4, '0');
-}
+import { formatHandle } from '../stores/instance';
 
 export const UserProfileFullModal: Component = () => {
   const subject = () => userProfileFullModal.subject;
@@ -34,7 +31,7 @@ export const UserProfileFullModal: Component = () => {
   function copyTag() {
     const s = subject();
     if (!s) return;
-    void navigator.clipboard.writeText(`${s.username}#${formatDiscriminator(s.discriminator)}`);
+    void navigator.clipboard.writeText(formatHandle({ username: s.username, home_domain: s.homeDomain }));
   }
 
   function copyUserId() {
@@ -136,7 +133,6 @@ export const UserProfileFullModal: Component = () => {
                 id="user-profile-full-title"
                 displayName={subject()!.displayName}
                 username={subject()!.username}
-                discriminator={subject()!.discriminator}
                 homeDomain={subject()!.homeDomain}
                 bot={subject()!.bot}
                 publicFlags={subject()!.publicFlags}

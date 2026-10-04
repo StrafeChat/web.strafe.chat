@@ -10,14 +10,9 @@ import { t } from '../i18n';
 /** How many badges draw before the rest fold into a `+N` chip. */
 export const PROFILE_BADGE_CAP = 5;
 
-function formatDiscriminator(d: number): string {
-  return String(d).padStart(4, '0');
-}
-
 export interface ProfileIdentityProps {
   displayName: string;
   username: string;
-  discriminator: number;
   homeDomain?: string;
   bot?: boolean;
   publicFlags?: number;
@@ -43,7 +38,7 @@ export interface ProfileIdentityProps {
 }
 
 /**
- * The identity block every profile surface shows: display name, BOT tag, the `@name#0001`
+ * The identity block every profile surface shows: display name, BOT tag, the `@name`
  * tag, pronouns, the 🎂 birthday marker, and the badge row.
  *
  * One component because these used to be written out three times and drift: the badge row
@@ -59,7 +54,7 @@ export const ProfileIdentity: Component<ProfileIdentityProps> = (props) => {
   const heading = () => (props.headingLevel === 'h2' ? 'h2' : 'h3');
   const nameClass = () =>
     `min-w-0 break-words font-semibold leading-tight ${props.compact ? 'text-lg' : 'text-xl'}`;
-  const tag = () => `${props.username}#${formatDiscriminator(props.discriminator)}`;
+  const tag = () => props.username;
   return (
     <div class="flex flex-col gap-1.5">
       <Dynamic

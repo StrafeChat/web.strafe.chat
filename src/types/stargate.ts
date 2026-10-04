@@ -36,7 +36,7 @@ export interface SendPayload {
 }
 
 export interface ReadyPayload {
-  user: { id: string; username: string; discriminator: number; display_name: string };
+  user: { id: string; username: string; display_name: string };
   session_id: string;
 }
 

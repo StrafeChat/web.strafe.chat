@@ -5,7 +5,6 @@ import type { UserPresence } from '../api/relationships';
 export interface RoomParticipant {
   id: string;
   username: string;
-  discriminator?: number;
   display_name: string;
   avatar?: string;
   banner?: string;
@@ -77,7 +76,7 @@ export function createPM(recipientId: string) {
   return api<Room>('/rooms', { method: 'POST', json: { recipient_id: recipientId } });
 }
 
-/** Start (or open) a PM by handle - `name#0001` locally, `name#0001@other.instance` across federation. */
+/** Start (or open) a PM by handle - `name` locally, `name@other.instance` across federation. */
 export function createPMByHandle(handle: string) {
   return api<Room>('/rooms', { method: 'POST', json: { recipient_handle: handle.trim() } });
 }

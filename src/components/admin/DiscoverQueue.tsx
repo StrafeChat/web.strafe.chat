@@ -111,7 +111,7 @@ export const DiscoverQueue: Component<{ onOpenUser: (id: string) => void; onOpen
                             <>
                               {t('admin.discover.requestedBy')}{' '}
                               <button type="button" class="hover:underline" onClick={() => props.onOpenUser(u().id)}>
-                                {u().username}#{u().discriminator}
+                                @{u().username}
                               </button>
                               {' · '}
                             </>

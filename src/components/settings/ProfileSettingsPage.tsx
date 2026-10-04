@@ -8,7 +8,6 @@ import { Input } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
 import { Toggle } from '../ui/Toggle';
 import { PresenceDot } from '../PresenceDot';
-import { formatDiscriminator } from './types.js';
 import { settingsSectionTitle } from './settingsChrome';
 import { useNavigate } from '@solidjs/router';
 import { closeUserSettings } from '../../stores/userSettingsModal';
@@ -59,7 +58,6 @@ export const ProfileSettingsPage: Component<ProfileSettingsPageProps> = (props) 
   }
 
   const user = () => auth.user;
-  const discriminatorStr = () => formatDiscriminator(user()?.discriminator ?? 0);
   const displayName = () => user()?.display_name || user()?.username || '';
 
   const bioPreviewHtml = createMemo(() => markdownAndHtmlToSanitizedBioHtml(bioDraft()));
@@ -400,7 +398,7 @@ export const ProfileSettingsPage: Component<ProfileSettingsPageProps> = (props) 
                 <div class="min-w-0 flex-1 space-y-2">
                   <label class="text-[15px] font-semibold text-foreground">{t('settings.profile.username')}</label>
                   <p class="rounded-lg border border-border/80 bg-background/50 px-3 py-2.5 font-mono text-sm text-muted-foreground" dir="ltr">
-                    {user()?.username}#{discriminatorStr()}
+                    {user()?.username}
                   </p>
                   <p class="text-xs text-muted-foreground">{t('settings.profile.usernameHint')}</p>
                 </div>

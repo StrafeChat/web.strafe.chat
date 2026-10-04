@@ -315,7 +315,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
       bot: s.bot,
       username: s.username || '',
       displayName: s.name,
-      discriminator: s.discriminator,
+      homeDomain: s.homeDomain,
       currentUserId: currentUserId(),
       onMessage: props.onMessageUser,
       spaceId: props.spaceId,

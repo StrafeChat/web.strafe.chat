@@ -9,7 +9,6 @@ import { ApiError } from './ApiError';
 export interface BotProfile {
   id: string;
   username: string;
-  discriminator: string;
   display_name: string;
   avatar: string;
   banner?: string;

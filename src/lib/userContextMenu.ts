@@ -1,3 +1,4 @@
+import { formatHandle } from '../stores/instance';
 import type { ContextMenuItem } from '../stores/contextMenu';
 import { RelType, relationshipType } from '../stores/relationships';
 import { putRelationship, blockUser, unblockUser } from '../api/relationships';
@@ -12,7 +13,8 @@ export interface UserMenuContext {
   userId: string;
   username: string;
   displayName: string;
-  discriminator?: number;
+  /** Federation: the user's home instance, so "copy username" yields name@domain for a remote user. */
+  homeDomain?: string;
   currentUserId?: string;
   /** A bot account: it cannot be friended; the menu offers adding it to a space instead. */
   bot?: boolean;
@@ -23,10 +25,6 @@ export interface UserMenuContext {
   roomId?: string;
   /** Context-specific actions (kick / ban / remove from group) appended after the universal ones. */
   extraItems?: ContextMenuItem[];
-}
-
-function formatTag(username: string, discriminator?: number): string {
-  return discriminator != null ? `${username}#${String(discriminator).padStart(4, '0')}` : `@${username}`;
 }
 
 /**
@@ -64,7 +62,7 @@ export function buildUserMenuItems(ctx: UserMenuContext): ContextMenuItem[] {
   items.push({
     label: t('userArea.copyUsername'),
     icon: 'fa-copy',
-    onClick: () => void navigator.clipboard?.writeText(formatTag(ctx.username, ctx.discriminator)),
+    onClick: () => void navigator.clipboard?.writeText(formatHandle({ username: ctx.username, home_domain: ctx.homeDomain })),
   });
   items.push({
     label: t('userArea.copyUserId'),

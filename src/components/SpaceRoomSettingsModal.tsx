@@ -1,4 +1,5 @@
 import type { Component } from 'solid-js';
+import { userOptionLabel } from '../stores/instance';
 import { createEffect, createMemo, createSignal, For, Show } from 'solid-js';
 import {
   deleteRoomPermissionOverride,
@@ -513,7 +514,7 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
                   <For each={props.members}>
                     {(m) => (
                       <option value={m.id}>
-                        {m.display_name || m.username}#{m.discriminator}
+                        {userOptionLabel(m)}
                       </option>
                     )}
                   </For>

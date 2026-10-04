@@ -15,7 +15,6 @@ export type RelationshipType =
 export interface RelationshipUser {
   id: string;
   username: string;
-  discriminator: string;
   display_name: string;
   avatar?: string;
   banner?: string;
@@ -28,7 +27,7 @@ export interface RelationshipUser {
   /** True when today (UTC) is this person's birthday. */
   is_birthday?: boolean;
   presence?: UserPresence;
-  /** Set for people on another instance; their handle is name#0001@home_domain. */
+  /** Set for people on another instance; their handle is name@home_domain. */
   home_domain?: string;
 }
 
@@ -47,7 +46,7 @@ export function listRelationships() {
   return api<Relationship[]>('/users/@me/relationships');
 }
 
-/** Send a friend request by handle: `name#0001` locally, `name#0001@their.instance` across
+/** Send a friend request by handle: `name` locally, `name@their.instance` across
  * federation (their home instance shows them the request). */
 export function sendFriendRequest(handle: string) {
   return api<void>('/users/@me/relationships', {

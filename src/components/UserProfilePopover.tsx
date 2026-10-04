@@ -290,7 +290,6 @@ export const UserProfilePopover: Component = () => {
         userId: s.userId,
         displayName: s.displayName,
         username: s.username,
-        discriminator: s.discriminator,
         avatar: s.avatar,
         banner: s.banner,
         bio: s.bio,
@@ -438,7 +437,6 @@ export const UserProfilePopover: Component = () => {
                 compact
                 displayName={subject()!.displayName}
                 username={subject()!.username}
-                discriminator={subject()!.discriminator}
                 homeDomain={subject()!.homeDomain}
                 bot={subject()!.bot}
                 publicFlags={subject()!.publicFlags}

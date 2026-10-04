@@ -5,7 +5,6 @@ export type UserProfileFullSubject = {
   userId: string;
   displayName: string;
   username: string;
-  discriminator: number;
   /** Federation: the user's home instance, shown after the tag when it isn't this one. */
   homeDomain?: string;
   avatar?: string;

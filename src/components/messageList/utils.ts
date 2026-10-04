@@ -169,7 +169,6 @@ export interface SenderDisplay {
   avatar?: string;
   banner?: string;
   username?: string;
-  discriminator?: number;
   bio?: string;
   aboutMe?: string;
   pronouns?: string;
@@ -195,7 +194,6 @@ export function getSenderDisplay(
       avatar: auth.user?.avatar,
       banner: auth.user?.banner,
       username: auth.user?.username,
-      discriminator: auth.user?.discriminator,
       bio: auth.user?.bio,
       aboutMe: auth.user?.about_me,
       pronouns: auth.user?.pronouns,
@@ -212,7 +210,6 @@ export function getSenderDisplay(
     avatar: p?.avatar,
     banner: p?.banner,
     username: p?.username,
-    discriminator: p?.discriminator,
     bio: p?.bio,
     aboutMe: p?.about_me,
     pronouns: p?.pronouns,

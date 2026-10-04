@@ -19,7 +19,6 @@ export interface AuthState {
   user: {
     id: string;
     username: string;
-    discriminator: number;
     display_name: string;
     avatar?: string;
     banner?: string;
@@ -76,7 +75,6 @@ export function hydrateFromReady(payload: {
   user?: {
     id: string;
     username: string;
-    discriminator: number | string;
     display_name: string;
     avatar?: string;
     banner?: string;
@@ -98,14 +96,9 @@ export function hydrateFromReady(payload: {
   calls?: unknown[];
 }) {
   if (payload.user) {
-    const d =
-      typeof payload.user.discriminator === 'string'
-        ? parseInt(payload.user.discriminator, 10)
-        : payload.user.discriminator;
     const user = {
       id: payload.user.id,
       username: payload.user.username,
-      discriminator: isNaN(d) ? 0 : d,
       display_name: payload.user.display_name,
       ...(typeof payload.user.avatar === 'string' ? { avatar: payload.user.avatar } : {}),
       ...(typeof payload.user.banner === 'string' ? { banner: payload.user.banner } : {}),

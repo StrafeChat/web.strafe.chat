@@ -72,7 +72,7 @@ An event frame nests: the outer `d` is the envelope, its `t` is the event type a
 {
   "op": 4,
   "d": {
-    "user": { "id": "2105141069376131072", "username": "Docs_Bot", "discriminator": "2994", "display_name": "Docs Bot", "public_flags": 0, "bot": true },
+    "user": { "id": "2105141069376131072", "username": "Docs_Bot", "display_name": "Docs Bot", "public_flags": 0, "bot": true },
     "session_id": "0",
     "rooms": [ { "id": "…", "type": 1, "recipients": ["…"], "e2ee_enabled": true, "created_at": "…" } ],
     "relationships": [],

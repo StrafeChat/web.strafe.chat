@@ -26,7 +26,6 @@ export interface DiscoverListing {
 export interface DiscoverUser {
   id: string;
   username: string;
-  discriminator: string;
   display_name: string;
   avatar?: string;
   bot?: boolean;

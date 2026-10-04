@@ -10,15 +10,6 @@ import { setSpaceMembers } from './spaceMembers';
 import type { Relationship } from '../api/relationships';
 import type { RoomParticipant } from '../api/rooms';
 
-function parseDisc(v: unknown): number | undefined {
-  if (typeof v === 'number' && !Number.isNaN(v)) return v;
-  if (typeof v === 'string') {
-    const n = parseInt(v, 10);
-    return Number.isNaN(n) ? undefined : n;
-  }
-  return undefined;
-}
-
 function patchFromPayload(data: Record<string, unknown>): Partial<RoomParticipant> {
   const out: Partial<RoomParticipant> = {};
   if (typeof data.avatar === 'string') out.avatar = data.avatar;
@@ -30,8 +21,6 @@ function patchFromPayload(data: Record<string, unknown>): Partial<RoomParticipan
   if (typeof data.pronouns === 'string') out.pronouns = data.pronouns;
   if (typeof data.birthday === 'string') out.birthday = data.birthday;
   if (typeof data.is_birthday === 'boolean') out.is_birthday = data.is_birthday;
-  const d = parseDisc(data.discriminator);
-  if (d !== undefined) out.discriminator = d;
   return out;
 }
 
@@ -48,13 +37,11 @@ export function initUserProfileHandler(): () => void {
 
     const selfId = auth.user?.id;
     if (selfId === userId && auth.user) {
-      const disc = parseDisc(data.discriminator);
       setAuthUser({
         ...auth.user,
         ...patch,
         display_name: typeof data.display_name === 'string' ? data.display_name : auth.user.display_name,
         username: typeof data.username === 'string' ? data.username : auth.user.username,
-        discriminator: disc ?? auth.user.discriminator,
         avatar: typeof data.avatar === 'string' ? data.avatar : auth.user.avatar,
         banner: typeof data.banner === 'string' ? data.banner : auth.user.banner,
         bio: typeof data.bio === 'string' ? data.bio : auth.user.bio,
@@ -81,10 +68,6 @@ export function initUserProfileHandler(): () => void {
                 pronouns: typeof data.pronouns === 'string' ? data.pronouns : r.user.pronouns,
                 birthday: typeof data.birthday === 'string' ? data.birthday : r.user.birthday,
                 is_birthday: typeof data.is_birthday === 'boolean' ? data.is_birthday : r.user.is_birthday,
-                discriminator:
-                  typeof data.discriminator === 'string'
-                    ? data.discriminator
-                    : String(r.user.discriminator ?? '0').padStart(4, '0'),
               },
             }
           : r,

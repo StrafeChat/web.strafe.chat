@@ -9,7 +9,6 @@ import { patchMe } from '../../api/users';
 import { openUserSettings } from '../../stores/userSettingsModal';
 import { openMobileRoom, setMobileTab } from '../../stores/mobileShellLayout';
 import { incomingFriendRequests } from '../../lib/mobileNotifications';
-import { formatDiscriminator } from '../settings/types';
 import { appChannelRail, appListRow, appListRowIdle, appPageHeader, appPageTitle, appSectionLabel } from '../../theme/appChrome';
 import { MOBILE_TAB_BAR_HEIGHT } from './MobileTabBar';
 import { t } from '../../i18n';
@@ -29,7 +28,7 @@ export const MobileYouPanel: Component = () => {
   const userId = () => auth.user?.id ?? '';
   const me = () => (userId() ? presence.byUser[userId()] : undefined);
   const displayName = () => auth.user?.display_name || auth.user?.username || '';
-  const handle = () => `${auth.user?.username ?? ''}#${formatDiscriminator(auth.user?.discriminator ?? 0)}`;
+  const handle = () => auth.user?.username ?? '';
   const requestCount = () => incomingFriendRequests().length;
 
   async function setStatus(status: UserPresence['status']) {

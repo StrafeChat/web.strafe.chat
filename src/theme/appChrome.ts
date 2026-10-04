@@ -105,7 +105,7 @@ export const appMenuSeparator = 'my-1 border-t border-border/60';
 /** Small uppercase group label: sidebar sections, member buckets, settings sections. */
 export const appSectionLabel = 'text-[11px] font-semibold uppercase tracking-wider text-muted-foreground';
 
-/** The `@name#0001` handle under a display name, everywhere one is shown. */
+/** The `@name` handle under a display name, everywhere one is shown. */
 export const appNameTagLine =
   'text-xs font-normal text-muted-foreground transition-colors hover:text-foreground';
 

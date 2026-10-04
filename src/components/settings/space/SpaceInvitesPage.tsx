@@ -161,7 +161,6 @@ export const SpaceInvitesPage: Component<Props> = (props) => {
                             size="sm"
                             name={inv.inviter?.display_name || inv.inviter?.username || t('common.someone')}
                             username={inv.inviter?.username}
-                            discriminator={inv.inviter?.discriminator}
                             avatar={inv.inviter?.avatar}
                           />
                         </td>

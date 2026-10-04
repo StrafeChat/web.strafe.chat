@@ -315,7 +315,7 @@ const MemberRow: Component<{
           bot: props.p.bot,
           username: props.p.username,
           displayName: displayName(),
-          discriminator: props.p.discriminator,
+          homeDomain: props.p.home_domain,
           currentUserId: props.currentUserId,
           onMessage: props.onMessageUser,
           spaceId: props.spaceId,

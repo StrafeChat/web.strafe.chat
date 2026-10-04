@@ -55,7 +55,6 @@ export function checkInstanceInvite(code: string) {
 export interface AdminUser {
   id: string;
   username: string;
-  discriminator: string;
   display_name: string;
   avatar?: string;
   home_domain?: string;

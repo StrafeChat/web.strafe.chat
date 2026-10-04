@@ -4,7 +4,6 @@ import { api } from './client';
 export interface VoiceUserSummary {
   id: string;
   username: string;
-  discriminator: number;
   display_name: string;
   avatar?: string;
   /** Set for someone on another instance (see stores/federationIds). */

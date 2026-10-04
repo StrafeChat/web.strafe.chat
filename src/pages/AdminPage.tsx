@@ -1,4 +1,5 @@
 import type { Component } from 'solid-js';
+import { formatHandle } from '../stores/instance';
 import { createEffect, createResource, createSignal, For, Show } from 'solid-js';
 import { A, Navigate, useNavigate } from '@solidjs/router';
 import { BADGES } from '../lib/badges';
@@ -66,7 +67,7 @@ const chipOn = 'bg-primary/20 text-foreground ring-1 ring-inset ring-primary/30'
 const chipOff = 'bg-muted/40 text-muted-foreground hover:bg-accent hover:text-foreground';
 
 const when = (iso?: string) => (iso ? formatDate(iso, { dateStyle: 'medium', timeStyle: 'short' }) || iso : '');
-const tag = (u: AdminUser | null | undefined) => (u ? `${u.username}#${u.discriminator}` : t('common.unknown'));
+const tag = (u: AdminUser | null | undefined) => (u ? formatHandle(u) : t('common.unknown'));
 const nameOf = (u: AdminUser | null | undefined) => u?.display_name || u?.username || t('common.unknown');
 
 /**

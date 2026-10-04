@@ -5,7 +5,6 @@
 export interface User {
   id: string;
   username: string;
-  discriminator: number;
   display_name: string;
   avatar?: string;
   banner?: string;

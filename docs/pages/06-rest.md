@@ -16,7 +16,7 @@ All paths are relative to this instance's API base: <code data-instance="api">ht
 The authenticated account. `email` is present for sessions and bots (a bot's is synthetic) and for OAuth2 tokens with `email`.
 
 ```json
-{ "id": "…", "email": "", "username": "Docs_Bot", "discriminator": "2994", "display_name": "Docs Bot", "bio": "", "about_me": "", "pronouns": "they/them", "birthday": "09-01", "birthday_opt_in": true, "avatar": "", "banner": "", "accent_color": "", "public_flags": 0, "bot": true, "presence": { "status": "online" } }
+{ "id": "…", "email": "", "username": "Docs_Bot", "display_name": "Docs Bot", "bio": "", "about_me": "", "pronouns": "they/them", "birthday": "09-01", "birthday_opt_in": true, "avatar": "", "banner": "", "accent_color": "", "public_flags": 0, "bot": true, "presence": { "status": "online" } }
 ```
 
 `pronouns` is free text (max 40 characters) and is public, like the bio - it rides along on every user object (message authors, `mention_users`, space members, relationships). `birthday` is `"MM-DD"` with no year, derived from the date of birth given at registration, and `birthday_opt_in` says whether the account wants it announced in spaces. The owner's own `birthday` is returned whether or not they opted in so their settings can show it; on other people's user objects both `birthday` and `is_birthday` appear only after they opt in.
@@ -158,7 +158,7 @@ Any room the account can see, space rooms included. Space rooms carry `space_id`
 
 ### `POST` /rooms
 
-Open a PM: `{"recipient_id": "…"}` (or `recipient_handle: "name#1234"`), or a group: `{"name", "recipient_ids": [...]}`. Returns the room. PMs are end-to-end encrypted by default, so a bot can open one but cannot read it until the person turns encryption off for that PM.
+Open a PM: `{"recipient_id": "…"}` (or `recipient_handle: "name"`), or a group: `{"name", "recipient_ids": [...]}`. Returns the room. PMs are end-to-end encrypted by default, so a bot can open one but cannot read it until the person turns encryption off for that PM.
 
 ### `POST` /rooms/:id/typing
 

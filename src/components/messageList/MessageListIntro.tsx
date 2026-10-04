@@ -22,10 +22,6 @@ export const MessageListIntro: Component<MessageListIntroProps> = (props) => (
     <Show when={props.roomType === 1 && props.pmOther}>
       {(other) => {
         const username = () => other().username || t('common.unknown');
-        const discrim = () => {
-          const d = other().discriminator;
-          return d != null ? String(d).padStart(4, '0') : null;
-        };
         return (
           <div class="flex flex-col items-center text-center pb-6 shrink-0">
             <div class="relative shrink-0 mb-3">
@@ -36,9 +32,6 @@ export const MessageListIntro: Component<MessageListIntroProps> = (props) => (
             </div>
             <p class="text-base" dir="ltr">
               <span class="font-semibold text-foreground">{username()}</span>
-              <Show when={discrim()}>
-                {(d) => <span class="text-muted-foreground font-normal">#{d()}</span>}
-              </Show>
             </p>
             <p class="text-xs text-muted-foreground/90 mt-3 max-w-[280px]">{t('intro.pmEncrypted')}</p>
           </div>

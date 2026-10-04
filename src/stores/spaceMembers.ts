@@ -119,12 +119,6 @@ export function initSpaceMembersHandlers(): () => void {
       const member: SpaceMember = {
         id,
         username: typeof d.username === 'string' ? d.username : '',
-        discriminator:
-          typeof d.discriminator === 'number'
-            ? d.discriminator
-            : typeof d.discriminator === 'string'
-              ? parseInt(d.discriminator, 10)
-              : undefined,
         display_name: typeof d.display_name === 'string' ? d.display_name : '',
         avatar: typeof d.avatar === 'string' ? d.avatar : undefined,
         banner: typeof d.banner === 'string' ? d.banner : undefined,

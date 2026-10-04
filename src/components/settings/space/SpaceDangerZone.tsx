@@ -1,4 +1,5 @@
 import type { Component } from 'solid-js';
+import { userOptionLabel } from '../../../stores/instance';
 import { createMemo, createSignal, For, Show } from 'solid-js';
 import { deleteSpace, transferSpaceOwnership, type Space, type SpaceMember } from '../../../api/spaces';
 import { addOrUpdateSpace, removeSpace } from '../../../stores/spaces';
@@ -137,7 +138,7 @@ export const SpaceDangerZone: Component<Props> = (props) => {
               <For each={candidates()}>
                 {(m) => (
                   <option value={m.id}>
-                    {memberName(m)}#{String(m.discriminator ?? 0).padStart(4, '0')}
+                    {userOptionLabel(m)}
                   </option>
                 )}
               </For>

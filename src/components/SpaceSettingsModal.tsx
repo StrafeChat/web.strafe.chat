@@ -1,4 +1,5 @@
 import type { Component } from 'solid-js';
+import { userOptionLabel } from '../stores/instance';
 import { createSignal, createEffect, createMemo, For, Show } from 'solid-js';
 import {
   createSpaceRole,
@@ -927,7 +928,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                                 <For each={props.members}>
                                   {(m) => (
                                     <option value={m.id}>
-                                      {m.display_name || m.username}#{m.discriminator}
+                                      {userOptionLabel(m)}
                                     </option>
                                   )}
                                 </For>
@@ -983,7 +984,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                                 <For each={roleMembers()}>
                                   {(m) => (
                                     <div class="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 hover:bg-muted/20">
-                                      <UserCell size="sm" name={m.display_name || m.username} bot={m.bot} username={m.username} discriminator={m.discriminator} avatar={m.avatar} />
+                                      <UserCell size="sm" name={m.display_name || m.username} bot={m.bot} username={m.username} avatar={m.avatar} />
                                       <Show when={props.canManageRoles && canAssignTo(m.id) && !roleLockedForViewer(r()) && !r().bot_id}>
                                         <button
                                           type="button"
@@ -1029,7 +1030,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                                         disabled={busy()}
                                         onClick={() => toggleMemberInRole(m.id, true)}
                                       >
-                                        <UserCell size="sm" name={m.display_name || m.username} bot={m.bot} username={m.username} discriminator={m.discriminator} avatar={m.avatar} />
+                                        <UserCell size="sm" name={m.display_name || m.username} bot={m.bot} username={m.username} avatar={m.avatar} />
                                         <i class="fa-solid fa-plus shrink-0 text-xs text-muted-foreground" aria-hidden="true" />
                                       </button>
                                     )}

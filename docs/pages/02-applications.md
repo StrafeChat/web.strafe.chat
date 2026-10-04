@@ -22,7 +22,7 @@ The **client ID** is the application's id. It is public - it appears in install 
 Click **Add Bot** on the application. This creates the bot account and shows its **token** once. Two things are worth knowing:
 
 - **The bot's user ID is the application's client ID.** Wherever the bot appears (a member list, a message's `sender_id`), that id is also the `client_id` of its install link, so anyone can add the bot without looking anything up.
-- The bot's username is derived from the application's name (`Weather Bot` → `Weather_Bot`) with a random discriminator, and its display name is the application's name. Its avatar starts as the application's icon.
+- The bot's username is derived from the application's name (`Weather Bot` → `Weather_Bot`) and, if that username is taken, given a numeric suffix (`Weather_Bot2`); its display name is the application's name. Its avatar starts as the application's icon.
 
 ### The bot's profile
 

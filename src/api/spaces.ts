@@ -221,7 +221,6 @@ export interface SpaceRoomUserOverride {
 export interface UserSummary {
   id: string;
   username: string;
-  discriminator: number;
   display_name: string;
   avatar?: string;
   bot?: boolean;

@@ -89,13 +89,6 @@ function normId(v: unknown): string | null {
   return null;
 }
 
-/** Normalize discriminator to 4-digit string. */
-function disc(d: unknown): string {
-  if (typeof d === 'number') return String(d).padStart(4, '0');
-  if (typeof d === 'string') return d;
-  return '0';
-}
-
 const VALID_RELATIONSHIP_TYPES = new Set<number>([0, 1, 2, 3, 4, 5, 6]);
 /** Normalize relationship type from a WS payload; falls back to Friend for out-of-range values. */
 function relType(v: unknown): RelationshipType {
@@ -114,7 +107,6 @@ function userFromPayload(u: unknown): RelationshipUser | null {
   return {
     id,
     username,
-    discriminator: disc(o.discriminator),
     display_name: (typeof o.display_name === 'string' ? o.display_name : '') || username,
     avatar: typeof o.avatar === 'string' ? o.avatar : undefined,
     banner: typeof o.banner === 'string' ? o.banner : undefined,

@@ -36,10 +36,6 @@ function statusLabel(status: string | undefined): string {
   }
 }
 
-function formatDiscriminator(d: number): string {
-  return String(d).padStart(4, '0');
-}
-
 export const UserArea: Component = () => {
   const navigate = useNavigate();
   const [isHovering, setIsHovering] = createSignal(false);
@@ -55,8 +51,6 @@ export const UserArea: Component = () => {
   const p = () => (userId() ? presence.byUser[userId()] : undefined);
   const displayName = () => auth.user?.display_name || auth.user?.username || '';
   const username = () => auth.user?.username || '';
-  const discriminator = () => auth.user?.discriminator ?? 0;
-  const discriminatorStr = () => formatDiscriminator(discriminator());
 
   const statusText = () => {
     const pres = p();
@@ -64,7 +58,7 @@ export const UserArea: Component = () => {
     return statusLabel(pres?.status);
   };
 
-  const subtitleText = () => (isHovering() ? `${username()}#${discriminatorStr()}` : statusText());
+  const subtitleText = () => (isHovering() ? username() : statusText());
 
   function handleDocumentClick(e: MouseEvent) {
     const target = e.target as Node;
@@ -80,8 +74,8 @@ export const UserArea: Component = () => {
     }
   }
 
-  function copyDiscriminator() {
-    navigator.clipboard.writeText(`${username()}#${discriminatorStr()}`);
+  function copyUsername() {
+    navigator.clipboard.writeText(username());
   }
 
   async function setStatus(status: UserPresence['status']) {
@@ -252,11 +246,11 @@ export const UserArea: Component = () => {
                 <h3 class="mt-2.5 text-lg font-semibold leading-tight text-foreground">{displayName()}</h3>
                 <button
                   type="button"
-                  onClick={copyDiscriminator}
+                  onClick={copyUsername}
                   class="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground"
                   title={t('userArea.copyUsername')}
                 >
-                  {username()}#{discriminatorStr()}
+                  {username()}
                   <i class="fa-regular fa-copy text-[10px]" aria-hidden="true" />
                 </button>
               </div>

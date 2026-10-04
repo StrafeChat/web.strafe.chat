@@ -32,7 +32,6 @@ export interface MessageReaction {
 export interface Reactor {
   id: string;
   username: string;
-  discriminator: number;
   display_name: string;
   avatar?: string;
 }

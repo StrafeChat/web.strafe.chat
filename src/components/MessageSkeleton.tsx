@@ -3,11 +3,13 @@ import { For, Show } from 'solid-js';
 import { settings } from '../stores/settings';
 
 /**
- * Placeholder rows drawn while a room's messages load. They use the real message layout
- * (the same avatar size, gutter, group spacing and line heights as MessageList, in cozy or
- * compact mode) so the page doesn't reflow when the messages arrive, and they vary the way
- * a real conversation does: multi-message groups from one sender, short one-liners, long
- * paragraphs, an image, a reply, a row of reactions.
+ * Placeholder rows drawn while a room's messages load. They are built with the same classes
+ * as the real rows in MessageListView - the column's padding and 8px row gap, the row's
+ * gutter and padding, the 40px avatar column, the 20px header line, the body's text-sm /
+ * leading-relaxed line pitch, the group spacing, in cozy or compact mode - so every bar sits
+ * exactly where the message that replaces it will, and nothing reflows when they arrive.
+ * They vary the way a real conversation does: multi-message groups from one sender, short
+ * one-liners, long paragraphs, an image, a reply, a row of reactions.
  */
 
 type SkeletonKind = 'text' | 'long' | 'image' | 'reply' | 'reactions' | 'short';
@@ -46,20 +48,29 @@ const SCRIPT: SkeletonGroup[] = [
 
 const pulse = 'animate-pulse rounded bg-muted';
 
-const Lines: Component<{ lines: number[]; leading?: boolean }> = (props) => (
-  <For each={props.lines}>
-    {(w, i) => <div class={`h-4 ${pulse} ${i() === 0 && props.leading === false ? '' : 'mt-1.5'}`} style={{ width: `${w}%` }} />}
-  </For>
+/** One body line in cozy mode: the real body is text-sm with leading-relaxed, so the bar is
+ * centred in a line box of exactly that height and consecutive lines keep the real pitch. */
+const CozyLine: Component<{ width: number }> = (props) => (
+  <div class="flex h-[1.625em] items-center text-sm">
+    <div class={`h-3.5 ${pulse} bg-muted/80`} style={{ width: `${props.width}%` }} />
+  </div>
 );
 
-/** The extras a message kind adds under its text lines. */
+/** One line in compact mode: text-sm at its default 20px line height. */
+const CompactLine: Component<{ width: number }> = (props) => (
+  <div class="flex h-5 items-center text-sm">
+    <div class={`h-3.5 ${pulse} bg-muted/80`} style={{ width: `${props.width}%` }} />
+  </div>
+);
+
+/** The extras a message kind adds under its text lines, at the real attachment/reaction offsets. */
 const Extras: Component<{ kind: SkeletonKind }> = (props) => (
   <>
     <Show when={props.kind === 'image'}>
-      <div class={`mb-2 mt-2 h-44 w-full max-w-[320px] rounded-lg ${pulse} bg-muted/80`} />
+      <div class={`mt-1 h-44 w-full max-w-[320px] rounded-lg ${pulse} bg-muted/80`} />
     </Show>
     <Show when={props.kind === 'reactions'}>
-      <div class="mt-2 flex gap-1.5">
+      <div class="mt-1 flex gap-1">
         <div class={`h-6 w-11 rounded-full ${pulse} bg-muted/80`} />
         <div class={`h-6 w-11 rounded-full ${pulse} bg-muted/70`} />
         <div class={`h-6 w-14 rounded-full ${pulse} bg-muted/60`} />
@@ -68,7 +79,8 @@ const Extras: Component<{ kind: SkeletonKind }> = (props) => (
   </>
 );
 
-/** The "replying to …" line above a reply. */
+/** The "replying to …" line above a reply: 20px plus the 4px it keeps from the message, the
+ * same 24px the real row pushes its avatar down by. */
 const ReplyLine: Component = () => (
   <div class="mb-1 flex h-5 items-center gap-1.5">
     <div class={`size-4 rounded-full ${pulse} bg-muted/80`} />
@@ -78,74 +90,90 @@ const ReplyLine: Component = () => (
 );
 
 /**
- * The rows themselves, for the empty-room skeleton and the load-older placeholder alike.
- * `groups` caps how many sender groups are drawn (from the top of the script).
+ * The rows themselves, for the whole-room skeleton and the load-older placeholder alike.
+ * `groups` is how many sender groups to draw; the script repeats past its end so a tall
+ * viewport can be filled.
  */
 export const MessageSkeletonRows: Component<{ groups?: number; class?: string }> = (props) => {
   const compact = () => !!settings.messageCompact;
-  const script = () => SCRIPT.slice(0, props.groups ?? SCRIPT.length);
+  const script = () => {
+    const n = props.groups ?? SCRIPT.length;
+    return Array.from({ length: n }, (_, i) => SCRIPT[i % SCRIPT.length]);
+  };
+  // The same spacing rules as a real row: the column gaps rows by 8px; a group's header row
+  // adds the configured group spacing (not the very first row); a follow-up row pulls itself
+  // up to sit tight under the previous one.
+  const rowClass = (gi: number, mi: number) =>
+    `flex gap-3 -mx-2 px-2 py-0.5 ${
+      mi === 0 ? (gi === 0 ? '' : 'mt-[var(--space-message-group)]') : compact() ? '-mt-0.5' : '-mt-1'
+    }`;
   return (
-    <div class={`flex flex-col ${props.class ?? ''}`} aria-hidden="true">
+    <div class={`flex flex-col gap-2 ${props.class ?? ''}`} aria-hidden="true">
       <For each={script()}>
         {(group, gi) => (
-          <div class={gi() === 0 ? '' : 'mt-[var(--space-message-group)]'}>
-            <For each={group.messages}>
-              {(m, mi) => (
-                <Show
-                  when={!compact()}
-                  fallback={
-                    <div class="-mx-2 flex items-start gap-x-2 px-2 py-0.5">
-                      <div class={`mt-1 h-3 w-12 shrink-0 ${pulse} bg-muted/60`} />
-                      <div class="min-w-0 flex-1">
-                        <Show when={m.kind === 'reply'}>
-                          <ReplyLine />
-                        </Show>
-                        <div class="flex items-center gap-2">
-                          <Show when={mi() === 0}>
-                            <div class={`h-4 shrink-0 ${pulse}`} style={{ width: `${group.name}px` }} />
-                          </Show>
-                          <div class={`h-4 ${pulse} bg-muted/80`} style={{ width: `${m.lines[0]}%` }} />
-                        </div>
-                        <Lines lines={m.lines.slice(1)} />
-                        <Extras kind={m.kind} />
-                      </div>
-                    </div>
-                  }
-                >
-                  <div class={`-mx-2 flex gap-3 px-2 py-0.5 ${mi() === 0 ? '' : '-mt-1'}`}>
-                    <Show when={mi() === 0} fallback={<div class="size-10 shrink-0" />}>
-                      <div class={`size-10 shrink-0 rounded-full ${pulse}`} />
+          <For each={group.messages}>
+            {(m, mi) => (
+              <div class={rowClass(gi(), mi())}>
+                <Show when={!compact()}>
+                  {/* The avatar column is always there (a follow-up row keeps the gutter). */}
+                  <div class="flex w-10 shrink-0 flex-col items-center">
+                    <Show when={mi() === 0}>
+                      <div class={`size-10 shrink-0 rounded-full ${pulse} ${m.kind === 'reply' ? 'mt-6' : ''}`} />
                     </Show>
-                    <div class="min-w-0 flex-1">
-                      <Show when={m.kind === 'reply'}>
-                        <ReplyLine />
-                      </Show>
-                      <Show when={mi() === 0}>
-                        <div class="mb-1 flex items-center gap-2">
-                          <div class={`h-4 ${pulse}`} style={{ width: `${group.name}px` }} />
-                          <div class={`h-3 w-14 ${pulse} bg-muted/60`} />
-                        </div>
-                      </Show>
-                      <div class={`h-4 ${pulse} bg-muted/80`} style={{ width: `${m.lines[0]}%` }} />
-                      <Lines lines={m.lines.slice(1)} />
-                      <Extras kind={m.kind} />
-                    </div>
                   </div>
                 </Show>
-              )}
-            </For>
-          </div>
+                <div class="min-w-0 flex-1">
+                  <Show when={m.kind === 'reply'}>
+                    <ReplyLine />
+                  </Show>
+                  <Show
+                    when={!compact()}
+                    fallback={
+                      <div class="flex h-5 items-center gap-x-2 text-sm">
+                        <div class={`h-3.5 shrink-0 ${pulse}`} style={{ width: `${group.name}px` }} />
+                        <div class={`h-2.5 w-11 shrink-0 ${pulse} bg-muted/60`} />
+                        <div class={`h-3.5 ${pulse} bg-muted/80`} style={{ width: `${m.lines[0]}%` }} />
+                      </div>
+                    }
+                  >
+                    <Show when={mi() === 0}>
+                      <div class="mb-0.5 flex h-5 items-center gap-2 text-sm">
+                        <div class={`h-3.5 ${pulse}`} style={{ width: `${group.name}px` }} />
+                        <div class={`h-3 w-14 ${pulse} bg-muted/60`} />
+                      </div>
+                    </Show>
+                    <CozyLine width={m.lines[0]} />
+                  </Show>
+                  <For each={m.lines.slice(1)}>
+                    {(w) => (
+                      <Show when={!compact()} fallback={<CompactLine width={w} />}>
+                        <CozyLine width={w} />
+                      </Show>
+                    )}
+                  </For>
+                  <Extras kind={m.kind} />
+                </div>
+              </div>
+            )}
+          </For>
         )}
       </For>
     </div>
   );
 };
 
-/** The whole-room skeleton: fills the message column from the bottom, like messages do. */
+/**
+ * The whole-room skeleton. The same column as MessageList (its padding, bottom-anchored, clear
+ * of the floating composer), so the rows stand where the messages will; it is anchored to the
+ * bottom edge rather than laid out from the top, so a script taller than the viewport runs off
+ * the top the way older history does, never under the composer.
+ */
 export const MessageSkeleton: Component = () => (
-  <div class="flex min-h-0 flex-1 flex-col overflow-hidden">
-    <div class="flex min-h-full flex-col justify-end px-4 pb-4 pt-6">
-      <MessageSkeletonRows />
+  <div class="relative flex-1 min-h-0">
+    <div class="absolute inset-0 overflow-hidden">
+      <div class="absolute inset-x-0 bottom-0 flex flex-col p-4 pb-[calc(var(--composer-height,0px)+0.25rem)]">
+        <MessageSkeletonRows groups={SCRIPT.length * 2} />
+      </div>
     </div>
   </div>
 );

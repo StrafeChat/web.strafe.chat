@@ -96,7 +96,6 @@ curl -H "Authorization: Bearer $ACCESS_TOKEN" <API>/users/@me
 {
   "id": "2102223172425220096",
   "username": "unreadtester1",
-  "discriminator": "5441",
   "display_name": "unreadtester1",
   "email": "unread-tester-1@example.com",
   "avatar": "",
@@ -118,7 +117,7 @@ A token can only reach the endpoints its scopes name. Every other endpoint answe
 
 | Scope | Grants | Endpoints |
 | --- | --- | --- |
-| `identify` | The person's id, username, discriminator, display name, avatar, banner, bio, about me, badges (`public_flags`) - **not** their email | `GET /users/@me` |
+| `identify` | The person's id, username, display name, avatar, banner, bio, about me, badges (`public_flags`) - **not** their email | `GET /users/@me` |
 | `email` | Their email address as well | `GET /users/@me` (adds `email`) |
 | `spaces` | The spaces they are in, whether they own each, and their permissions there | `GET /users/@me/spaces` |
 | `spaces.join` | Lets a bot of yours add them to a space, without an invite | `PUT /spaces/:id/members/:user_id` (called by the bot) |
@@ -166,7 +165,7 @@ People can also revoke from their side: **Settings → Authorized Apps** lists e
   "application": { "id": "2104652899186380800", "name": "Login With Strafe Demo", "description": "", "icon": "", "has_bot": false, "bot_public": false },
   "scopes": ["identify", "email"],
   "expires": "2026-10-07T03:41:56Z",
-  "user": { "id": "2102223172425220096", "username": "unreadtester1", "discriminator": "5441", "display_name": "unreadtester1", "avatar": "", "public_flags": 0 }
+  "user": { "id": "2102223172425220096", "username": "unreadtester1", "display_name": "unreadtester1", "avatar": "", "public_flags": 0 }
 }
 ```
 

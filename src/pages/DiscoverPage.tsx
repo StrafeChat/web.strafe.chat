@@ -178,7 +178,7 @@ const BotCard: Component<{ entry: DiscoverEntry; onAdd: () => void }> = (props) 
         <MessageAvatar name={bot().bot?.display_name || bot().name} avatar={bot().bot?.avatar || bot().icon} class="size-12 rounded-xl text-base" />
         <div class="min-w-0">
           <h2 class="truncate text-sm font-semibold text-foreground">{bot().bot?.display_name || bot().name}</h2>
-          <Show when={bot().bot}>{(u) => <p class="truncate text-xs text-muted-foreground">{u().username}#{u().discriminator}</p>}</Show>
+          <Show when={bot().bot}>{(u) => <p class="truncate text-xs text-muted-foreground">@{u().username}</p>}</Show>
         </div>
       </div>
       <p class="line-clamp-3 text-sm text-muted-foreground">{props.entry.tagline || bot().description}</p>

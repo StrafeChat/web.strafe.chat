@@ -105,12 +105,21 @@ export function loadInstanceInfo(): Promise<void> {
   return inflight;
 }
 
-/** Format a user as name#0001[@domain], showing the domain only for remote users. */
-export function formatHandle(u: { username?: string; discriminator?: number | string; home_domain?: string }): string {
-  const disc = u.discriminator == null ? '' : `#${String(u.discriminator).padStart(4, '0')}`;
-  const base = `${u.username ?? ''}${disc}`;
+/** Format a user as name[@domain], showing the domain only for remote users. Usernames are
+ * unique on their own (no #0001 tag), so this is also what you give someone to add you. */
+export function formatHandle(u: { username?: string; home_domain?: string }): string {
+  const base = u.username ?? '';
   if (u.home_domain && instance.domain && u.home_domain !== instance.domain) return `${base}@${u.home_domain}`;
   return base;
+}
+
+/** A member's label for an <option> or a one-line list: the display name with the username
+ * after it when they differ ("Alice (alice)"), otherwise just "@username". */
+export function userOptionLabel(u: { username?: string; display_name?: string }): string {
+  const name = u.display_name?.trim();
+  const user = u.username ?? '';
+  if (name && name !== user) return `${name} (${user})`;
+  return `@${user}`;
 }
 
 /** True when the user lives on another instance. */

@@ -8,7 +8,6 @@ interface UserCellProps {
   /** Bot accounts get the BOT tag right after the name. */
   bot?: boolean;
   username?: string;
-  discriminator?: number;
   avatar?: string;
   /** Extra line under the tag (e.g. "joined …"). */
   subline?: string;
@@ -28,7 +27,6 @@ export const UserCell: Component<UserCellProps> = (props) => (
       <Show when={props.username}>
         <p class="truncate text-xs text-muted-foreground">
           @{props.username}
-          <Show when={props.discriminator != null}>#{String(props.discriminator).padStart(4, '0')}</Show>
           <Show when={props.subline}> · {props.subline}</Show>
         </p>
       </Show>

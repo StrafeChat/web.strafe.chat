@@ -38,13 +38,13 @@ function friendStatusText(rel: Relationship): string | undefined {
   return presence.byUser[rel.user.id]?.custom_status ?? rel.user.presence?.custom_status;
 }
 
-/** name#0001, plus @domain for someone on another instance. */
+/** The username, plus @domain for someone on another instance. */
 function userTag(rel: Relationship): string {
   return formatHandle(rel.user);
 }
 
-/** The same grammar equinox accepts: name#0001, optionally @domain[:port]. */
-const HANDLE_RE = /^([A-Za-z0-9_.\-]{2,32})#(\d{1,4})(?:@([A-Za-z0-9.\-]+(?::\d+)?))?$/;
+/** The same grammar equinox accepts: a username, optionally @domain[:port]. */
+const HANDLE_RE = /^([A-Za-z0-9_.\-]{2,32})(?:@([A-Za-z0-9.\-]+(?::\d+)?))?$/;
 
 const TAB_IDS: TabId[] = ['online', 'all', 'pending', 'blocked'];
 
@@ -90,11 +90,11 @@ const FriendsPage: Component = () => {
   const [actionLoading, setActionLoading] = createSignal<string | null>(null);
   const [messageLoading, setMessageLoading] = createSignal<string | null>(null);
 
-  /** What to give other people: name#0001, with @domain when this instance federates. */
+  /** What to give other people: the username, with @domain when this instance federates. */
   const myHandle = () => {
     const u = auth.user;
     if (!u) return '';
-    const base = formatHandle({ username: u.username, discriminator: u.discriminator });
+    const base = formatHandle({ username: u.username });
     return instance.federationEnabled && instance.domain ? `${base}@${instance.domain}` : base;
   };
 
@@ -252,7 +252,7 @@ const FriendsPage: Component = () => {
               <Input
                 type="text"
                 label={t('friends.username')}
-                placeholder={instance.federationEnabled ? 'turtle#1234@their.instance' : 'turtle#1234'}
+                placeholder={instance.federationEnabled ? 'turtle@their.instance' : 'turtle'}
                 value={addHandle()}
                 onInput={(e) => {
                   setAddHandle(e.currentTarget.value);
