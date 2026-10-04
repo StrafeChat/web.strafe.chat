@@ -198,7 +198,9 @@ export const SpaceBar: Component = () => {
       rooms.rooms.filter((r) => {
         if (!((r.type === 1 || r.type === 2) && !r.space_id)) return false;
         if (isNotesRoom(r, currentUserId())) return false;
-        if (activePmRoomId() === r.id) return true;
+        // Only unread DMs appear here; opening a PM (it becomes the active room, so
+        // dmUnread returns 0) drops its avatar from the rail right away, and it stays
+        // gone once the open conversation is marked read.
         return !isRoomMuted(r) && dmUnread(r) > 0;
       }),
     );
