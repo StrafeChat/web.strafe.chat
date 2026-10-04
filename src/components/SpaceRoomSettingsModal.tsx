@@ -46,6 +46,9 @@ interface Props {
   room: SpaceRoom | null;
   members: SpaceMember[];
   canManageRooms: boolean;
+  /** Discord's split: Manage Rooms edits the room itself, Manage Roles edits its permission
+   * overrides (the server enforces the same on the override endpoints). */
+  canManageRoles: boolean;
   onSaved: () => void;
 }
 
@@ -80,7 +83,7 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
 
   createEffect(() => {
     if (!props.open || !props.room) return;
-    setPage('general');
+    setPage(props.canManageRooms || !props.canManageRoles ? 'general' : 'overrides');
     setErr('');
     setName(props.room.name ?? '');
     setTopic(props.room.topic ?? '');
@@ -117,7 +120,7 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
   async function togglePrivateCategory(next: boolean) {
     const room = props.room;
     const eid = everyoneRoleId();
-    if (!room || !props.canManageRooms || !eid) return;
+    if (!room || !props.canManageRoles || !eid) return;
     setBusy(true);
     setErr('');
     try {
@@ -254,7 +257,7 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
   }
 
   async function saveOverride() {
-    if (!props.room || !props.canManageRooms) return;
+    if (!props.room || !props.canManageRoles) return;
     setBusy(true);
     setErr('');
     try {
@@ -281,7 +284,7 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
   }
 
   async function clearOverride() {
-    if (!props.room || !props.canManageRooms) return;
+    if (!props.room || !props.canManageRoles) return;
     setBusy(true);
     setErr('');
     try {
@@ -469,7 +472,7 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
                 </div>
                 <Toggle
                   checked={isPrivateCategory()}
-                  disabled={!props.canManageRooms || busy()}
+                  disabled={!props.canManageRoles || busy()}
                   onChange={(v) => void togglePrivateCategory(v)}
                 />
               </div>
@@ -528,7 +531,7 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
                     </div>
                     <TriStateToggle
                       state={overrideState(row.bit)}
-                      disabled={!props.canManageRooms || busy() || syncLocked()}
+                      disabled={!props.canManageRoles || busy() || syncLocked()}
                       onChange={(next) => setOverrideState(row.bit, next)}
                     />
                   </div>
@@ -536,10 +539,10 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
               </For>
             </div>
             <div class="flex flex-wrap gap-2">
-              <Button type="button" onClick={() => saveOverride()} disabled={!props.canManageRooms || busy() || syncLocked()} loading={busy()}>
+              <Button type="button" onClick={() => saveOverride()} disabled={!props.canManageRoles || busy() || syncLocked()} loading={busy()}>
                 {t('roomSettings.saveOverride')}
               </Button>
-              <Button type="button" variant="outline" onClick={() => clearOverride()} disabled={!props.canManageRooms || busy() || syncLocked()}>
+              <Button type="button" variant="outline" onClick={() => clearOverride()} disabled={!props.canManageRoles || busy() || syncLocked()}>
                 {t('roomSettings.clearOverride')}
               </Button>
             </div>

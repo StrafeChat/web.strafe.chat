@@ -63,6 +63,9 @@ export interface RoomMessageInputProps {
    * PermMentionEveryone; group PMs (no permission system) can pass true unconditionally;
    * 1:1 PMs should omit/leave false since mass-notifying one other person is meaningless. */
   canMentionEveryone?: boolean;
+  /** Space channels: set when the viewer lacks Use External Emojis there, so the picker
+   * offers only this space's custom emoji (Discord greys the others out). */
+  customEmojiSpaceId?: string;
   currentUserId?: string;
   /** Current selection start in the input (for mention trigger detection) */
   cursorPos?: number;
@@ -826,6 +829,7 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
                       onClose={() => setPickerOpen(false)}
                       onPickEmoji={handlePickEmoji}
                       onPickGif={handlePickGif}
+                      customEmojiSpaceId={props.customEmojiSpaceId}
                     />
                   </div>
                 </Portal>
@@ -926,6 +930,7 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
                 onClose={() => setPickerOpen(false)}
                 onPickEmoji={handlePickEmoji}
                 onPickGif={handlePickGif}
+                customEmojiSpaceId={props.customEmojiSpaceId}
               />
             </div>
           </Show>

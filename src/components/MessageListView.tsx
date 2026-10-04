@@ -111,6 +111,12 @@ export interface MessageListProps {
   /** When false, adding a new reaction is disabled (existing reactions still show, and the
    * viewer can still remove their own). Default true (DMs / non-space rooms). */
   canReact?: boolean;
+  /** May click an existing reaction pill to join it. Discord asks only Read Message History
+   * for that; Add Reactions (canReact) is needed to start a new one. Defaults to canReact. */
+  canJoinReactions?: boolean;
+  /** When set, the reaction picker offers only this space's custom emoji (viewer lacks Use
+   * External Emojis in the room). */
+  customEmojiSpaceId?: string;
   /** When false, room messages are plaintext (no E2EE). Show one banner and hide per-message "Not encrypted". */
   e2eeEnabled?: boolean;
   /** Reports near-bottom state for parent read/ack logic. */
@@ -241,6 +247,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
   // in (unfurling sends the link to the server, which it otherwise never sees there).
   const allowLinkPreviews = () => props.e2eeEnabled !== true || settings.linkPreviewsInEncrypted;
   const canReact = () => props.canReact !== false;
+  const canJoinReactions = () => props.canJoinReactions ?? canReact();
 
   let publishTimer: ReturnType<typeof setTimeout> | null = null;
   /** Report the bottom-most message with any part on screen - the viewport-ack cursor. */
@@ -1218,7 +1225,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                         roomId={props.roomId!}
                         messageId={msg.id}
                         reactions={msg.reactions!}
-                        canReact={canReact()}
+                        canReact={canJoinReactions()}
                         onToggle={(emoji, mine) => toggleReaction(props.roomId!, msg.id, emoji, mine).catch((err) => console.error('Toggle reaction failed:', err))}
                       />
                     </Show>
@@ -1283,7 +1290,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                         roomId={props.roomId!}
                         messageId={msg.id}
                         reactions={msg.reactions!}
-                        canReact={canReact()}
+                        canReact={canJoinReactions()}
                         onToggle={(emoji, mine) => toggleReaction(props.roomId!, msg.id, emoji, mine).catch((err) => console.error('Toggle reaction failed:', err))}
                       />
                     </Show>
@@ -1412,7 +1419,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                           height: `${anchor().height}px`,
                         }}
                       >
-                        <EmojiPicker onClose={() => setReactionPickerFor(null)} onPick={(pick) => pickReaction(msg, pick)} />
+                        <EmojiPicker onClose={() => setReactionPickerFor(null)} onPick={(pick) => pickReaction(msg, pick)} customEmojiSpaceId={props.customEmojiSpaceId} />
                       </div>
                     </Portal>
                   )}

@@ -15,6 +15,8 @@ export interface ExpressionPickerProps {
   /** Fill the parent (the mobile sheet that replaces the keyboard) instead of the fixed desktop card. */
   fill?: boolean;
   initialTab?: ExpressionTab;
+  /** Passed to the EmojiPicker: restrict custom emoji to this space (no Use External Emojis). */
+  customEmojiSpaceId?: string;
 }
 
 /**
@@ -86,7 +88,7 @@ export const ExpressionPicker: Component<ExpressionPickerProps> = (props) => {
       {/* Emoji stays mounted; the GIF tab mounts on first open, then both stay mounted (hidden
           when inactive) so switching tabs keeps each one's scroll position and results. */}
       <div class="flex min-h-0 flex-1" classList={{ hidden: tab() !== 'emoji' }}>
-        <EmojiPicker embedded autofocusSearch={!props.fill} onClose={props.onClose} onPick={props.onPickEmoji} />
+        <EmojiPicker embedded autofocusSearch={!props.fill} onClose={props.onClose} onPick={props.onPickEmoji} customEmojiSpaceId={props.customEmojiSpaceId} />
       </div>
       <Show when={gifActivated()}>
         <div class="flex min-h-0 flex-1" classList={{ hidden: tab() !== 'gif' }}>

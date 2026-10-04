@@ -1,5 +1,9 @@
 import {
+  AllRoomPermMask,
+  PermAddReactions,
   PermAdministrator,
+  PermAttachFiles,
+  PermMentionEveryone,
   PermSendMessages,
   PermViewChannel,
   effectiveChannelPermissionsForMember,
@@ -19,6 +23,8 @@ export interface PermissionMatrixCase {
     userOverrides?: SpaceRoomUserOverride[];
   };
   expectMask: number;
+  /** Bits that must NOT be in the result. */
+  expectDenied?: number;
 }
 
 // Shared frontend validation matrix mirroring backend precedence rules.
@@ -50,11 +56,53 @@ export const permissionMatrixCases: PermissionMatrixCase[] = [
     },
     expectMask: PermViewChannel | PermSendMessages,
   },
+  {
+    // The bug of 2026-10-04: the owner's mask must carry every room bit, including ones added
+    // after the mask was first written - @everyone denying Attach Files must not touch them.
+    name: 'owner keeps every room bit when @everyone denies attach files',
+    input: {
+      memberUserId: 'u1',
+      ownerId: 'u1',
+      everyoneRoleId: 'r0',
+      memberRoleIds: ['r0'],
+      roles: [{ id: 'r0', name: '@everyone', permissions: PermViewChannel | PermSendMessages, position: 0, color: 0, hoist: false, mentionable: false, created_at: '', updated_at: '' }],
+      overrides: [{ role_id: 'r0', allow: 0, deny: PermAttachFiles, created_at: '', updated_at: '' }],
+    },
+    expectMask: AllRoomPermMask,
+  },
+  {
+    name: 'no View Channel means no permissions at all',
+    input: {
+      memberUserId: 'u2',
+      ownerId: 'u1',
+      everyoneRoleId: 'r0',
+      memberRoleIds: ['r0'],
+      roles: [{ id: 'r0', name: '@everyone', permissions: PermViewChannel | PermSendMessages | PermAttachFiles | PermAddReactions, position: 0, color: 0, hoist: false, mentionable: false, created_at: '', updated_at: '' }],
+      overrides: [{ role_id: 'r0', allow: 0, deny: PermViewChannel, created_at: '', updated_at: '' }],
+    },
+    expectMask: 0,
+    expectDenied: PermSendMessages | PermAttachFiles | PermAddReactions,
+  },
+  {
+    name: 'no Send Messages clears Attach Files and @everyone only',
+    input: {
+      memberUserId: 'u2',
+      ownerId: 'u1',
+      everyoneRoleId: 'r0',
+      memberRoleIds: ['r0'],
+      roles: [{ id: 'r0', name: '@everyone', permissions: PermViewChannel | PermSendMessages | PermAttachFiles | PermMentionEveryone | PermAddReactions, position: 0, color: 0, hoist: false, mentionable: false, created_at: '', updated_at: '' }],
+      overrides: [],
+      userOverrides: [{ user_id: 'u2', allow: 0, deny: PermSendMessages, created_at: '', updated_at: '' }],
+    },
+    expectMask: PermViewChannel | PermAddReactions,
+    expectDenied: PermAttachFiles | PermMentionEveryone,
+  },
 ];
 
 export function evaluatePermissionMatrix(): { name: string; pass: boolean }[] {
   return permissionMatrixCases.map((c) => {
     const got = effectiveChannelPermissionsForMember(c.input);
-    return { name: c.name, pass: got !== null && (got & c.expectMask) === c.expectMask };
+    const pass = got !== null && (got & c.expectMask) === c.expectMask && (got & (c.expectDenied ?? 0)) === 0;
+    return { name: c.name, pass };
   });
 }

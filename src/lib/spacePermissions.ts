@@ -185,7 +185,9 @@ export function togglePerm(mask: number, bit: number, on: boolean): number {
   return mask & ~bit;
 }
 
-/** Mirrors equinox/internal/modules/permissions/bits.go AllRoom. */
+/** Mirrors equinox/internal/modules/permissions/bits.go AllRoom - what the owner and an
+ * Administrator get in every room. A new room bit has to be added here as well as on the
+ * server, or the owner is the one member the client wrongly shows as lacking it. */
 export const AllRoomPermMask =
   PermViewChannel |
   PermSendMessages |
@@ -194,6 +196,7 @@ export const AllRoomPermMask =
   PermUseExternalEmojis |
   PermMentionEveryone |
   PermManageMessages |
+  PermAttachFiles |
   AllVoicePermMask;
 
 /** Discord-style overwrite stack (same as permissions.ApplyOverwrites). */
@@ -277,6 +280,15 @@ export function effectiveChannelPermissionsForMember(input: EffectiveChannelPerm
     perms = (perms & ~userOverride.deny) | userOverride.allow;
   }
 
+  return applyImplicitRoomRules(perms);
+}
+
+/** Discord's two dependent-permission rules, mirroring the server's applyImplicitRoomRules:
+ * no View Channel means no permission at all in the room; no Send Messages means no Attach
+ * Files or Mention @everyone either. */
+export function applyImplicitRoomRules(perms: number): number {
+  if (!hasPerm(perms, PermViewChannel)) return 0;
+  if (!hasPerm(perms, PermSendMessages)) perms &= ~(PermAttachFiles | PermMentionEveryone);
   return perms;
 }
 

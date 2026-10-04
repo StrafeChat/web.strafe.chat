@@ -18,8 +18,8 @@ const ReactionPill: Component<{
   roomId: string;
   messageId: string;
   reaction: MessageReaction;
-  /** False when the viewer lacks Add Reactions in this room - they can still remove their
-   * own existing reaction (mine === true), just can't add a new one. */
+  /** False when the viewer may not join this reaction (no Read Message History in the room -
+   * Discord's requirement for reacting at all) - they can still remove their own (mine). */
   canReact: boolean;
   onToggle: (emoji: string, currentlyMine: boolean) => void;
 }> = (props) => {
@@ -81,7 +81,7 @@ export const MessageReactions: Component<{
   roomId: string;
   messageId: string;
   reactions: MessageReaction[];
-  /** False when the viewer lacks Add Reactions in this room. Default true. */
+  /** False when the viewer may not join existing reactions in this room. Default true. */
   canReact?: boolean;
   onToggle: (emoji: string, currentlyMine: boolean) => void;
 }> = (props) => (

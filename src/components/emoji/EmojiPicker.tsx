@@ -29,6 +29,9 @@ export interface EmojiPickerProps {
   /** Focus the search box on open. Off on mobile, where it would re-pop the on-screen keyboard
    * the picker just replaced. Defaults to true. */
   autofocusSearch?: boolean;
+  /** Offer only this space's custom emoji (the viewer lacks Use External Emojis in the room
+   * being composed in), the way Discord greys out other servers' emoji. Unicode is unaffected. */
+  customEmojiSpaceId?: string;
 }
 
 type CategoryId = 'recent' | `space:${string}` | `group:${number}`;
@@ -73,9 +76,12 @@ export const EmojiPicker: Component<EmojiPickerProps> = (props) => {
 
   const tone = () => appearance.emojiSkinTone;
 
+  const allowsSpace = (spaceId: string | null | undefined) =>
+    props.customEmojiSpaceId === undefined || spaceId === props.customEmojiSpaceId;
+
   const spaceCategories = createMemo(() =>
     Object.entries(customEmojis.bySpaceId)
-      .filter(([, list]) => list.length > 0)
+      .filter(([spaceId, list]) => list.length > 0 && allowsSpace(spaceId))
       .map(([spaceId, list]) => {
         const space = spaces.spaces.find((s) => s.id === spaceId);
         return { id: `space:${spaceId}` as CategoryId, spaceId, name: space?.name ?? t('emoji.picker.space'), icon: space?.icon, acronym: space?.name_acronym || (space?.name ?? '?').slice(0, 2), list };
@@ -101,7 +107,7 @@ export const EmojiPicker: Component<EmojiPickerProps> = (props) => {
     if (q) {
       const customHits = Object.values(customEmojis.bySpaceId)
         .flat()
-        .filter((c) => c.name.toLowerCase().includes(q))
+        .filter((c) => allowsSpace(c.space_id) && c.name.toLowerCase().includes(q))
         .slice(0, 24)
         .map(customItem);
       const unicodeHits = cat ? searchEmoji(cat, q, 96).map(unicodeItem) : [];
@@ -113,7 +119,7 @@ export const EmojiPicker: Component<EmojiPickerProps> = (props) => {
       for (const key of recent()) {
         if (key.startsWith('c:')) {
           const custom = customEmojis.byId[key.slice(2)];
-          if (custom) out.push(customItem(custom));
+          if (custom && allowsSpace(custom.space_id)) out.push(customItem(custom));
         } else if (key.startsWith('u:') && cat) {
           const entry = cat.byUnicode.get(key.slice(2));
           if (entry) out.push(unicodeItem(entry));
@@ -122,7 +128,8 @@ export const EmojiPicker: Component<EmojiPickerProps> = (props) => {
       return out;
     }
     if (c.startsWith('space:')) {
-      return (customEmojis.bySpaceId[c.slice('space:'.length)] ?? []).map(customItem);
+      const sid = c.slice('space:'.length);
+      return allowsSpace(sid) ? (customEmojis.bySpaceId[sid] ?? []).map(customItem) : [];
     }
     if (c.startsWith('group:') && cat) {
       return (cat.byGroup.get(Number(c.slice('group:'.length))) ?? []).map(unicodeItem);

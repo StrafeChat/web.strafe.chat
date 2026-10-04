@@ -162,11 +162,12 @@ export const SpaceRoomsBar: Component = () => {
   const canManageRooms = createMemo(() =>
     memberCanManageRooms(space(), rolesRes(), currentMember(), auth.user?.id)
   );
-  /** Hide private channels and private categories (Discord-style). Managers see everything so
-   * they can administer them; everyone else only sees what they can view. A synced channel
-   * inherits its category's View grant, so a private category hides all its synced channels. */
+  /** Hide private channels and private categories (Discord-style). Only the owner and
+   * Administrators see everything (effectiveChannelPermissionsForMember gives them every bit);
+   * a Manage Rooms member without View on a room does not, exactly as the server's
+   * VisibleSpaceRooms decides. A synced channel inherits its category's View grant, so a
+   * private category hides all its synced channels. */
   const canViewRoom = (room: SpaceRoom): boolean => {
-    if (canManageRooms()) return true;
     return canViewSpaceChannel({
       room,
       allRooms: spaceRooms(),
@@ -276,9 +277,10 @@ export const SpaceRoomsBar: Component = () => {
         ) > 0);
     showContextMenu(e, [
       {
+        // Manage Roles opens it too: room permission overrides live there (Discord's rule).
         label: t('space.roomSettings'),
         icon: 'fa-gear',
-        disabled: !canManageRooms(),
+        disabled: !(canManageRooms() || canManageRoles()),
         onClick: () => setEditingRoom(room),
       },
       ...(msgId && unread
@@ -375,7 +377,7 @@ export const SpaceRoomsBar: Component = () => {
         }
       },
     });
-    if (canManageRooms()) {
+    if (canManageRooms() || canManageRoles()) {
       items.push({ label: t('space.sectionSettings'), icon: 'fa-gear', onClick: () => setEditingRoom(section) });
     }
     items.push({
@@ -874,6 +876,7 @@ export const SpaceRoomsBar: Component = () => {
         spaceId={spaceId()!}
         members={spaceMembers.bySpaceId[spaceId()!] ?? []}
         canManageRooms={canManageRooms()}
+        canManageRoles={canManageRoles()}
         onClose={() => setEditingRoom(null)}
         onSaved={() => {
           const sid = spaceId();

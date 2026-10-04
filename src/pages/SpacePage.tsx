@@ -86,6 +86,8 @@ import {
   PermAddReactions,
   PermManageMessages,
   PermMentionEveryone,
+  PermReadMessageHistory,
+  PermUseExternalEmojis,
   PermViewChannel,
 } from '../lib/spacePermissions';
 import { instance } from '../stores/instance';
@@ -728,6 +730,23 @@ const SpacePage: Component = () => {
     return hasPerm(mask, PermAddReactions);
   });
 
+  /** Discord lets anyone with Read Message History join an existing reaction; Add Reactions
+   * (canReact) is only needed to start a new one. */
+  const canJoinReactions = createMemo(() => {
+    if (!isTextChannel()) return true;
+    const mask = myChannelMask();
+    if (mask === null) return true;
+    return hasPerm(mask, PermReadMessageHistory);
+  });
+
+  /** Which custom emoji the pickers offer: without Use External Emojis in this room only this
+   * space's own, the way Discord greys out other servers' emoji. Undefined = no restriction. */
+  const customEmojiSpaceId = createMemo(() => {
+    const mask = myChannelMask();
+    if (mask === null || hasPerm(mask, PermUseExternalEmojis)) return undefined;
+    return spaceId() || undefined;
+  });
+
   const pinnedIdsForRoom = createMemo(() => {
     const id = roomId();
     if (!id) return [] as string[];
@@ -952,6 +971,8 @@ const SpacePage: Component = () => {
                   onKickMember={handleKickMember}
                   onBanMember={handleBanMember}
                   canReact={canReact()}
+                  canJoinReactions={canJoinReactions()}
+                  customEmojiSpaceId={customEmojiSpaceId()}
                 onBottomVisibleMessageChange={viewportAck.setBottomVisibleMessageId}
                 onNearBottomChange={setIsNearBottom}
                 />
@@ -970,6 +991,7 @@ const SpacePage: Component = () => {
                 spaceRoles={spaceRolesRes()}
                 spaceRooms={spaceRooms()}
                 canMentionEveryone={canMentionEveryone()}
+                customEmojiSpaceId={customEmojiSpaceId()}
                 currentUserId={auth.user?.id}
                 cursorPos={cursorPos()}
                 onInsertMention={onInsertMention}

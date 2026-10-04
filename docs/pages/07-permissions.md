@@ -16,12 +16,12 @@ Add the values of the bits you need to build a mask; test a bit with `(mask & bi
 | 0 | `1` | View Room | room | See the room and read new messages |
 | 1 | `2` | Send Messages | room | Post in text rooms |
 | 2 | `4` | Read Message History | room | Load older messages |
-| 3 | `8` | Add Reactions | room | React to messages |
+| 3 | `8` | Add Reactions | room | Start a new emoji reaction on a message; joining an existing one only needs Read Message History |
 | 4 | `16` | Use External Emojis | room | Use custom emoji from other spaces |
-| 5 | `32` | Mention @everyone | room | Ping everyone with `mention_everyone` |
+| 5 | `32` | Mention @everyone | room | Ping everyone with `mention_everyone`, and ping roles that are not mentionable |
 | 6 | `64` | Manage Messages | room | Delete and pin other members' messages; exempt from slowmode |
-| 7 | `128` | Manage Roles | space | Create, edit, delete and assign roles below their own |
-| 8 | `256` | Manage Rooms | space | Create, edit, reorder and delete rooms and sections |
+| 7 | `128` | Manage Roles | space | Create, edit, delete and assign roles below their own; edit room permission overrides (only bits they hold in that room) |
+| 8 | `256` | Manage Rooms | space | Create, edit, reorder and delete rooms and sections; exempt from slowmode |
 | 9 | `512` | Kick Members | space | Kick members ranked below them |
 | 10 | `1024` | Ban Members | space | Ban and unban |
 | 11 | `2048` | Administrator | space | **Every** permission in the space, overrides ignored. Only ownership transfer and deleting the space stay owner-only |
@@ -56,7 +56,10 @@ For a member in a space:
 1. **Owner?** The space owner has every permission, always.
 2. **Space-wide mask** = `@everyone.permissions | role₁.permissions | role₂.permissions …` over the member's roles.
 3. **Administrator?** If bit 11 is set, the member has every permission in every room; stop here.
-4. **Room overrides**, applied in order to the space-wide mask for that room: the `@everyone` override, then overrides of the member's other roles (each `(mask & ~deny) | allow`), then the member's own user override. Overrides can only touch room-scoped bits.
+4. **Room overrides**, applied in order to the space-wide mask for that room: the `@everyone` override, then overrides of the member's other roles (every deny first, then every allow), then the member's own user override (deny, then allow). Overrides can only touch room-scoped bits.
+5. **Two implicit rules**, the same as Discord's: without View Room the member has no permission at all in that room, whatever the bits say; and without Send Messages they cannot Attach Files or Mention @everyone either.
+
+Administrator also grants every space-scoped permission for management actions (adding bots, editing the space, invites, emoji, roles, kicks and bans), though role hierarchy still applies to Administrators - only the owner is above it.
 
 `GET /users/@me/spaces` and the `permissions` of a space in `READY` give you step 2; to know what a bot may do *in a room*, apply that room's `permission_overrides` and `user_overrides` from `READY.space_rooms` (or `GET /spaces/:id/rooms`) yourself, or simply try the call and handle `403`.
 
