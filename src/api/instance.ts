@@ -264,3 +264,40 @@ export function resolveReport(reportId: string, input: { action: ResolveAction; 
 export function listAudit() {
   return api<AuditRow[]>('/instance/audit');
 }
+
+// ---- federation allow/block list -------------------------------------------------------
+
+export interface PeerPolicyRow {
+  domain: string;
+  /** Snowflake of the admin who added it. */
+  added_by: string;
+  created_at: string;
+}
+
+export interface FederationPolicy {
+  /** Whether this instance federates at all (FEDERATION_DOMAIN set). */
+  enabled: boolean;
+  /** This instance's own domain. */
+  domain: string;
+  /** Editable, admin-managed entries. */
+  allow: PeerPolicyRow[];
+  block: PeerPolicyRow[];
+  /** Read-only entries from FEDERATION_ALLOWLIST / FEDERATION_BLOCKLIST (environment). */
+  env_allow: string[];
+  env_block: string[];
+}
+
+/** Admin: the instance's federation allow/block list plus the read-only env lists. */
+export function listFederationPolicy() {
+  return api<FederationPolicy>('/instance/federation/policy');
+}
+
+/** Admin: allow or block a peer instance domain. A non-empty allowlist = allowlist-only mode. */
+export function setFederationPolicy(domain: string, kind: 'allow' | 'block') {
+  return api<void>('/instance/federation/policy', { method: 'POST', json: { domain, kind } });
+}
+
+/** Admin: remove a peer instance domain's rule. */
+export function removeFederationPolicy(domain: string) {
+  return api<void>(`/instance/federation/policy/${encodeURIComponent(domain)}`, { method: 'DELETE' });
+}

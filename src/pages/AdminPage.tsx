@@ -27,7 +27,11 @@ import {
   setUserBadges,
   regenerateUserRecoveryCodes,
   type RecoveryCodesResult,
-  setSpaceOfficial,} from '../api/instance';
+  setSpaceOfficial,
+  listFederationPolicy,
+  setFederationPolicy,
+  removeFederationPolicy,
+} from '../api/instance';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { DiscoverQueue } from '../components/admin/DiscoverQueue';
 import { Button } from '../components/ui/Button';
@@ -44,7 +48,7 @@ import { settingsGroupFrame, settingsRowIcon, settingsRowShell, settingsSectionT
 import { appDialogActions, zLayer } from '../theme/appChrome';
 import { formatDate, t } from '../i18n';
 
-type Tab = 'overview' | 'users' | 'reports' | 'bans' | 'discover' | 'audit';
+type Tab = 'overview' | 'users' | 'reports' | 'bans' | 'discover' | 'audit' | 'federation';
 
 const DAY = 24 * 60 * 60;
 /** Ban lengths. Matches the server's cap of a year. */
@@ -140,6 +144,7 @@ const Dashboard: Component = () => {
               { id: 'bans', label: t('admin.tabs.bans') },
               { id: 'discover', label: t('admin.tabs.discover') },
               { id: 'audit', label: t('admin.tabs.audit') },
+              { id: 'federation', label: t('admin.federation.tab') },
             ]}
           />
         </div>
@@ -162,6 +167,9 @@ const Dashboard: Component = () => {
         </Show>
         <Show when={tab() === 'audit'}>
           <Audit onOpenUser={goUser} />
+        </Show>
+        <Show when={tab() === 'federation'}>
+          <FederationPanel />
         </Show>
       </main>
       <SpaceDrawer spaceId={focusSpace()} onClose={() => setFocusSpace(null)} onOpenUser={goUser} onOpenReport={goReport} />
@@ -1036,3 +1044,160 @@ export type { AdminSpace };
 void A;
 
 export default AdminPage;
+
+/** Admin: the instance's federation allow/block list. Editable runtime entries are merged
+ * with the read-only FEDERATION_ALLOWLIST/BLOCKLIST env lists by the server; a non-empty
+ * allowlist (from either source) puts the instance in allowlist-only mode. */
+const FederationPanel: Component = () => {
+  const [policy, { refetch }] = createResource(listFederationPolicy);
+  const [domain, setDomain] = createSignal('');
+  const [kind, setKind] = createSignal<'allow' | 'block'>('block');
+  const [busy, setBusy] = createSignal(false);
+  const [error, setError] = createSignal('');
+
+  const allowlistActive = () => {
+    const p = policy();
+    return !!p && (p.allow.length > 0 || (p.env_allow?.length ?? 0) > 0);
+  };
+
+  async function add(e: Event) {
+    e.preventDefault();
+    const dom = domain().trim();
+    if (!dom) return;
+    setBusy(true);
+    setError('');
+    try {
+      await setFederationPolicy(dom, kind());
+      setDomain('');
+      await refetch();
+    } catch {
+      setError(t('admin.federation.invalid'));
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function remove(dom: string) {
+    setBusy(true);
+    setError('');
+    try {
+      await removeFederationPolicy(dom);
+      await refetch();
+    } catch {
+      setError(t('admin.federation.failed'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const entryRow = (dom: string, onRemove?: () => void) => (
+    <div class={`${settingsRowShell} items-center justify-between`}>
+      <span class="truncate font-mono text-sm">{dom}</span>
+      <Show
+        when={onRemove}
+        fallback={
+          <span class="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">
+            {t('admin.federation.fromConfig')}
+          </span>
+        }
+      >
+        <Button variant="ghost" size="sm" disabled={busy()} onClick={onRemove}>
+          <i class="fa-solid fa-xmark text-xs" aria-hidden="true" /> {t('admin.federation.remove')}
+        </Button>
+      </Show>
+    </div>
+  );
+
+  return (
+    <div class="mx-auto max-w-2xl space-y-5">
+      <Show when={policy()} fallback={<p class="text-sm text-muted-foreground">{t('common.loading')}</p>}>
+        {(p) => (
+          <Show
+            when={p().enabled}
+            fallback={<div class={`${settingsGroupFrame} text-sm text-muted-foreground`}>{t('admin.federation.disabled')}</div>}
+          >
+            <div class="space-y-1">
+              <div class={settingsSectionTitle}>{t('admin.federation.title')}</div>
+              <p class="px-0.5 text-xs text-muted-foreground">{t('admin.federation.self', { domain: p().domain })}</p>
+            </div>
+
+            <div
+              class={`rounded-lg border px-3 py-2 text-xs ${
+                allowlistActive()
+                  ? 'border-yellow-500/40 bg-yellow-500/10 text-foreground'
+                  : 'border-border/70 bg-background/40 text-muted-foreground'
+              }`}
+            >
+              {allowlistActive() ? t('admin.federation.allowlistMode') : t('admin.federation.openMode')}
+            </div>
+
+            <form onSubmit={add} class="flex flex-wrap items-center gap-2">
+              <input
+                value={domain()}
+                onInput={(e) => setDomain(e.currentTarget.value)}
+                placeholder={t('admin.federation.domainPlaceholder')}
+                class="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                autocapitalize="off"
+                autocomplete="off"
+                spellcheck={false}
+              />
+              <select
+                value={kind()}
+                onChange={(e) => setKind(e.currentTarget.value as 'allow' | 'block')}
+                class="rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <option value="block">{t('admin.federation.block')}</option>
+                <option value="allow">{t('admin.federation.allow')}</option>
+              </select>
+              <Button type="submit" size="sm" disabled={busy() || !domain().trim()}>
+                {t('admin.federation.add')}
+              </Button>
+            </form>
+            <Show when={error()}>
+              <p class="text-sm text-destructive">{error()}</p>
+            </Show>
+
+            <section class="space-y-2">
+              <div class={settingsSectionTitle}>{t('admin.federation.allowHeading')}</div>
+              <p class="px-0.5 text-xs text-muted-foreground">{t('admin.federation.allowHint')}</p>
+              <div class="space-y-1">
+                <For
+                  each={p().allow}
+                  fallback={
+                    <Show when={(p().env_allow?.length ?? 0) === 0}>
+                      <p class="px-0.5 text-xs text-muted-foreground">{t('admin.federation.empty')}</p>
+                    </Show>
+                  }
+                >
+                  {(e) => entryRow(e.domain, () => void remove(e.domain))}
+                </For>
+                <For each={p().env_allow}>{(d) => entryRow(d)}</For>
+              </div>
+            </section>
+
+            <section class="space-y-2">
+              <div class={settingsSectionTitle}>{t('admin.federation.blockHeading')}</div>
+              <p class="px-0.5 text-xs text-muted-foreground">{t('admin.federation.blockHint')}</p>
+              <div class="space-y-1">
+                <For
+                  each={p().block}
+                  fallback={
+                    <Show when={(p().env_block?.length ?? 0) === 0}>
+                      <p class="px-0.5 text-xs text-muted-foreground">{t('admin.federation.empty')}</p>
+                    </Show>
+                  }
+                >
+                  {(e) => entryRow(e.domain, () => void remove(e.domain))}
+                </For>
+                <For each={p().env_block}>{(d) => entryRow(d)}</For>
+              </div>
+            </section>
+
+            <Show when={(p().env_allow?.length ?? 0) + (p().env_block?.length ?? 0) > 0}>
+              <p class="px-0.5 text-xs text-muted-foreground">{t('admin.federation.envHint')}</p>
+            </Show>
+          </Show>
+        )}
+      </Show>
+    </div>
+  );
+};
