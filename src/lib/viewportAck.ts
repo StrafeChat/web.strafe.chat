@@ -115,7 +115,16 @@ export function createViewportAck(roomId: Accessor<string | undefined>) {
       readState.byRoom[id]?.lastReadMessageId ??
       room?.last_read_message_id ??
       null;
-    if (lastRead && !messageIdGt(ackID, lastRead)) return;
+    if (lastRead && !messageIdGt(ackID, lastRead)) {
+      // Caught up on messages, so there is nothing newer to ack. Normally we stop here - but a
+      // STRANDED mention badge (its message was deleted, leaving nothing to advance the cursor
+      // to) must still be cleared, or it is permanent. Re-ack at the current cursor: the server
+      // treats a non-advancing ack as "reset the mention baseline" without moving the cursor.
+      if ((readState.byRoom[id]?.mentionCount ?? 0) === 0) return;
+      if (typeof document !== 'undefined' && document.visibilityState === 'hidden') return;
+      ackRoomOptimistic(id, lastRead);
+      return;
+    }
     setPendingAck(id, ackID);
     // Was document.hasFocus(), which requires OS-level window focus - anyone with two
     // accounts side by side in separate windows had the second window lose focus constantly

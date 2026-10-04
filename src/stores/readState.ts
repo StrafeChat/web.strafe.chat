@@ -127,6 +127,20 @@ export function ackRoomFromEvent(roomId: string, lastReadMessageId: string) {
   }
 }
 
+/**
+ * Set a room's mention badge to an exact count from the server (authoritative), without moving
+ * the read cursor. Used when a message that mentioned you is deleted: the server rolls the
+ * mention counter back and pushes the new display count on MESSAGE_MENTION_UPDATE, so the badge
+ * clears live instead of only on the next reload. Clamped at 0.
+ */
+export function setRoomMentionCount(roomId: string, mentionCount: number) {
+  const current = readState.byRoom[roomId];
+  setReadState('byRoom', roomId, {
+    lastReadMessageId: current?.lastReadMessageId ?? null,
+    mentionCount: Math.max(0, Math.floor(mentionCount)),
+  });
+}
+
 /** Compute unread count: messages from others with id > lastReadMessageId. Excludes temp and own messages. */
 export function getUnreadCount(
   roomId: string,
@@ -283,6 +297,18 @@ export function getUnreadBannerInfo(
 /** Register MESSAGE_ACK handler. Call once on app init. */
 export function initReadStateHandler() {
   return onStargateEvent((evt) => {
+    if (evt.t === 'MESSAGE_MENTION_UPDATE') {
+      // The server rolled a room's mention counter back (a mention's message was deleted) and
+      // sent the new display count for this user - set it so the badge clears without a reload.
+      const md = (evt.d as Record<string, unknown>)?.d ?? evt.d;
+      const mdata = md as Record<string, unknown>;
+      const mRoom = mdata?.room_id ?? (evt as { room_id?: string | number }).room_id;
+      const mRoomId = mRoom != null ? String(mRoom) : '';
+      const rawCount = mdata?.mention_count;
+      const count = typeof rawCount === 'number' ? rawCount : Number(rawCount);
+      if (mRoomId && Number.isFinite(count)) setRoomMentionCount(mRoomId, count);
+      return;
+    }
     if (evt.t !== 'MESSAGE_ACK') return;
     const d = (evt.d as Record<string, unknown>)?.d ?? evt.d;
     const data = d as Record<string, unknown>;
