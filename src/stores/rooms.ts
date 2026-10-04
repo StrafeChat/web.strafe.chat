@@ -55,6 +55,14 @@ export function updateRoomLastMessage(roomId: string, messageId: string) {
   );
 }
 
+/** Set a room's last_message_id to an exact value or clear it (null) - used when a deletion
+ * moves or removes the room's newest message, so the sidebar stops showing a phantom unread. */
+export function setRoomLastMessageId(roomId: string, messageId: string | null) {
+  setRooms('rooms', (list) =>
+    list.map((r) => (r.id === roomId ? { ...r, last_message_id: messageId ?? undefined } : r))
+  );
+}
+
 /** Patch this room's own mute/notify-mode fields (PM/group PM rooms only - see
  * patchSpaceRoomNotifySettings in stores/spaces.ts for space channels). */
 export function patchRoomNotifySettings(

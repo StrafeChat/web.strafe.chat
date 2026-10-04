@@ -334,6 +334,29 @@ export function canViewSpaceChannel(input: {
   return hasPerm(mask, PermViewChannel);
 }
 
+/**
+ * Whether a room is restricted from @everyone - its effective overrides deny @everyone the
+ * View permission (its own, or its section's when synced). Used to mark private rooms with a
+ * lock so members who do have access can tell they're not open to everyone.
+ */
+export function isRoomPrivate(
+  room:
+    | {
+        permission_overrides?: SpaceRoomOverride[];
+        user_overrides?: SpaceRoomUserOverride[];
+        permissions_synced?: boolean;
+        parent_id?: string;
+      }
+    | undefined,
+  allRooms: { id: string; permission_overrides?: SpaceRoomOverride[]; user_overrides?: SpaceRoomUserOverride[] }[] | undefined,
+  everyoneRoleId: string | undefined
+): boolean {
+  if (!room || !everyoneRoleId) return false;
+  const { overrides } = channelOverridesSource(room, allRooms);
+  const ev = overrides?.find((o) => o.role_id === everyoneRoleId);
+  return !!ev && (ev.deny & PermViewChannel) !== 0;
+}
+
 export function spaceRoleColorHex(c: number): string {
   const u = c >>> 0;
   return `#${(u & 0xffffff).toString(16).padStart(6, '0')}`;

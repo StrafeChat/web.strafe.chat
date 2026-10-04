@@ -11,6 +11,8 @@ import type { ReorderPayload } from '../../../lib/roomReorder';
 import { appCompactRow, appCompactRowActive, appCompactRowIdle } from '../../../theme/appChrome';
 import { roomTypeIcon } from './RoomTypeIcon';
 import { instance } from '../../../stores/instance';
+import { spaces } from '../../../stores/spaces';
+import { isRoomPrivate } from '../../../lib/spacePermissions';
 import { isConnectedTo, joinVoiceRoom, voiceStatesForRoom } from '../../../stores/voice';
 import { voicePermsFor } from '../../../lib/voice/perms';
 import { VoiceChannelUsers } from '../../voice/VoiceChannelUsers';
@@ -85,6 +87,13 @@ export const SpaceChannelRow: Component<SpaceChannelRowProps> = (props) => {
   }
   const reorderSource = () => props.reorderDragSource?.() ?? false;
   const isVoice = () => props.room.type === ROOM_TYPE_VOICE;
+  /** Restricted from @everyone - shows a lock so members with access know it isn't open. */
+  const isPrivate = () =>
+    isRoomPrivate(
+      props.room,
+      spaces.spaceRoomsBySpaceId[props.spaceId],
+      spaces.spaces.find((sp) => sp.id === props.spaceId)?.everyone_role_id
+    );
   const voiceCount = () => (isVoice() ? voiceStatesForRoom(props.room.id).length : 0);
   const canConnect = () => voicePermsFor(uid(), props.spaceId, props.room.id).connect;
   /** Clicking a voice room joins it (Discord's behaviour) as well as opening its view. */
@@ -109,7 +118,7 @@ export const SpaceChannelRow: Component<SpaceChannelRowProps> = (props) => {
       onClick={() => handleVoiceClick()}
       onContextMenu={(e) => props.onContextMenu(e, props.room)}
     >
-      {roomTypeIcon(props.room)}
+      {roomTypeIcon(props.room, { private: isPrivate() })}
       <Show when={baseUnread() > 0 && mentions() === 0 && !muted()}>
         <span class="w-1.5 h-1.5 rounded-full bg-primary" />
       </Show>

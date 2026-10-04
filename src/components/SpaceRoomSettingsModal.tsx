@@ -314,7 +314,7 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
   return (
     <SettingsShell open={props.open && !!props.room} onClose={props.onClose} zClass={zLayer.modalStacked} labelledBy="room-settings-title">
       <SettingsNav<Page>
-        title={t('space.roomSettings')}
+        title={isSection() ? t('space.sectionSettings') : t('space.roomSettings')}
         titleId="room-settings-title"
         groups={[
           {
@@ -464,8 +464,8 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
             <Show when={isSection()}>
               <div class="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-card/10 px-4 py-3">
                 <div class="min-w-0">
-                  <p class="text-sm font-medium text-foreground">{t('roomSettings.privateCategory')}</p>
-                  <p class="text-xs text-muted-foreground">{t('roomSettings.privateCategoryHelp')}</p>
+                  <p class="text-sm font-medium text-foreground">{t('roomSettings.privateSection')}</p>
+                  <p class="text-xs text-muted-foreground">{t('roomSettings.privateSectionHelp')}</p>
                 </div>
                 <Toggle
                   checked={isPrivateCategory()}
@@ -477,8 +477,8 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
             <Show when={isChannelInCategory()}>
               <div class="flex items-center justify-between gap-4 rounded-xl border border-border/60 bg-card/10 px-4 py-3">
                 <div class="min-w-0">
-                  <p class="text-sm font-medium text-foreground">{t('roomSettings.syncCategory')}</p>
-                  <p class="text-xs text-muted-foreground">{t('roomSettings.syncCategoryHelp')}</p>
+                  <p class="text-sm font-medium text-foreground">{t('roomSettings.syncSection')}</p>
+                  <p class="text-xs text-muted-foreground">{t('roomSettings.syncSectionHelp')}</p>
                 </div>
                 <Toggle checked={synced()} disabled={!props.canManageRooms || busy()} onChange={(v) => void toggleSync(v)} />
               </div>

@@ -27,20 +27,27 @@ const SpeakerIcon = () => (
   </svg>
 );
 
-/** Hash, hash-with-lock (E2EE) or speaker, by room type. */
-export function roomTypeIcon(room: SpaceRoom): JSX.Element {
-  if (room.type === ROOM_TYPE_VOICE) return <SpeakerIcon />;
-  if (room.e2ee_enabled) {
-    // Hash with a small brand-colored lock badge: end-to-end encrypted text room.
-    return (
-      <span class="relative flex size-4 shrink-0 items-center justify-center" title={t('room.e2eeBadge')}>
-        <HashIcon />
-        <i
-          class="fa-solid fa-lock absolute -bottom-1 -right-1.5 text-[8px] leading-none text-primary"
-          aria-hidden="true"
-        />
-      </span>
-    );
-  }
-  return <HashIcon />;
+/**
+ * Hash or speaker by room type, with a small lock badge when the room is end-to-end encrypted
+ * (brand-colored) or restricted from @everyone (muted). E2EE takes the color when both apply.
+ */
+export function roomTypeIcon(room: SpaceRoom, opts?: { private?: boolean }): JSX.Element {
+  const base = room.type === ROOM_TYPE_VOICE ? <SpeakerIcon /> : <HashIcon />;
+  const e2ee = room.e2ee_enabled === true;
+  const isPrivate = opts?.private === true;
+  if (!e2ee && !isPrivate) return base;
+  return (
+    <span
+      class="relative flex size-4 shrink-0 items-center justify-center"
+      title={e2ee ? t('room.e2eeBadge') : t('room.privateBadge')}
+    >
+      {base}
+      <i
+        class={`fa-solid fa-lock absolute -bottom-1 -right-1.5 text-[8px] leading-none ${
+          e2ee ? 'text-primary' : 'text-muted-foreground'
+        }`}
+        aria-hidden="true"
+      />
+    </span>
+  );
 }

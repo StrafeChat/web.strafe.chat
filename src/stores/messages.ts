@@ -40,8 +40,8 @@ import { forgetScrollPosition } from '../lib/scrollPositions';
 export { viewFromServerAttachment };
 import { auth } from './auth';
 import { settings } from './settings';
-import { rooms, updateRoomLastMessage } from './rooms';
-import { spaces, updateSpaceRoomLastMessage } from './spaces';
+import { rooms, updateRoomLastMessage, setRoomLastMessageId } from './rooms';
+import { spaces, updateSpaceRoomLastMessage, setSpaceRoomLastMessageId } from './spaces';
 import { onStargateEvent } from '../services/stargate/client';
 import { maybeNotifyMessage } from '../lib/notifications';
 import { setReadState, extractMentionedUserIds, extractMentionedRoleIds, mentionsEveryone, messageIdGt, isSnowflake } from './readState';
@@ -1109,6 +1109,14 @@ export function initStargateMessageHandler() {
       const messageId = rawMessageId != null ? String(rawMessageId) : '';
       if (roomId && messageId) {
         removeMessageFromEvent(roomId, messageId);
+        // The server includes last_message_id only when this delete moved the room's newest
+        // message; apply it so the cached cursor (and thus the unread badge) stays correct.
+        if ('last_message_id' in data) {
+          const raw = data.last_message_id;
+          const next = raw == null ? null : String(raw);
+          setRoomLastMessageId(roomId, next);
+          setSpaceRoomLastMessageId(roomId, next);
+        }
       }
     } else if (evt.t === 'MESSAGE_REACTION_ADD' || evt.t === 'MESSAGE_REACTION_REMOVE') {
       const payload = (evt.d as Record<string, unknown>)?.d ?? evt.d;

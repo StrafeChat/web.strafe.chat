@@ -68,9 +68,28 @@ export function createViewportAck(roomId: Accessor<string | undefined>) {
     visibilityTick();
     const id = roomId();
     let ackID = bottomVisibleMessageId();
-    if (!id || !ackID || !/^\d+$/.test(ackID)) {
+    // Tracked so this re-runs once the room's messages finish loading, which is the only
+    // signal an empty room gives (it never reports a bottom-visible message).
+    const loaded = id ? messages.byRoom[id] : undefined;
+    const loading = id ? messages.loading[id] === true : false;
+    if (!id) {
       clearPendingAck();
       return;
+    }
+    if (!ackID || !/^\d+$/.test(ackID)) {
+      // An empty room (its messages were all deleted) has nothing to ack, yet may still claim
+      // a last_message_id above our read cursor - a permanent phantom unread. Once it has
+      // finished loading and there is nothing more to page in either way, ack straight to that
+      // id so the badge clears for good.
+      const r = rooms.rooms.find((x) => x.id === id);
+      const roomLast = r?.last_message_id;
+      const trulyEmpty = !loading && (loaded?.length ?? 0) === 0 && messages.hasMoreOlder[id] !== true && messages.hasMoreNewer[id] !== true;
+      if (roomLast && /^\d+$/.test(roomLast) && trulyEmpty) {
+        ackID = roomLast;
+      } else {
+        clearPendingAck();
+        return;
+      }
     }
     const room = rooms.rooms.find((r) => r.id === id);
     // Heal a dangling last_message_id: when the room's newest message is deleted the server

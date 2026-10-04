@@ -603,3 +603,24 @@ export function updateSpaceRoomLastMessage(roomId: string, messageId: string): v
     return changed ? next : bySpaceId;
   });
 }
+
+/** Set a space channel's last_message_id to an exact value or clear it (null). Used when a
+ * deletion moves or removes the channel's newest message. */
+export function setSpaceRoomLastMessageId(roomId: string, messageId: string | null): void {
+  setSpaces('spaceRoomsBySpaceId', (bySpaceId) => {
+    const next: Record<string, SpaceRoom[]> = {};
+    let changed = false;
+    for (const [sid, list] of Object.entries(bySpaceId)) {
+      let listChanged = false;
+      const updated = list.map((r) => {
+        if (r.id !== roomId) return r;
+        if ((r.last_message_id ?? null) === (messageId ?? null)) return r;
+        listChanged = true;
+        return { ...r, last_message_id: messageId ?? undefined };
+      });
+      next[sid] = listChanged ? updated : list;
+      if (listChanged) changed = true;
+    }
+    return changed ? next : bySpaceId;
+  });
+}

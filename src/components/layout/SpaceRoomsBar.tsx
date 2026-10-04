@@ -365,7 +365,7 @@ export const SpaceRoomsBar: Component = () => {
       });
     }
     items.push({
-      label: anyUnmuted ? t('contextMenu.muteCategory') : t('contextMenu.unmuteCategory'),
+      label: anyUnmuted ? t('contextMenu.muteSection') : t('contextMenu.unmuteSection'),
       icon: anyUnmuted ? 'fa-bell-slash' : 'fa-bell',
       onClick: () => {
         for (const r of kids) {
@@ -376,23 +376,23 @@ export const SpaceRoomsBar: Component = () => {
       },
     });
     if (canManageRooms()) {
-      items.push({ label: t('space.categorySettings'), icon: 'fa-gear', onClick: () => setEditingRoom(section) });
+      items.push({ label: t('space.sectionSettings'), icon: 'fa-gear', onClick: () => setEditingRoom(section) });
     }
     items.push({
-      label: t('contextMenu.copyCategoryId'),
+      label: t('contextMenu.copySectionId'),
       icon: 'fa-copy',
       onClick: () => navigator.clipboard.writeText(section.id),
     });
     if (canManageRooms()) {
       items.push({
-        label: t('space.deleteCategory'),
+        label: t('space.deleteSection'),
         icon: 'fa-trash',
         danger: true,
         onClick: async () => {
           const ok = await confirmDialog({
-            title: t('space.deleteCategory'),
-            body: t('space.deleteCategoryConfirm', { name: section.name || t('space.section') }),
-            confirmLabel: t('space.deleteCategory'),
+            title: t('space.deleteSection'),
+            body: t('space.deleteSectionConfirm', { name: section.name || t('space.section') }),
+            confirmLabel: t('space.deleteSection'),
             tone: 'danger',
             icon: 'fa-solid fa-trash',
           });
