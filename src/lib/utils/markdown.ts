@@ -1,9 +1,11 @@
 /**
  * Lightweight markdown-like parsing for chat messages: bold, italic, inline code,
- * code blocks, [text](url), bare URLs, @mentions, and emoji (Unicode + custom).
+ * code blocks, [text](url), bare URLs, @mentions, dynamic timestamps, and emoji
+ * (Unicode + custom).
  * Output is an array of segments for safe rendering (no raw HTML).
  */
 import { emojiAt } from '../emoji/regex';
+import { timestampStyle, type TimestampStyle } from './messageTimestamp';
 
 export type MessageSegment =
   | { type: 'text'; content: string }
@@ -16,6 +18,8 @@ export type MessageSegment =
   | { type: 'roleMention'; roleId: string }
   | { type: 'channelMention'; roomId: string }
   | { type: 'everyone'; text: string }
+  /** Dynamic timestamp: <t:unixSeconds[:style]> - rendered in the *reader's* timezone. */
+  | { type: 'timestamp'; unix: number; style: TimestampStyle }
   /** One Unicode emoji sequence (rendered by the chosen image provider). */
   | { type: 'emoji'; emoji: string }
   /** Space custom emoji: <:name:id> or <a:name:id>. */
@@ -40,6 +44,11 @@ const MENTION_CHANNEL_ID = /^<#(\d+)>/;
 const MENTION_EVERYONE = /^@(everyone|here)(?!\w)/;
 /** Custom emoji: <:name:id> (static) or <a:name:id> (animated) - Discord's wire syntax. */
 const CUSTOM_EMOJI = /^<(a?):([A-Za-z0-9_]{2,32}):(\d+)>/;
+/** Dynamic timestamp: <t:unixSeconds[:style]> - the style letter is optional ('f' by default).
+ *  Seconds are bounded to 11 digits (year 5138) so the value can never overflow into an
+ *  Invalid Date; anything longer simply fails to match here and is rendered as the literal
+ *  text it is. A leading `-` allows pre-1970 instants. */
+const DYNAMIC_TIMESTAMP = /^<t:(-?\d{1,11})(?::([tTdDfFR]))?>/;
 
 /** Does an emoji sequence start at `j`? Cheap gate first so ASCII prose never hits the
  * Unicode-property regex: only non-Latin-1 code units, or a keycap base followed by its
@@ -72,7 +81,8 @@ function sanitizeHref(url: string): string {
 
 /**
  * Parse message content into segments for rendering.
- * Order of matching: code blocks → inline code → markdown links → bare URLs → @mentions → **bold** → *italic*.
+ * Order of matching: code blocks → inline code → markdown links → mentions → dynamic timestamps
+ * → custom emoji → Unicode emoji → @everyone → bare URLs → **bold** → *italic*.
  */
 export function parseMessageContent(text: string): MessageSegment[] {
   const out: MessageSegment[] = [];
@@ -111,6 +121,19 @@ export function parseMessageContent(text: string): MessageSegment[] {
         i += mdLinkMatch[0]!.length;
         continue;
       }
+    }
+
+    // Dynamic timestamp: <t:unixSeconds[:style]> - an absolute instant, so every reader
+    // renders it in their own timezone and locale.
+    const timestampMatch = text.slice(i).match(DYNAMIC_TIMESTAMP);
+    if (timestampMatch) {
+      out.push({
+        type: 'timestamp',
+        unix: Number(timestampMatch[1]),
+        style: timestampStyle(timestampMatch[2]),
+      });
+      i += timestampMatch[0]!.length;
+      continue;
     }
 
     // Role mention: <@&roleId> - must be checked before the user-mention pattern.
