@@ -7,6 +7,7 @@ import { CustomEmoji } from '../emoji/CustomEmoji';
 import { extractSpaceInviteCodeFromUrl } from '../../lib/utils/spaceInviteLink';
 import { SpaceInviteLinkEmbed } from '../SpaceInviteLinkEmbed';
 import { LinkPreview } from './LinkPreview';
+import { DynamicTimestamp } from './DynamicTimestamp';
 import { VideoPlayer } from '../media';
 import { fitWithin } from '../../lib/attachments/format';
 import { getMediaDimensions, recordMediaDimensions, hasRecentMediaFailure, recordMediaFailure } from '../../lib/mediaDimensions';
@@ -389,6 +390,9 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
                 )}
               </Show>
             );
+          }
+          if (seg.type === 'timestamp') {
+            return <DynamicTimestamp unix={seg.unix} style={seg.style} />;
           }
           if (seg.type === 'everyone') {
             return <span class={brandPill}>{seg.text}</span>;

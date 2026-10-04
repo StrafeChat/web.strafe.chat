@@ -3,6 +3,7 @@ import { auth } from '../../stores/auth';
 import { spaces } from '../../stores/spaces';
 import type { RoomParticipant } from '../../api/rooms';
 import { birthdayIsToday } from '../../lib/utils/birthday';
+import { formatTimestamp, timestampStyle } from '../../lib/utils/messageTimestamp';
 import { t } from '../../i18n';
 
 export const LOADING_PLACEHOLDER = '...';
@@ -133,6 +134,12 @@ export function messagePreviewText(
     .replace(/<@!?(\d+)>/g, (_m, uid: string) => `@${participantName(uid, participants, currentUserId)}`)
     .replace(/<@&(\d+)>/g, `@${t('messages.preview.role')}`)
     .replace(/<#(\d+)>/g, (_m, rid: string) => `#${channelNameForPreview(rid)}`)
+    // Dynamic timestamps resolve to the reader's own rendering, same as the message body -
+    // a raw `<t:…>` in a reply strip or a desktop notification helps nobody. (A timestamp
+    // inside a code span also resolves here; the message body keeps showing it verbatim.)
+    .replace(/<t:(-?\d{1,11})(?::([tTdDfFR]))?>/g, (_m, unix: string, style?: string) =>
+      formatTimestamp(new Date(Number(unix) * 1000), timestampStyle(style))
+    )
     .replace(/```[\s\S]*?```/g, (m) => m.replace(/```\w*\n?/g, '').trim())
     .replace(/`([^`]+)`/g, '$1')
     .replace(/\*\*([^*]+)\*\*/g, '$1')
