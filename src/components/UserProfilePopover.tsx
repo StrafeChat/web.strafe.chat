@@ -30,9 +30,6 @@ const EVERYONE_ROLE_NAME = '@everyone';
 /** How many role pills to show before a “+N” overflow chip (popover is narrow). */
 const MAX_ROLE_CHIPS_VISIBLE = 3;
 
-function formatDiscriminator(d: number): string {
-  return String(d).padStart(4, '0');
-}
 
 /** Small dark circular button for the icon row over the banner - readable against any banner color/image, echoes the close button on the full profile modal. */
 const BannerIconButton: Component<{
@@ -271,17 +268,19 @@ export const UserProfilePopover: Component = () => {
       !!(subject()?.spaceRoles?.length && !roleEditCtx()),
   );
 
-  function copyTag() {
-    const s = subject();
-    if (!s) return;
-    void navigator.clipboard.writeText(`${s.username}#${formatDiscriminator(s.discriminator)}`);
-  }
 
   function copyUserId() {
     const s = subject();
     if (!s) return;
     void navigator.clipboard.writeText(s.userId);
   }
+
+  /** Whether anything renders under the identity block, so the divider never trails empty. */
+  const hasDetailSections = () =>
+    !!(subject()?.bot && botApp()?.has_bot && botApp()?.bot_public) ||
+    !!subject()?.aboutMe?.trim() ||
+    !!subject()?.birthday ||
+    showRolesOrJoinSection();
 
   function viewFullProfile() {
     const s = subject();
@@ -414,16 +413,22 @@ export const UserProfilePopover: Component = () => {
                 <BannerIconButton icon="fa-regular fa-id-card" title={t('userArea.copyUserId')} onClick={copyUserId} />
               </div>
               <div class="relative px-4 -mt-10">
-                <div class="relative inline-block">
+                <button
+                  type="button"
+                  onClick={viewFullProfile}
+                  aria-label={t('profile.viewFull')}
+                  data-tooltip={t('profile.viewFull')}
+                  class="group/avatar relative inline-block rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
                   <MessageAvatar
                     name={subject()!.displayName}
                     avatar={subject()!.avatar}
-                    class="size-20 border-4 border-popover bg-primary text-2xl font-semibold text-primary-foreground shadow-lg shadow-black/30"
+                    class="size-20 border-4 border-popover bg-primary text-2xl font-semibold text-primary-foreground shadow-lg shadow-black/30 transition-opacity group-hover/avatar:opacity-90"
                   />
                   <span class="absolute bottom-0.5 end-0.5">
                     <PresenceDot userId={subject()!.userId} class="size-5" borderClass="border-popover" />
                   </span>
-                </div>
+                </button>
               </div>
             </div>
 
@@ -440,11 +445,14 @@ export const UserProfilePopover: Component = () => {
                 pronouns={subject()!.pronouns}
                 isBirthday={subject()!.birthdayToday}
                 nameColor={subject()!.nameColor}
-                onCopyTag={copyTag}
+                onOpenProfile={viewFullProfile}
+                openProfileLabel={t('profile.viewFull')}
               />
             </div>
 
-            <div class="mx-4 my-2.5 border-t border-border/60" />
+            <Show when={hasDetailSections()}>
+              <div class="mx-4 my-2.5 border-t border-border/60" />
+            </Show>
 
             <Show when={subject()?.bot && botApp()?.has_bot && botApp()?.bot_public}>
               <div class="px-4 pb-3">
@@ -565,16 +573,6 @@ export const UserProfilePopover: Component = () => {
               </div>
             </Show>
 
-            <div class="px-4 pb-3">
-              <button
-                type="button"
-                onClick={viewFullProfile}
-                class="flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
-              >
-                <i class="fa-regular fa-user text-[11px]" />
-                {t('profile.viewFull')}
-              </button>
-            </div>
           </div>
 
           <Show when={!isSelf() && userProfilePopover.onMessageUser}>

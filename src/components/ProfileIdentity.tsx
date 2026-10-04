@@ -1,5 +1,5 @@
 import type { Component } from 'solid-js';
-import { Show } from 'solid-js';
+import { Match, Show, Switch } from 'solid-js';
 import { Dynamic } from 'solid-js/web';
 import { UserBadges } from './UserBadges';
 import { BotTag } from './BotTag';
@@ -32,6 +32,12 @@ export interface ProfileIdentityProps {
   /** The popover card is narrow; the modal is not. */
   compact?: boolean;
   onCopyTag?: () => void;
+  /** When set, the display name and the tag line become triggers that open the full
+   * profile - the popover card does this (Discord's "click the name to open the profile");
+   * the full profile itself does not. Takes the tag line over onCopyTag. */
+  onOpenProfile?: () => void;
+  /** Tooltip for those triggers, e.g. "View full profile". */
+  openProfileLabel?: string;
   /** `id` on the name element, for a dialog's `labelledBy`. */
   id?: string;
 }
@@ -62,7 +68,16 @@ export const ProfileIdentity: Component<ProfileIdentityProps> = (props) => {
         class={nameClass()}
         style={props.nameColor ? { color: props.nameColor } : undefined}
       >
-        {props.displayName}
+        <Show when={props.onOpenProfile} fallback={props.displayName}>
+          <button
+            type="button"
+            onClick={() => props.onOpenProfile?.()}
+            data-tooltip={props.openProfileLabel}
+            class="inline rounded-sm text-start hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {props.displayName}
+          </button>
+        </Show>
         <BotTag bot={props.bot} size={props.compact ? 'sm' : 'md'} class="relative -top-0.5" />
         <Show when={props.isBirthday}>
           <span
@@ -77,27 +92,42 @@ export const ProfileIdentity: Component<ProfileIdentityProps> = (props) => {
       </Dynamic>
 
       <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
-        <Show
-          when={props.onCopyTag}
+        <Switch
           fallback={
             <span class={`truncate ${appNameTagLine}`} dir="ltr">
               {tag()}
             </span>
           }
         >
-          <button
-            type="button"
-            onClick={() => props.onCopyTag?.()}
-            class={`flex min-w-0 items-center gap-1.5 rounded-sm hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${appNameTagLine}`}
-            dir="ltr"
-          >
-            <span class="truncate">{tag()}</span>
-            <Show when={isRemoteUser({ home_domain: props.homeDomain })}>
-              <span class="shrink-0 text-primary">@{props.homeDomain}</span>
-            </Show>
-            <i class="fa-regular fa-copy shrink-0 text-[10px]" aria-hidden="true" />
-          </button>
-        </Show>
+          <Match when={props.onOpenProfile}>
+            <button
+              type="button"
+              onClick={() => props.onOpenProfile?.()}
+              data-tooltip={props.openProfileLabel}
+              class={`flex min-w-0 items-center gap-1.5 rounded-sm hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${appNameTagLine}`}
+              dir="ltr"
+            >
+              <span class="truncate">{tag()}</span>
+              <Show when={isRemoteUser({ home_domain: props.homeDomain })}>
+                <span class="shrink-0 text-primary">@{props.homeDomain}</span>
+              </Show>
+            </button>
+          </Match>
+          <Match when={props.onCopyTag}>
+            <button
+              type="button"
+              onClick={() => props.onCopyTag?.()}
+              class={`flex min-w-0 items-center gap-1.5 rounded-sm hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${appNameTagLine}`}
+              dir="ltr"
+            >
+              <span class="truncate">{tag()}</span>
+              <Show when={isRemoteUser({ home_domain: props.homeDomain })}>
+                <span class="shrink-0 text-primary">@{props.homeDomain}</span>
+              </Show>
+              <i class="fa-regular fa-copy shrink-0 text-[10px]" aria-hidden="true" />
+            </button>
+          </Match>
+        </Switch>
 
         <Show when={props.pronouns?.trim()}>
           <span class="shrink-0 text-xs text-muted-foreground">{props.pronouns!.trim()}</span>
