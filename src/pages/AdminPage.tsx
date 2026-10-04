@@ -25,6 +25,8 @@ import {
   type SpaceDetail,
   type UserDetail,
   setUserBadges,
+  regenerateUserRecoveryCodes,
+  type RecoveryCodesResult,
   setSpaceOfficial,} from '../api/instance';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { DiscoverQueue } from '../components/admin/DiscoverQueue';
@@ -300,10 +302,15 @@ const UserPanel: Component<{ userId: string; onOpenReport: (id: string) => void;
   // loads (or right after a switch to a new user), when it seeds from the server.
   const [badgeFlags, setBadgeFlags] = createSignal<number | null>(null);
   const [badgeSaving, setBadgeSaving] = createSignal(false);
+  const [recoveryResult, setRecoveryResult] = createSignal<RecoveryCodesResult | null>(null);
+  const [recoveryBusy, setRecoveryBusy] = createSignal(false);
 
   createEffect(() => {
     const d = detail();
     setBadgeFlags(d ? (d.user.public_flags ?? 0) : null);
+    // New user selected - drop any recovery codes shown for the previous one.
+    void props.userId;
+    setRecoveryResult(null);
   });
 
   async function toggleBadge(userId: string, bit: number) {
@@ -335,6 +342,26 @@ const UserPanel: Component<{ userId: string; onOpenReport: (id: string) => void;
       await refetch();
     } catch {
       setError(t('admin.actionFailed'));
+    }
+  }
+
+  async function regenerateRecovery(d: UserDetail) {
+    const ok = await confirmDialog({
+      title: t('admin.users.recoveryTitle', { name: nameOf(d.user) }),
+      body: t('admin.users.recoveryBody'),
+      confirmLabel: t('admin.users.recoveryRegen'),
+      tone: 'danger',
+    });
+    if (!ok) return;
+    setRecoveryBusy(true);
+    setError('');
+    setRecoveryResult(null);
+    try {
+      setRecoveryResult(await regenerateUserRecoveryCodes(d.user.id));
+    } catch {
+      setError(t('admin.actionFailed'));
+    } finally {
+      setRecoveryBusy(false);
     }
   }
 
@@ -421,6 +448,43 @@ const UserPanel: Component<{ userId: string; onOpenReport: (id: string) => void;
                   }}
                 </For>
               </div>
+            </section>
+          </Show>
+
+          <Show when={!d().user.home_domain}>
+            <section class="space-y-2">
+              <div class={settingsSectionTitle}>{t('admin.users.recovery')}</div>
+              <p class="px-0.5 text-xs text-muted-foreground">{t('admin.users.recoveryHint')}</p>
+              <Button variant="outline" size="sm" disabled={recoveryBusy()} onClick={() => void regenerateRecovery(d())}>
+                <i class="fa-solid fa-key text-xs" aria-hidden="true" /> {t('admin.users.recoveryRegen')}
+              </Button>
+              <Show when={recoveryResult()}>
+                {(r) => (
+                  <Show
+                    when={!r().emailed}
+                    fallback={
+                      <p class="flex items-center gap-2 text-sm text-primary">
+                        <i class="fa-solid fa-envelope-circle-check text-xs" aria-hidden="true" />
+                        {t('admin.users.recoveryEmailed')}
+                      </p>
+                    }
+                  >
+                    <div class={`${settingsGroupFrame} space-y-2`}>
+                      <p class="text-xs text-muted-foreground">{t('admin.users.recoveryCopyHint')}</p>
+                      <div class="grid grid-cols-2 gap-x-4 gap-y-1 font-mono text-sm">
+                        <For each={r().codes ?? []}>{(c) => <span>{c}</span>}</For>
+                      </div>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => void navigator.clipboard?.writeText((r().codes ?? []).join('\n'))}
+                      >
+                        <i class="fa-solid fa-copy text-xs" aria-hidden="true" /> {t('admin.users.recoveryCopy')}
+                      </Button>
+                    </div>
+                  </Show>
+                )}
+              </Show>
             </section>
           </Show>
 
@@ -825,6 +889,7 @@ const Bans: Component<{ onOpenUser: (id: string) => void }> = (props) => {
 const AUDIT_ICON: Record<string, string> = {
   user_ban: 'fa-ban',
   user_unban: 'fa-user-check',
+  user_recovery_regen: 'fa-key',
   space_takedown: 'fa-trash',
   report_resolve: 'fa-check',
   report_dismiss: 'fa-xmark',

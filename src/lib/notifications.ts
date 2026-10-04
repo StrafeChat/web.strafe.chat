@@ -49,7 +49,10 @@ interface RoomContext {
 
 function roomContext(roomId: string, senderName: string): RoomContext | null {
   const uid = auth.user?.id ?? '';
-  const pm = rooms.rooms.find((r) => r.id === roomId);
+  // Only a real PM (1) or group DM (2) uses pmMode. A space channel is also kept in the rooms
+  // store (for its per-user mute/notify_mode), so matching on presence alone misclassified it
+  // as a PM and applied pmMode - making "mentions only" for spaces silently play a sound.
+  const pm = rooms.rooms.find((r) => r.id === roomId && (r.type === 1 || r.type === 2));
   if (pm) {
     const isGroup = pm.type === 2 || (pm.recipients?.length ?? 0) > 1;
     const name = roomDisplayName(pm, uid);

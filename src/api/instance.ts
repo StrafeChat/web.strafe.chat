@@ -207,6 +207,21 @@ export function unbanUser(userId: string) {
   return api<void>(`/instance/users/${encodeURIComponent(userId)}/ban`, { method: 'DELETE' });
 }
 
+export interface RecoveryCodesResult {
+  /** The new recovery codes, present only when they were NOT emailed (so the admin can relay
+   * them). Null/absent when they were emailed to the user. */
+  codes: string[] | null;
+  emailed: boolean;
+}
+
+/** Admin: regenerate a user's 2FA recovery codes. Emails them to the user when email is
+ * configured; otherwise returns them for the admin to hand over. The old codes stop working. */
+export function regenerateUserRecoveryCodes(userId: string) {
+  return api<RecoveryCodesResult>(`/instance/users/${encodeURIComponent(userId)}/recovery_codes`, {
+    method: 'POST',
+  });
+}
+
 export function setUserBadges(userId: string, flags: number) {
   return api<{ public_flags: number }>(`/instance/users/${encodeURIComponent(userId)}/badges`, {
     method: 'PATCH',
