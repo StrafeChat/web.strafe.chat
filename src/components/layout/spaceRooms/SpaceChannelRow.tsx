@@ -105,7 +105,7 @@ export const SpaceChannelRow: Component<SpaceChannelRowProps> = (props) => {
     <>
     <A
       href={`/spaces/${props.spaceId}/rooms/${props.room.id}`}
-      class={`group/room ${appCompactRow} ${
+      class={`group/room relative ${appCompactRow} ${
         reorderSource()
           ? 'bg-muted/60 text-muted-foreground ring-1 ring-inset ring-dashed ring-primary/35'
           : props.activeRoomId === props.room.id
@@ -118,10 +118,13 @@ export const SpaceChannelRow: Component<SpaceChannelRowProps> = (props) => {
       onClick={() => handleVoiceClick()}
       onContextMenu={(e) => props.onContextMenu(e, props.room)}
     >
-      {roomTypeIcon(props.room, { private: isPrivate() })}
       <Show when={baseUnread() > 0 && mentions() === 0 && !muted()}>
-        <span class="w-1.5 h-1.5 rounded-full bg-primary" />
+        <span
+          class="pointer-events-none absolute -left-3 top-1/2 h-2 w-1 -translate-y-1/2 rounded-r-full bg-foreground"
+          aria-hidden="true"
+        />
       </Show>
+      {roomTypeIcon(props.room, { private: isPrivate() })}
       <span
         class={`truncate min-w-0 flex-1 ${
           (baseUnread() > 0 || mentions() > 0) && !muted() ? 'font-semibold text-foreground' : ''
@@ -192,3 +195,4 @@ export const SpaceChannelRow: Component<SpaceChannelRowProps> = (props) => {
     </>
   );
 };
+

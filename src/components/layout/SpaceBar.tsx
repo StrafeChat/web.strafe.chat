@@ -11,7 +11,10 @@ import { requestSpaceAction, type SpaceQuickAction } from '../../stores/spaceQui
 import { lastSpaceRoom } from '../../stores/lastSpaceRoom';
 import { Tooltip } from '../ui/Tooltip';
 import { CreateSpaceModal } from '../CreateSpaceModal';
-import { rooms } from '../../stores/rooms';
+import { rooms, roomDisplayName, isNotesRoom, sortRoomsByLastMessage } from '../../stores/rooms';
+import { MessageAvatar } from '../messageList/MessageAvatar';
+import { PresenceDot } from '../PresenceDot';
+import { isRoomMuted } from '../../lib/roomNotify';
 import { messages } from '../../stores/messages';
 import { readState, getUnreadCountForDisplay } from '../../stores/readState';
 import { auth } from '../../stores/auth';
@@ -122,6 +125,57 @@ const SpaceIcon: Component<SpaceIconProps> = (props) => {
   );
 };
 
+interface DmRailIconProps {
+  room: (typeof rooms.rooms)[number];
+  active: boolean;
+  unread: number;
+}
+
+/** A PM / group-DM avatar in the spaces rail, below the home button (Discord-style). Shows a
+ * white edge pill for unread/hover/active and a red count badge, mirroring SpaceIcon. */
+const DmRailIcon: Component<DmRailIconProps> = (props) => {
+  const uid = () => auth.user?.id ?? '';
+  const isGroup = () => props.room.type === 2;
+  const other = () => props.room.participants?.find((p) => p.id !== uid());
+  const name = () => roomDisplayName(props.room, uid());
+  const hasUnread = () => props.unread > 0;
+  const base = 'relative flex items-center justify-center size-12 rounded-full transition-all duration-200';
+  const dotClass = () =>
+    hasUnread() && !props.active
+      ? 'absolute left-0 top-1/2 -translate-y-1/2 w-1 h-2 rounded-r-full bg-foreground pointer-events-none'
+      : 'absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full bg-foreground opacity-0 transition-opacity duration-200 group-hover:opacity-100 pointer-events-none';
+  return (
+    <div class="group relative w-full flex items-center justify-center min-h-12">
+      <Show when={props.active} fallback={<div class={dotClass()} />}>
+        <div class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-12 rounded-r-full bg-foreground pointer-events-none" />
+      </Show>
+      <A
+        href={`/rooms/${props.room.id}`}
+        class={`${base} ${props.active ? 'ring-2 ring-primary/50' : 'hover:ring-2 hover:ring-primary/30'}`}
+      >
+        <Show
+          when={isGroup()}
+          fallback={<MessageAvatar name={name()} avatar={other()?.avatar ?? undefined} class="size-12 text-base" />}
+        >
+          <div class="flex size-12 items-center justify-center rounded-full bg-muted ring-1 ring-border/50">
+            <i class="fa-solid fa-user-group text-base text-muted-foreground" aria-hidden="true" />
+          </div>
+        </Show>
+        <Show when={!isGroup() && other()?.id}>
+          <span class="absolute -bottom-0.5 -right-0.5">
+            <PresenceDot userId={other()!.id} class="size-3.5" />
+          </span>
+        </Show>
+        <Show when={hasUnread()}>
+          <span class="absolute -top-1 -right-1 z-10 min-w-[16px] h-[16px] flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-semibold px-1 ring-2 ring-background">
+            {props.unread > 99 ? '99+' : props.unread}
+          </span>
+        </Show>
+      </A>
+    </div>
+  );
+};
+
 export const SpaceBar: Component = () => {
   const [showCreateSpace, setShowCreateSpace] = createSignal(false);
   const location = useLocation();
@@ -131,20 +185,23 @@ export const SpaceBar: Component = () => {
   const activeRoomId = () => pathname().match(/^\/spaces\/[^/]+\/rooms\/([^/]+)/)?.[1] ?? null;
 
   const friendRequestCount = () => incomingFriendRequests().length;
-
-  const homeUnreadCount = () => {
+  const activePmRoomId = () => pathname().match(/^\/rooms\/([^/]+)/)?.[1] ?? null;
+  const dmUnread = (room: (typeof rooms.rooms)[number]) => {
     const uid = currentUserId();
     if (!uid) return 0;
-    let total = 0;
-    for (const room of rooms.rooms) {
-      // Home icon only reflects PM / group PM unread, not spaces.
-      if ((room.type === 1 || room.type === 2) && !room.space_id) {
-        const list = messages.byRoom[room.id] ?? [];
-        total += getUnreadCountForDisplay(room.id, room, list, uid);
-      }
-    }
-    return total;
+    if (activePmRoomId() === room.id) return 0;
+    const list = messages.byRoom[room.id] ?? [];
+    return getUnreadCountForDisplay(room.id, room, list, uid);
   };
+  const railDms = () =>
+    sortRoomsByLastMessage(
+      rooms.rooms.filter((r) => {
+        if (!((r.type === 1 || r.type === 2) && !r.space_id)) return false;
+        if (isNotesRoom(r, currentUserId())) return false;
+        if (activePmRoomId() === r.id) return true;
+        return !isRoomMuted(r) && dmUnread(r) > 0;
+      }),
+    );
 
   const spaceUnreadCount = (spaceId: string): number => {
     const uid = currentUserId();
@@ -303,16 +360,7 @@ export const SpaceBar: Component = () => {
           >
             <span class="relative inline-flex items-center justify-center">
               <HomeIcon />
-              <Show
-                when={friendRequestCount() > 0}
-                fallback={
-                  <Show when={homeUnreadCount() > 0}>
-                    <span class="absolute -top-1 -right-1 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-semibold px-1">
-                      {homeUnreadCount() > 99 ? '99+' : homeUnreadCount()}
-                    </span>
-                  </Show>
-                }
-              >
+              <Show when={friendRequestCount() > 0}>
                 <span class="absolute -top-1 -right-1 min-w-[14px] h-[14px] flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-semibold px-1" title={t('friends.pendingRequests', { count: friendRequestCount() })}>
                   {friendRequestCount() > 99 ? '99+' : friendRequestCount()}
                 </span>
@@ -321,6 +369,15 @@ export const SpaceBar: Component = () => {
           </A>
         </div>
       </Tooltip>
+      <Show when={railDms().length > 0}>
+        <For each={railDms()}>
+          {(room) => (
+            <Tooltip label={roomDisplayName(room, currentUserId())}>
+              <DmRailIcon room={room} active={activePmRoomId() === room.id} unread={dmUnread(room)} />
+            </Tooltip>
+          )}
+        </For>
+      </Show>
       <Divider />
       <For each={spaces.spaces}>
         {(s) => (
