@@ -2,6 +2,7 @@ import type { DecryptedMessage } from '../../stores/messages';
 import { auth } from '../../stores/auth';
 import { spaces } from '../../stores/spaces';
 import type { RoomParticipant } from '../../api/rooms';
+import { birthdayIsToday } from '../../lib/utils/birthday';
 import { t } from '../../i18n';
 
 export const LOADING_PLACEHOLDER = '...';
@@ -88,6 +89,12 @@ export function formatSystemMessageText(
         : payload.how === 'banned'
           ? t('messages.system.spaceBanned', { user })
           : t('messages.system.spaceLeave', { user });
+    case 'space_birthday': {
+      // The space's own greeting template, with {user} naming the member. Empty (the space
+      // never set one) falls back to the default line, so the day is still announced.
+      const custom = typeof payload.message === 'string' ? payload.message.trim() : '';
+      return custom ? custom.replace(/\{user\}/g, user) : t('messages.system.birthday', { user });
+    }
     case 'room_renamed':
       return t('messages.system.roomRenamed', { actor, name: payload.new_name ?? '?' });
     case 'call_started':
@@ -158,6 +165,11 @@ export interface SenderDisplay {
   discriminator?: number;
   bio?: string;
   aboutMe?: string;
+  pronouns?: string;
+  /** "MM-DD", no year - present only for people who opted in to birthday announcements. */
+  birthday?: string;
+  /** Whether today is this person's birthday (the server decides, in UTC). */
+  isBirthday?: boolean;
   publicFlags?: number;
   bot?: boolean;
   /** Federation: the user's home instance, shown after the tag when it isn't this one. */
@@ -179,6 +191,9 @@ export function getSenderDisplay(
       discriminator: auth.user?.discriminator,
       bio: auth.user?.bio,
       aboutMe: auth.user?.about_me,
+      pronouns: auth.user?.pronouns,
+      birthday: auth.user?.birthday,
+      isBirthday: birthdayIsToday(auth.user?.birthday),
       publicFlags: auth.user?.public_flags,
       bot: auth.user?.bot,
     };
@@ -193,6 +208,9 @@ export function getSenderDisplay(
     discriminator: p?.discriminator,
     bio: p?.bio,
     aboutMe: p?.about_me,
+    pronouns: p?.pronouns,
+    birthday: p?.birthday,
+    isBirthday: birthdayIsToday(p?.birthday, p?.is_birthday),
     publicFlags: p?.public_flags,
     bot: p?.bot,
     homeDomain: p?.home_domain,

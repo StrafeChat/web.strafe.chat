@@ -5,6 +5,7 @@ import { UserBadges } from './UserBadges';
 import { BotTag } from './BotTag';
 import { appNameTagLine } from '../theme/appChrome';
 import { isRemoteUser } from '../stores/instance';
+import { t } from '../i18n';
 
 /** How many badges draw before the rest fold into a `+N` chip. */
 export const PROFILE_BADGE_CAP = 5;
@@ -22,6 +23,8 @@ export interface ProfileIdentityProps {
   publicFlags?: number;
   /** The user's pronouns, shown under the name the way Discord does. */
   pronouns?: string;
+  /** Today is their birthday - adds the 🎂 chip and a line under the tag. */
+  isBirthday?: boolean;
   /** Hex colour for the name, from the member's highest hoisted role. */
   nameColor?: string;
   /** Heading level for the name - the popover card is an h3, the full profile an h2. */
@@ -35,7 +38,7 @@ export interface ProfileIdentityProps {
 
 /**
  * The identity block every profile surface shows: display name, BOT tag, the `@name#0001`
- * tag, and the badge row.
+ * tag, pronouns, the 🎂 birthday marker, and the badge row.
  *
  * One component because these used to be written out three times and drift: the badge row
  * moved between being a sibling of the heading and part of a wrapping flex row, so the same
@@ -61,6 +64,16 @@ export const ProfileIdentity: Component<ProfileIdentityProps> = (props) => {
       >
         {props.displayName}
         <BotTag bot={props.bot} size={props.compact ? 'sm' : 'md'} class="relative -top-0.5" />
+        <Show when={props.isBirthday}>
+          <span
+            class="ms-1.5 align-baseline text-sm"
+            role="img"
+            aria-label={t('profile.birthdayToday')}
+            title={t('profile.birthdayToday')}
+          >
+            🎂
+          </span>
+        </Show>
       </Dynamic>
 
       <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
@@ -90,6 +103,12 @@ export const ProfileIdentity: Component<ProfileIdentityProps> = (props) => {
           <span class="shrink-0 text-xs text-muted-foreground">{props.pronouns!.trim()}</span>
         </Show>
       </div>
+
+      <Show when={props.isBirthday}>
+        <p class="text-xs font-medium text-primary">
+          {t('profile.birthdayToday')}
+        </p>
+      </Show>
 
       <Show when={(props.publicFlags ?? 0) !== 0}>
         <UserBadges flags={props.publicFlags} size={props.compact ? 14 : 16} max={PROFILE_BADGE_CAP} />

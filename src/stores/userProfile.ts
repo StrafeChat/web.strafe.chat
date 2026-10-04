@@ -27,6 +27,9 @@ function patchFromPayload(data: Record<string, unknown>): Partial<RoomParticipan
   if (typeof data.username === 'string') out.username = data.username;
   if (typeof data.bio === 'string') out.bio = data.bio;
   if (typeof data.about_me === 'string') out.about_me = data.about_me;
+  if (typeof data.pronouns === 'string') out.pronouns = data.pronouns;
+  if (typeof data.birthday === 'string') out.birthday = data.birthday;
+  if (typeof data.is_birthday === 'boolean') out.is_birthday = data.is_birthday;
   const d = parseDisc(data.discriminator);
   if (d !== undefined) out.discriminator = d;
   return out;
@@ -56,6 +59,8 @@ export function initUserProfileHandler(): () => void {
         banner: typeof data.banner === 'string' ? data.banner : auth.user.banner,
         bio: typeof data.bio === 'string' ? data.bio : auth.user.bio,
         about_me: typeof data.about_me === 'string' ? data.about_me : auth.user.about_me,
+        pronouns: typeof data.pronouns === 'string' ? data.pronouns : auth.user.pronouns,
+        birthday: typeof data.birthday === 'string' ? data.birthday : auth.user.birthday,
       });
     }
 
@@ -73,6 +78,9 @@ export function initUserProfileHandler(): () => void {
                 banner: typeof data.banner === 'string' ? data.banner : r.user.banner,
                 bio: typeof data.bio === 'string' ? data.bio : r.user.bio,
                 about_me: typeof data.about_me === 'string' ? data.about_me : r.user.about_me,
+                pronouns: typeof data.pronouns === 'string' ? data.pronouns : r.user.pronouns,
+                birthday: typeof data.birthday === 'string' ? data.birthday : r.user.birthday,
+                is_birthday: typeof data.is_birthday === 'boolean' ? data.is_birthday : r.user.is_birthday,
                 discriminator:
                   typeof data.discriminator === 'string'
                     ? data.discriminator
@@ -94,6 +102,9 @@ export function initUserProfileHandler(): () => void {
                 display_name: (data.display_name as string) ?? p.display_name,
                 bio: typeof data.bio === 'string' ? data.bio : p.bio,
                 about_me: typeof data.about_me === 'string' ? data.about_me : p.about_me,
+                pronouns: typeof data.pronouns === 'string' ? data.pronouns : p.pronouns,
+                birthday: typeof data.birthday === 'string' ? data.birthday : p.birthday,
+                is_birthday: typeof data.is_birthday === 'boolean' ? data.is_birthday : p.is_birthday,
               }
             : p,
         ),
@@ -114,6 +125,9 @@ export function initUserProfileHandler(): () => void {
                 username: (data.username as string) ?? m.username,
                 bio: typeof data.bio === 'string' ? data.bio : m.bio,
                 about_me: typeof data.about_me === 'string' ? data.about_me : m.about_me,
+                pronouns: typeof data.pronouns === 'string' ? data.pronouns : m.pronouns,
+                birthday: typeof data.birthday === 'string' ? data.birthday : m.birthday,
+                is_birthday: typeof data.is_birthday === 'boolean' ? data.is_birthday : m.is_birthday,
               }
             : m,
         );

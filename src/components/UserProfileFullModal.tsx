@@ -2,6 +2,7 @@ import type { Component } from 'solid-js';
 import { Show, For, createMemo } from 'solid-js';
 import { MessageAvatar } from './messageList/MessageAvatar';
 import { ProfileIdentity } from './ProfileIdentity';
+import { ProfileBirthday } from './ProfileBirthday';
 import { RolePill } from './RolePill';
 import { PresenceDot } from './PresenceDot';
 import { IconButton } from './ui/IconButton';
@@ -140,10 +141,13 @@ export const UserProfileFullModal: Component = () => {
                 bot={subject()!.bot}
                 publicFlags={subject()!.publicFlags}
                 pronouns={subject()!.pronouns}
+                isBirthday={subject()!.birthdayToday}
                 nameColor={subject()!.nameColor}
                 onCopyTag={copyTag}
               />
             </div>
+
+            <ProfileBirthday birthday={subject()?.birthday} />
 
             <Show when={bioHtml()}>
               <div class="border-t border-border pt-4">

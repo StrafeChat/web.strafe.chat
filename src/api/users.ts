@@ -13,6 +13,13 @@ export interface MeResponse {
   display_name: string;
   bio?: string;
   about_me?: string;
+  /** Free-text pronouns ("they/them"), shown under the name on profiles. Max 40 characters. */
+  pronouns?: string;
+  /** Whether the account's birthday is announced in spaces that celebrate it. */
+  birthday_opt_in?: boolean;
+  /** "MM-DD" derived from the registration date of birth. Sent to the owner whether or
+   * not they opted in, so the settings screen can show it; absent when no DOB is on file. */
+  birthday?: string;
   avatar?: string;
   banner?: string;
   accent_color?: string;
@@ -29,6 +36,10 @@ export interface PatchMeInput {
   display_name?: string;
   bio?: string;
   about_me?: string;
+  /** Free text, max 40 characters. An empty string clears it. */
+  pronouns?: string;
+  /** Opt in (or out) of birthday announcements. The server keeps the index itself. */
+  birthday_opt_in?: boolean;
   avatar?: string;
   banner?: string;
   accent_color?: string;
@@ -54,6 +65,9 @@ export function toAuthUser(
   banner?: string;
   bio?: string;
   about_me?: string;
+  pronouns?: string;
+  birthday?: string;
+  birthday_opt_in?: boolean;
   public_flags?: number;
   bot?: boolean;
 } {
@@ -67,6 +81,9 @@ export function toAuthUser(
     ...(me.banner ? { banner: me.banner } : {}),
     ...(typeof me.bio === 'string' ? { bio: me.bio } : {}),
     ...(typeof me.about_me === 'string' ? { about_me: me.about_me } : {}),
+    ...(typeof me.pronouns === 'string' ? { pronouns: me.pronouns } : {}),
+    ...(typeof me.birthday === 'string' ? { birthday: me.birthday } : {}),
+    ...(typeof me.birthday_opt_in === 'boolean' ? { birthday_opt_in: me.birthday_opt_in } : {}),
     ...(typeof me.public_flags === 'number' ? { public_flags: me.public_flags } : {}),
     ...(me.bot ? { bot: true } : {}),
   };

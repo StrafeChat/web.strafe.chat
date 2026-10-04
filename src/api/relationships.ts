@@ -21,6 +21,12 @@ export interface RelationshipUser {
   banner?: string;
   bio?: string;
   about_me?: string;
+  /** Free-text pronouns ("they/them"), shown under the name on profiles. */
+  pronouns?: string;
+  /** "MM-DD" - only present when the person opted in to birthday announcements. */
+  birthday?: string;
+  /** True when today (UTC) is this person's birthday. */
+  is_birthday?: boolean;
   presence?: UserPresence;
   /** Set for people on another instance; their handle is name#0001@home_domain. */
   home_domain?: string;

@@ -3,6 +3,7 @@ import type { SpaceMember, SpaceRole } from '../api/spaces';
 import type { SenderDisplay } from '../components/messageList/utils';
 import type { ProfileRole, UserProfilePopoverSubject } from '../stores/userProfilePopover';
 import { memberNameColorHex as sharedMemberNameColorHex } from './spacePermissions';
+import { birthdayIsToday } from './utils/birthday';
 import { formatLongDate } from './utils/datetime';
 import { t } from '../i18n';
 
@@ -84,6 +85,9 @@ export function popoverSubjectFromParticipant(
     banner: p.banner,
     aboutMe: p.about_me,
     bio: p.bio,
+    pronouns: p.pronouns,
+    birthday: p.birthday,
+    birthdayToday: p.birthday ? birthdayIsToday(p.birthday, p.is_birthday) : false,
     spaceRoles: rolesForMemberProfile(participantRoleIds(p), spaceRoles),
     nameColor: memberNameColorHex(participantRoleIds(p), spaceRoles),
     joinedAtLabel: spaceJoinedLabel(p),
@@ -113,6 +117,9 @@ export function popoverSubjectFromSender(
     banner: s.banner,
     aboutMe: s.aboutMe,
     bio: s.bio,
+    pronouns: s.pronouns,
+    birthday: s.birthday,
+    birthdayToday: birthdayIsToday(s.birthday, s.isBirthday),
     spaceRoles: rolesForMemberProfile(p ? participantRoleIds(p) : undefined, opts?.spaceRoles),
     nameColor: memberNameColorHex(p ? participantRoleIds(p) : undefined, opts?.spaceRoles),
     joinedAtLabel: p ? spaceJoinedLabel(p) : undefined,
