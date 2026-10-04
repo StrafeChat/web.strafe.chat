@@ -3,6 +3,7 @@ import { Show, For, onMount, onCleanup, createEffect, createSignal, createMemo, 
 import { Portal } from 'solid-js/web';
 import { MessageAvatar } from './messageList/MessageAvatar';
 import { ProfileIdentity } from './ProfileIdentity';
+import { ProfileBirthday } from './ProfileBirthday';
 import { RolePill } from './RolePill';
 import { MessageBody } from './messageList/MessageBody';
 import { PresenceDot } from './PresenceDot';
@@ -298,6 +299,8 @@ export const UserProfilePopover: Component = () => {
         spaceRoles: s.spaceRoles,
         nameColor: s.nameColor,
         pronouns: s.pronouns,
+        birthday: s.birthday,
+        birthdayToday: s.birthdayToday,
         joinedAtLabel: s.joinedAtLabel,
         publicFlags: s.publicFlags,
         bot: s.bot,
@@ -435,6 +438,7 @@ export const UserProfilePopover: Component = () => {
                 bot={subject()!.bot}
                 publicFlags={subject()!.publicFlags}
                 pronouns={subject()!.pronouns}
+                isBirthday={subject()!.birthdayToday}
                 nameColor={subject()!.nameColor}
                 onCopyTag={copyTag}
               />
@@ -464,6 +468,8 @@ export const UserProfilePopover: Component = () => {
                 />
               </div>
             </Show>
+
+            <ProfileBirthday birthday={subject()?.birthday} class="px-4 pb-3" />
 
             <Show when={showRolesOrJoinSection()}>
               <div class="space-y-2.5 px-4 pb-3">

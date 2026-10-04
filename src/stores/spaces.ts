@@ -304,6 +304,8 @@ function spaceFromPayload(payload: unknown): Space | null {
     ...(d.widget_room_id != null && { widget_room_id: String(d.widget_room_id) }),
     ...(d.afk_room_id != null && { afk_room_id: String(d.afk_room_id) }),
     ...(d.system_room_id != null && { system_room_id: String(d.system_room_id) }),
+    ...(d.birthday_channel_id != null && { birthday_channel_id: String(d.birthday_channel_id) }),
+    ...(typeof d.birthday_message === 'string' && { birthday_message: d.birthday_message }),
     ...(d.rules_room_id != null && { rules_room_id: String(d.rules_room_id) }),
     ...(d.public_updates_room_id != null && { public_updates_room_id: String(d.public_updates_room_id) }),
     ...(d.everyone_role_id != null && { everyone_role_id: String(d.everyone_role_id) }),

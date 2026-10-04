@@ -187,7 +187,7 @@ Room events reach every subscriber of the room; space events reach every subscri
 | `t` | `d` |
 | --- | --- |
 | `PRESENCE_UPDATE` | `{"user_id", "presence": {"status": "online" \| "offline" \| …}}` for people you share a space or PM with |
-| `USER_UPDATE` | A profile changed (display name, avatar, …) |
+| `USER_UPDATE` | A profile changed (display name, avatar, pronouns, …) - `{"user_id", "display_name", "avatar", "pronouns", …}` |
 | `RELATIONSHIP_REQUEST` / `RELATIONSHIP_ADD` / `RELATIONSHIP_REMOVE` | Friend requests and friendships (people only) |
 | `SESSION_REVOKED` | `{"reason"}` - this credential is dead: the account was banned from the instance, signed out everywhere, or (for a bot) the token was reset. The socket is closed right after |
 | `VOICE_STATE_UPDATE`, `CALL_RING`, `CALL_DECLINE`, `CALL_END` | Voice and video (see the client) |

@@ -25,6 +25,11 @@ export interface AuthState {
     banner?: string;
     bio?: string;
     about_me?: string;
+    /** Free-text pronouns ("they/them"), shown under the name on profiles. */
+    pronouns?: string;
+    /** "MM-DD", no year. Sent for the owner whether or not they opted in. */
+    birthday?: string;
+    birthday_opt_in?: boolean;
     public_flags?: number;
     bot?: boolean;
   } | null;
@@ -77,6 +82,9 @@ export function hydrateFromReady(payload: {
     banner?: string;
     bio?: string;
     about_me?: string;
+    pronouns?: string;
+    birthday?: string;
+    birthday_opt_in?: boolean;
     public_flags?: number;
     bot?: boolean;
     presence?: { status: string; custom_status?: string };
@@ -103,6 +111,11 @@ export function hydrateFromReady(payload: {
       ...(typeof payload.user.banner === 'string' ? { banner: payload.user.banner } : {}),
       ...(typeof payload.user.bio === 'string' ? { bio: payload.user.bio } : {}),
       ...(typeof payload.user.about_me === 'string' ? { about_me: payload.user.about_me } : {}),
+      ...(typeof payload.user.pronouns === 'string' ? { pronouns: payload.user.pronouns } : {}),
+      ...(typeof payload.user.birthday === 'string' ? { birthday: payload.user.birthday } : {}),
+      ...(typeof payload.user.birthday_opt_in === 'boolean'
+        ? { birthday_opt_in: payload.user.birthday_opt_in }
+        : {}),
       ...(typeof payload.user.public_flags === 'number' ? { public_flags: payload.user.public_flags } : {}),
       ...(payload.user.bot ? { bot: true } : {}),
     };

@@ -9,6 +9,15 @@ export interface User {
   display_name: string;
   avatar?: string;
   banner?: string;
+  bio?: string;
+  /** Free-text pronouns ("they/them"), shown under the name on profiles. */
+  pronouns?: string;
+  /** "MM-DD", no year. Present for others only when they opted in. */
+  birthday?: string;
+  /** Whether the birthday is today, so clients need not compute it in their own timezone. */
+  is_birthday?: boolean;
+  /** Self-only: whether this person allows their birthday to be announced. */
+  birthday_opt_in?: boolean;
   bots?: string[];
   relationships?: string[];
 }

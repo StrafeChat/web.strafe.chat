@@ -14,6 +14,10 @@ export type UserProfileFullSubject = {
   aboutMe?: string;
   /** Shown under the name. */
   pronouns?: string;
+  /** "MM-DD" (no year); present only when the person opted in to birthday announcements. */
+  birthday?: string;
+  /** Whether today is their birthday - drives the 🎂 next to the name. */
+  birthdayToday?: boolean;
   /** Assignable roles (never @everyone), highest position first. */
   spaceRoles?: ProfileRole[];
   /** The member's highest hoisted role colour, or undefined if they have none. */

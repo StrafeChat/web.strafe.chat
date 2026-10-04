@@ -6,12 +6,14 @@ import { MessageAvatar } from '../messageList/MessageAvatar';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
+import { Toggle } from '../ui/Toggle';
 import { PresenceDot } from '../PresenceDot';
 import { formatDiscriminator } from './types.js';
 import { settingsSectionTitle } from './settingsChrome';
 import { useNavigate } from '@solidjs/router';
 import { closeUserSettings } from '../../stores/userSettingsModal';
 import { markdownAndHtmlToSanitizedBioHtml } from '../../lib/profileRichText';
+import { formatBirthday } from '../../lib/utils/birthday';
 import { t } from '../../i18n';
 
 function getInitialName(): string {
@@ -31,6 +33,7 @@ export const ProfileSettingsPage: Component<ProfileSettingsPageProps> = (props) 
   const [displayNameDraft, setDisplayNameDraft] = createSignal(getInitialName());
   const [bioDraft, setBioDraft] = createSignal('');
   const [aboutMeDraft, setAboutMeDraft] = createSignal('');
+  const [pronounsDraft, setPronounsDraft] = createSignal('');
   const [savingProfile, setSavingProfile] = createSignal(false);
   const [profileError, setProfileError] = createSignal('');
   const [avatarUploading, setAvatarUploading] = createSignal(false);
@@ -39,6 +42,12 @@ export const ProfileSettingsPage: Component<ProfileSettingsPageProps> = (props) 
   const [bannerUploading, setBannerUploading] = createSignal(false);
   const [bannerError, setBannerError] = createSignal('');
   let bannerFileInput: HTMLInputElement | undefined;
+  // The birthday opt-in is its own switch that saves the moment it flips, so it is kept out
+  // of the draft above (a discarded profile edit must not silently undo it, and vice versa).
+  const [birthday, setBirthday] = createSignal<string | undefined>(undefined);
+  const [birthdayOptIn, setBirthdayOptIn] = createSignal(false);
+  const [birthdayBusy, setBirthdayBusy] = createSignal(false);
+  const [birthdayError, setBirthdayError] = createSignal('');
 
   const profileImageMaxBytes = 8 * 1024 * 1024;
 
@@ -54,6 +63,7 @@ export const ProfileSettingsPage: Component<ProfileSettingsPageProps> = (props) 
   const displayName = () => user()?.display_name || user()?.username || '';
 
   const bioPreviewHtml = createMemo(() => markdownAndHtmlToSanitizedBioHtml(bioDraft()));
+  const birthdayLabel = createMemo(() => formatBirthday(birthday()));
 
   createEffect(() => {
     props.registerSaveHandler?.(() => saveProfile());
@@ -65,6 +75,9 @@ export const ProfileSettingsPage: Component<ProfileSettingsPageProps> = (props) 
         setDisplayNameDraft(me.display_name || me.username || '');
         setBioDraft(me.bio ?? '');
         setAboutMeDraft(me.about_me ?? '');
+        setPronounsDraft(me.pronouns ?? '');
+        setBirthday(me.birthday);
+        setBirthdayOptIn(me.birthday_opt_in === true);
         const u = auth.user;
         if (u) setAuthUser({ ...u, ...toAuthUser(me) });
         markClean();
@@ -72,6 +85,9 @@ export const ProfileSettingsPage: Component<ProfileSettingsPageProps> = (props) 
       .catch(() => {
         const u = auth.user;
         setDisplayNameDraft(u?.display_name || u?.username || '');
+        setPronounsDraft(u?.pronouns ?? '');
+        setBirthday(u?.birthday);
+        setBirthdayOptIn(u?.birthday_opt_in === true);
         markClean();
       });
   });
@@ -90,6 +106,9 @@ export const ProfileSettingsPage: Component<ProfileSettingsPageProps> = (props) 
         display_name: name || undefined,
         bio: bio || undefined,
         about_me: about || undefined,
+        // Sent even when empty: an empty string is how the server is told to clear it, while
+        // omitting the key would leave whatever was there before.
+        pronouns: pronounsDraft().trim(),
       });
       setAuthUser({ ...u, ...toAuthUser(me) });
       markClean();
@@ -98,6 +117,22 @@ export const ProfileSettingsPage: Component<ProfileSettingsPageProps> = (props) 
     } finally {
       setSavingProfile(false);
       props.onSavingChange?.(false);
+    }
+  }
+
+  async function toggleBirthdayOptIn(next: boolean) {
+    if (birthdayBusy()) return;
+    setBirthdayBusy(true);
+    setBirthdayError('');
+    try {
+      const me = await patchMe({ birthday_opt_in: next });
+      setBirthdayOptIn(me.birthday_opt_in === true);
+      const u = auth.user;
+      if (u) setAuthUser({ ...u, ...toAuthUser(me) });
+    } catch (err) {
+      setBirthdayError(err instanceof Error ? err.message : t('settings.profile.birthdaySaveFailed'));
+    } finally {
+      setBirthdayBusy(false);
     }
   }
 
@@ -288,6 +323,26 @@ export const ProfileSettingsPage: Component<ProfileSettingsPageProps> = (props) 
               </div>
               <div class={fieldCard}>
                 <div class={fieldIcon}>
+                  <i class="fa-solid fa-venus-mars text-sm" />
+                </div>
+                <div class="min-w-0 flex-1 space-y-2">
+                  <label class="text-[15px] font-semibold text-foreground">{t('settings.profile.pronouns')}</label>
+                  <Input
+                    value={pronounsDraft()}
+                    maxLength={40}
+                    placeholder={t('settings.profile.pronounsPlaceholder')}
+                    onInput={(e) => {
+                      setPronounsDraft(e.currentTarget.value);
+                      markDirty();
+                    }}
+                    disabled={savingProfile()}
+                    class="rounded-lg border-border bg-background/60"
+                  />
+                  <p class="text-xs text-muted-foreground">{t('settings.profile.pronounsHint')}</p>
+                </div>
+              </div>
+              <div class={fieldCard}>
+                <div class={fieldIcon}>
                   <i class="fa-regular fa-note-sticky text-sm" />
                 </div>
                 <div class="min-w-0 flex-1 space-y-2">
@@ -349,6 +404,40 @@ export const ProfileSettingsPage: Component<ProfileSettingsPageProps> = (props) 
                   </p>
                   <p class="text-xs text-muted-foreground">{t('settings.profile.usernameHint')}</p>
                 </div>
+              </div>
+            </div>
+          </section>
+
+          <section class="space-y-3">
+            <h3 class={settingsSectionTitle}>
+              {t('settings.profile.birthdayTitle')}
+            </h3>
+            <div class={fieldCard}>
+              <div class={fieldIcon}>
+                <i class="fa-solid fa-cake-candles text-sm" />
+              </div>
+              <div class="min-w-0 flex-1 space-y-1">
+                <p class="text-[15px] font-semibold text-foreground">{t('settings.profile.birthdayShow')}</p>
+                <p class="text-xs leading-snug text-muted-foreground">{t('settings.profile.birthdayShowHint')}</p>
+                <p class="text-xs text-muted-foreground">
+                  <Show
+                    when={birthdayLabel()}
+                    fallback={<span>{t('settings.profile.birthdayNone')}</span>}
+                  >
+                    {(date) => t('settings.profile.birthdayYours', { date: date() })}
+                  </Show>
+                </p>
+                <Show when={birthdayError()}>
+                  <p class="text-xs text-destructive">{birthdayError()}</p>
+                </Show>
+              </div>
+              <div class="flex shrink-0 items-center self-center">
+                <Toggle
+                  checked={birthdayOptIn()}
+                  disabled={birthdayBusy()}
+                  label={t('settings.profile.birthdayShow')}
+                  onChange={(on) => void toggleBirthdayOptIn(on)}
+                />
               </div>
             </div>
           </section>

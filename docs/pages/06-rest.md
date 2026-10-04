@@ -16,12 +16,14 @@ All paths are relative to this instance's API base: <code data-instance="api">ht
 The authenticated account. `email` is present for sessions and bots (a bot's is synthetic) and for OAuth2 tokens with `email`.
 
 ```json
-{ "id": "…", "email": "", "username": "Docs_Bot", "discriminator": "2994", "display_name": "Docs Bot", "bio": "", "about_me": "", "avatar": "", "banner": "", "accent_color": "", "public_flags": 0, "bot": true, "presence": { "status": "online" } }
+{ "id": "…", "email": "", "username": "Docs_Bot", "discriminator": "2994", "display_name": "Docs Bot", "bio": "", "about_me": "", "pronouns": "they/them", "birthday": "09-01", "birthday_opt_in": true, "avatar": "", "banner": "", "accent_color": "", "public_flags": 0, "bot": true, "presence": { "status": "online" } }
 ```
+
+`pronouns` is free text (max 40 characters) and is public, like the bio - it rides along on every user object (message authors, `mention_users`, space members, relationships). `birthday` is `"MM-DD"` with no year, derived from the date of birth given at registration, and `birthday_opt_in` says whether the account wants it announced in spaces. The owner's own `birthday` is returned whether or not they opted in so their settings can show it; on other people's user objects both `birthday` and `is_birthday` appear only after they opt in.
 
 ### `PATCH` /users/@me
 
-Update the account's profile: `display_name`, `bio`, `about_me`, `accent_color` (hex), `presence` (`{"status": "online" | "idle" | "dnd" | "invisible", "custom_status": "…"}`). Avatar and banner are uploaded with `POST /users/@me/avatar` and `/users/@me/banner` (multipart `file`).
+Update the account's profile: `display_name`, `bio`, `about_me`, `pronouns` (free text, max 40 characters; `""` clears it), `birthday_opt_in` (`true` lets spaces celebrate the account's birthday - the server keeps the announcement index itself), `accent_color` (hex), `presence` (`{"status": "online" | "idle" | "dnd" | "invisible", "custom_status": "…"}`). Avatar and banner are uploaded with `POST /users/@me/avatar` and `/users/@me/banner` (multipart `file`). The date of birth itself cannot be changed over the API.
 
 ### `GET` /users/@me/spaces — *scope: spaces*
 
@@ -49,7 +51,7 @@ One space (member only) with `roles`.
 
 ### `PATCH` /spaces/:id — *Manage Space*
 
-`name`, `description`, `system_room_id`, `system_room_flags`, `default_message_notifications` (`0` all messages, `1` only mentions), `afk_room_id`, `afk_timeout` (60, 300, 900, 1800 or 3600), `widget_enabled`, `widget_room_id`. Room ids as strings; `""` clears one.
+`name`, `description`, `system_room_id`, `system_room_flags`, `default_message_notifications` (`0` all messages, `1` only mentions), `afk_room_id`, `afk_timeout` (60, 300, 900, 1800 or 3600), `widget_enabled`, `widget_room_id`, `birthday_channel_id`, `birthday_message`. Room ids as strings; `""` clears one. `birthday_channel_id` must be a text room in the space (otherwise `400`) and is where the daily birthday greetings go; `birthday_message` is an optional template, max 500 characters, with `{user}` marking where the member is named - empty uses the default greeting.
 
 ### `GET` /spaces/:id/rooms
 
@@ -189,7 +191,7 @@ Broadcast a typing indicator (rate limited to one per 5 s per room).
 }
 ```
 
-`plaintext` is present in plain rooms; encrypted rooms carry `ciphertext` instead. `reactions` is included when fetching messages, not in gateway events. Deleted messages keep their id with a `deleted_at`. System notices have `sender_id: "0"`, a `system_type` (`space_member_join`, `space_member_leave`, …) and a `system_payload`.
+`plaintext` is present in plain rooms; encrypted rooms carry `ciphertext` instead. `reactions` is included when fetching messages, not in gateway events. Deleted messages keep their id with a `deleted_at`. System notices have `sender_id: "0"`, a `system_type` (`space_member_join`, `space_member_leave`, `space_birthday`, …) and a `system_payload`. `space_birthday` is posted once a day in the space's `birthday_channel_id` for each opted-in member whose birthday is that day (UTC); its payload is `{"user_id": "…", "message": "…"}`, with `message` being the space's `birthday_message` (possibly empty, meaning use the default greeting).
 
 ### `GET` /rooms/:id/messages
 

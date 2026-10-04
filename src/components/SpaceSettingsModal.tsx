@@ -571,6 +571,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
           <SpaceOverviewPage
             spaceId={props.spaceId}
             space={props.space}
+            rooms={spaceRoomList()}
             canManage={canManageSpace()}
             members={props.members}
             viewerId={viewerId()}

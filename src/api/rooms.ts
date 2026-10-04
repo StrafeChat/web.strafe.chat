@@ -11,6 +11,12 @@ export interface RoomParticipant {
   banner?: string;
   bio?: string;
   about_me?: string;
+  /** Free-text pronouns ("they/them"), shown under the name on profiles. */
+  pronouns?: string;
+  /** "MM-DD" - only sent for people who opted in to birthday announcements. No year. */
+  birthday?: string;
+  /** True when today (UTC) is this person's birthday. */
+  is_birthday?: boolean;
   /** Profile-badge bitfield (see lib/badges.ts). */
   public_flags?: number;
   /** Bot account. */

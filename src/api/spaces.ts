@@ -20,6 +20,10 @@ export interface Space {
   afk_timeout: number;
   system_room_id?: string;
   system_room_flags: number;
+  /** Text room the daily birthday greetings are posted in; absent = not celebrated. */
+  birthday_channel_id?: string;
+  /** Optional template for those greetings; `{user}` is replaced by the member's name. */
+  birthday_message?: string;
   rules_room_id?: string;
   max_presences: number;
   max_members: number;
@@ -69,6 +73,10 @@ export interface PatchSpaceInput {
   description?: string;
   system_room_id?: string;
   system_room_flags?: number;
+  /** Must be a text room in this space; an empty string turns birthday greetings off. */
+  birthday_channel_id?: string;
+  /** Greeting template, max 500 characters, `{user}` marks where the member is named. */
+  birthday_message?: string;
   default_message_notifications?: number;
   afk_room_id?: string;
   afk_timeout?: number;

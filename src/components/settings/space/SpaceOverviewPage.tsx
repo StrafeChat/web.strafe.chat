@@ -1,17 +1,28 @@
 import type { Component } from 'solid-js';
-import { createEffect, createSignal, Show } from 'solid-js';
-import { patchSpace, uploadSpaceIcon, uploadSpaceBanner, type Space, type SpaceMember } from '../../../api/spaces';
+import { createEffect, createMemo, createSignal, For, Show } from 'solid-js';
+import {
+  patchSpace,
+  uploadSpaceIcon,
+  uploadSpaceBanner,
+  type Space,
+  type SpaceMember,
+  type SpaceRoom,
+} from '../../../api/spaces';
 import { addOrUpdateSpace } from '../../../stores/spaces';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
+import { Select } from '../../ui/Select';
 import { Textarea } from '../../ui/Textarea';
 import { SpaceDangerZone } from './SpaceDangerZone';
-import { settingsSectionTitle } from '../settingsChrome';
+import { settingsGroupFrame, settingsSectionTitle } from '../settingsChrome';
 import { t } from '../../../i18n';
+
+const ROOM_TYPE_TEXT = 3;
 
 interface Props {
   spaceId: string;
   space: Space | undefined;
+  rooms: SpaceRoom[];
   canManage: boolean;
   /** For the owner-only transfer picker in the danger zone. */
   members: SpaceMember[];
@@ -20,7 +31,7 @@ interface Props {
   onError: (msg: string) => void;
 }
 
-/** Space settings → Overview: icon, name, description, and the owner's danger zone. */
+/** Space settings → Overview: icon, name, description, birthday announcements, and the owner's danger zone. */
 export const SpaceOverviewPage: Component<Props> = (props) => {
   const [name, setName] = createSignal('');
   const [description, setDescription] = createSignal('');
@@ -30,13 +41,27 @@ export const SpaceOverviewPage: Component<Props> = (props) => {
   let fileInput: HTMLInputElement | undefined;
   let bannerInput: HTMLInputElement | undefined;
 
+  // Drafted together with the identity fields above and saved on one button: the greeting
+  // template is free text, so saving it on every keystroke would mean a PATCH per character.
+  const [birthdayChannelId, setBirthdayChannelId] = createSignal('');
+  const [birthdayMessage, setBirthdayMessage] = createSignal('');
+  const [birthdaySaving, setBirthdaySaving] = createSignal(false);
+
+  const textRooms = createMemo(() => props.rooms.filter((r) => r.type === ROOM_TYPE_TEXT));
+
   createEffect(() => {
     setName(props.space?.name ?? '');
     setDescription(props.space?.description ?? '');
+    setBirthdayChannelId(props.space?.birthday_channel_id ?? '');
+    setBirthdayMessage(props.space?.birthday_message ?? '');
   });
 
   const dirty = () =>
     name().trim() !== (props.space?.name ?? '') || description().trim() !== (props.space?.description ?? '');
+
+  const birthdayDirty = () =>
+    birthdayChannelId() !== (props.space?.birthday_channel_id ?? '') ||
+    birthdayMessage().trim() !== (props.space?.birthday_message ?? '');
 
   async function save() {
     if (!props.canManage || !dirty()) return;
@@ -51,6 +76,25 @@ export const SpaceOverviewPage: Component<Props> = (props) => {
       props.onError(e instanceof Error ? e.message : t('spaceSettings.saveNameFailed'));
     } finally {
       setSaving(false);
+    }
+  }
+
+  async function saveBirthdays() {
+    if (!props.canManage || !birthdayDirty() || birthdaySaving()) return;
+    setBirthdaySaving(true);
+    props.onError('');
+    try {
+      // An empty channel id is how the server is told to stop announcing birthdays.
+      addOrUpdateSpace(
+        await patchSpace(props.spaceId, {
+          birthday_channel_id: birthdayChannelId(),
+          birthday_message: birthdayMessage().trim(),
+        })
+      );
+    } catch (e) {
+      props.onError(e instanceof Error ? e.message : t('spaceSettings.overview.birthdaySaveFailed'));
+    } finally {
+      setBirthdaySaving(false);
     }
   }
 
@@ -175,6 +219,42 @@ export const SpaceOverviewPage: Component<Props> = (props) => {
             {t('spaceSettings.overview.uploadBanner')}
           </Button>
         </Show>
+      </section>
+
+      <section class="space-y-3">
+        <h3 class={settingsSectionTitle}>{t('spaceSettings.overview.birthdaysTitle')}</h3>
+        <p class="text-sm text-muted-foreground">{t('spaceSettings.overview.birthdaysHint')}</p>
+        <div class={`space-y-4 ${settingsGroupFrame}`}>
+          <Select
+            label={t('spaceSettings.overview.birthdayChannel')}
+            value={birthdayChannelId()}
+            disabled={!props.canManage || birthdaySaving()}
+            onValueChange={setBirthdayChannelId}
+          >
+            <option value="">{t('spaceSettings.overview.birthdayNoChannel')}</option>
+            <For each={textRooms()}>{(r) => <option value={r.id}>#{r.name}</option>}</For>
+          </Select>
+          <Input
+            label={t('spaceSettings.overview.birthdayMessage')}
+            value={birthdayMessage()}
+            maxLength={500}
+            placeholder={t('spaceSettings.overview.birthdayMessagePlaceholder')}
+            disabled={!props.canManage || birthdaySaving() || !birthdayChannelId()}
+            onInput={(e) => setBirthdayMessage(e.currentTarget.value)}
+          />
+          <p class="text-xs text-muted-foreground">{t('spaceSettings.overview.birthdayMessageHint')}</p>
+          <Show when={props.canManage && birthdayDirty()}>
+            <div class="flex justify-end">
+              <Button
+                onClick={() => void saveBirthdays()}
+                disabled={birthdaySaving()}
+                loading={birthdaySaving()}
+              >
+                {t('common.saveChanges')}
+              </Button>
+            </div>
+          </Show>
+        </div>
       </section>
 
       <SpaceDangerZone

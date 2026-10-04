@@ -43,6 +43,14 @@ export type UserProfilePopoverSubject = {
   bio?: string;
   /** Shown next to the display name. */
   pronouns?: string;
+  /**
+   * "MM-DD" birthday, kept raw so the label can be re-rendered in the current UI language
+   * (the subject is built once, when the card opens). Only set for people who opted in to
+   * birthday announcements. `birthdayToday` is resolved from it - or from the server's
+   * flag, when it sent one.
+   */
+  birthday?: string;
+  birthdayToday?: boolean;
   /** Assignable roles (never @everyone), highest position first. */
   spaceRoles?: ProfileRole[];
   /**
