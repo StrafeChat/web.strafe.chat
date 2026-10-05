@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs';
 import tailwindcss from '@tailwindcss/vite';
 import { defineConfig } from 'vite';
 import solidPlugin from 'vite-plugin-solid';
@@ -9,6 +10,13 @@ import { strafeDocsPlugin } from './scripts/docs-plugin.mjs';
 // /version.json (emitted below), so a running client can poll that file and tell when a
 // newer build has been deployed - then prompt the user to refresh.
 const buildId = String(Date.now());
+
+// The app's semantic version, taken straight from package.json so there is one source of
+// truth - exposed as __APP_VERSION__ and shown in the user-settings footer. Bump package.json
+// to change it.
+const appVersion = String(
+  (JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')) as { version?: string }).version ?? '0.0.0'
+);
 
 /** Emits /version.json alongside the build so the client can detect new deploys. */
 function versionFilePlugin() {
@@ -44,6 +52,7 @@ const prodProxy = {
 export default defineConfig({
   define: {
     __BUILD_ID__: JSON.stringify(buildId),
+    __APP_VERSION__: JSON.stringify(appVersion),
   },
   // wasm(): loads the @matrix-org/matrix-sdk-crypto-wasm E2EE engine as an ES module.
   // Its init glue uses top-level await; build.target is already esnext below, so every

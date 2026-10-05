@@ -123,8 +123,8 @@ export const UserSettingsModal: Component = () => {
             />
           }
           footer={
-            <p class="text-[10px] leading-relaxed text-muted-foreground/80">
-              v{import.meta.env.VITE_APP_VERSION ?? '0.0.0'} · {import.meta.env.MODE}
+            <p class="text-[10px] leading-relaxed text-muted-foreground/80" title={__BUILD_ID__}>
+              Public beta · v{__APP_VERSION__}
             </p>
           }
         />
