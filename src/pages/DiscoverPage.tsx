@@ -138,7 +138,16 @@ const DiscoverPage: Component = () => {
                           <article class="flex flex-col overflow-hidden rounded-xl border border-border bg-card/60" data-discover-card={card().id}>
                             <div class="h-20 bg-gradient-to-br from-primary/30 to-primary/5" style={card().banner ? { 'background-image': `url(${card().banner})`, 'background-size': 'cover', 'background-position': 'center' } : undefined} />
                             <div class="-mt-6 flex flex-1 flex-col gap-2 px-4 pb-4">
-                              <MessageAvatar name={card().name} avatar={card().icon} class="size-12 rounded-xl border-2 border-card text-base" />
+                              {/* Space icons are squircles (as in the server rail), not round -
+                                  MessageAvatar forces the image to rounded-full, which left a round
+                                  icon inside this squircle border. Clip the image to the squircle instead. */}
+                              <div class="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-xl border-2 border-card bg-primary/20 text-base font-medium text-foreground ring-1 ring-border/50">
+                                {card().icon ? (
+                                  <img src={card().icon} alt="" class="size-full object-cover" />
+                                ) : (
+                                  (card().name?.[0] ?? '?').toUpperCase()
+                                )}
+                              </div>
                               <div class="min-w-0">
                                 <h2 class="truncate text-sm font-semibold text-foreground">{card().name}</h2>
                                 <p class="text-xs text-muted-foreground">
