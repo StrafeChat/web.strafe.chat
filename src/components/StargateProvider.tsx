@@ -2,7 +2,7 @@ import type { Component } from 'solid-js';
 import { createEffect, onMount, onCleanup } from 'solid-js';
 import { auth } from '../stores/auth';
 import { stargate } from '../stores/stargate';
-import { connectStargate, disconnectStargate, subscribe, unsubscribe, onStargateReady } from '../services/stargate/client';
+import { connectStargate, disconnectStargate, subscribe, unsubscribe, resubscribeAll, onStargateReady } from '../services/stargate/client';
 import { hydrateFromReady, bootstrapFromRest } from '../stores/auth';
 import { rooms } from '../stores/rooms';
 import { initStargateMessageHandler, loadMessages, messages } from '../stores/messages';
@@ -204,6 +204,33 @@ export const StargateProvider: Component<{ children?: import('solid-js').JSX.Ele
       for (const r of list) {
         if (r.id) unsubscribe(r.id, undefined);
       }
+    });
+  });
+
+  // A space joined mid-session (Discover, an invite) has its channels subscribed by the effects
+  // above, but the gateway can briefly reject those subscribes right after the join - the new
+  // membership isn't visible to its authorization read yet - leaving the space with no live
+  // messages/typing until a reconnect. When a new space id appears, re-assert subscriptions a
+  // couple of times to ride out that window; channels already held are cheap no-ops (the gateway
+  // dedupes), only the rejected new ones get re-authorized.
+  let knownSpaceIds = new Set<string>();
+  createEffect(() => {
+    if (!stargate.ready) return;
+    const current = new Set(spaces.spaces.map((s) => s.id).filter((id): id is string => !!id));
+    let added = false;
+    for (const sid of current) {
+      if (!knownSpaceIds.has(sid)) {
+        added = true;
+        break;
+      }
+    }
+    knownSpaceIds = current;
+    if (!added) return;
+    const t1 = setTimeout(resubscribeAll, 1500);
+    const t2 = setTimeout(resubscribeAll, 4000);
+    onCleanup(() => {
+      clearTimeout(t1);
+      clearTimeout(t2);
     });
   });
 

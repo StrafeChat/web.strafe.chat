@@ -21,7 +21,9 @@ import { translateCaughtApiError } from '../lib/formatApiError';
  * Where a verification email's link lands: /verify-email?token=... The token is redeemed on
  * arrival - there is nothing for the person to type - and the page says whether it took.
  * Works signed out (the usual case: the link was opened in a fresh tab or another browser)
- * and signed in alike; the token is single-use, so a second visit reports it invalid.
+ * and signed in alike. Redeeming is idempotent server-side (the token lives for its whole TTL,
+ * not just one use), so a mail-security scanner fetching the link first, a refresh, or a
+ * double-mount all still report success rather than a spurious "link expired".
  */
 export default function VerifyEmailPage() {
   const [t] = useReactiveTranslate();
