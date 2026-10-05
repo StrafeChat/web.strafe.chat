@@ -10,6 +10,7 @@ import {
   type SpaceRoomUserOverride,
 } from '../api/spaces';
 import { onStargateEvent } from '../services/stargate/client';
+import { removeRoom } from './rooms';
 import { registerRoomIdentity } from './federationIds';
 import { setReadStateFromRoom } from './readState';
 
@@ -66,6 +67,14 @@ export function addOrUpdateSpace(space: Space): void {
 
 /** Drop a space from local state (kicked, banned, left - including from another session). */
 export function removeSpace(spaceId: string): void {
+  // Also drop the space's channels from the rooms store. The channel being viewed is mirrored
+  // there (SpacePage.addOrUpdateRoom, for the send path), and if left behind the gateway-
+  // subscription effect keeps a reference on it - so its subscribe ref count never returns to
+  // zero, and rejoining the space later never re-sends a Subscribe frame (subscribe() early-
+  // returns on a non-zero count). That was the "no live events after leaving and rejoining a
+  // space" bug: a rejoin was treated differently from a first join, which starts from a clean
+  // ref count. Collect the ids before deleting the room list below.
+  const roomIds = (spaces.spaceRoomsBySpaceId[spaceId] ?? []).map((r) => r.id);
   setSpaces('spaces', (list) => list.filter((s) => s.id !== spaceId));
   // `produce`, not a spread copy: a store setter handed a plain object *merges* it, so
   // "everything except this key" quietly leaves the space's room list cached forever.
@@ -74,6 +83,7 @@ export function removeSpace(spaceId: string): void {
       delete s.spaceRoomsBySpaceId[spaceId];
     })
   );
+  for (const rid of roomIds) removeRoom(rid);
 }
 
 // ---- roles -----------------------------------------------------------------------------
