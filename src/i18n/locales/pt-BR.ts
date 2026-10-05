@@ -879,6 +879,37 @@ export default {
       audit: {
         title: 'Registro de auditoria',
       },
+      moderation: {
+        title: 'Moderação',
+      },
+    },
+    moderation: {
+      verificationTitle: 'Nível de verificação',
+      verificationHint:
+        'O que um membro sem cargo precisa cumprir antes de poder enviar mensagens. Membros com algum cargo e quem pode gerenciar mensagens nunca ficam sujeitos a isso: serve para silenciar invasores, não os frequentadores.',
+      levels: {
+        none: { title: 'Nenhum', description: 'Quem pode ver um canal pode escrever nele.' },
+        low: { title: 'Baixo', description: 'Precisa ter um e-mail verificado.' },
+        medium: { title: 'Médio', description: 'A conta também precisa ter pelo menos 5 minutos.' },
+        high: { title: 'Alto', description: 'Também precisa ser membro deste espaço há 10 minutos.' },
+      },
+      automodTitle: 'Automod',
+      automodHint:
+        'Mensagens que quebram uma regra são recusadas antes que alguém as veja, e quem enviou é avisado do motivo. Membros que podem gerenciar mensagens estão isentos. As regras de conteúdo só funcionam em canais sem criptografia de ponta a ponta: o servidor não consegue ler os criptografados.',
+      repeated: {
+        title: 'Bloquear mensagens repetidas',
+        description: 'O mesmo texto três vezes em um minuto é recusado a partir da terceira. Mensagens curtas são ignoradas.',
+      },
+      invites: {
+        title: 'Bloquear links de convite para outros espaços',
+        description: 'Links para outros espaços do Strafe e para servidores do Discord são recusados. Convites para este espaço são permitidos.',
+      },
+      mentions: {
+        title: 'Limitar menções por mensagem',
+        description: 'Mensagens que mencionam mais pessoas e cargos do que o limite são recusadas.',
+        limit: 'Máximo de menções por mensagem',
+        limitHint: 'Entre 1 e {{max}}. Conta pessoas e cargos distintos.',
+      },
     },
     overview: {
       identity: 'Identidade',
@@ -1418,6 +1449,7 @@ export default {
       online: 'Online agora',
       spaces: 'Espaços',
       bans: 'Banimentos ativos',
+      ipBans: 'Redes banidas',
       invites: 'Códigos de convite',
       registration: 'Cadastro',
       inviteOnly: 'Somente por convite',
@@ -1461,6 +1493,8 @@ export default {
       bannedSince: 'Desde {{when}}',
       bannedUntil: 'até {{when}}',
       bannedForever: 'até ser removido',
+      banIPs: 'Banir também os endereços das sessões conectadas ({{count}})',
+      banIPsHint: 'Impede que a pessoa simplesmente se registre de novo pela mesma rede. Endereços privados e de proxy compartilhado são ignorados.',
       banTitle: 'Banir {{name}}',
       banBody: 'A pessoa é desconectada em todos os dispositivos e não consegue entrar de novo enquanto o banimento durar. A conta e as mensagens permanecem.',
       banReason: 'Motivo',
@@ -1512,6 +1546,18 @@ export default {
     },
     bans: {
       empty: 'Nenhum banimento ativo.',
+      accountsTitle: 'Banimentos de contas',
+      ipTitle: 'Redes banidas',
+      ipHint:
+        'Endereços e faixas que não podem se registrar nem entrar. Banir uma conta pode adicionar aqui os endereços das sessões dela; uma faixa (CIDR, p. ex. 203.0.113.0/24) cobre uma rede inteira.',
+      ipCidr: 'Endereço ou faixa',
+      ipReasonPlaceholder: 'Visível para outros administradores.',
+      ipBan: 'Banir rede',
+      ipEmpty: 'Nenhuma rede banida.',
+      ipBy: 'por {{name}}',
+      ipLift: 'Remover',
+      ipLiftTitle: 'Remover o banimento de {{cidr}}?',
+      ipLiftBody: 'Essa rede poderá se registrar e entrar de novo imediatamente.',
     },
     audit: {
       empty: 'Nada foi feito ainda.',
@@ -1521,6 +1567,8 @@ export default {
         discover_remove: 'removeu do Descobrir',
         user_ban: 'baniu uma conta',
         user_unban: 'removeu o banimento de',
+        ip_ban: 'baniu uma rede',
+        ip_unban: 'removeu o banimento de uma rede',
         user_recovery_regen: 'gerou novos códigos de recuperação para',
         space_takedown: 'removeu um espaço',
         report_resolve: 'resolveu uma denúncia sobre',
@@ -2134,6 +2182,14 @@ export default {
       validationFailed: 'Verifique o formulário e tente de novo.',
       httpStatus: 'A solicitação falhou ({{status}}). Tente de novo.',
       rateLimited: 'Muitas tentativas. Aguarde um minuto e tente de novo.',
+      automodRepeated: 'Você já enviou essa mensagem várias vezes - o automod a bloqueou.',
+      automodInvite: 'Links de convite para outros espaços não são permitidos aqui.',
+      automodMentions: 'Essa mensagem menciona pessoas demais para este espaço.',
+      verificationEmail: 'Verifique seu e-mail para enviar mensagens neste espaço.',
+      verificationAccountAge: 'Sua conta precisa ter pelo menos 5 minutos para enviar mensagens neste espaço.',
+      verificationMemberAge: 'Você precisa ser membro deste espaço há 10 minutos para enviar mensagens.',
+      ipBanned: 'Sua rede foi banida desta instância.',
+      disposableEmail: 'E-mails descartáveis não podem ser usados aqui. Use um endereço permanente.',
       mfaTokenInvalid: 'Sua sessão de login expirou. Entre novamente.',
       mfaTooManyAttempts: 'Muitas tentativas. Entre novamente.',
       invalidTotpCode: 'Esse código não é válido.',

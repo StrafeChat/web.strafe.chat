@@ -1,5 +1,6 @@
 export { SpaceOverviewPage } from './SpaceOverviewPage';
 export { SpaceSystemPage } from './SpaceSystemPage';
+export { SpaceModerationPage } from './SpaceModerationPage';
 export { SpaceMembersPage } from './SpaceMembersPage';
 export { SpaceInvitesPage } from './SpaceInvitesPage';
 export { SpaceBansPage } from './SpaceBansPage';

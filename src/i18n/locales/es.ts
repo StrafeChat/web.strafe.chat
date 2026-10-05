@@ -879,6 +879,37 @@ export default {
       audit: {
         title: 'Registro de auditoría',
       },
+      moderation: {
+        title: 'Moderación',
+      },
+    },
+    moderation: {
+      verificationTitle: 'Nivel de verificación',
+      verificationHint:
+        'Lo que debe cumplir un miembro sin rol antes de poder enviar mensajes. Los miembros con algún rol y quienes pueden gestionar mensajes nunca están sujetos a ello: sirve para silenciar a los asaltantes, no a los habituales.',
+      levels: {
+        none: { title: 'Ninguno', description: 'Cualquiera que pueda ver un canal puede escribir en él.' },
+        low: { title: 'Bajo', description: 'Debe tener un correo electrónico verificado.' },
+        medium: { title: 'Medio', description: 'Además, su cuenta debe tener al menos 5 minutos.' },
+        high: { title: 'Alto', description: 'Además, debe llevar 10 minutos como miembro de este espacio.' },
+      },
+      automodTitle: 'Automod',
+      automodHint:
+        'Los mensajes que rompen una regla se rechazan antes de que alguien los vea, y se le explica el motivo a quien los envía. Los miembros que pueden gestionar mensajes están exentos. Las reglas de contenido solo funcionan en canales sin cifrado de extremo a extremo: el servidor no puede leer los cifrados.',
+      repeated: {
+        title: 'Bloquear mensajes repetidos',
+        description: 'El mismo texto tres veces en un minuto se rechaza a partir de la tercera. Los mensajes cortos se ignoran.',
+      },
+      invites: {
+        title: 'Bloquear enlaces de invitación a otros espacios',
+        description: 'Se rechazan los enlaces a otros espacios de Strafe y a servidores de Discord. Las invitaciones a este espacio están permitidas.',
+      },
+      mentions: {
+        title: 'Limitar menciones por mensaje',
+        description: 'Se rechazan los mensajes que mencionan a más personas y roles que el límite.',
+        limit: 'Menciones máximas por mensaje',
+        limitHint: 'Entre 1 y {{max}}. Cuenta personas y roles distintos.',
+      },
     },
     overview: {
       identity: 'Identidad',
@@ -1418,6 +1449,7 @@ export default {
       online: 'En línea ahora',
       spaces: 'Espacios',
       bans: 'Expulsiones activas',
+      ipBans: 'Redes bloqueadas',
       invites: 'Códigos de invitación',
       registration: 'Registro',
       inviteOnly: 'Solo por invitación',
@@ -1461,6 +1493,8 @@ export default {
       bannedSince: 'Desde {{when}}',
       bannedUntil: 'hasta {{when}}',
       bannedForever: 'hasta que se levante',
+      banIPs: 'Bloquear también las direcciones de sus sesiones iniciadas ({{count}})',
+      banIPsHint: 'Evita que vuelva a registrarse desde la misma red. Se omiten las direcciones privadas y de proxy compartido.',
       banTitle: 'Expulsar a {{name}}',
       banBody: 'Se cerrará su sesión en todos los dispositivos y no podrá volver a iniciar sesión mientras dure la expulsión. Su cuenta y sus mensajes se conservan.',
       banReason: 'Motivo',
@@ -1512,6 +1546,18 @@ export default {
     },
     bans: {
       empty: 'No hay expulsiones activas.',
+      accountsTitle: 'Expulsiones de cuentas',
+      ipTitle: 'Redes bloqueadas',
+      ipHint:
+        'Direcciones y rangos que no pueden registrarse ni iniciar sesión. Al expulsar una cuenta se pueden añadir aquí las direcciones de sus sesiones; un rango (CIDR, p. ej. 203.0.113.0/24) cubre toda una red.',
+      ipCidr: 'Dirección o rango',
+      ipReasonPlaceholder: 'Visible para otros administradores.',
+      ipBan: 'Bloquear red',
+      ipEmpty: 'No hay redes bloqueadas.',
+      ipBy: 'por {{name}}',
+      ipLift: 'Levantar',
+      ipLiftTitle: '¿Levantar el bloqueo de {{cidr}}?',
+      ipLiftBody: 'Esa red podrá registrarse e iniciar sesión de inmediato.',
     },
     audit: {
       empty: 'Aún no se ha hecho nada.',
@@ -1521,6 +1567,8 @@ export default {
         discover_remove: 'quitó de Descubrir',
         user_ban: 'expulsó una cuenta',
         user_unban: 'levantó la expulsión de',
+        ip_ban: 'bloqueó una red',
+        ip_unban: 'levantó el bloqueo de una red',
         user_recovery_regen: 'regeneró los códigos de recuperación de',
         space_takedown: 'retiró un espacio',
         report_resolve: 'resolvió una denuncia sobre',
@@ -2134,6 +2182,14 @@ export default {
       validationFailed: 'Revisa el formulario e inténtalo de nuevo.',
       httpStatus: 'La solicitud falló ({{status}}). Inténtalo de nuevo.',
       rateLimited: 'Demasiados intentos. Espera un minuto e inténtalo de nuevo.',
+      automodRepeated: 'Ya has enviado ese mensaje varias veces: el automod lo bloqueó.',
+      automodInvite: 'Aquí no se permiten enlaces de invitación a otros espacios.',
+      automodMentions: 'Ese mensaje menciona a demasiadas personas para este espacio.',
+      verificationEmail: 'Verifica tu correo electrónico para enviar mensajes en este espacio.',
+      verificationAccountAge: 'Tu cuenta debe tener al menos 5 minutos para enviar mensajes en este espacio.',
+      verificationMemberAge: 'Debes llevar 10 minutos como miembro de este espacio para enviar mensajes.',
+      ipBanned: 'Tu red ha sido bloqueada en esta instancia.',
+      disposableEmail: 'Aquí no se pueden usar correos desechables. Usa una dirección permanente.',
       mfaTokenInvalid: 'Tu sesión de inicio de sesión caducó. Vuelve a iniciar sesión.',
       mfaTooManyAttempts: 'Demasiados intentos. Vuelve a iniciar sesión.',
       invalidTotpCode: 'Ese código no es válido.',

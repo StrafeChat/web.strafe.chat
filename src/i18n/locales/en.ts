@@ -874,6 +874,37 @@ export default {
       audit: {
         title: 'Audit log',
       },
+      moderation: {
+        title: 'Moderation',
+      },
+    },
+    moderation: {
+      verificationTitle: 'Verification level',
+      verificationHint:
+        'What a member without a role has to meet before they can send messages. Members holding any role, and anyone who can manage messages, are never held to it - it keeps raiders quiet, not regulars.',
+      levels: {
+        none: { title: 'None', description: 'Anyone who can see a channel can talk in it.' },
+        low: { title: 'Low', description: 'Must have a verified email address.' },
+        medium: { title: 'Medium', description: 'Must also have had their account for at least 5 minutes.' },
+        high: { title: 'High', description: 'Must also have been a member of this space for 10 minutes.' },
+      },
+      automodTitle: 'Automod',
+      automodHint:
+        'Messages that break a rule are refused before anyone sees them, and the sender is told why. Members who can manage messages are exempt. Content rules only work in channels without end-to-end encryption - the server cannot read encrypted ones.',
+      repeated: {
+        title: 'Block repeated messages',
+        description: 'The same text three times within a minute is refused from the third time on. Short messages are ignored.',
+      },
+      invites: {
+        title: 'Block invite links to other spaces',
+        description: 'Links to other Strafe spaces and to Discord servers are refused. Invites to this space are fine.',
+      },
+      mentions: {
+        title: 'Limit mentions per message',
+        description: 'Messages that mention more people and roles than the limit are refused.',
+        limit: 'Maximum mentions per message',
+        limitHint: 'Between 1 and {{max}}. Counts distinct people and roles.',
+      },
     },
     overview: {
       identity: 'Identity',
@@ -1412,6 +1443,7 @@ export default {
       online: 'Online now',
       spaces: 'Spaces',
       bans: 'Active bans',
+      ipBans: 'Banned networks',
       invites: 'Invite codes',
       registration: 'Registration',
       inviteOnly: 'Invite only',
@@ -1455,6 +1487,8 @@ export default {
       bannedSince: 'Since {{when}}',
       bannedUntil: 'until {{when}}',
       bannedForever: 'until lifted',
+      banIPs: 'Also ban the addresses of their signed-in sessions ({{count}})',
+      banIPsHint: 'Stops them from registering again from the same network. Private and shared-proxy addresses are skipped.',
       banTitle: 'Ban {{name}}',
       banBody: 'They are signed out everywhere at once and cannot sign in again while the ban stands. Their account and messages stay.',
       banReason: 'Reason',
@@ -1506,6 +1540,18 @@ export default {
     },
     bans: {
       empty: 'No active bans.',
+      accountsTitle: 'Account bans',
+      ipTitle: 'Banned networks',
+      ipHint:
+        'Addresses and ranges that may not register or sign in. Banning an account can add the addresses of its sessions here; a range (CIDR, e.g. 203.0.113.0/24) covers a whole network.',
+      ipCidr: 'Address or range',
+      ipReasonPlaceholder: 'Shown to other administrators.',
+      ipBan: 'Ban network',
+      ipEmpty: 'No banned networks.',
+      ipBy: 'by {{name}}',
+      ipLift: 'Lift',
+      ipLiftTitle: 'Lift the ban on {{cidr}}?',
+      ipLiftBody: 'That network can register and sign in again immediately.',
     },
     audit: {
       empty: 'Nothing has been done yet.',
@@ -1515,6 +1561,8 @@ export default {
         discover_remove: 'removed from Discover',
         user_ban: 'banned an account',
         user_unban: 'lifted a ban on',
+        ip_ban: 'banned a network',
+        ip_unban: 'lifted a network ban',
         user_recovery_regen: 'regenerated recovery codes for',
         space_takedown: 'took down a space',
         report_resolve: 'resolved a report about',
@@ -2128,6 +2176,14 @@ export default {
       validationFailed: 'Please check the form and try again.',
       httpStatus: 'Request failed ({{status}}). Please try again.',
       rateLimited: 'Too many attempts. Please wait a minute and try again.',
+      automodRepeated: 'You have already sent that message several times - automod blocked it.',
+      automodInvite: 'Invite links to other spaces are not allowed here.',
+      automodMentions: 'That message mentions too many people for this space.',
+      verificationEmail: 'Verify your email address to send messages in this space.',
+      verificationAccountAge: 'Your account must be at least 5 minutes old to send messages in this space.',
+      verificationMemberAge: 'You need to have been a member of this space for 10 minutes to send messages.',
+      ipBanned: 'Your network has been banned from this instance.',
+      disposableEmail: 'Disposable email addresses cannot be used here. Use a permanent address.',
       mfaTokenInvalid: 'Your sign-in session expired. Please log in again.',
       mfaTooManyAttempts: 'Too many attempts. Please log in again.',
       invalidTotpCode: 'That code is not valid.',

@@ -879,6 +879,37 @@ export default {
       audit: {
         title: 'Journal d\'audit',
       },
+      moderation: {
+        title: 'Modération',
+      },
+    },
+    moderation: {
+      verificationTitle: 'Niveau de vérification',
+      verificationHint:
+        "Ce qu'un membre sans rôle doit remplir avant de pouvoir envoyer des messages. Les membres qui ont un rôle et ceux qui peuvent gérer les messages n'y sont jamais soumis : cela fait taire les raids, pas les habitués.",
+      levels: {
+        none: { title: 'Aucun', description: 'Quiconque voit un salon peut y écrire.' },
+        low: { title: 'Faible', description: 'Doit avoir une adresse e-mail vérifiée.' },
+        medium: { title: 'Moyen', description: 'Son compte doit aussi avoir au moins 5 minutes.' },
+        high: { title: 'Élevé', description: 'Doit aussi être membre de cet espace depuis 10 minutes.' },
+      },
+      automodTitle: 'Automod',
+      automodHint:
+        "Les messages qui enfreignent une règle sont refusés avant que quiconque les voie, et l'expéditeur en est informé. Les membres qui peuvent gérer les messages sont exemptés. Les règles de contenu ne fonctionnent que dans les salons sans chiffrement de bout en bout : le serveur ne peut pas lire les salons chiffrés.",
+      repeated: {
+        title: 'Bloquer les messages répétés',
+        description: 'Le même texte trois fois en une minute est refusé à partir de la troisième. Les messages courts sont ignorés.',
+      },
+      invites: {
+        title: "Bloquer les liens d'invitation vers d'autres espaces",
+        description: "Les liens vers d'autres espaces Strafe et vers des serveurs Discord sont refusés. Les invitations vers cet espace sont acceptées.",
+      },
+      mentions: {
+        title: 'Limiter les mentions par message',
+        description: 'Les messages qui mentionnent plus de personnes et de rôles que la limite sont refusés.',
+        limit: 'Mentions maximales par message',
+        limitHint: 'Entre 1 et {{max}}. Compte les personnes et les rôles distincts.',
+      },
     },
     overview: {
       identity: 'Identité',
@@ -1418,6 +1449,7 @@ export default {
       online: 'En ligne',
       spaces: 'Espaces',
       bans: 'Bannissements actifs',
+      ipBans: 'Réseaux bannis',
       invites: "Codes d'invitation",
       registration: 'Inscription',
       inviteOnly: 'Sur invitation',
@@ -1461,6 +1493,8 @@ export default {
       bannedSince: 'Depuis {{when}}',
       bannedUntil: "jusqu'au {{when}}",
       bannedForever: "jusqu'à levée",
+      banIPs: 'Bannir aussi les adresses de ses sessions connectées ({{count}})',
+      banIPsHint: "L'empêche de simplement se réinscrire depuis le même réseau. Les adresses privées et de proxy partagé sont ignorées.",
       banTitle: 'Bannir {{name}}',
       banBody: 'La personne est déconnectée partout immédiatement et ne peut plus se connecter tant que le bannissement dure. Son compte et ses messages restent.',
       banReason: 'Motif',
@@ -1512,6 +1546,18 @@ export default {
     },
     bans: {
       empty: 'Aucun bannissement actif.',
+      accountsTitle: 'Bannissements de comptes',
+      ipTitle: 'Réseaux bannis',
+      ipHint:
+        "Adresses et plages qui ne peuvent ni s'inscrire ni se connecter. Bannir un compte peut ajouter ici les adresses de ses sessions ; une plage (CIDR, p. ex. 203.0.113.0/24) couvre tout un réseau.",
+      ipCidr: 'Adresse ou plage',
+      ipReasonPlaceholder: 'Visible par les autres administrateurs.',
+      ipBan: 'Bannir le réseau',
+      ipEmpty: 'Aucun réseau banni.',
+      ipBy: 'par {{name}}',
+      ipLift: 'Lever',
+      ipLiftTitle: 'Lever le bannissement de {{cidr}} ?',
+      ipLiftBody: "Ce réseau pourra s'inscrire et se connecter à nouveau immédiatement.",
     },
     audit: {
       empty: "Rien n'a encore été fait.",
@@ -1521,6 +1567,8 @@ export default {
         discover_remove: 'a retiré de Découvrir',
         user_ban: 'a banni un compte',
         user_unban: 'a levé le bannissement de',
+        ip_ban: 'a banni un réseau',
+        ip_unban: "a levé le bannissement d'un réseau",
         user_recovery_regen: 'a régénéré les codes de récupération de',
         space_takedown: 'a retiré un espace',
         report_resolve: 'a résolu un signalement concernant',
@@ -2134,6 +2182,14 @@ export default {
       validationFailed: 'Vérifiez le formulaire et réessayez.',
       httpStatus: 'La requête a échoué ({{status}}). Veuillez réessayer.',
       rateLimited: 'Trop de tentatives. Patientez une minute et réessayez.',
+      automodRepeated: "Vous avez déjà envoyé ce message plusieurs fois - l'automod l'a bloqué.",
+      automodInvite: "Les liens d'invitation vers d'autres espaces ne sont pas autorisés ici.",
+      automodMentions: 'Ce message mentionne trop de personnes pour cet espace.',
+      verificationEmail: 'Vérifiez votre adresse e-mail pour envoyer des messages dans cet espace.',
+      verificationAccountAge: 'Votre compte doit avoir au moins 5 minutes pour envoyer des messages dans cet espace.',
+      verificationMemberAge: 'Vous devez être membre de cet espace depuis 10 minutes pour envoyer des messages.',
+      ipBanned: 'Votre réseau a été banni de cette instance.',
+      disposableEmail: 'Les adresses e-mail jetables ne sont pas acceptées ici. Utilisez une adresse permanente.',
       mfaTokenInvalid: 'Votre session de connexion a expiré. Reconnectez-vous.',
       mfaTooManyAttempts: 'Trop de tentatives. Reconnectez-vous.',
       invalidTotpCode: "Ce code n'est pas valide.",

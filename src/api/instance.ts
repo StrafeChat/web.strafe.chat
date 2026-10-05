@@ -81,6 +81,18 @@ export interface InstanceBan {
   reason: string;
   created_at: string;
   expires_at?: string;
+  /** Ranges banned alongside when `ban_ips` was asked for; only on the ban response. */
+  banned_ips?: string[];
+}
+
+/** A banned network: nothing under `cidr` may register or sign in. */
+export interface InstanceIPBan {
+  /** Canonical CIDR - a single address shows as /32 (IPv4) or /128 (IPv6). */
+  cidr: string;
+  banned_by: string;
+  reason: string;
+  created_at: string;
+  expires_at?: string;
 }
 
 export interface AdminSession {
@@ -178,6 +190,7 @@ export interface AuditRow {
 export interface InstanceStats {
   open_reports: number;
   bans: number;
+  ip_bans: number;
   invites: number;
   invite_only: boolean;
   /** Instance-wide counts; -1 means the server could not determine it right now. */
@@ -198,7 +211,7 @@ export function getUserDetail(userId: string) {
   return api<UserDetail>(`/instance/users/${encodeURIComponent(userId)}`);
 }
 
-export function banUser(userId: string, input: { reason?: string; max_age_seconds?: number }) {
+export function banUser(userId: string, input: { reason?: string; max_age_seconds?: number; ban_ips?: boolean }) {
   return api<InstanceBan>(`/instance/users/${encodeURIComponent(userId)}/ban`, { method: 'POST', json: input });
 }
 
@@ -230,6 +243,19 @@ export function setUserBadges(userId: string, flags: number) {
 
 export function listBans() {
   return api<{ ban: InstanceBan; user: AdminUser | null }[]>('/instance/bans');
+}
+
+export function listIPBans() {
+  return api<{ ban: InstanceIPBan; banned_by: AdminUser | null }[]>('/instance/ip_bans');
+}
+
+/** Ban an address ("203.0.113.9") or range ("203.0.113.0/24") from registering and signing in. */
+export function banIP(input: { cidr: string; reason?: string; max_age_seconds?: number }) {
+  return api<InstanceIPBan>('/instance/ip_bans', { method: 'POST', json: input });
+}
+
+export function unbanIP(cidr: string) {
+  return api<void>(`/instance/ip_bans?cidr=${encodeURIComponent(cidr)}`, { method: 'DELETE' });
 }
 
 export function getSpaceDetail(spaceId: string) {

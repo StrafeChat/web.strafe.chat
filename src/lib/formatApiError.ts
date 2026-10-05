@@ -17,6 +17,8 @@ const SERVER_MESSAGE_TO_KEY: Record<string, string> = {
   'that invite code is not valid': 'errors.api.inviteInvalid',
   'account is banned': 'errors.api.banned',
   'email already in use': 'errors.api.emailInUse',
+  'disposable email addresses cannot be used here - use a permanent address': 'errors.api.disposableEmail',
+  'this network is banned from this instance': 'errors.api.ipBanned',
   'username already taken': 'errors.api.usernameTaken',
   'password does not meet requirements': 'errors.api.weakPassword',
   'invalid username': 'errors.api.invalidUsername',
@@ -114,11 +116,38 @@ export function translateApiErrorMessage(raw: string, t: ErrorTranslateFn): stri
   return splitErrorMessage(n).map((seg) => translateSegment(seg, t));
 }
 
+/** Space automod rules (messages/automod.go) → the line the composer shows. */
+const AUTOMOD_RULE_KEY: Record<string, string> = {
+  repeated: 'errors.api.automodRepeated',
+  invite: 'errors.api.automodInvite',
+  mentions: 'errors.api.automodMentions',
+};
+
+/** Verification-level requirements the sender does not meet yet → the line the composer shows. */
+const VERIFICATION_REQUIREMENT_KEY: Record<string, string> = {
+  email: 'errors.api.verificationEmail',
+  account_age: 'errors.api.verificationAccountAge',
+  member_age: 'errors.api.verificationMemberAge',
+};
+
 export function translateCaughtApiError(err: unknown, t: ErrorTranslateFn): string[] {
   // A burned pending login is a 429 too, but it means "log in again", not "slow down" -
   // branch on the wire code before the status collapses it into the generic rate limit.
   if (isApiError(err) && err.code === 'mfa_too_many_attempts') {
     return [t('errors.api.mfaTooManyAttempts')];
+  }
+  // A space's automod / verification level refused the message: the code names the rule or
+  // requirement, which is what the person can act on.
+  if (isApiError(err) && err.code === 'automod_blocked') {
+    const key = AUTOMOD_RULE_KEY[String(err.body?.rule ?? '')];
+    if (key) return [t(key)];
+  }
+  if (isApiError(err) && err.code === 'verification_level') {
+    const key = VERIFICATION_REQUIREMENT_KEY[String(err.body?.requirement ?? '')];
+    if (key) return [t(key)];
+  }
+  if (isApiError(err) && err.code === 'ip_banned') {
+    return [t('errors.api.ipBanned')];
   }
   // Likewise a 429 that means "one was just sent", not "slow down".
   if (isApiError(err) && err.code === 'email_cooldown') {

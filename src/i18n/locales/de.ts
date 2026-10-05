@@ -871,6 +871,37 @@ export default {
       audit: {
         title: 'Audit-Log',
       },
+      moderation: {
+        title: 'Moderation',
+      },
+    },
+    moderation: {
+      verificationTitle: 'Verifizierungsstufe',
+      verificationHint:
+        'Was ein Mitglied ohne Rolle erfüllen muss, bevor es Nachrichten senden kann. Mitglieder mit einer Rolle und alle, die Nachrichten verwalten dürfen, sind nie betroffen – das hält Raider ruhig, nicht Stammgäste.',
+      levels: {
+        none: { title: 'Keine', description: 'Wer einen Kanal sehen kann, darf darin schreiben.' },
+        low: { title: 'Niedrig', description: 'Muss eine bestätigte E-Mail-Adresse haben.' },
+        medium: { title: 'Mittel', description: 'Das Konto muss außerdem mindestens 5 Minuten alt sein.' },
+        high: { title: 'Hoch', description: 'Muss außerdem seit 10 Minuten Mitglied dieses Spaces sein.' },
+      },
+      automodTitle: 'Automod',
+      automodHint:
+        'Nachrichten, die gegen eine Regel verstoßen, werden abgelehnt, bevor sie jemand sieht, und der Absender erfährt warum. Mitglieder, die Nachrichten verwalten dürfen, sind ausgenommen. Inhaltsregeln funktionieren nur in Kanälen ohne Ende-zu-Ende-Verschlüsselung – verschlüsselte kann der Server nicht lesen.',
+      repeated: {
+        title: 'Wiederholte Nachrichten blockieren',
+        description: 'Derselbe Text dreimal innerhalb einer Minute wird ab dem dritten Mal abgelehnt. Kurze Nachrichten werden ignoriert.',
+      },
+      invites: {
+        title: 'Einladungslinks zu anderen Spaces blockieren',
+        description: 'Links zu anderen Strafe-Spaces und zu Discord-Servern werden abgelehnt. Einladungen in diesen Space sind in Ordnung.',
+      },
+      mentions: {
+        title: 'Erwähnungen pro Nachricht begrenzen',
+        description: 'Nachrichten, die mehr Personen und Rollen erwähnen als das Limit, werden abgelehnt.',
+        limit: 'Maximale Erwähnungen pro Nachricht',
+        limitHint: 'Zwischen 1 und {{max}}. Zählt verschiedene Personen und Rollen.',
+      },
     },
     overview: {
       identity: 'Identität',
@@ -1409,6 +1440,7 @@ export default {
       online: 'Jetzt online',
       spaces: 'Spaces',
       bans: 'Aktive Sperren',
+      ipBans: 'Gesperrte Netzwerke',
       invites: 'Einladungscodes',
       registration: 'Registrierung',
       inviteOnly: 'Nur mit Einladung',
@@ -1452,6 +1484,8 @@ export default {
       bannedSince: 'Seit {{when}}',
       bannedUntil: 'bis {{when}}',
       bannedForever: 'bis zur Aufhebung',
+      banIPs: 'Auch die Adressen der angemeldeten Sitzungen sperren ({{count}})',
+      banIPsHint: 'Verhindert, dass sie sich aus demselben Netzwerk einfach neu registrieren. Private und Proxy-Adressen werden übersprungen.',
       banTitle: '{{name}} verbannen',
       banBody: 'Die Person wird sofort überall abgemeldet und kann sich nicht mehr anmelden, solange die Sperre gilt. Konto und Nachrichten bleiben erhalten.',
       banReason: 'Grund',
@@ -1503,6 +1537,18 @@ export default {
     },
     bans: {
       empty: 'Keine aktiven Sperren.',
+      accountsTitle: 'Kontosperren',
+      ipTitle: 'Gesperrte Netzwerke',
+      ipHint:
+        'Adressen und Bereiche, die sich weder registrieren noch anmelden dürfen. Beim Sperren eines Kontos können die Adressen seiner Sitzungen hier landen; ein Bereich (CIDR, z. B. 203.0.113.0/24) deckt ein ganzes Netzwerk ab.',
+      ipCidr: 'Adresse oder Bereich',
+      ipReasonPlaceholder: 'Für andere Administratoren sichtbar.',
+      ipBan: 'Netzwerk sperren',
+      ipEmpty: 'Keine gesperrten Netzwerke.',
+      ipBy: 'von {{name}}',
+      ipLift: 'Aufheben',
+      ipLiftTitle: 'Sperre für {{cidr}} aufheben?',
+      ipLiftBody: 'Dieses Netzwerk kann sich sofort wieder registrieren und anmelden.',
     },
     audit: {
       empty: 'Bisher wurde nichts unternommen.',
@@ -1512,6 +1558,8 @@ export default {
         discover_remove: 'hat von Entdecken entfernt',
         user_ban: 'hat ein Konto gesperrt',
         user_unban: 'hat die Sperre aufgehoben von',
+        ip_ban: 'hat ein Netzwerk gesperrt',
+        ip_unban: 'hat eine Netzwerksperre aufgehoben',
         user_recovery_regen: 'hat die Wiederherstellungscodes neu erzeugt für',
         space_takedown: 'hat einen Space entfernt',
         report_resolve: 'hat eine Meldung erledigt über',
@@ -2125,6 +2173,14 @@ export default {
       validationFailed: 'Bitte prüfe das Formular und versuche es erneut.',
       httpStatus: 'Anfrage fehlgeschlagen ({{status}}). Bitte versuche es erneut.',
       rateLimited: 'Zu viele Versuche. Bitte warte eine Minute und versuche es erneut.',
+      automodRepeated: 'Du hast diese Nachricht schon mehrfach gesendet – Automod hat sie blockiert.',
+      automodInvite: 'Einladungslinks zu anderen Spaces sind hier nicht erlaubt.',
+      automodMentions: 'Diese Nachricht erwähnt zu viele Personen für diesen Space.',
+      verificationEmail: 'Bestätige deine E-Mail-Adresse, um in diesem Space Nachrichten zu senden.',
+      verificationAccountAge: 'Dein Konto muss mindestens 5 Minuten alt sein, um in diesem Space Nachrichten zu senden.',
+      verificationMemberAge: 'Du musst seit 10 Minuten Mitglied dieses Spaces sein, um Nachrichten zu senden.',
+      ipBanned: 'Dein Netzwerk wurde von dieser Instanz gesperrt.',
+      disposableEmail: 'Wegwerf-E-Mail-Adressen können hier nicht verwendet werden. Nutze eine dauerhafte Adresse.',
       mfaTokenInvalid: 'Deine Anmeldesitzung ist abgelaufen. Melde dich erneut an.',
       mfaTooManyAttempts: 'Zu viele Versuche. Melde dich erneut an.',
       invalidTotpCode: 'Dieser Code ist ungültig.',

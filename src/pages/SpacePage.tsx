@@ -94,6 +94,7 @@ import { instance } from '../stores/instance';
 import { VoiceStage } from '../components/voice/VoiceStage';
 import { voiceStatesForRoom } from '../stores/voice';
 import { t } from '../i18n';
+import { translateCaughtApiError } from '../lib/formatApiError';
 
 const ROOM_TYPE_TEXT = 3;
 const ROOM_TYPE_VOICE = 4;
@@ -376,10 +377,11 @@ const SpacePage: Component = () => {
       })
       .catch((err) => {
         console.error('Send failed:', err);
-        // Give the user their message back to retry rather than silently losing it.
+        // Give the user their message back to retry rather than silently losing it - and say
+        // why in their language (slowmode, rate limit, automod, verification level).
         setDraft(raw);
         attachmentDraft.restore(files);
-        attachmentDraft.setError(err instanceof Error ? err.message : t('room.sendFailed'));
+        attachmentDraft.setError(translateCaughtApiError(err, t).join(' ') || t('room.sendFailed'));
       });
   }
 

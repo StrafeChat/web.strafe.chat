@@ -56,6 +56,7 @@ import {
   SpaceMembersPage,
   SpaceOverviewPage,
   SpaceSystemPage,
+  SpaceModerationPage,
 } from './settings/space';
 import { appSectionLabel } from '../theme/appChrome';
 import { t } from '../i18n';
@@ -81,7 +82,7 @@ function hexToInt(h: string): number {
   return Number.isNaN(n) ? 0 : n & 0xffffff;
 }
 
-type SpaceSettingsSection = 'general' | 'system' | 'discover' | 'roles' | 'emojis' | 'members' | 'invites' | 'bans' | 'audit';
+type SpaceSettingsSection = 'general' | 'system' | 'discover' | 'roles' | 'emojis' | 'moderation' | 'members' | 'invites' | 'bans' | 'audit';
 type RolesSubTab = 'display' | 'permissions' | 'members' | 'channel';
 
 interface SpaceSettingsModalProps {
@@ -157,6 +158,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
       case 'general':
       case 'system':
       case 'discover':
+      case 'moderation':
       case 'invites':
       case 'audit':
         return canManageSpace();
@@ -179,6 +181,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
     if (allowed('roles')) general.push({ id: 'roles', label: t('spaceSettings.rolesPerms'), icon: 'fa-shield-halved' });
     if (allowed('emojis')) general.push({ id: 'emojis', label: t('spaceSettings.emojis'), icon: 'fa-face-smile' });
     const moderation: SettingsNavItemDef<SpaceSettingsSection>[] = [];
+    if (allowed('moderation')) moderation.push({ id: 'moderation', label: t('spaceSettings.pages.moderation.title'), icon: 'fa-shield' });
     if (allowed('members')) moderation.push({ id: 'members', label: t('spaceSettings.pages.members.title'), icon: 'fa-user-group' });
     if (allowed('invites')) moderation.push({ id: 'invites', label: t('spaceSettings.pages.invites.title'), icon: 'fa-link' });
     if (allowed('bans')) moderation.push({ id: 'bans', label: t('spaceSettings.pages.bans.title'), icon: 'fa-ban' });
@@ -583,6 +586,10 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
 
         <Show when={nav() === 'system' && canManageSpace()}>
           <SpaceSystemPage spaceId={props.spaceId} space={props.space} rooms={spaceRoomList()} canManage={canManageSpace()} onError={setErr} />
+        </Show>
+
+        <Show when={nav() === 'moderation' && canManageSpace()}>
+          <SpaceModerationPage spaceId={props.spaceId} space={props.space} canManage={canManageSpace()} onError={setErr} />
         </Show>
 
         <Show when={nav() === 'members' && canSeeMembers()}>

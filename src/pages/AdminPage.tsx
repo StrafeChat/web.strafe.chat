@@ -4,6 +4,7 @@ import { createEffect, createResource, createSignal, For, Show } from 'solid-js'
 import { A, Navigate, useNavigate } from '@solidjs/router';
 import { BADGES } from '../lib/badges';
 import {
+  banIP,
   banUser,
   getInstanceCapabilities,
   getInstanceStats,
@@ -12,10 +13,12 @@ import {
   getUserDetail,
   listAudit,
   listBans,
+  listIPBans,
   listReports,
   resolveReport,
   searchUsers,
   takeDownSpace,
+  unbanIP,
   unbanUser,
   type AdminSpace,
   type AdminUser,
@@ -36,6 +39,8 @@ import {
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { DiscoverQueue } from '../components/admin/DiscoverQueue';
 import { Button } from '../components/ui/Button';
+import { Checkbox } from '../components/ui/Checkbox';
+import { Input } from '../components/ui/Input';
 import { Toggle } from '../components/ui/Toggle';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ResponsiveDialog } from '../components/ui/ResponsiveDialog';
@@ -47,6 +52,7 @@ import { confirmDialog } from '../stores/confirmDialog';
 import { openUserSettings } from '../stores/userSettingsModal';
 import { settingsGroupFrame, settingsRowIcon, settingsRowShell, settingsSectionTitle } from '../components/settings/settingsChrome';
 import { appDialogActions, zLayer } from '../theme/appChrome';
+import { translateCaughtApiError } from '../lib/formatApiError';
 import { formatDate, t } from '../i18n';
 
 type Tab = 'overview' | 'users' | 'reports' | 'bans' | 'discover' | 'audit' | 'federation';
@@ -205,9 +211,10 @@ const Overview: Component<{ onOpenReports: () => void; onOpenBans: () => void }>
               {stat(t('admin.overview.online'), num(s().online))}
               {stat(t('admin.overview.spaces'), num(s().spaces))}
             </div>
-            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {stat(t('admin.overview.openReports'), s().open_reports, props.onOpenReports)}
               {stat(t('admin.overview.bans'), s().bans, props.onOpenBans)}
+              {stat(t('admin.overview.ipBans'), s().ip_bans ?? 0, props.onOpenBans)}
               {stat(t('admin.overview.invites'), s().invites, () => openUserSettings('instance'))}
               {stat(t('admin.overview.registration'), s().invite_only ? t('admin.overview.inviteOnly') : t('admin.overview.open'))}
             </div>
@@ -553,6 +560,7 @@ const UserPanel: Component<{ userId: string; onOpenReport: (id: string) => void;
 
           <BanDialog
             user={banOpen() ? d().user : null}
+            sessionCount={d().sessions.length}
             onClose={() => setBanOpen(false)}
             onBanned={() => {
               setBanOpen(false);
@@ -565,9 +573,10 @@ const UserPanel: Component<{ userId: string; onOpenReport: (id: string) => void;
   );
 };
 
-const BanDialog: Component<{ user: AdminUser | null; onClose: () => void; onBanned: () => void }> = (props) => {
+const BanDialog: Component<{ user: AdminUser | null; sessionCount: number; onClose: () => void; onBanned: () => void }> = (props) => {
   const [reason, setReason] = createSignal('');
   const [seconds, setSeconds] = createSignal(0);
+  const [banIPs, setBanIPs] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal('');
 
@@ -578,8 +587,9 @@ const BanDialog: Component<{ user: AdminUser | null; onClose: () => void; onBann
     setBusy(true);
     setError('');
     try {
-      await banUser(u.id, { reason: reason().trim(), max_age_seconds: seconds() });
+      await banUser(u.id, { reason: reason().trim(), max_age_seconds: seconds(), ban_ips: banIPs() && props.sessionCount > 0 });
       setReason('');
+      setBanIPs(false);
       props.onBanned();
     } catch {
       setError(t('admin.actionFailed'));
@@ -622,6 +632,15 @@ const BanDialog: Component<{ user: AdminUser | null; onClose: () => void; onBann
                 </For>
               </div>
             </div>
+            <Show when={props.sessionCount > 0}>
+              <Checkbox
+                checked={banIPs()}
+                disabled={busy()}
+                onChange={setBanIPs}
+                label={t('admin.users.banIPs', { count: props.sessionCount })}
+                description={t('admin.users.banIPsHint')}
+              />
+            </Show>
             <Show when={error()}>
               <p class="text-sm text-destructive">{error()}</p>
             </Show>
@@ -859,7 +878,133 @@ const ReportPanel: Component<{ reportId: string; onOpenUser: (id: string) => voi
 
 // ---- bans / audit -----------------------------------------------------------------------
 
-const Bans: Component<{ onOpenUser: (id: string) => void }> = (props) => {
+const Bans: Component<{ onOpenUser: (id: string) => void }> = (props) => (
+  <div class="space-y-8">
+    <section class="space-y-3">
+      <div class={settingsSectionTitle}>{t('admin.bans.accountsTitle')}</div>
+      <AccountBans onOpenUser={props.onOpenUser} />
+    </section>
+    <IPBans />
+  </div>
+);
+
+/** Banned networks: the list plus the form that adds one. Lifting asks first. */
+const IPBans: Component = () => {
+  const [rows, { refetch }] = createResource(() => listIPBans());
+  const [cidr, setCidr] = createSignal('');
+  const [reason, setReason] = createSignal('');
+  const [seconds, setSeconds] = createSignal(0);
+  const [busy, setBusy] = createSignal(false);
+  const [error, setError] = createSignal('');
+
+  async function add(e: Event) {
+    e.preventDefault();
+    const c = cidr().trim();
+    if (!c) return;
+    setBusy(true);
+    setError('');
+    try {
+      await banIP({ cidr: c, reason: reason().trim(), max_age_seconds: seconds() });
+      setCidr('');
+      setReason('');
+      await refetch();
+    } catch (err) {
+      // The server's validation ("not a CIDR", "too wide", "already banned") is the useful part.
+      setError(translateCaughtApiError(err, t).join(' ') || t('admin.actionFailed'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function lift(c: string) {
+    const ok = await confirmDialog({ title: t('admin.bans.ipLiftTitle', { cidr: c }), body: t('admin.bans.ipLiftBody'), confirmLabel: t('admin.bans.ipLift') });
+    if (!ok) return;
+    setBusy(true);
+    setError('');
+    try {
+      await unbanIP(c);
+      await refetch();
+    } catch {
+      setError(t('admin.actionFailed'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section class="space-y-3">
+      <div class="space-y-1">
+        <div class={settingsSectionTitle}>{t('admin.bans.ipTitle')}</div>
+        <p class="px-0.5 text-xs text-muted-foreground">{t('admin.bans.ipHint')}</p>
+      </div>
+      <form onSubmit={add} class={`${settingsGroupFrame} space-y-3`}>
+        <div class="grid gap-3 sm:grid-cols-2">
+          <Input
+            label={t('admin.bans.ipCidr')}
+            placeholder="203.0.113.0/24"
+            value={cidr()}
+            onInput={(e) => setCidr(e.currentTarget.value)}
+            disabled={busy()}
+            autocomplete="off"
+            spellcheck={false}
+          />
+          <Input
+            label={t('admin.users.banReason')}
+            placeholder={t('admin.bans.ipReasonPlaceholder')}
+            value={reason()}
+            onInput={(e) => setReason(e.currentTarget.value)}
+            maxlength={500}
+            disabled={busy()}
+          />
+        </div>
+        <div class="space-y-1.5">
+          <div class="text-xs font-medium text-muted-foreground">{t('admin.users.banDuration')}</div>
+          <div class="flex flex-wrap gap-1.5">
+            <For each={DURATIONS}>
+              {(d) => (
+                <button type="button" class={`${chip} ${seconds() === d.seconds ? chipOn : chipOff}`} aria-pressed={seconds() === d.seconds} onClick={() => setSeconds(d.seconds)}>
+                  {t(d.key)}
+                </button>
+              )}
+            </For>
+          </div>
+        </div>
+        <Show when={error()}>
+          <p class="text-sm text-destructive">{error()}</p>
+        </Show>
+        <div class="flex justify-end">
+          <Button type="submit" variant="destructive" size="sm" loading={busy()} disabled={!cidr().trim()}>
+            {t('admin.bans.ipBan')}
+          </Button>
+        </div>
+      </form>
+      <Show when={rows()} fallback={<p class="text-sm text-muted-foreground">…</p>}>
+        {(list) => (
+          <Show when={list().length > 0} fallback={<EmptyState icon="fa-network-wired" title={t('admin.bans.ipEmpty')} size="inline" />}>
+            <div class="space-y-1.5">
+              <For each={list()}>
+                {(row) => (
+                  <div class={settingsRowShell}>
+                    <div class={settingsRowIcon}><i class="fa-solid fa-network-wired" aria-hidden="true" /></div>
+                    <div class="min-w-0 flex-1">
+                      <div class="truncate font-mono text-sm">{row.ban.cidr}</div>
+                      <div class="truncate text-xs text-muted-foreground">
+                        {row.ban.reason || t('admin.users.noReason')} · {row.ban.expires_at ? t('admin.users.bannedUntil', { when: when(row.ban.expires_at) }) : t('admin.users.bannedForever')} · {t('admin.bans.ipBy', { name: nameOf(row.banned_by) })}
+                      </div>
+                    </div>
+                    <Button variant="outline" size="sm" disabled={busy()} onClick={() => void lift(row.ban.cidr)}>{t('admin.bans.ipLift')}</Button>
+                  </div>
+                )}
+              </For>
+            </div>
+          </Show>
+        )}
+      </Show>
+    </section>
+  );
+};
+
+const AccountBans: Component<{ onOpenUser: (id: string) => void }> = (props) => {
   const [rows, { refetch }] = createResource(() => listBans());
   async function lift(userId: string, name: string) {
     const ok = await confirmDialog({ title: t('admin.users.unbanTitle', { name }), body: t('admin.users.unbanBody'), confirmLabel: t('admin.users.unban') });

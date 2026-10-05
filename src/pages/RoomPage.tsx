@@ -58,6 +58,7 @@ import { instance } from '../stores/instance';
 import { isConnectedTo, joinVoiceRoom, voice, voiceStatesForRoom } from '../stores/voice';
 import { VoiceStage } from '../components/voice/VoiceStage';
 import { t } from '../i18n';
+import { translateCaughtApiError } from '../lib/formatApiError';
 
 /** How often we re-announce "still typing" while the user keeps going. Must sit above
  * the server's 5s per-user rate limit (announcements inside it are dropped) and below
@@ -354,10 +355,12 @@ const RoomPage: Component = () => {
       dismissNewHeader(params.roomId);
     } catch (err) {
       console.error('Send failed:', err);
-      // Give the user their message back to retry rather than silently losing it.
+      // Give the user their message back to retry rather than silently losing it - and say why
+      // (the server's reason: rate limited / slowmode / forbidden), the way SpacePage already does.
+      // Without this a throttled DM just bounced back into the box with no explanation.
       setDraft(raw);
       attachmentDraft.restore(files);
-      attachmentDraft.setError(err instanceof Error ? err.message : t('room.sendFailed'));
+      attachmentDraft.setError(translateCaughtApiError(err, t).join(' ') || t('room.sendFailed'));
     }
   }
 

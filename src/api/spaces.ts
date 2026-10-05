@@ -12,7 +12,11 @@ export interface Space {
   owner_id: string;
   /** Blessed by an instance admin as part of this instance. */
   official?: boolean;
+  /** Raid protection: what a member with no role must satisfy before sending (VERIFICATION_*). */
   verification_level: number;
+  /** Light automod: AUTOMOD_* bits, and the mention cap the mass-mention rule uses (0 = default 5). */
+  automod_flags?: number;
+  automod_mention_limit?: number;
   default_message_notifications: number;
   explicit_content_filter: number;
   features: string[];
@@ -82,11 +86,29 @@ export interface PatchSpaceInput {
   afk_timeout?: number;
   widget_enabled?: boolean;
   widget_room_id?: string;
+  verification_level?: number;
+  automod_flags?: number;
+  /** 1-50; 0 means the default of 5. */
+  automod_mention_limit?: number;
 }
 
 /** spaces.system_room_flags bits - set = that notice is suppressed. */
 export const SYSTEM_FLAG_SUPPRESS_JOIN = 1;
 export const SYSTEM_FLAG_SUPPRESS_LEAVE = 2;
+
+/** Verification levels (cumulative; members with any role are exempt). Same values as Discord's 0-3. */
+export const VERIFICATION_NONE = 0;
+export const VERIFICATION_LOW = 1; // verified email
+export const VERIFICATION_MEDIUM = 2; // + account older than 5 minutes
+export const VERIFICATION_HIGH = 3; // + member for 10 minutes
+export const VERIFICATION_LEVELS = [VERIFICATION_NONE, VERIFICATION_LOW, VERIFICATION_MEDIUM, VERIFICATION_HIGH] as const;
+
+/** spaces.automod_flags bits. Content rules only apply in channels the server can read (E2EE off). */
+export const AUTOMOD_REPEATED_MESSAGES = 1;
+export const AUTOMOD_INVITE_LINKS = 2;
+export const AUTOMOD_MASS_MENTIONS = 4;
+export const AUTOMOD_DEFAULT_MENTION_LIMIT = 5;
+export const AUTOMOD_MAX_MENTION_LIMIT = 50;
 
 /** Accepted afk_timeout values (seconds). */
 export const AFK_TIMEOUTS = [60, 300, 900, 1800, 3600] as const;
