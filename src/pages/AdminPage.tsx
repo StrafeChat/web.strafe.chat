@@ -29,6 +29,7 @@ import {
   type SpaceDetail,
   type UserDetail,
   setUserBadges,
+  setUserEmail,
   regenerateUserRecoveryCodes,
   type RecoveryCodesResult,
   setSpaceOfficial,
@@ -320,6 +321,7 @@ const UserPanel: Component<{ userId: string; onOpenReport: (id: string) => void;
   const [badgeSaving, setBadgeSaving] = createSignal(false);
   const [recoveryResult, setRecoveryResult] = createSignal<RecoveryCodesResult | null>(null);
   const [recoveryBusy, setRecoveryBusy] = createSignal(false);
+  const [emailOpen, setEmailOpen] = createSignal(false);
 
   createEffect(() => {
     const d = detail();
@@ -405,7 +407,15 @@ const UserPanel: Component<{ userId: string; onOpenReport: (id: string) => void;
               </div>
               <dl class="grid gap-x-4 gap-y-0.5 text-xs text-muted-foreground sm:grid-cols-2">
                 <div><dt class="inline font-medium text-foreground/80">{t('admin.users.id')}: </dt><dd class="inline font-mono">{d().user.id}</dd></div>
-                <div><dt class="inline font-medium text-foreground/80">{t('admin.users.email')}: </dt><dd class="inline">{d().user.email || '—'}</dd></div>
+                <div>
+                  <dt class="inline font-medium text-foreground/80">{t('admin.users.email')}: </dt>
+                  <dd class="inline">{d().user.email || '—'}</dd>
+                  <Show when={!d().user.home_domain && !d().user.bot}>
+                    <button type="button" class="ml-1.5 text-[11px] font-medium text-primary hover:underline" onClick={() => setEmailOpen(true)}>
+                      {t('admin.users.changeEmail')}
+                    </button>
+                  </Show>
+                </div>
                 <div><dt class="inline font-medium text-foreground/80">{t('admin.users.created')}: </dt><dd class="inline">{when(d().user.created_at) || '—'}</dd></div>
               </dl>
             </div>
@@ -567,6 +577,14 @@ const UserPanel: Component<{ userId: string; onOpenReport: (id: string) => void;
               void refetch();
             }}
           />
+          <EmailDialog
+            user={emailOpen() ? d().user : null}
+            onClose={() => setEmailOpen(false)}
+            onChanged={() => {
+              setEmailOpen(false);
+              void refetch();
+            }}
+          />
         </div>
       )}
     </Show>
@@ -647,6 +665,68 @@ const BanDialog: Component<{ user: AdminUser | null; sessionCount: number; onClo
             <div class={appDialogActions}>
               <Button type="button" variant="ghost" onClick={props.onClose} disabled={busy()}>{t('common.cancel')}</Button>
               <Button type="submit" variant="destructive" loading={busy()}>{t('admin.users.confirmBan')}</Button>
+            </div>
+          </form>
+        </ResponsiveDialog>
+      )}
+    </Show>
+  );
+};
+
+/** Admin: move an account to a new email address (support for "I lost my old mailbox"). */
+const EmailDialog: Component<{ user: AdminUser | null; onClose: () => void; onChanged: () => void }> = (props) => {
+  const [email, setEmail] = createSignal('');
+  const [busy, setBusy] = createSignal(false);
+  const [error, setError] = createSignal('');
+
+  async function submit(e: Event) {
+    e.preventDefault();
+    const u = props.user;
+    const next = email().trim();
+    if (!u || !next) return;
+    setBusy(true);
+    setError('');
+    try {
+      await setUserEmail(u.id, next);
+      setEmail('');
+      props.onChanged();
+    } catch (err) {
+      // The server's reason is the useful part: invalid address, already in use.
+      setError(translateCaughtApiError(err, t).join(' ') || t('admin.actionFailed'));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <Show when={props.user}>
+      {(u) => (
+        <ResponsiveDialog
+          size="sm"
+          zClass={zLayer.modalStacked}
+          onClose={props.onClose}
+          dismissible={!busy()}
+          title={t('admin.users.changeEmailTitle', { name: nameOf(u()) })}
+          description={t('admin.users.changeEmailBody')}
+          icon="fa-solid fa-envelope"
+        >
+          <form onSubmit={submit} class="space-y-4">
+            <Input
+              type="email"
+              label={t('admin.users.newEmail')}
+              placeholder={u().email || 'name@example.com'}
+              value={email()}
+              onInput={(e) => setEmail(e.currentTarget.value)}
+              disabled={busy()}
+              autocomplete="off"
+              required
+            />
+            <Show when={error()}>
+              <p class="text-sm text-destructive">{error()}</p>
+            </Show>
+            <div class={appDialogActions}>
+              <Button type="button" variant="ghost" onClick={props.onClose} disabled={busy()}>{t('common.cancel')}</Button>
+              <Button type="submit" loading={busy()} disabled={!email().trim()}>{t('admin.users.confirmChangeEmail')}</Button>
             </div>
           </form>
         </ResponsiveDialog>

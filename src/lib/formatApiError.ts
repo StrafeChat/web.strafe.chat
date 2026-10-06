@@ -17,6 +17,7 @@ const SERVER_MESSAGE_TO_KEY: Record<string, string> = {
   'that invite code is not valid': 'errors.api.inviteInvalid',
   'account is banned': 'errors.api.banned',
   'email already in use': 'errors.api.emailInUse',
+  'enter a valid email address': 'errors.validation.emailInvalid',
   'disposable email addresses cannot be used here - use a permanent address': 'errors.api.disposableEmail',
   'this network is banned from this instance': 'errors.api.ipBanned',
   'username already taken': 'errors.api.usernameTaken',

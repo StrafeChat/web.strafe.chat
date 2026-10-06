@@ -234,6 +234,14 @@ export function regenerateUserRecoveryCodes(userId: string) {
   });
 }
 
+/** Admin: move an account to a new email address. The new address counts as verified. */
+export function setUserEmail(userId: string, email: string) {
+  return api<AdminUser>(`/instance/users/${encodeURIComponent(userId)}/email`, {
+    method: 'PATCH',
+    json: { email },
+  });
+}
+
 export function setUserBadges(userId: string, flags: number) {
   return api<{ public_flags: number }>(`/instance/users/${encodeURIComponent(userId)}/badges`, {
     method: 'PATCH',
