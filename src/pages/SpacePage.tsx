@@ -66,6 +66,7 @@ import { createAttachmentDraft } from '../lib/attachments/draft';
 import { allCustomEmojis } from '../stores/customEmojis';
 import { isRoomMuted, muteRoom, setRoomNotifyMode, unmuteRoom } from '../lib/roomNotify';
 import { slowmodeRemaining, startSlowmode } from '../stores/slowmode';
+import { formatWait, gateApplies, verificationGate } from '../lib/spaceVerification';
 import {
   isMdViewport,
   mobileMembersOpen,
@@ -586,6 +587,42 @@ const SpacePage: Component = () => {
     });
   });
   const canSendMessages = createMemo(() => canSendMessagesInChannel(myChannelMask()));
+  /** What this space's verification level holds against the viewer, if anything. Steady
+   * over time: an age rule reports when the wait ends rather than whether it has. */
+  const verification = createMemo(() =>
+    verificationGate({
+      space: space(),
+      member: spaceMembers.bySpaceId[spaceId()]?.find((m) => m.id === auth.user?.id),
+      channelMask: myChannelMask(),
+      verifiedEmail: auth.user?.verified_email,
+      accountCreatedAt: auth.user?.created_at,
+      emailEnabled: instance.email.enabled,
+    })
+  );
+  /** Ticks only while a verification countdown is actually running. */
+  const [verificationNow, setVerificationNow] = createSignal(Date.now());
+  createEffect(() => {
+    const gate = verification();
+    if (!gate?.unlockAt) return;
+    setVerificationNow(Date.now());
+    const timer = setInterval(() => {
+      const now = Date.now();
+      setVerificationNow(now);
+      if (now >= gate.unlockAt!) clearInterval(timer);
+    }, 1000);
+    onCleanup(() => clearInterval(timer));
+  });
+  /** The line the composer shows in place of the input, or undefined when it may be used. */
+  const verificationNotice = createMemo(() => {
+    const gate = verification();
+    if (!gateApplies(gate, verificationNow())) return undefined;
+    if (gate!.requirement === 'email') return t('space.verification.email');
+    const wait = formatWait(gate!.unlockAt! - verificationNow());
+    return gate!.requirement === 'account_age'
+      ? t('space.verification.accountAge', { time: wait })
+      : t('space.verification.memberAge', { time: wait });
+  });
+
   /** How long this channel makes *this* member wait between messages, 0 when slowmode is off
    * or they are exempt. Mirrors the server's rule exactly (messages/service.go exempts Manage
    * Messages and Manage Rooms), so the countdown never appears for someone who can ignore it. */
@@ -1007,7 +1044,7 @@ const SpacePage: Component = () => {
                 onInput={onInput}
                 onSubmit={handleSubmit}
                 placeholder={t('room.messageSpaceRoom', { name: currentRoom()!.name || t('space.defaultRoom') })}
-                disabled={!canSendMessages()}
+                disabled={!canSendMessages() || !!verificationNotice()}
                 sending={isSending()}
                 inputRef={setInputRef}
                 typingUsers={typingUsers()}
@@ -1028,7 +1065,7 @@ const SpacePage: Component = () => {
                 attachmentError={attachmentDraft.error()}
                 customEmojis={allCustomEmojis()}
                 slowmodeRemaining={slowmodeRemaining(roomId())}
-                noSendMessage={canSendMessages() ? undefined : t('space.noSendPermission')}
+                noSendMessage={canSendMessages() ? verificationNotice() : t('space.noSendPermission')}
                 onSendGif={handleSendGif}
               />
               </RoomComposerDock>

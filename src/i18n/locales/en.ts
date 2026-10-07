@@ -445,6 +445,11 @@ export default {
     voiceUnsupported: 'Voice is not set up on this instance. Ask the person running it to configure LiveKit.',
     loadingRoom: 'Loading room…',
     noSendPermission: 'You do not have permission to send messages in this room.',
+    verification: {
+      email: 'Verify your email address to chat in this space.',
+      accountAge: 'This space asks new accounts to wait. You can chat in {{time}}.',
+      memberAge: 'This space asks new members to wait. You can chat in {{time}}.',
+    },
     membersAria: 'Space members',
     defaultRoom: 'general',
     fallbackName: 'Space {{id}}',

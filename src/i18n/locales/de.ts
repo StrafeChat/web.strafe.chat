@@ -445,6 +445,11 @@ export default {
     voiceUnsupported: 'Sprache ist auf dieser Instanz nicht eingerichtet. Bitte die betreibende Person, LiveKit zu konfigurieren.',
     loadingRoom: 'Raum wird geladen…',
     noSendPermission: 'Du hast keine Berechtigung, in diesem Raum Nachrichten zu senden.',
+    verification: {
+      email: 'Bestätige deine E-Mail-Adresse, um in diesem Space zu schreiben.',
+      accountAge: 'Dieser Space lässt neue Konten warten. Du kannst in {{time}} schreiben.',
+      memberAge: 'Dieser Space lässt neue Mitglieder warten. Du kannst in {{time}} schreiben.',
+    },
     membersAria: 'Space-Mitglieder',
     defaultRoom: 'allgemein',
     fallbackName: 'Space {{id}}',

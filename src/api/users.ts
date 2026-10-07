@@ -24,6 +24,8 @@ export interface MeResponse {
   accent_color?: string;
   public_flags?: number;
   bot?: boolean;
+  /** When the account was created - a space's verification level can require a minimum age. */
+  created_at?: string;
   presence?: unknown;
 }
 
@@ -69,6 +71,8 @@ export function toAuthUser(
   birthday_opt_in?: boolean;
   public_flags?: number;
   bot?: boolean;
+  verified_email?: boolean;
+  created_at?: string;
 } {
   return {
     id: me.id,
@@ -83,6 +87,8 @@ export function toAuthUser(
     ...(typeof me.birthday_opt_in === 'boolean' ? { birthday_opt_in: me.birthday_opt_in } : {}),
     ...(typeof me.public_flags === 'number' ? { public_flags: me.public_flags } : {}),
     ...(me.bot ? { bot: true } : {}),
+    ...(typeof me.verified_email === 'boolean' ? { verified_email: me.verified_email } : {}),
+    ...(typeof me.created_at === 'string' ? { created_at: me.created_at } : {}),
   };
 }
 

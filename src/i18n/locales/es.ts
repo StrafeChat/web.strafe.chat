@@ -452,6 +452,11 @@ export default {
     voiceUnsupported: 'La voz no está configurada en esta instancia. Pide a quien la administra que configure LiveKit.',
     loadingRoom: 'Cargando sala…',
     noSendPermission: 'No tienes permiso para enviar mensajes en esta sala.',
+    verification: {
+      email: 'Verifica tu correo electrónico para escribir en este espacio.',
+      accountAge: 'Este espacio hace esperar a las cuentas nuevas. Podrás escribir en {{time}}.',
+      memberAge: 'Este espacio hace esperar a los miembros nuevos. Podrás escribir en {{time}}.',
+    },
     membersAria: 'Miembros del espacio',
     defaultRoom: 'general',
     fallbackName: 'Espacio {{id}}',

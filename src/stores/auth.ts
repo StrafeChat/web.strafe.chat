@@ -31,6 +31,10 @@ export interface AuthState {
     birthday_opt_in?: boolean;
     public_flags?: number;
     bot?: boolean;
+    /** Whether the address is confirmed, and when the account was made: a space's
+     * verification level is decided against these (see lib/spaceVerification.ts). */
+    verified_email?: boolean;
+    created_at?: string;
   } | null;
   token: string | null;
   sessionId: string | null;
@@ -85,6 +89,8 @@ export function hydrateFromReady(payload: {
     birthday_opt_in?: boolean;
     public_flags?: number;
     bot?: boolean;
+    verified_email?: boolean;
+    created_at?: string;
     presence?: { status: string; custom_status?: string };
   };
   session_id?: string;
@@ -111,6 +117,10 @@ export function hydrateFromReady(payload: {
         : {}),
       ...(typeof payload.user.public_flags === 'number' ? { public_flags: payload.user.public_flags } : {}),
       ...(payload.user.bot ? { bot: true } : {}),
+      ...(typeof payload.user.verified_email === 'boolean'
+        ? { verified_email: payload.user.verified_email }
+        : {}),
+      ...(typeof payload.user.created_at === 'string' ? { created_at: payload.user.created_at } : {}),
     };
     setAuth('user', user);
     if (payload.user.presence?.status) {
