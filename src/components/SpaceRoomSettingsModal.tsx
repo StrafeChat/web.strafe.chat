@@ -319,6 +319,7 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
     <SettingsShell open={props.open && !!props.room} onClose={props.onClose} zClass={zLayer.modalStacked} labelledBy="room-settings-title">
       <SettingsNav<Page>
         title={isSection() ? t('space.sectionSettings') : t('space.roomSettings')}
+        onClose={props.onClose}
         titleId="room-settings-title"
         groups={[
           {

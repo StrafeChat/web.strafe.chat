@@ -835,6 +835,7 @@ const SpacePage: Component = () => {
         <RoomHeader
           headerIcon="fa-hashtag"
           name={headerName()}
+          topic={currentRoom()?.topic}
           pmOtherUserId={undefined}
           e2ee={currentRoom()?.e2ee_enabled === true}
           isGroup={false}

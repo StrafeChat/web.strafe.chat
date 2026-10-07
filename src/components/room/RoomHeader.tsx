@@ -16,6 +16,10 @@ export interface RoomHeaderProps {
   bot?: boolean;
   headerIcon: string;
   name: string;
+  /** Space channel topic, shown after the name behind a divider on a wide window only -
+   * the header's button row and search box take ~400px, so below `lg` there is no honest
+   * room for it (Discord hides it on narrow windows too). Hover gives the full text. */
+  topic?: string;
   pmOtherUserId: string | undefined;
   /** Show the end-to-end-encrypted badge next to the name. */
   e2ee?: boolean;
@@ -55,7 +59,7 @@ export interface RoomHeaderProps {
 
 export const RoomHeader: Component<RoomHeaderProps> = (props) => (
   <div class={`${appPageHeader} justify-between gap-3`}>
-    <div class="flex min-w-0 items-center gap-2">
+    <div class="flex min-w-0 flex-1 items-center gap-2">
       <MobileRailsOpenButton />
       <i class={`fa-solid ${props.headerIcon} shrink-0 text-muted-foreground`} aria-hidden="true" />
       <h1 class={`flex min-w-0 items-center ${appPageTitle}`}>
@@ -74,6 +78,18 @@ export const RoomHeader: Component<RoomHeaderProps> = (props) => (
             <i class="fa-solid fa-lock text-[10px]" aria-hidden="true" />
           </span>
         </Tooltip>
+      </Show>
+      <Show when={props.topic?.trim()}>
+        {(topic) => (
+          <>
+            <span class="hidden h-5 w-px shrink-0 bg-border/80 lg:block" aria-hidden="true" />
+            {/* The topic is the part that gives way when the header is tight: it shrinks
+                and truncates while the name keeps its width. */}
+            <p class="hidden min-w-0 flex-1 truncate text-sm text-muted-foreground lg:block" title={topic()}>
+              {topic()}
+            </p>
+          </>
+        )}
       </Show>
     </div>
     <div class="flex shrink-0 items-center gap-1">

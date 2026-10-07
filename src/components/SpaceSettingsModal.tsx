@@ -559,6 +559,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
     <SettingsShell open={props.open} onClose={props.onClose} labelledBy="space-settings-title">
       <SettingsNav<SpaceSettingsSection>
         title={t('space.settings')}
+        onClose={props.onClose}
         titleId="space-settings-title"
         groups={navGroups()}
         active={nav()}

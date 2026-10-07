@@ -762,16 +762,8 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
                   />
                 </div>
                 <div class="absolute bottom-1.5 right-1.5 flex items-center gap-0.5" ref={(el) => (toggleClusterEl = el)}>
-                  <IconButton
-                    size="lg"
-                    tone="subtle"
-                    icon="fa-solid fa-film"
-                    label={t('gif.tab')}
-                    active={pickerOpen() && pickerTab() === 'gif'}
-                    disabled={props.disabled}
-                    data-expr-toggle=""
-                    onClick={() => togglePicker('gif')}
-                  />
+                  {/* Same order as the picker's tabs (Emoji, then GIF), so the tab that
+                      lights up sits above the button that was pressed. */}
                   <IconButton
                     size="lg"
                     tone="subtle"
@@ -781,6 +773,16 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
                     disabled={props.disabled}
                     data-expr-toggle=""
                     onClick={() => togglePicker('emoji')}
+                  />
+                  <IconButton
+                    size="lg"
+                    tone="subtle"
+                    icon="fa-solid fa-film"
+                    label={t('gif.tab')}
+                    active={pickerOpen() && pickerTab() === 'gif'}
+                    disabled={props.disabled}
+                    data-expr-toggle=""
+                    onClick={() => togglePicker('gif')}
                   />
                   <Show when={props.onAddFiles && !recording()}>
                     <IconButton

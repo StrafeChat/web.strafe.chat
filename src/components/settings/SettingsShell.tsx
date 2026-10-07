@@ -2,7 +2,9 @@ import type { Component, JSX } from 'solid-js';
 import { createContext, createSignal, For, Show, useContext } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { createDialogBehavior, createDialogExit } from '../ui/dialogBehavior';
+import { IconButton } from '../ui/IconButton';
 import { isMdViewport } from '../../stores/mobileShellLayout';
+import { t } from '../../i18n';
 import { appModalBackdrop, appModalPanel, appSectionLabel, appSettingsSidebar, zLayer } from '../../theme/appChrome';
 
 /**
@@ -118,6 +120,9 @@ export interface SettingsNavProps<T extends string = string> {
   onSelect: (id: T) => void;
   /** Extra content under the title (e.g. a search box). */
   header?: JSX.Element;
+  /** Closes the whole modal. Shown as an X beside the title on a phone, where this list is
+   * a screen of its own and the panel's close button is not on screen. */
+  onClose?: () => void;
   /** Pinned to the bottom of the rail. */
   footer?: JSX.Element;
 }
@@ -139,9 +144,22 @@ export function SettingsNav<T extends string = string>(props: SettingsNavProps<T
       aria-label={props.title}
     >
       <div class="shrink-0 space-y-3 border-b border-border/60 px-3 pb-3 pt-4 max-md:pt-[max(1rem,env(safe-area-inset-top))]">
-        <p id={props.titleId} class={`px-1 ${appSectionLabel} tracking-[0.12em]`}>
-          {props.title}
-        </p>
+        <div class="flex items-center gap-2">
+          <p id={props.titleId} class={`min-w-0 flex-1 px-1 ${appSectionLabel} tracking-[0.12em]`}>
+            {props.title}
+          </p>
+          <Show when={props.onClose}>
+            {(close) => (
+              <IconButton
+                icon="fa-solid fa-xmark"
+                label={t('common.close')}
+                size="lg"
+                class="-my-1 md:hidden"
+                onClick={() => close()()}
+              />
+            )}
+          </Show>
+        </div>
         {props.header}
       </div>
       <div class="flex min-h-0 flex-1 flex-col gap-1 overflow-y-auto overscroll-contain px-2 py-3">

@@ -109,6 +109,7 @@ export const UserSettingsModal: Component = () => {
       >
         <SettingsNav<SectionId>
           title={t('settings.title')}
+          onClose={() => void requestClose()}
           groups={navGroups()}
           active={section()}
           onSelect={(id) => setSection(id)}
