@@ -134,6 +134,7 @@ export const UserProfileFullModal: Component = () => {
                 displayName={subject()!.displayName}
                 username={subject()!.username}
                 homeDomain={subject()!.homeDomain}
+                alwaysShowDomain
                 bot={subject()!.bot}
                 publicFlags={subject()!.publicFlags}
                 pronouns={subject()!.pronouns}

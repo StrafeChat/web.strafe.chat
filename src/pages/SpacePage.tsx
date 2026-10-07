@@ -922,13 +922,6 @@ const SpacePage: Component = () => {
           }
         >
           <div class="flex-1 flex min-h-0 flex-col">
-            <div class="flex h-9 shrink-0 items-center gap-2 px-4 text-xs text-muted-foreground">
-              <i class="fa-solid fa-volume-high" aria-hidden="true" />
-              <span>
-                {t('voice.participants', { count: voiceStatesForRoom(roomId()!).length })}
-                <Show when={(currentRoom()?.user_limit ?? 0) > 0}> · {t('voice.limit', { count: voiceStatesForRoom(roomId()!).length, limit: currentRoom()!.user_limit })}</Show>
-              </span>
-            </div>
             <VoiceStage
               roomId={roomId()!}
               spaceId={spaceId()!}

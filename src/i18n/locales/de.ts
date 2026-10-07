@@ -504,7 +504,6 @@ export default {
     emptyCall: 'Starte einen Anruf mit {{name}}.',
     participants_one: '{{count}} Teilnehmer',
     participants_other: '{{count}} Teilnehmer',
-    limit: '{{count}}/{{limit}}',
     ringing: '{{names}} wird angerufen…',
     ringAgain: 'Erneut anrufen',
     enableAudio: 'Klicken, um Audio zu aktivieren',

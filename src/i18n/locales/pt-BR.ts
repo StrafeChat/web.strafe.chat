@@ -511,7 +511,6 @@ export default {
     emptyCall: 'Inicie uma chamada com {{name}}.',
     participants_one: '{{count}} participante',
     participants_other: '{{count}} participantes',
-    limit: '{{count}}/{{limit}}',
     ringing: 'Chamando {{names}}…',
     ringAgain: 'Chamar de novo',
     enableAudio: 'Clique para ativar o áudio',

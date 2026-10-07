@@ -4,7 +4,7 @@ import { Dynamic } from 'solid-js/web';
 import { UserBadges } from './UserBadges';
 import { BotTag } from './BotTag';
 import { appNameTagLine } from '../theme/appChrome';
-import { isRemoteUser } from '../stores/instance';
+import { instance, isRemoteUser } from '../stores/instance';
 import { t } from '../i18n';
 
 /** How many badges draw before the rest fold into a `+N` chip. */
@@ -26,6 +26,11 @@ export interface ProfileIdentityProps {
   headingLevel?: 'h2' | 'h3';
   /** The popover card is narrow; the modal is not. */
   compact?: boolean;
+  /** Show the instance after the username even for a local account (`alice@this.instance`).
+   * The full profile does this - on a federated instance "who is this and where are they
+   * from" is part of the identity; the popover keeps to the short form and names an
+   * instance only when it is somebody else's. */
+  alwaysShowDomain?: boolean;
   onCopyTag?: () => void;
   /** When set, the display name and the tag line become triggers that open the full
    * profile - the popover card does this (Discord's "click the name to open the profile");
@@ -55,6 +60,14 @@ export const ProfileIdentity: Component<ProfileIdentityProps> = (props) => {
   const nameClass = () =>
     `min-w-0 break-words font-semibold leading-tight ${props.compact ? 'text-lg' : 'text-xl'}`;
   const tag = () => props.username;
+  const remote = () => isRemoteUser({ home_domain: props.homeDomain });
+  /** The instance to name after the username, '' when there is none to show. */
+  const domain = () => {
+    if (remote()) return props.homeDomain ?? '';
+    if (!props.alwaysShowDomain) return '';
+    // A local account carries no home_domain; it belongs to this instance.
+    return props.homeDomain || instance.domain;
+  };
   return (
     <div class="flex flex-col gap-1.5">
       <Dynamic
@@ -103,8 +116,9 @@ export const ProfileIdentity: Component<ProfileIdentityProps> = (props) => {
               dir="ltr"
             >
               <span class="truncate">{tag()}</span>
-              <Show when={isRemoteUser({ home_domain: props.homeDomain })}>
-                <span class="shrink-0 text-primary">@{props.homeDomain}</span>
+              <Show when={domain()}>
+                {/* Another instance is worth pointing out; our own is just context. */}
+                <span class={`shrink-0 ${remote() ? 'text-primary' : ''}`}>@{domain()}</span>
               </Show>
             </button>
           </Match>
@@ -116,8 +130,9 @@ export const ProfileIdentity: Component<ProfileIdentityProps> = (props) => {
               dir="ltr"
             >
               <span class="truncate">{tag()}</span>
-              <Show when={isRemoteUser({ home_domain: props.homeDomain })}>
-                <span class="shrink-0 text-primary">@{props.homeDomain}</span>
+              <Show when={domain()}>
+                {/* Another instance is worth pointing out; our own is just context. */}
+                <span class={`shrink-0 ${remote() ? 'text-primary' : ''}`}>@{domain()}</span>
               </Show>
               <i class="fa-regular fa-copy shrink-0 text-[10px]" aria-hidden="true" />
             </button>

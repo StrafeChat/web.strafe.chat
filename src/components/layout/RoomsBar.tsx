@@ -204,20 +204,22 @@ export const RoomsBar: Component = () => {
         <div class={`${appPageHeader}`}>
           <h1 class={`truncate ${appPageTitle}`}>{t('nav.privateMessages')}</h1>
         </div>
-        <div class="shrink-0 px-3 py-2">
+        {/* One scroll region for the whole rail below the title: Home/Friends/Notes scroll
+            away with the conversation list instead of staying pinned above their own
+            scrollbar, which is what a phone-height list needs and what Discord does. */}
+        <div class="min-h-0 flex-1 overflow-y-auto overscroll-contain px-3 py-2">
           <div class="flex flex-col gap-0.5">
             <PaneButton href="/" active={pathname() === '/'} icon="fa-house" label={t('nav.home')} />
             <PaneButton href="/friends" active={pathname() === '/friends'} icon="fa-user-group" label={t('nav.friends')} badge={incomingFriendRequests().length} />
             <PaneButton href="/notes" active={isNotesActive()} icon="fa-note-sticky" label={t('nav.notes')} />
           </div>
-        </div>
-        <div class="flex min-h-0 flex-1 flex-col overflow-hidden px-3 py-2">
-          <div class="mb-1 flex items-center justify-between ps-2">
-            <h3 class={`truncate ${appSectionLabel}`}>{t('nav.conversations')}</h3>
-            <IconButton size="sm" icon="fa-solid fa-plus" label={t('nav.newGroup')} onClick={() => setShowCreateGroup(true)} />
-          </div>
-          <CreateGroupModal open={showCreateGroup()} onClose={() => setShowCreateGroup(false)} />
-          <div class="min-h-0 flex-1 space-y-0.5 overflow-y-auto">
+          <div class="pt-3">
+            <div class="mb-1 flex items-center justify-between ps-2">
+              <h3 class={`truncate ${appSectionLabel}`}>{t('nav.conversations')}</h3>
+              <IconButton size="sm" icon="fa-solid fa-plus" label={t('nav.newGroup')} onClick={() => setShowCreateGroup(true)} />
+            </div>
+            <CreateGroupModal open={showCreateGroup()} onClose={() => setShowCreateGroup(false)} />
+            <div class="space-y-0.5">
             <Show when={rooms.loading}>
               <div class="px-2 py-2 text-xs text-muted-foreground">{t('common.loading')}</div>
             </Show>
@@ -304,6 +306,7 @@ export const RoomsBar: Component = () => {
                 );
               }}
             </For>
+            </div>
           </div>
         </div>
       </div>

@@ -504,7 +504,6 @@ export default {
     emptyCall: 'Start a call with {{name}}.',
     participants_one: '{{count}} participant',
     participants_other: '{{count}} participants',
-    limit: '{{count}}/{{limit}}',
     ringing: 'Ringing {{names}}…',
     ringAgain: 'Ring again',
     enableAudio: 'Click to enable audio',

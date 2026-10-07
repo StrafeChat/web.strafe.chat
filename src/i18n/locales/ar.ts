@@ -538,7 +538,6 @@ export default {
     participants_few: '{{count}} مشاركين',
     participants_many: '{{count}} مشاركًا',
     participants_other: '{{count}} مشارك',
-    limit: '{{count}}/{{limit}}',
     ringing: 'جارٍ الاتصال بـ {{names}}…',
     ringAgain: 'اتصل مجددًا',
     enableAudio: 'انقر لتفعيل الصوت',
