@@ -65,6 +65,7 @@ import { confirmDialog } from '../stores/confirmDialog';
 import { createAttachmentDraft } from '../lib/attachments/draft';
 import { allCustomEmojis } from '../stores/customEmojis';
 import { isRoomMuted, muteRoom, setRoomNotifyMode, unmuteRoom } from '../lib/roomNotify';
+import { slowmodeRemaining, startSlowmode } from '../stores/slowmode';
 import {
   isMdViewport,
   mobileMembersOpen,
@@ -85,6 +86,7 @@ import {
   memberHighestRolePosition,
   PermAddReactions,
   PermManageMessages,
+  PermManageRooms,
   PermMentionEveryone,
   PermReadMessageHistory,
   PermUseExternalEmojis,
@@ -95,9 +97,18 @@ import { VoiceStage } from '../components/voice/VoiceStage';
 import { voiceStatesForRoom } from '../stores/voice';
 import { t } from '../i18n';
 import { translateCaughtApiError } from '../lib/formatApiError';
+import { isApiError } from '../api/ApiError';
 
 const ROOM_TYPE_TEXT = 3;
 const ROOM_TYPE_VOICE = 4;
+
+/** Seconds the server told us to wait (slowmode and the per-account limiter both answer
+ * 429 with `retry_after`), or 0 when the refusal was about something else. */
+function retryAfterSeconds(err: unknown): number {
+  if (!isApiError(err) || err.status !== 429) return 0;
+  const v = (err.body as { retry_after?: unknown } | undefined)?.retry_after;
+  return typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : 0;
+}
 /** How often we re-announce "still typing" while the user keeps going. Must sit above
  * the server's 5s per-user rate limit (announcements inside it are dropped) and below
  * the client's 10s TTL, so a continuous typist never flickers out. */
@@ -374,9 +385,13 @@ const SpacePage: Component = () => {
     sendMessage(id, text, replyTo, files)
       .then(() => {
         dismissNewHeader(id);
+        startSlowmode(id, slowmodeSeconds());
       })
       .catch((err) => {
         console.error('Send failed:', err);
+        // A refused send carries the authoritative wait (slowmode answers 429 + retry_after),
+        // which also covers a message sent from another device.
+        startSlowmode(id, retryAfterSeconds(err));
         // Give the user their message back to retry rather than silently losing it - and say
         // why in their language (slowmode, rate limit, automod, verification level).
         setDraft(raw);
@@ -388,10 +403,16 @@ const SpacePage: Component = () => {
   /** Send a GIF picked from the composer's GIF tab (its .gif URL becomes the message). */
   function handleSendGif(url: string) {
     const id = roomId();
-    if (!id || isSending()) return;
+    if (!id || isSending() || slowmodeRemaining(id) > 0) return;
     sendMessage(id, url)
-      .then(() => dismissNewHeader(id))
-      .catch((err) => console.error('Send GIF failed:', err));
+      .then(() => {
+        dismissNewHeader(id);
+        startSlowmode(id, slowmodeSeconds());
+      })
+      .catch((err) => {
+        console.error('Send GIF failed:', err);
+        startSlowmode(id, retryAfterSeconds(err));
+      });
   }
 
   function handleReplyToMessage(msg: DecryptedMessage) {
@@ -565,6 +586,16 @@ const SpacePage: Component = () => {
     });
   });
   const canSendMessages = createMemo(() => canSendMessagesInChannel(myChannelMask()));
+  /** How long this channel makes *this* member wait between messages, 0 when slowmode is off
+   * or they are exempt. Mirrors the server's rule exactly (messages/service.go exempts Manage
+   * Messages and Manage Rooms), so the countdown never appears for someone who can ignore it. */
+  const slowmodeSeconds = createMemo(() => {
+    const secs = currentRoom()?.slowmode_seconds ?? 0;
+    if (secs <= 0) return 0;
+    const mask = myChannelMask();
+    if (mask !== null && (hasPerm(mask, PermManageMessages) || hasPerm(mask, PermManageRooms))) return 0;
+    return secs;
+  });
   /** Attach Files is its own bit: without it the attach button, drag-and-drop and
    * paste-to-attach are off, matching the server's refusal. */
   const canAttachFiles = createMemo(() => canAttachFilesInChannel(myChannelMask()));
@@ -1006,6 +1037,7 @@ const SpacePage: Component = () => {
                 onRemoveAttachment={attachmentDraft.remove}
                 attachmentError={attachmentDraft.error()}
                 customEmojis={allCustomEmojis()}
+                slowmodeRemaining={slowmodeRemaining(roomId())}
                 noSendMessage={canSendMessages() ? undefined : t('space.noSendPermission')}
                 onSendGif={handleSendGif}
               />

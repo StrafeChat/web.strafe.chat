@@ -343,6 +343,7 @@ export default {
   },
   composer: {
     mentionEveryone: 'Notifier tout le monde dans ce salon',
+    slowmodeWait: 'Le mode lent est activé : attendez {{seconds}} s avant de renvoyer',
     mentionHere: 'Notifier les membres en ligne',
     customEmoji: 'Emoji personnalisé',
     dropFiles: 'Déposez des fichiers pour les joindre',

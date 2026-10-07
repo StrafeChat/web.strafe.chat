@@ -366,6 +366,7 @@ export default {
   },
   composer: {
     mentionEveryone: 'تنبيه الجميع في هذه الغرفة',
+    slowmodeWait: 'الوضع البطيء مفعّل - انتظر {{seconds}} ثانية قبل الإرسال مجددًا',
     mentionHere: 'تنبيه الأعضاء المتصلين',
     customEmoji: 'إيموجي مخصص',
     dropFiles: 'أفلت الملفات لإرفاقها',

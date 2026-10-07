@@ -336,6 +336,7 @@ export default {
   },
   composer: {
     mentionEveryone: 'Alle in diesem Raum benachrichtigen',
+    slowmodeWait: 'Langsamer Modus ist an - warte {{seconds}} s bis zur nächsten Nachricht',
     mentionHere: 'Online-Mitglieder benachrichtigen',
     customEmoji: 'Eigenes Emoji',
     dropFiles: 'Dateien hier ablegen, um sie anzuhängen',

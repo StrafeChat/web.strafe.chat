@@ -297,6 +297,10 @@ function spaceFromPayload(payload: unknown): Space | null {
     owner_id: d.owner_id != null ? String(d.owner_id) : '',
     official: d.official === true,
     verification_level: typeof d.verification_level === 'number' ? d.verification_level : 0,
+    // Every field a space carries has to be listed here: this mapper is what READY and every
+    // SPACE_UPDATE go through, so one left out silently resets on the next refresh.
+    automod_flags: typeof d.automod_flags === 'number' ? d.automod_flags : 0,
+    automod_mention_limit: typeof d.automod_mention_limit === 'number' ? d.automod_mention_limit : 0,
     default_message_notifications:
       typeof d.default_message_notifications === 'number' ? d.default_message_notifications : 0,
     explicit_content_filter: typeof d.explicit_content_filter === 'number' ? d.explicit_content_filter : 0,

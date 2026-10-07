@@ -90,6 +90,9 @@ export interface RoomMessageInputProps {
   customEmojis?: CustomEmoji[];
   /** Send a GIF (its direct .gif URL) as a message, straight from the GIF picker. */
   onSendGif?: (url: string) => void;
+  /** Seconds left on this channel's slowmode cooldown (0 = may send). While it counts down
+   * the composer shows the number and refuses to submit, as Discord does. */
+  slowmodeRemaining?: number;
 }
 
 function participantDisplayName(p: RoomParticipant): string {
@@ -116,7 +119,9 @@ const COMPOSER_MAX_HEIGHT_PX = 200;
 /** Typography shared by the textarea and its mirror so they stay glyph-aligned. The
  * horizontal padding leaves room for the attach (left) and the GIF, emoji and voice-message
  * (right) buttons - three size-9 buttons plus their gaps, so the text never runs under them. */
-const composerTextClass = 'pl-12 pr-[8rem] py-3 text-sm leading-5';
+/** `slowmode` widens the right padding for the countdown pill, so text never runs under it. */
+const composerTextClass = (slowmode: boolean) =>
+  `pl-12 ${slowmode ? 'pr-[10.5rem]' : 'pr-[8rem]'} py-3 text-sm leading-5`;
 
 function isWordChar(c: string | undefined): boolean {
   return c != null && /[\p{L}\p{N}_]/u.test(c);
@@ -224,8 +229,14 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
   const hasAttachments = () => (props.attachments?.length ?? 0) > 0;
   // Recording blocks sending: the field is hidden behind the recording bar, so an Enter or a
   // click on send must not fire a half-written draft while the mic is hot.
+  /** Counting down after a send in a slowmode channel (Discord blocks the send meanwhile). */
+  const slowmodeLeft = () => props.slowmodeRemaining ?? 0;
   const canSend = () =>
-    (props.draft.trim().length > 0 || hasAttachments()) && !props.disabled && !props.sending && !recording();
+    (props.draft.trim().length > 0 || hasAttachments()) &&
+    !props.disabled &&
+    !props.sending &&
+    !recording() &&
+    slowmodeLeft() === 0;
 
   // Voice messages. The recorder lives here rather than in the page because it is pure UI
   // state that dies with the composer; the finished clip is handed to the normal
@@ -693,7 +704,7 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
                     mirrorEl = el;
                   }}
                   aria-hidden="true"
-                  class={`pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words rounded-lg border border-transparent text-foreground ${composerTextClass} ${
+                  class={`pointer-events-none absolute inset-0 overflow-hidden whitespace-pre-wrap break-words rounded-lg border border-transparent text-foreground ${composerTextClass(slowmodeLeft() > 0)} ${
                     hasTopStrip() ? 'rounded-t-none' : ''
                   }`}
                 >
@@ -731,7 +742,7 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
                   placeholder={props.placeholder}
                   rows={1}
                   spellcheck={settings.spellcheck}
-                  class={`relative box-border block min-h-12 w-full resize-none overflow-hidden rounded-lg border border-input bg-transparent text-transparent caret-foreground placeholder:text-muted-foreground transition-colors focus:border-input focus:outline-none focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed ${composerTextClass} ${
+                  class={`relative box-border block min-h-12 w-full resize-none overflow-hidden rounded-lg border border-input bg-transparent text-transparent caret-foreground placeholder:text-muted-foreground transition-colors focus:border-input focus:outline-none focus-visible:outline-none focus-visible:ring-0 disabled:cursor-not-allowed ${composerTextClass(slowmodeLeft() > 0)} ${
                     hasTopStrip() ? 'rounded-t-none' : ''
                   }`}
                   disabled={props.disabled}
@@ -762,6 +773,17 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
                   />
                 </div>
                 <div class="absolute bottom-1.5 right-1.5 flex items-center gap-0.5" ref={(el) => (toggleClusterEl = el)}>
+                  {/* Slowmode: the seconds left before this channel accepts another message. */}
+                  <Show when={slowmodeLeft() > 0}>
+                    <span
+                      class="mr-1 inline-flex h-7 min-w-7 shrink-0 select-none items-center justify-center rounded-full bg-muted/70 px-1.5 text-xs font-semibold tabular-nums text-muted-foreground"
+                      title={t('composer.slowmodeWait', { seconds: String(slowmodeLeft()) })}
+                      aria-label={t('composer.slowmodeWait', { seconds: String(slowmodeLeft()) })}
+                      aria-live="polite"
+                    >
+                      {slowmodeLeft()}
+                    </span>
+                  </Show>
                   {/* Same order as the picker's tabs (Emoji, then GIF), so the tab that
                       lights up sits above the button that was pressed. */}
                   <IconButton

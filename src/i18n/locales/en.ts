@@ -336,6 +336,7 @@ export default {
   },
   composer: {
     mentionEveryone: 'Notify everyone in this room',
+    slowmodeWait: 'Slowmode is on - wait {{seconds}}s before sending again',
     mentionHere: 'Notify online members',
     customEmoji: 'Custom emoji',
     dropFiles: 'Drop files to attach',
