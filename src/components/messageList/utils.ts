@@ -96,6 +96,8 @@ export function formatSystemMessageText(
       const custom = typeof payload.message === 'string' ? payload.message.trim() : '';
       return custom ? custom.replace(/\{user\}/g, user) : t('messages.system.birthday', { user });
     }
+    case 'message_pinned':
+      return t('messages.system.pinned', { actor });
     case 'room_renamed':
       return t('messages.system.roomRenamed', { actor, name: payload.new_name ?? '?' });
     case 'call_started':

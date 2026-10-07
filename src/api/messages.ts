@@ -64,6 +64,10 @@ export interface Message {
   /** Only present when non-empty - omitted (not populated on MESSAGE_CREATE/UPDATE events,
    * which can't yet/don't change reactions) rather than sent as an empty array. */
   reactions?: MessageReaction[];
+  /** Pinned in its room, for everyone (see listPins). Present only while pinned. */
+  pinned?: boolean;
+  pinned_at?: string;
+  pinned_by?: string;
   created_at: string;
   updated_at: string;
   deleted_at?: string;
@@ -256,4 +260,25 @@ export function removeReaction(roomId: string, msgId: string, emoji: string) {
 /** Who reacted with a specific emoji - the hover tooltip's "X, Y and Z reacted" list. */
 export function listReactors(roomId: string, msgId: string, emoji: string) {
   return api<Reactor[]>(`/rooms/${roomId}/messages/${msgId}/reactions/${encodeURIComponent(emoji)}`);
+}
+
+/** One entry of a room's pin list: when and by whom, plus the message itself. */
+export interface PinnedItem {
+  pinned_at: string;
+  pinned_by?: string;
+  message: Message;
+}
+
+/** The room's pinned messages, newest pin first (Discord's GET .../messages/pins). */
+export function listPins(roomId: string) {
+  return api<{ items: PinnedItem[]; has_more: boolean }>(`/rooms/${roomId}/pins`);
+}
+
+/** Pin for everyone in the room: Manage Messages in a space channel, anyone in a PM or group. */
+export function pinMessageRequest(roomId: string, msgId: string) {
+  return api<void>(`/rooms/${roomId}/messages/${msgId}/pin`, { method: 'PUT' });
+}
+
+export function unpinMessageRequest(roomId: string, msgId: string) {
+  return api<void>(`/rooms/${roomId}/messages/${msgId}/pin`, { method: 'DELETE' });
 }

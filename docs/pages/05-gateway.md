@@ -151,6 +151,7 @@ Room events reach every subscriber of the room; space events reach every subscri
 | `MESSAGE_DELETE` | `{"room_id", "message_id"}` |
 | `MESSAGE_REACTION_ADD` | `{"room_id", "message_id", "user_id", "emoji"}` - `emoji` is a unicode string or `"custom:<id>"` |
 | `MESSAGE_REACTION_REMOVE` | same |
+| `ROOM_PINS_UPDATE` | `{"room_id", "message_id", "user_id", "pinned", "pinned_at", "last_pin_timestamp"}` - a message was pinned (`pinned: true`, with `pinned_at`) or unpinned; `last_pin_timestamp` is when the room's newest remaining pin was made, `null` when none |
 | `TYPING_START` | `{"room_id", "user_id", "timestamp"}` (unix seconds) |
 
 ### Rooms

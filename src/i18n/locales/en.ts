@@ -326,6 +326,7 @@ export default {
       spaceKicked: '{{user}} was removed from the space',
       spaceBanned: '{{user}} was banned from the space',
       birthday: '🎂 Happy birthday, {{user}}!',
+      pinned: '{{actor}} pinned a message',
       default: 'System message',
     },
     preview: {
@@ -2178,6 +2179,8 @@ export default {
       inviteInvalid: 'That invite code is not valid or has already been used.',
       emailInUse: 'That email is already registered.',
       usernameTaken: 'That username is taken. Try another one.',
+      tooManyPins: 'This room already has the maximum of 50 pinned messages.',
+      pinForbidden: "You don't have permission to pin messages here.",
       weakPassword: 'Password does not meet requirements.',
       invalidUsername: 'That username is not allowed.',
       validationFailed: 'Please check the form and try again.',

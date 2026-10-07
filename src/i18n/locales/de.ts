@@ -326,6 +326,7 @@ export default {
       spaceKicked: '{{user}} wurde aus dem Space entfernt',
       spaceBanned: '{{user}} wurde aus dem Space gebannt',
       birthday: '🎂 Alles Gute zum Geburtstag, {{user}}!',
+      pinned: '{{actor}} hat eine Nachricht angepinnt',
       default: 'Systemnachricht',
     },
     preview: {
@@ -2175,6 +2176,8 @@ export default {
       inviteInvalid: 'Dieser Einladungscode ist ungültig oder wurde bereits verwendet.',
       emailInUse: 'Diese E-Mail ist bereits registriert.',
       usernameTaken: 'Dieser Benutzername ist vergeben. Probiere einen anderen.',
+      tooManyPins: 'Dieser Raum hat bereits die maximale Anzahl von 50 angepinnten Nachrichten.',
+      pinForbidden: 'Du hast keine Berechtigung, hier Nachrichten anzupinnen.',
       weakPassword: 'Das Passwort erfüllt die Anforderungen nicht.',
       invalidUsername: 'Dieser Benutzername ist nicht erlaubt.',
       validationFailed: 'Bitte prüfe das Formular und versuche es erneut.',

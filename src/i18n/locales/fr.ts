@@ -333,6 +333,7 @@ export default {
       spaceKicked: '{{user}} a été expulsé de l\'espace',
       spaceBanned: '{{user}} a été banni de l\'espace',
       birthday: '🎂 Joyeux anniversaire, {{user}} !',
+      pinned: '{{actor}} a épinglé un message',
       default: 'Message système',
     },
     preview: {
@@ -2184,6 +2185,8 @@ export default {
       inviteInvalid: "Ce code d'invitation n'est pas valide ou a déjà été utilisé.",
       emailInUse: 'Cet e-mail est déjà enregistré.',
       usernameTaken: "Ce nom d'utilisateur est déjà pris. Essayez-en un autre.",
+      tooManyPins: "Ce salon a déjà atteint le maximum de 50 messages épinglés.",
+      pinForbidden: "Vous n'avez pas la permission d'épingler des messages ici.",
       weakPassword: 'Le mot de passe ne respecte pas les exigences.',
       invalidUsername: "Ce nom d'utilisateur n'est pas autorisé.",
       validationFailed: 'Vérifiez le formulaire et réessayez.',

@@ -910,6 +910,30 @@ export function removeMessageFromEvent(roomId: string, messageId: string) {
   setMessages('byRoom', roomId, (prev) => (prev ?? []).filter((m) => m.id !== messageId));
 }
 
+/** Decrypt (or pass through) raw server messages for display outside the room list - the pin
+ * panel - with the same rules a history page gets. */
+export function decryptServerMessages(list: Message[]): Promise<DecryptedMessage[]> {
+  const currentUserId = auth.user?.id;
+  if (!currentUserId) return Promise.resolve([]);
+  return decryptPage(list, currentUserId);
+}
+
+/** Flip a loaded message's pinned flag in place (ROOM_PINS_UPDATE, optimistic toggles). Mutates
+ * rather than replaces the message object - see patchReaction for why. */
+export function setMessagePinned(roomId: string, messageId: string, pinned: boolean, pinnedAt?: string, pinnedBy?: string) {
+  setMessages(
+    'byRoom',
+    roomId,
+    produce((prev) => {
+      const msg = (prev ?? []).find((m) => m.id === messageId);
+      if (!msg) return;
+      msg.pinned = pinned;
+      msg.pinned_at = pinned ? pinnedAt : undefined;
+      msg.pinned_by = pinned ? pinnedBy : undefined;
+    })
+  );
+}
+
 /**
  * Apply one reaction delta (one user added/removed one emoji) to a message's aggregated
  * summary in place. Only used for events about *other* users - the current user's own

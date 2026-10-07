@@ -356,6 +356,7 @@ export default {
       spaceKicked: 'تمت إزالة {{user}} من المساحة',
       spaceBanned: 'تم حظر {{user}} من المساحة',
       birthday: '🎂 عيد ميلاد سعيد يا {{user}}!',
+      pinned: '{{actor}} ثبّت رسالة',
       default: 'رسالة نظام',
     },
     preview: {
@@ -2249,6 +2250,8 @@ export default {
       inviteInvalid: 'رمز الدعوة هذا غير صالح أو تم استخدامه بالفعل.',
       emailInUse: 'هذا البريد الإلكتروني مسجّل بالفعل.',
       usernameTaken: 'اسم المستخدم هذا مستخدم بالفعل. جرّب اسمًا آخر.',
+      tooManyPins: 'تحتوي هذه الغرفة بالفعل على الحد الأقصى وهو 50 رسالة مثبتة.',
+      pinForbidden: 'ليس لديك إذن لتثبيت الرسائل هنا.',
       weakPassword: 'كلمة المرور لا تستوفي المتطلبات.',
       invalidUsername: 'اسم المستخدم هذا غير مسموح به.',
       validationFailed: 'راجع النموذج وحاول مجددًا.',

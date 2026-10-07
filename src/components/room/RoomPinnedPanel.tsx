@@ -23,6 +23,8 @@ export interface RoomPinnedPanelProps {
   participants?: RoomParticipant[];
   spaceRoles?: SpaceRole[];
   onSelectMessage: (messageId: string) => void;
+  /** Whether the viewer may unpin here (Manage Messages in a space channel). Default true. */
+  canManage?: boolean;
 }
 
 export const RoomPinnedPanel: Component<RoomPinnedPanelProps> = (props) => {
@@ -95,7 +97,7 @@ export const RoomPinnedPanel: Component<RoomPinnedPanelProps> = (props) => {
                         <MessageAttachments attachments={msg.attachments!} />
                       </Show>
                     </div>
-                    <Show when={props.roomId}>
+                    <Show when={props.roomId && props.canManage !== false}>
                       <IconButton
                         size="sm"
                         icon="fa-solid fa-xmark"
@@ -104,7 +106,7 @@ export const RoomPinnedPanel: Component<RoomPinnedPanelProps> = (props) => {
                         onClick={(e) => {
                           e.preventDefault();
                           e.stopPropagation();
-                          if (props.roomId) unpinMessage(props.roomId, msg.id);
+                          if (props.roomId) void unpinMessage(props.roomId, msg.id).catch((err) => console.error('Unpin failed:', err));
                         }}
                       />
                     </Show>

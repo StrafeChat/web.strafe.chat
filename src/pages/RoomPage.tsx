@@ -43,7 +43,7 @@ import { buildMentionCatalog, serializeDraft } from '../lib/utils/mentions';
 import type { ReplyTarget, TypingPerson } from '../components/room';
 import { createComposerAutoFocus } from '../lib/composerFocus';
 import { scrollToMessage } from '../lib/utils/messages';
-import { pinnedMessages } from '../stores/pinnedMessages';
+import { ensureRoomPins, pinnedMessages } from '../stores/pinnedMessages';
 import { createAttachmentDraft } from '../lib/attachments/draft';
 import { allCustomEmojis } from '../stores/customEmojis';
 import { isRoomMuted, muteRoom, setRoomNotifyMode, unmuteRoom } from '../lib/roomNotify';
@@ -195,22 +195,12 @@ const RoomPage: Component = () => {
     })
   );
 
-  const pinnedIdsForRoom = createMemo(() => {
+  /** The room's pins as the server keeps them (shared by everyone in it), newest pin first. */
+  const pinnedMessagesForRoom = createMemo(() => pinnedMessages.byRoom[params.roomId] ?? []);
+  // Fetched once per room so the header's pin icon knows whether anything is pinned.
+  createEffect(() => {
     const roomId = params.roomId;
-    if (!roomId) return [] as string[];
-    return pinnedMessages.byRoom[roomId] ?? [];
-  });
-
-  const pinnedMessagesForRoom = createMemo(() => {
-    const ids = new Set(pinnedIdsForRoom());
-    if (ids.size === 0) return [] as DecryptedMessage[];
-    const list: DecryptedMessage[] = roomMessages();
-    const found: DecryptedMessage[] = [];
-    for (const m of list) {
-      if (ids.has(m.id)) found.push(m);
-    }
-    found.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    return found;
+    if (roomId) void ensureRoomPins(roomId);
   });
 
   function onInput(e: InputEvent) {
@@ -405,6 +395,7 @@ const RoomPage: Component = () => {
     setPinnedOpen(next);
     if (next) {
       setSearchOpen(false);
+      void ensureRoomPins(params.roomId);
     }
   }
 

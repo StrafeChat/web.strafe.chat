@@ -186,12 +186,15 @@ Broadcast a typing indicator (rate limited to one per 5 s per room).
   "mention_everyone": false,
   "attachments": [ { "id": "…", "filename": "chart.png", "url": "https://…/cdn/…", "content_type": "image/png", "size": 48213, "width": 1280, "height": 720 } ],
   "reactions": [ { "emoji": "👋", "count": 1, "me": false } ],
+  "pinned": true,
+  "pinned_at": "2026-10-06T01:12:00.000Z",
+  "pinned_by": "2102223172425220096",
   "created_at": "2026-09-30T03:44:47.421Z",
   "updated_at": "2026-09-30T03:44:47.421Z"
 }
 ```
 
-`plaintext` is present in plain rooms; encrypted rooms carry `ciphertext` instead. `reactions` is included when fetching messages, not in gateway events. Deleted messages keep their id with a `deleted_at`. System notices have `sender_id: "0"`, a `system_type` (`space_member_join`, `space_member_leave`, `space_birthday`, …) and a `system_payload`. `space_birthday` is posted once a day in the space's `birthday_channel_id` for each opted-in member whose birthday is that day (UTC); its payload is `{"user_id": "…", "message": "…"}`, with `message` being the space's `birthday_message` (possibly empty, meaning use the default greeting).
+`plaintext` is present in plain rooms; encrypted rooms carry `ciphertext` instead. `reactions` is included when fetching messages, not in gateway events. `pinned`, `pinned_at` and `pinned_by` are present while the message is pinned in its room. Deleted messages keep their id with a `deleted_at`. System notices have `sender_id: "0"`, a `system_type` (`space_member_join`, `space_member_leave`, `space_birthday`, …) and a `system_payload`. `space_birthday` is posted once a day in the space's `birthday_channel_id` for each opted-in member whose birthday is that day (UTC); its payload is `{"user_id": "…", "message": "…"}`, with `message` being the space's `birthday_message` (possibly empty, meaning use the default greeting).
 
 ### `GET` /rooms/:id/messages
 
@@ -216,6 +219,12 @@ See [Bots › Sending messages](/docs/bots/#sending-messages). `201` with the me
 ### Reactions — *Add Reactions*
 
 `PUT` / `DELETE` /rooms/:id/messages/:msg_id/reactions/:emoji, `GET …/reactions/:emoji` (who reacted). `:emoji` is a URL-encoded unicode emoji or `custom:<id>`. Custom emoji from other spaces need **Use External Emojis**.
+
+### Pins — *Manage Messages in a space room; anyone in a PM or group*
+
+`PUT` / `DELETE` /rooms/:id/messages/:msg_id/pin pin or unpin a message for everyone in the room (`204`, idempotent). A room holds at most 50 pins. Pinning posts a `message_pinned` system message whose `system_payload` names `actor_id` and `message_id`; every change fires [`ROOM_PINS_UPDATE`](/docs/gateway/#events). Deleting a message drops its pin.
+
+`GET` /rooms/:id/pins — the room's pinned messages, newest pin first: `{"items": [{"pinned_at", "pinned_by", "message": {…}}], "has_more": false}`. Needs **View Room** and **Read Message History**.
 
 ### `POST` /rooms/:id/attachments — *Send Messages*
 

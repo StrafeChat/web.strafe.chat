@@ -47,7 +47,7 @@ import { appFloatToolbar, zLayer } from '../theme/appChrome';
 import { MessageAttachments } from './messageList/MessageAttachments';
 import { EmojiPicker, type EmojiPick } from './emoji/EmojiPicker';
 import { IconButton } from './ui/IconButton';
-import { isMessagePinned, pinMessage, unpinMessage } from '../stores/pinnedMessages';
+import { pinMessage, unpinMessage } from '../stores/pinnedMessages';
 import { openUserProfilePopover } from '../stores/userProfilePopover';
 import { popoverSubjectFromSender } from '../lib/userProfilePopoverHelpers';
 import { memberNameColorHex, viewerRoleCeiling } from '../lib/spacePermissions';
@@ -1003,7 +1003,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                     const roomId = props.roomId;
                     const bodyText = getMessageBodyText(msg);
                     const isOwn = msg.sender_id === currentUserId();
-                    const pinned = isMessagePinned(props.roomId, msg.id);
+                    const pinned = msg.pinned === true;
                     showContextMenu(e, [
                       ...(props.roomId && canReact()
                         ? [
@@ -1039,9 +1039,9 @@ export const MessageList: Component<MessageListProps> = (props) => {
                               label: pinned ? t('messages.actions.unpin') : t('messages.actions.pin'),
                               icon: 'fa-thumbtack',
                               onClick: () =>
-                                pinned
-                                  ? unpinMessage(props.roomId, msg.id)
-                                  : pinMessage(props.roomId, msg.id),
+                                void (pinned ? unpinMessage(props.roomId, msg.id) : pinMessage(props.roomId, msg.id)).catch(
+                                  (err) => console.error('Pin toggle failed:', err)
+                                ),
                             },
                           ]
                         : []),
@@ -1328,21 +1328,19 @@ export const MessageList: Component<MessageListProps> = (props) => {
                     </Tooltip>
                   </Show>
                   <Show when={props.roomId && props.canManageMessages !== false}>
-                    <Tooltip label={isMessagePinned(props.roomId, msg.id) ? t('messages.actions.unpin') : t('messages.actions.pin')} inline side="top">
+                    <Tooltip label={msg.pinned === true ? t('messages.actions.unpin') : t('messages.actions.pin')} inline side="top">
                       <IconButton
                         size="sm"
                         icon="fa-solid fa-thumbtack"
-                        label={isMessagePinned(props.roomId, msg.id) ? t('messages.actions.unpin') : t('messages.actions.pin')}
+                        label={msg.pinned === true ? t('messages.actions.unpin') : t('messages.actions.pin')}
                         title=""
-                        active={isMessagePinned(props.roomId, msg.id)}
+                        active={msg.pinned === true}
                         onClick={(e) => {
                           e.preventDefault();
                           if (!props.roomId) return;
-                          if (isMessagePinned(props.roomId, msg.id)) {
-                            unpinMessage(props.roomId, msg.id);
-                          } else {
-                            pinMessage(props.roomId, msg.id);
-                          }
+                          void (msg.pinned ? unpinMessage(props.roomId, msg.id) : pinMessage(props.roomId, msg.id)).catch(
+                            (err) => console.error('Pin toggle failed:', err)
+                          );
                         }}
                       />
                     </Tooltip>

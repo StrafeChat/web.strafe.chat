@@ -21,6 +21,8 @@ const SERVER_MESSAGE_TO_KEY: Record<string, string> = {
   'disposable email addresses cannot be used here - use a permanent address': 'errors.api.disposableEmail',
   'this network is banned from this instance': 'errors.api.ipBanned',
   'username already taken': 'errors.api.usernameTaken',
+  'this room already has the maximum of 50 pinned messages': 'errors.api.tooManyPins',
+  'missing permission to pin messages in this channel': 'errors.api.pinForbidden',
   'password does not meet requirements': 'errors.api.weakPassword',
   'invalid username': 'errors.api.invalidUsername',
   'validation failed': 'errors.api.validationFailed',

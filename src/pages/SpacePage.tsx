@@ -55,7 +55,7 @@ import { spaceMembers, loadSpaceMembers, ensureSpaceMembers } from '../stores/sp
 import { lastSpaceRoom } from '../stores/lastSpaceRoom';
 import { createPM } from '../api/rooms';
 import { dismissNewHeader, clearNewHeaderDismissed, newHeaderDismissed } from '../stores/newHeaderDismissed';
-import { pinnedMessages } from '../stores/pinnedMessages';
+import { ensureRoomPins, pinnedMessages } from '../stores/pinnedMessages';
 import { settings, setMembersPanelOpen } from '../stores/settings';
 import type { SettingsData } from '../stores/settings';
 import { createComposerAutoFocus } from '../lib/composerFocus';
@@ -780,22 +780,15 @@ const SpacePage: Component = () => {
     return spaceId() || undefined;
   });
 
-  const pinnedIdsForRoom = createMemo(() => {
-    const id = roomId();
-    if (!id) return [] as string[];
-    return pinnedMessages.byRoom[id] ?? [];
-  });
-
+  /** The channel's pins as the server keeps them (shared by everyone in it), newest pin first. */
   const pinnedMessagesForRoom = createMemo(() => {
-    const ids = new Set(pinnedIdsForRoom());
-    if (ids.size === 0) return [] as DecryptedMessage[];
-    const list = roomMessages();
-    const found: DecryptedMessage[] = [];
-    for (const m of list) {
-      if (ids.has(m.id)) found.push(m);
-    }
-    found.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-    return found;
+    const id = roomId();
+    return id ? (pinnedMessages.byRoom[id] ?? []) : [];
+  });
+  // Fetched once per channel so the header's pin icon knows whether anything is pinned.
+  createEffect(() => {
+    const id = roomId();
+    if (id && isTextChannel()) void ensureRoomPins(id);
   });
 
   const headerName = createMemo(() => {
@@ -830,7 +823,10 @@ const SpacePage: Component = () => {
   function handleTogglePinned() {
     const next = !pinnedOpen();
     setPinnedOpen(next);
-    if (next) setSearchOpen(false);
+    if (next) {
+      setSearchOpen(false);
+      void ensureRoomPins(roomId());
+    }
   }
 
   /** A hit in another channel has to get there first; its history then loads before the
@@ -952,6 +948,7 @@ const SpacePage: Component = () => {
             participants={visibleMembers()}
             spaceRoles={spaceRolesRes()}
             onSelectMessage={handleSelectPinnedMessage}
+            canManage={canManageMessagesInRoom()}
           />
         </div>
       </Show>

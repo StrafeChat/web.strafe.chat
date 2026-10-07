@@ -333,6 +333,7 @@ export default {
       spaceKicked: '{{user}} fue expulsado del espacio',
       spaceBanned: '{{user}} fue baneado del espacio',
       birthday: '🎂 ¡Feliz cumpleaños, {{user}}!',
+      pinned: '{{actor}} fijó un mensaje',
       default: 'Mensaje del sistema',
     },
     preview: {
@@ -2184,6 +2185,8 @@ export default {
       inviteInvalid: 'Ese código de invitación no es válido o ya se usó.',
       emailInUse: 'Ese correo ya está registrado.',
       usernameTaken: 'Ese nombre de usuario ya está en uso. Prueba otro.',
+      tooManyPins: 'Esta sala ya tiene el máximo de 50 mensajes fijados.',
+      pinForbidden: 'No tienes permiso para fijar mensajes aquí.',
       weakPassword: 'La contraseña no cumple los requisitos.',
       invalidUsername: 'Ese nombre de usuario no está permitido.',
       validationFailed: 'Revisa el formulario e inténtalo de nuevo.',
