@@ -255,3 +255,80 @@ html.underline-links a {
 .link-preview-in {
   animation: link-preview-in 180ms ease-out;
 }
+
+/* ---------------------------------------------------------------- message code blocks --
+ * Fenced blocks wrap rather than scroll forever (Discord's behaviour), and highlight.js
+ * tokens are coloured from a small palette of their own so the theme engine's --color-*
+ * overrides never leave code unreadable on a light canvas.
+ */
+.message-code-block {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  tab-size: 2;
+}
+
+:root {
+  --code-fg: hsl(0 0% 85%);
+  --code-muted: hsl(0 0% 52%);
+  --code-keyword: hsl(286 60% 72%);
+  --code-string: hsl(95 38% 62%);
+  --code-number: hsl(29 54% 61%);
+  --code-literal: hsl(187 47% 55%);
+  --code-title: hsl(207 82% 66%);
+  --code-attr: hsl(39 67% 69%);
+  --code-type: hsl(39 67% 69%);
+  --code-deletion: hsl(355 65% 65%);
+  --code-addition: hsl(95 38% 62%);
+}
+
+[data-theme='light'] {
+  --code-fg: hsl(0 0% 20%);
+  --code-muted: hsl(0 0% 45%);
+  --code-keyword: hsl(286 60% 42%);
+  --code-string: hsl(119 34% 32%);
+  --code-number: hsl(29 90% 36%);
+  --code-literal: hsl(187 80% 30%);
+  --code-title: hsl(207 82% 40%);
+  --code-attr: hsl(29 80% 38%);
+  --code-type: hsl(29 80% 38%);
+  --code-deletion: hsl(355 70% 42%);
+  --code-addition: hsl(119 34% 32%);
+}
+
+.hljs { color: var(--code-fg); }
+.hljs-comment,
+.hljs-quote { color: var(--code-muted); font-style: italic; }
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-doctag,
+.hljs-formula { color: var(--code-keyword); }
+.hljs-string,
+.hljs-regexp,
+.hljs-meta .hljs-string { color: var(--code-string); }
+.hljs-number,
+.hljs-symbol,
+.hljs-bullet { color: var(--code-number); }
+.hljs-literal,
+.hljs-built_in,
+.hljs-variable.language_ { color: var(--code-literal); }
+.hljs-title,
+.hljs-title.class_,
+.hljs-title.function_,
+.hljs-section,
+.hljs-name { color: var(--code-title); }
+.hljs-attr,
+.hljs-attribute,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-property { color: var(--code-attr); }
+.hljs-type,
+.hljs-class .hljs-title,
+.hljs-params { color: var(--code-type); }
+.hljs-meta,
+.hljs-punctuation,
+.hljs-operator { color: var(--code-muted); }
+.hljs-deletion { color: var(--code-deletion); }
+.hljs-addition { color: var(--code-addition); }
+.hljs-emphasis { font-style: italic; }
+.hljs-strong { font-weight: 600; }
+.hljs-link { text-decoration: underline; }

@@ -301,6 +301,7 @@ export default {
     },
   },
   messages: {
+    spoilerReveal: 'محتوى مخفي، انقر للكشف عنه',
     roomUnavailable: 'الغرفة غير متاحة',
     goToRoom: 'الانتقال إلى #{{name}}',
     newMessages: 'رسائل جديدة',

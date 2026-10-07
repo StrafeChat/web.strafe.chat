@@ -282,6 +282,7 @@ export default {
     },
   },
   messages: {
+    spoilerReveal: 'Spoiler, clique para revelar',
     roomUnavailable: 'Sala indisponível',
     goToRoom: 'Ir para #{{name}}',
     newMessages: 'Mensagens novas',

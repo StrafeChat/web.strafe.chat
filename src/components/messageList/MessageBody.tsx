@@ -1,7 +1,8 @@
 import type { Component } from 'solid-js';
 import { For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
-import { parseMessageContent } from '../../lib/utils/markdown';
+import { parseMessageContent, walkSegments, type MessageSegment } from '../../lib/utils/markdown';
+import { CodeBlock } from './CodeBlock';
 import { Emoji } from '../emoji/Emoji';
 import { CustomEmoji } from '../emoji/CustomEmoji';
 import { extractSpaceInviteCodeFromUrl } from '../../lib/utils/spaceInviteLink';
@@ -53,6 +54,35 @@ function findChannel(roomId: string): { spaceId: string; name: string } | null {
 
 /** Discord-style "jumbo" emoji: a message that is nothing but a few emoji renders them big. */
 const JUMBO_MAX = 10;
+
+/** ||spoiler||: blacked out until clicked, and it stays open once opened. */
+const Spoiler: Component<{ children: import('solid-js').JSX.Element }> = (props) => {
+  const [open, setOpen] = createSignal(false);
+  return (
+    <span
+      role="button"
+      tabIndex={open() ? -1 : 0}
+      aria-label={open() ? undefined : t('messages.spoilerReveal')}
+      class={`rounded px-0.5 transition-colors ${
+        open()
+          ? 'bg-muted/60'
+          : 'cursor-pointer select-none bg-foreground/85 text-transparent hover:bg-foreground/75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring'
+      }`}
+      onClick={(e) => {
+        if (open()) return;
+        e.stopPropagation();
+        setOpen(true);
+      }}
+      onKeyDown={(e) => {
+        if (open() || (e.key !== 'Enter' && e.key !== ' ')) return;
+        e.preventDefault();
+        setOpen(true);
+      }}
+    >
+      {props.children}
+    </span>
+  );
+};
 
 const guardClick = (href: string) => (e: MouseEvent) => {
   if (!isExternalLink(href)) return;
@@ -226,180 +256,204 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
   // directly) or space invites (their own embed). Capped so a link-dump doesn't fill the screen.
   const previewUrls = createMemo(() => (props.allowLinkPreviews ? previewUrlsFor(props.text) : []));
 
+
+    /** One node, recursively: an inline container renders its children through the same
+     * function, which is what lets **bold with *italic* inside** nest at all. */
+    const renderSegment = (seg: MessageSegment): import('solid-js').JSX.Element => {
+      const kids = () => <For each={(seg as { children: MessageSegment[] }).children}>{(c) => renderSegment(c)}</For>;
+      if (seg.type === 'bold') return <strong class="font-semibold">{kids()}</strong>;
+      if (seg.type === 'italic') return <em class="italic">{kids()}</em>;
+      if (seg.type === 'underline') return <u class="underline underline-offset-2">{kids()}</u>;
+      if (seg.type === 'strike') return <s class="line-through opacity-90">{kids()}</s>;
+      if (seg.type === 'spoiler') return <Spoiler>{kids()}</Spoiler>;
+      if (seg.type === 'heading') {
+        const size = seg.level === 1 ? 'text-xl' : seg.level === 2 ? 'text-lg' : 'text-base';
+        return (
+          <div class={`mb-1 mt-2 block font-bold leading-tight first:mt-0 ${size}`}>{kids()}</div>
+        );
+      }
+      if (seg.type === 'subtext') {
+        return <div class="mt-0.5 block text-xs text-muted-foreground">{kids()}</div>;
+      }
+      if (seg.type === 'quote') {
+        return (
+          <div class="my-0.5 flex gap-2.5">
+            <span class="w-1 shrink-0 rounded-full bg-border" aria-hidden="true" />
+            <div class="min-w-0 flex-1 text-muted-foreground">{kids()}</div>
+          </div>
+        );
+      }
+      if (seg.type === 'listItem') {
+        return (
+          <div class="flex gap-2" style={{ 'margin-inline-start': `${seg.depth * 1.25}rem` }}>
+            <span class="shrink-0 select-none text-muted-foreground">{seg.marker}</span>
+            <span class="min-w-0 flex-1">{kids()}</span>
+          </div>
+        );
+      }
+        if (seg.type === 'text') {
+          return <span class="whitespace-pre-wrap">{seg.content}</span>;
+        }
+        if (seg.type === 'emoji') {
+          return <Emoji emoji={seg.emoji} jumbo={jumbo()} />;
+        }
+        if (seg.type === 'customEmoji') {
+          return <CustomEmoji id={seg.id} name={seg.name} jumbo={jumbo()} />;
+        }
+        if (seg.type === 'code') {
+          return (
+            <code class="rounded bg-muted px-1 py-0.5 font-mono text-[0.9em]">
+              {seg.content}
+            </code>
+          );
+        }
+        if (seg.type === 'codeBlock') {
+          return <CodeBlock lang={seg.lang} content={seg.content} />;
+        }
+        if (seg.type === 'link') {
+          const href = seg.href;
+          const inviteCode = extractSpaceInviteCodeFromUrl(href);
+          if (inviteCode) {
+            return (
+              <div class="block max-w-full my-1.5 space-y-1.5">
+                <a
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  class="text-primary underline underline-offset-2 break-all hover:text-primary/90 cursor-pointer"
+                  onClick={(e) => {
+                    if (!isExternalLink(href)) return;
+                    if (e.shiftKey) return;
+                    e.preventDefault();
+                    requestOpenExternalLink(href);
+                  }}
+                >
+                  {seg.text}
+                </a>
+                <SpaceInviteLinkEmbed code={inviteCode} />
+              </div>
+            );
+          }
+          const linkAnchor = (
+            <a
+              href={href}
+              target="_blank"
+              rel="noopener noreferrer"
+              class="text-primary underline underline-offset-2 break-all hover:text-primary/90 cursor-pointer"
+              onClick={(e) => {
+                if (!isExternalLink(href)) return;
+                if (e.shiftKey) return; // Shift+click: bypass modal, open directly
+                e.preventDefault();
+                requestOpenExternalLink(href);
+              }}
+            >
+              {seg.text}
+            </a>
+          );
+          // A media link (GIF/image/video): keep the link and add the media (or, if the URL
+          // turns out to be an HTML page, a preview card) below it. A message that is only a
+          // GIF is handled by loneGif above and shows just the animation.
+          const kind = mediaKind(href);
+          if (kind) {
+            return (
+              <div class="block max-w-full my-1.5 space-y-1.5">
+                {linkAnchor}
+                <MediaEmbed href={href} kind={kind} allowLinkPreviews={props.allowLinkPreviews} />
+              </div>
+            );
+          }
+          return linkAnchor;
+        }
+        if (seg.type === 'mention') {
+          // Accessor, not a one-shot lookup: participants often finish loading after the
+          // message has rendered (a fresh MESSAGE_CREATE beats the member list), and a
+          // plain const here rendered "@Unknown" permanently for that message.
+          const display = () => {
+            const p = props.participants?.find((x) => x.id === seg.userId);
+            return p?.display_name || p?.username || t('common.unknown');
+          };
+          return (
+            <Show when={props.onMentionClick} fallback={<span class={brandPill}>@{display()}</span>}>
+              <button
+                type="button"
+                class={brandPillClickable}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  props.onMentionClick?.(seg.userId, e.currentTarget);
+                }}
+              >
+                @{display()}
+              </button>
+            </Show>
+          );
+        }
+        if (seg.type === 'roleMention') {
+          const role = () => props.spaceRoles?.find((r) => r.id === seg.roleId);
+          return (
+            <Show
+              when={role()}
+              fallback={
+                // Role no longer exists (deleted) or this context has no role data (e.g.
+                // a PM rendering old space-channel content) - plain text rather than a
+                // mention pill pointing at nothing.
+                <span class="whitespace-pre-wrap">{`<@&${seg.roleId}>`}</span>
+              }
+            >
+              {(r) => (
+                <span
+                  class={`inline-flex items-center gap-1 ${pillBase}`}
+                  style={{
+                    'background-color': `${spaceRoleColorHex(r().color)}26`,
+                    color: spaceRoleColorHex(r().color),
+                  }}
+                >
+                  @{r().name}
+                </span>
+              )}
+            </Show>
+          );
+        }
+        if (seg.type === 'channelMention') {
+          const channel = () => findChannel(seg.roomId);
+          return (
+            <Show
+              when={channel()}
+              fallback={
+                <span class={`${pillBase} bg-muted text-muted-foreground`} title={t('messages.roomUnavailable')}>
+                  #unknown
+                </span>
+              }
+            >
+              {(ch) => (
+                <button
+                  type="button"
+                  class={brandPillClickable}
+                  title={t('messages.goToRoom', { name: ch().name })}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/spaces/${ch().spaceId}/rooms/${seg.roomId}`);
+                  }}
+                >
+                  #{ch().name}
+                </button>
+              )}
+            </Show>
+          );
+        }
+        if (seg.type === 'timestamp') {
+          return <DynamicTimestamp unix={seg.unix} style={seg.style} />;
+        }
+        if (seg.type === 'everyone') {
+          return <span class={brandPill}>{seg.text}</span>;
+        }
+      return null;
+    };
+
   return (
     <div class={props.class}>
       <Show when={loneGif()} fallback={
       <>
-      <For each={segments()}>
-        {(seg) => {
-          if (seg.type === 'text') {
-            return <span class="whitespace-pre-wrap">{seg.content}</span>;
-          }
-          if (seg.type === 'emoji') {
-            return <Emoji emoji={seg.emoji} jumbo={jumbo()} />;
-          }
-          if (seg.type === 'customEmoji') {
-            return <CustomEmoji id={seg.id} name={seg.name} jumbo={jumbo()} />;
-          }
-          if (seg.type === 'bold') {
-            return <strong class="font-semibold">{seg.content}</strong>;
-          }
-          if (seg.type === 'italic') {
-            return <em class="italic">{seg.content}</em>;
-          }
-          if (seg.type === 'code') {
-            return (
-              <code class="rounded bg-muted px-1 py-0.5 font-mono text-[0.9em]">
-                {seg.content}
-              </code>
-            );
-          }
-          if (seg.type === 'codeBlock') {
-            return (
-              <div class="my-1.5 block rounded-md border border-border bg-muted/50 px-3 py-2 font-mono text-[0.85em] whitespace-pre-wrap overflow-x-auto">
-                {seg.content}
-              </div>
-            );
-          }
-          if (seg.type === 'link') {
-            const href = seg.href;
-            const inviteCode = extractSpaceInviteCodeFromUrl(href);
-            if (inviteCode) {
-              return (
-                <div class="block max-w-full my-1.5 space-y-1.5">
-                  <a
-                    href={href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    class="text-primary underline underline-offset-2 break-all hover:text-primary/90 cursor-pointer"
-                    onClick={(e) => {
-                      if (!isExternalLink(href)) return;
-                      if (e.shiftKey) return;
-                      e.preventDefault();
-                      requestOpenExternalLink(href);
-                    }}
-                  >
-                    {seg.text}
-                  </a>
-                  <SpaceInviteLinkEmbed code={inviteCode} />
-                </div>
-              );
-            }
-            const linkAnchor = (
-              <a
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                class="text-primary underline underline-offset-2 break-all hover:text-primary/90 cursor-pointer"
-                onClick={(e) => {
-                  if (!isExternalLink(href)) return;
-                  if (e.shiftKey) return; // Shift+click: bypass modal, open directly
-                  e.preventDefault();
-                  requestOpenExternalLink(href);
-                }}
-              >
-                {seg.text}
-              </a>
-            );
-            // A media link (GIF/image/video): keep the link and add the media (or, if the URL
-            // turns out to be an HTML page, a preview card) below it. A message that is only a
-            // GIF is handled by loneGif above and shows just the animation.
-            const kind = mediaKind(href);
-            if (kind) {
-              return (
-                <div class="block max-w-full my-1.5 space-y-1.5">
-                  {linkAnchor}
-                  <MediaEmbed href={href} kind={kind} allowLinkPreviews={props.allowLinkPreviews} />
-                </div>
-              );
-            }
-            return linkAnchor;
-          }
-          if (seg.type === 'mention') {
-            // Accessor, not a one-shot lookup: participants often finish loading after the
-            // message has rendered (a fresh MESSAGE_CREATE beats the member list), and a
-            // plain const here rendered "@Unknown" permanently for that message.
-            const display = () => {
-              const p = props.participants?.find((x) => x.id === seg.userId);
-              return p?.display_name || p?.username || t('common.unknown');
-            };
-            return (
-              <Show when={props.onMentionClick} fallback={<span class={brandPill}>@{display()}</span>}>
-                <button
-                  type="button"
-                  class={brandPillClickable}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    props.onMentionClick?.(seg.userId, e.currentTarget);
-                  }}
-                >
-                  @{display()}
-                </button>
-              </Show>
-            );
-          }
-          if (seg.type === 'roleMention') {
-            const role = () => props.spaceRoles?.find((r) => r.id === seg.roleId);
-            return (
-              <Show
-                when={role()}
-                fallback={
-                  // Role no longer exists (deleted) or this context has no role data (e.g.
-                  // a PM rendering old space-channel content) - plain text rather than a
-                  // mention pill pointing at nothing.
-                  <span class="whitespace-pre-wrap">{`<@&${seg.roleId}>`}</span>
-                }
-              >
-                {(r) => (
-                  <span
-                    class={`inline-flex items-center gap-1 ${pillBase}`}
-                    style={{
-                      'background-color': `${spaceRoleColorHex(r().color)}26`,
-                      color: spaceRoleColorHex(r().color),
-                    }}
-                  >
-                    @{r().name}
-                  </span>
-                )}
-              </Show>
-            );
-          }
-          if (seg.type === 'channelMention') {
-            const channel = () => findChannel(seg.roomId);
-            return (
-              <Show
-                when={channel()}
-                fallback={
-                  <span class={`${pillBase} bg-muted text-muted-foreground`} title={t('messages.roomUnavailable')}>
-                    #unknown
-                  </span>
-                }
-              >
-                {(ch) => (
-                  <button
-                    type="button"
-                    class={brandPillClickable}
-                    title={t('messages.goToRoom', { name: ch().name })}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      navigate(`/spaces/${ch().spaceId}/rooms/${seg.roomId}`);
-                    }}
-                  >
-                    #{ch().name}
-                  </button>
-                )}
-              </Show>
-            );
-          }
-          if (seg.type === 'timestamp') {
-            return <DynamicTimestamp unix={seg.unix} style={seg.style} />;
-          }
-          if (seg.type === 'everyone') {
-            return <span class={brandPill}>{seg.text}</span>;
-          }
-          return null;
-        }}
-      </For>
+      <For each={segments()}>{(seg) => renderSegment(seg)}</For>
       {props.trailing}
       </>
       }>

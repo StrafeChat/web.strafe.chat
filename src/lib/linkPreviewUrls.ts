@@ -1,4 +1,4 @@
-import { parseMessageContent } from './utils/markdown';
+import { parseMessageContent, walkSegments } from './utils/markdown';
 import { mediaKind } from './gif/providers';
 import { extractSpaceInviteCodeFromUrl } from './utils/spaceInviteLink';
 
@@ -15,13 +15,13 @@ export const MAX_PREVIEWS_PER_MESSAGE = 4;
 export function previewUrlsFor(text: string): string[] {
   const seen = new Set<string>();
   const out: string[] = [];
-  for (const s of parseMessageContent(text)) {
-    if (s.type !== 'link') continue;
-    if (mediaKind(s.href) || extractSpaceInviteCodeFromUrl(s.href)) continue;
-    if (!/^https?:\/\//i.test(s.href) || seen.has(s.href)) continue;
-    seen.add(s.href);
-    out.push(s.href);
-    if (out.length >= MAX_PREVIEWS_PER_MESSAGE) break;
-  }
+  // Walks into blocks and styling too: a link inside a quote or a bold run is still a link.
+  walkSegments(parseMessageContent(text), (node) => {
+    if (node.type !== 'link' || out.length >= MAX_PREVIEWS_PER_MESSAGE) return;
+    if (mediaKind(node.href) || extractSpaceInviteCodeFromUrl(node.href)) return;
+    if (!/^https?:\/\//i.test(node.href) || seen.has(node.href)) return;
+    seen.add(node.href);
+    out.push(node.href);
+  });
   return out;
 }

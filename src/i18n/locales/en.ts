@@ -275,6 +275,7 @@ export default {
     },
   },
   messages: {
+    spoilerReveal: 'Spoiler, click to reveal',
     roomUnavailable: 'Room not available',
     goToRoom: 'Go to #{{name}}',
     newMessages: 'New messages',
