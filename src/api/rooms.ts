@@ -20,6 +20,8 @@ export interface RoomParticipant {
   public_flags?: number;
   /** Bot account. */
   bot?: boolean;
+  /** The instance's official account (moderation and system notices). */
+  system?: boolean;
   presence?: UserPresence;
   /** Federation: the user's home instance and the id it knows them by (present when the
    * instance federates; equals this instance/`id` for local users). */

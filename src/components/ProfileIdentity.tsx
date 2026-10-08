@@ -3,6 +3,7 @@ import { Match, Show, Switch } from 'solid-js';
 import { Dynamic } from 'solid-js/web';
 import { UserBadges } from './UserBadges';
 import { BotTag } from './BotTag';
+import { OfficialTag } from './OfficialTag';
 import { appNameTagLine } from '../theme/appChrome';
 import { instance, isRemoteUser } from '../stores/instance';
 import { t } from '../i18n';
@@ -15,6 +16,8 @@ export interface ProfileIdentityProps {
   username: string;
   homeDomain?: string;
   bot?: boolean;
+  /** The instance's official account: shows the OFFICIAL tag. */
+  system?: boolean;
   publicFlags?: number;
   /** The user's pronouns, shown under the name the way Discord does. */
   pronouns?: string;
@@ -87,6 +90,7 @@ export const ProfileIdentity: Component<ProfileIdentityProps> = (props) => {
           </button>
         </Show>
         <BotTag bot={props.bot} size={props.compact ? 'sm' : 'md'} class="relative -top-0.5" />
+        <OfficialTag system={props.system} size={props.compact ? 'sm' : 'md'} class="relative -top-0.5" />
         <Show when={props.isBirthday}>
           <span
             class="ms-1.5 align-baseline text-sm"

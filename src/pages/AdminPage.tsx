@@ -30,6 +30,7 @@ import {
   type UserDetail,
   setUserBadges,
   setUserEmail,
+  sendUserNotice,
   regenerateUserRecoveryCodes,
   type RecoveryCodesResult,
   setSpaceOfficial,
@@ -322,12 +323,19 @@ const UserPanel: Component<{ userId: string; onOpenReport: (id: string) => void;
   const [recoveryResult, setRecoveryResult] = createSignal<RecoveryCodesResult | null>(null);
   const [recoveryBusy, setRecoveryBusy] = createSignal(false);
   const [emailOpen, setEmailOpen] = createSignal(false);
+  const [noticeText, setNoticeText] = createSignal('');
+  const [noticeBusy, setNoticeBusy] = createSignal(false);
+  const [noticeError, setNoticeError] = createSignal('');
+  const [noticeSent, setNoticeSent] = createSignal(false);
 
   createEffect(() => {
     const d = detail();
     setBadgeFlags(d ? (d.user.public_flags ?? 0) : null);
     // New user selected - drop any recovery codes shown for the previous one.
     void props.userId;
+    setNoticeText('');
+    setNoticeError('');
+    setNoticeSent(false);
     setRecoveryResult(null);
   });
 
@@ -380,6 +388,23 @@ const UserPanel: Component<{ userId: string; onOpenReport: (id: string) => void;
       setError(t('admin.actionFailed'));
     } finally {
       setRecoveryBusy(false);
+    }
+  }
+
+  async function sendNotice(d: UserDetail) {
+    const text = noticeText().trim();
+    if (!text) return;
+    setNoticeBusy(true);
+    setNoticeError('');
+    setNoticeSent(false);
+    try {
+      await sendUserNotice(d.user.id, text);
+      setNoticeText('');
+      setNoticeSent(true);
+    } catch (err) {
+      setNoticeError(translateCaughtApiError(err, t).join(' ') || t('admin.actionFailed'));
+    } finally {
+      setNoticeBusy(false);
     }
   }
 
@@ -511,6 +536,38 @@ const UserPanel: Component<{ userId: string; onOpenReport: (id: string) => void;
                   </Show>
                 )}
               </Show>
+            </section>
+          </Show>
+
+          <Show when={!d().user.home_domain && !d().user.bot}>
+            <section class="space-y-2">
+              <div class={settingsSectionTitle}>{t('admin.users.notice')}</div>
+              <p class="px-0.5 text-xs text-muted-foreground">{t('admin.users.noticeHint')}</p>
+              <Textarea
+                rows={3}
+                value={noticeText()}
+                onInput={(e) => {
+                  setNoticeText(e.currentTarget.value);
+                  setNoticeSent(false);
+                }}
+                placeholder={t('admin.users.noticePlaceholder')}
+                disabled={noticeBusy()}
+                maxLength={2000}
+              />
+              <Show when={noticeError()}>
+                <p class="text-sm text-destructive">{noticeError()}</p>
+              </Show>
+              <div class="flex items-center gap-2">
+                <Button size="sm" disabled={noticeBusy() || !noticeText().trim()} onClick={() => void sendNotice(d())}>
+                  <i class="fa-solid fa-paper-plane text-xs" aria-hidden="true" /> {t('admin.users.noticeSend')}
+                </Button>
+                <Show when={noticeSent()}>
+                  <span class="flex items-center gap-1.5 text-sm text-primary">
+                    <i class="fa-solid fa-circle-check text-xs" aria-hidden="true" />
+                    {t('admin.users.noticeSent')}
+                  </span>
+                </Show>
+              </div>
             </section>
           </Show>
 

@@ -63,6 +63,7 @@ export type UserProfilePopoverSubject = {
   /** Profile-badge bitfield and bot flag, for the badge row. */
   publicFlags?: number;
   bot?: boolean;
+  system?: boolean;
 };
 
 const POPOVER_WIDTH = 320;

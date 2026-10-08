@@ -302,6 +302,7 @@ export const UserProfilePopover: Component = () => {
         joinedAtLabel: s.joinedAtLabel,
         publicFlags: s.publicFlags,
         bot: s.bot,
+        system: s.system,
       },
       {
         currentUserId: userProfilePopover.currentUserId,
@@ -439,6 +440,7 @@ export const UserProfilePopover: Component = () => {
                 username={subject()!.username}
                 homeDomain={subject()!.homeDomain}
                 bot={subject()!.bot}
+                system={subject()!.system}
                 publicFlags={subject()!.publicFlags}
                 pronouns={subject()!.pronouns}
                 isBirthday={subject()!.birthdayToday}

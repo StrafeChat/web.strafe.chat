@@ -30,7 +30,9 @@ const BEFORE_JOIN_PLACEHOLDER = '[Sent before you joined this space]';
 export function roomE2EEOff(room: Room, isGroupRoom: boolean, isSpaceTextRoom: boolean): boolean {
   if (isGroupRoom) return room.e2ee_enabled === false;
   if (isSpaceTextRoom) return room.e2ee_enabled !== true;
-  return false;
+  // A 1:1 PM is E2EE unless explicitly flagged plain-text - the official account's DM is,
+  // since that account has no encryption keys (equinox roomE2EEOff mirrors this).
+  return room.e2ee_enabled === false;
 }
 
 /** Every user whose devices should receive this room's Megolm session key. Always

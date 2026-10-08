@@ -104,11 +104,14 @@ const RoomPage: Component = () => {
   const viewportAck = createViewportAck(() => params.roomId);
   let lastTypingSent = 0;
   const room = () => rooms.rooms.find((r) => r.id === params.roomId);
-  const pmOtherUserId = createMemo(() => {
+  const pmOther = createMemo(() => {
     const r = room();
     if (r?.type !== 1 || !auth.user?.id) return undefined;
-    return r.participants?.find((p) => p.id !== auth.user?.id)?.id;
+    return r.participants?.find((p) => p.id !== auth.user?.id);
   });
+  const pmOtherUserId = createMemo(() => pmOther()?.id);
+  /** A 1:1 DM with the instance's official account is one-way: no replying. */
+  const isOfficialDM = createMemo(() => room()?.type === 1 && pmOther()?.system === true);
   const name = () => {
     const r = room();
     return r && auth.user?.id ? roomDisplayName(r, auth.user.id) : t('room.conversation');
@@ -437,7 +440,8 @@ const RoomPage: Component = () => {
       <RoomHeader
         headerIcon={headerIcon()}
         name={name()}
-        bot={room()?.type === 1 && room()?.participants?.some((p) => p.id === pmOtherUserId() && p.bot === true)}
+        bot={room()?.type === 1 && pmOther()?.bot === true}
+        system={isOfficialDM()}
         pmOtherUserId={pmOtherUserId()}
         e2ee={room()?.type === 1 || (room()?.type === 2 && room()?.e2ee_enabled !== false)}
         isGroup={room()?.type === 2}
@@ -546,8 +550,8 @@ const RoomPage: Component = () => {
               draft={draft()}
               onInput={onInput}
               onSubmit={handleSubmit}
-              placeholder={inputPlaceholder()}
-              disabled={false}
+              placeholder={isOfficialDM() ? t('room.officialReadOnly') : inputPlaceholder()}
+              disabled={isOfficialDM()}
               sending={isSending()}
               inputRef={setInputRef}
               typingUsers={typingUsers()}

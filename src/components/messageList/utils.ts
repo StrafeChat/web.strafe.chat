@@ -184,6 +184,7 @@ export interface SenderDisplay {
   isBirthday?: boolean;
   publicFlags?: number;
   bot?: boolean;
+  system?: boolean;
   /** Federation: the user's home instance, shown after the tag when it isn't this one. */
   homeDomain?: string;
 }
@@ -207,6 +208,7 @@ export function getSenderDisplay(
       isBirthday: birthdayIsToday(auth.user?.birthday),
       publicFlags: auth.user?.public_flags,
       bot: auth.user?.bot,
+      system: false,
     };
   }
   const p = participants?.find((x) => x.id === senderId);
@@ -223,6 +225,7 @@ export function getSenderDisplay(
     isBirthday: birthdayIsToday(p?.birthday, p?.is_birthday),
     publicFlags: p?.public_flags,
     bot: p?.bot,
+    system: p?.system,
     homeDomain: p?.home_domain,
   };
 }

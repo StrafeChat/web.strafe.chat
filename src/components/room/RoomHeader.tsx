@@ -10,11 +10,14 @@ import { MessageSearchBox } from './MessageSearchBox';
 import type { SearchChannel, SearchIdentity } from '../../lib/messageSearch';
 import { t } from '../../i18n';
 import { BotTag } from '../BotTag';
+import { OfficialTag } from '../OfficialTag';
 import { showContextMenu, type ContextMenuItem } from '../../stores/contextMenu';
 
 export interface RoomHeaderProps {
   /** A 1:1 PM with a bot: the BOT tag follows the name. */
   bot?: boolean;
+  /** A 1:1 PM with the instance's official account: the OFFICIAL tag follows the name. */
+  system?: boolean;
   headerIcon: string;
   name: string;
   /** Space channel topic, shown after the name behind a divider on a wide window only -
@@ -88,6 +91,7 @@ export const RoomHeader: Component<RoomHeaderProps> = (props) => (
       <h1 class={`flex min-w-0 items-center ${appPageTitle}`}>
         <span class="truncate">{props.name}</span>
         <BotTag bot={props.bot} size="sm" />
+        <OfficialTag system={props.system} size="sm" />
       </h1>
       <Show when={props.pmOtherUserId}>
         {(uid) => <PresenceDot userId={uid()} class="mt-0.5 size-2 shrink-0" />}

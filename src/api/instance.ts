@@ -242,6 +242,14 @@ export function setUserEmail(userId: string, email: string) {
   });
 }
 
+/** Send a user a free-text official message, delivered as a DM from the instance's official account. */
+export function sendUserNotice(userId: string, message: string) {
+  return api<void>(`/instance/users/${encodeURIComponent(userId)}/notice`, {
+    method: 'POST',
+    json: { message },
+  });
+}
+
 export function setUserBadges(userId: string, flags: number) {
   return api<{ public_flags: number }>(`/instance/users/${encodeURIComponent(userId)}/badges`, {
     method: 'PATCH',

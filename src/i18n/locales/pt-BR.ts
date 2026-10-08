@@ -174,6 +174,7 @@ export default {
   },
   room: {
     conversation: 'Conversa',
+    officialReadOnly: 'Você não pode responder a mensagens oficiais.',
     messagePlaceholder: 'Mensagem…',
     messageUser: 'Mensagem para @{{name}}',
     messageRoom: 'Mensagem para {{name}}',
@@ -421,6 +422,7 @@ export default {
   },
   intro: {
     pmEncrypted: 'As mensagens são criptografadas de ponta a ponta. Ninguém fora desta conversa, nem mesmo o Strafe, pode lê-las.',
+    pmOfficial: 'Esta é a conta oficial desta instância. Ela envia resultados de moderação e outros avisos. Você não pode responder aqui.',
     notesTitle: 'Notas privadas',
     notesBody: 'Suas notas privadas. Só você pode vê-las.',
     groupTitle: 'Conversa em grupo',
@@ -1504,6 +1506,11 @@ export default {
       recoveryTitle: 'Gerar novos códigos de recuperação para {{name}}?',
       recoveryBody: 'Isso substitui os códigos de recuperação atuais. Os antigos pararão de funcionar.',
       recoveryEmailed: 'Os novos códigos de recuperação foram enviados por e-mail ao usuário.',
+      notice: 'Enviar um aviso',
+      noticeHint: 'Envie a este usuário uma mensagem oficial, entregue como mensagem direta da conta oficial da instância.',
+      noticePlaceholder: 'Escreva uma mensagem oficial para este usuário…',
+      noticeSend: 'Enviar aviso',
+      noticeSent: 'Aviso enviado.',
       recoveryCopyHint: 'O e-mail está desativado, então entregue-os ao usuário com segurança. Cada um funciona uma vez e ainda exige a senha dele.',
       recoveryCopy: 'Copiar códigos',
       remote: 'De {{domain}}',
@@ -1624,6 +1631,8 @@ export default {
     alphaTester: 'Testador alfa',
     bot: 'Conta de bot',
     botTag: 'Bot',
+    official: 'Conta oficial',
+    officialTag: 'Oficial',
   },
   userMenu: {
     acceptFriend: 'Aceitar pedido de amizade',

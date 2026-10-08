@@ -22,6 +22,7 @@ import { newHeaderDismissed } from '../stores/newHeaderDismissed';
 import { formatMessageTimestamp, formatDateHeader, formatTimeOfDay } from '../lib/utils/datetime';
 import { t } from '../i18n';
 import { BotTag } from './BotTag';
+import { OfficialTag } from './OfficialTag';
 import { showContextMenu } from '../stores/contextMenu';
 import { onEditLastMessageRequest } from '../lib/chatShortcuts';
 import { buildUserMenuItems, buildSpaceModerationItems } from '../lib/userContextMenu';
@@ -1206,6 +1207,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                         {sender().name}
                       </span>
                       <BotTag bot={sender().bot} size="sm" class="-ms-0.5" />
+                      <OfficialTag system={sender().system} size="sm" class="-ms-0.5" />
                       <span class="text-[11px] text-muted-foreground shrink-0">
                         {formatMessageTimestamp(new Date(msg.created_at))}
                       </span>
@@ -1274,6 +1276,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                         {sender().name}
                       </span>
                         <BotTag bot={sender().bot} size="sm" class="-ms-0.5" />
+                      <OfficialTag system={sender().system} size="sm" class="-ms-0.5" />
                         <span class="text-[13px] text-muted-foreground shrink-0">
                           {formatMessageTimestamp(new Date(msg.created_at))}
                         </span>

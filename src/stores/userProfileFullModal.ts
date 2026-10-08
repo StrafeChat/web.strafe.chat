@@ -24,6 +24,7 @@ export type UserProfileFullSubject = {
   joinedAtLabel?: string;
   publicFlags?: number;
   bot?: boolean;
+  system?: boolean;
 };
 
 type State = {

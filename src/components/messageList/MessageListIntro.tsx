@@ -1,4 +1,5 @@
 import type { Component } from 'solid-js';
+import { OfficialTag } from '../OfficialTag';
 import { Show } from 'solid-js';
 import type { RoomParticipant } from '../../api/rooms';
 import { PresenceDot } from '../PresenceDot';
@@ -42,8 +43,11 @@ export const MessageListIntro: Component<MessageListIntroProps> = (props) => (
             </div>
             <p class="text-base" dir="ltr">
               <span class="font-semibold text-foreground">{username()}</span>
+              <OfficialTag system={other().system} size="sm" />
             </p>
-            <p class="text-xs text-muted-foreground/90 mt-3 max-w-[280px]">{t('intro.pmEncrypted')}</p>
+            <p class="text-xs text-muted-foreground/90 mt-3 max-w-[280px]">
+              {other().system ? t('intro.pmOfficial') : t('intro.pmEncrypted')}
+            </p>
           </div>
         );
       }}

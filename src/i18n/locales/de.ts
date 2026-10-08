@@ -172,6 +172,7 @@ export default {
   },
   room: {
     conversation: 'Unterhaltung',
+    officialReadOnly: 'Auf offizielle Nachrichten kannst du nicht antworten.',
     messagePlaceholder: 'Nachricht…',
     messageUser: 'Nachricht an @{{name}}',
     messageRoom: 'Nachricht an {{name}}',
@@ -414,6 +415,7 @@ export default {
   },
   intro: {
     pmEncrypted: 'Nachrichten sind Ende-zu-Ende-verschlüsselt. Niemand außerhalb dieser Unterhaltung, nicht einmal Strafe, kann sie lesen.',
+    pmOfficial: 'Dies ist das offizielle Konto dieser Instanz. Es sendet Moderationsergebnisse und andere Hinweise. Du kannst hier nicht antworten.',
     notesTitle: 'Private Notizen',
     notesBody: 'Deine privaten Notizen. Nur du kannst sie sehen.',
     groupTitle: 'Gruppenunterhaltung',
@@ -1495,6 +1497,11 @@ export default {
       recoveryTitle: 'Wiederherstellungscodes für {{name}} neu erzeugen?',
       recoveryBody: 'Dies ersetzt die aktuellen Wiederherstellungscodes. Die alten funktionieren dann nicht mehr.',
       recoveryEmailed: 'Die neuen Wiederherstellungscodes wurden dem Benutzer per E-Mail gesendet.',
+      notice: 'Hinweis senden',
+      noticeHint: 'Sende dieser Person eine offizielle Nachricht, zugestellt als Direktnachricht vom offiziellen Konto der Instanz.',
+      noticePlaceholder: 'Schreibe eine offizielle Nachricht an diese Person…',
+      noticeSend: 'Hinweis senden',
+      noticeSent: 'Hinweis gesendet.',
       recoveryCopyHint: 'E-Mail ist aus, übergib diese dem Benutzer sicher. Jeder funktioniert einmal und benötigt weiterhin sein Passwort.',
       recoveryCopy: 'Codes kopieren',
       remote: 'Von {{domain}}',
@@ -1615,6 +1622,8 @@ export default {
     alphaTester: 'Alpha-Tester',
     bot: 'Bot-Konto',
     botTag: 'Bot',
+    official: 'Offizielles Konto',
+    officialTag: 'Offiziell',
   },
   userMenu: {
     acceptFriend: 'Freundschaftsanfrage annehmen',

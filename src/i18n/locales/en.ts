@@ -172,6 +172,7 @@ export default {
   },
   room: {
     conversation: 'Conversation',
+    officialReadOnly: 'You can\'t reply to official messages.',
     messagePlaceholder: 'Message…',
     messageUser: 'Message @{{name}}',
     messageRoom: 'Message {{name}}',
@@ -414,6 +415,7 @@ export default {
   },
   intro: {
     pmEncrypted: 'Messages are end-to-end encrypted. No one outside of this conversation, not even Strafe, can read your messages.',
+    pmOfficial: "This is the instance's official account. It sends moderation outcomes and other notices. You can't reply here.",
     notesTitle: 'Private Notes',
     notesBody: 'Your private notes. Only you can see these.',
     groupTitle: 'Group conversation',
@@ -1498,6 +1500,11 @@ export default {
       recoveryTitle: 'Regenerate recovery codes for {{name}}?',
       recoveryBody: 'This replaces their current recovery codes. The old ones will stop working.',
       recoveryEmailed: 'New recovery codes were emailed to the user.',
+      notice: 'Send a notice',
+      noticeHint: 'Send this user an official message, delivered as a direct message from the instance\'s official account.',
+      noticePlaceholder: 'Write an official message to this user…',
+      noticeSend: 'Send notice',
+      noticeSent: 'Notice sent.',
       recoveryCopyHint: 'Email is off, so hand these to the user securely. Each works once and still needs their password.',
       recoveryCopy: 'Copy codes',
       remote: 'From {{domain}}',
@@ -1618,6 +1625,8 @@ export default {
     alphaTester: 'Alpha Tester',
     bot: 'Bot account',
     botTag: 'Bot',
+    official: 'Official account',
+    officialTag: 'Official',
   },
   userMenu: {
     acceptFriend: 'Accept friend request',

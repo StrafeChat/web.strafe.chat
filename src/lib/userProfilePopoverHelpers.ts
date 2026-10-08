@@ -92,6 +92,7 @@ export function popoverSubjectFromParticipant(
     joinedAtLabel: spaceJoinedLabel(p),
     publicFlags: p.public_flags,
     bot: p.bot,
+    system: p.system,
   };
 }
 
@@ -123,5 +124,6 @@ export function popoverSubjectFromSender(
     joinedAtLabel: p ? spaceJoinedLabel(p) : undefined,
     publicFlags: s.publicFlags,
     bot: s.bot,
+    system: s.system,
   };
 }

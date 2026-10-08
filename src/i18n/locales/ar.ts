@@ -184,6 +184,7 @@ export default {
   },
   room: {
     conversation: 'محادثة',
+    officialReadOnly: 'لا يمكنك الرد على الرسائل الرسمية.',
     messagePlaceholder: 'رسالة…',
     messageUser: 'مراسلة @{{name}}',
     messageRoom: 'مراسلة {{name}}',
@@ -444,6 +445,7 @@ export default {
   },
   intro: {
     pmEncrypted: 'الرسائل مشفّرة من طرف إلى طرف. لا أحد خارج هذه المحادثة، ولا حتى Strafe، يستطيع قراءتها.',
+    pmOfficial: 'هذا هو الحساب الرسمي لهذا الخادم. يرسل نتائج الإشراف وإشعارات أخرى. لا يمكنك الرد هنا.',
     notesTitle: 'ملاحظات خاصة',
     notesBody: 'ملاحظاتك الخاصة. أنت وحدك من يراها.',
     groupTitle: 'محادثة جماعية',
@@ -1569,6 +1571,11 @@ export default {
       recoveryTitle: 'إعادة إنشاء رموز الاسترداد لـ {{name}}؟',
       recoveryBody: 'يستبدل هذا رموز الاسترداد الحالية. ستتوقف القديمة عن العمل.',
       recoveryEmailed: 'تم إرسال رموز الاسترداد الجديدة إلى المستخدم بالبريد.',
+      notice: 'إرسال إشعار',
+      noticeHint: 'أرسل إلى هذا المستخدم رسالة رسمية، تُسلَّم كرسالة مباشرة من الحساب الرسمي للخادم.',
+      noticePlaceholder: 'اكتب رسالة رسمية إلى هذا المستخدم…',
+      noticeSend: 'إرسال الإشعار',
+      noticeSent: 'تم إرسال الإشعار.',
       recoveryCopyHint: 'البريد معطّل، لذا سلّمها للمستخدم بأمان. يعمل كل رمز مرة واحدة ويظل بحاجة إلى كلمة مروره.',
       recoveryCopy: 'نسخ الرموز',
       remote: 'من {{domain}}',
@@ -1689,6 +1696,8 @@ export default {
     alphaTester: 'مختبِر ألفا',
     bot: 'حساب بوت',
     botTag: 'بوت',
+    official: 'الحساب الرسمي',
+    officialTag: 'رسمي',
   },
   userMenu: {
     acceptFriend: 'قبول طلب الصداقة',

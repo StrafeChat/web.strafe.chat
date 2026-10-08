@@ -174,6 +174,7 @@ export default {
   },
   room: {
     conversation: 'Conversation',
+    officialReadOnly: 'Vous ne pouvez pas répondre aux messages officiels.',
     messagePlaceholder: 'Message…',
     messageUser: 'Écrire à @{{name}}',
     messageRoom: 'Écrire à {{name}}',
@@ -421,6 +422,7 @@ export default {
   },
   intro: {
     pmEncrypted: 'Les messages sont chiffrés de bout en bout. Personne en dehors de cette conversation, pas même Strafe, ne peut les lire.',
+    pmOfficial: "Ceci est le compte officiel de cette instance. Il envoie les décisions de modération et d'autres avis. Vous ne pouvez pas répondre ici.",
     notesTitle: 'Notes privées',
     notesBody: 'Vos notes privées. Vous seul pouvez les voir.',
     groupTitle: 'Conversation de groupe',
@@ -1504,6 +1506,11 @@ export default {
       recoveryTitle: 'Régénérer les codes de récupération de {{name}} ?',
       recoveryBody: 'Cela remplace leurs codes de récupération actuels. Les anciens cesseront de fonctionner.',
       recoveryEmailed: "Les nouveaux codes de récupération ont été envoyés par e-mail à l'utilisateur.",
+      notice: 'Envoyer un avis',
+      noticeHint: "Envoyez à cette personne un message officiel, remis en message privé depuis le compte officiel de l'instance.",
+      noticePlaceholder: 'Rédigez un message officiel à cette personne…',
+      noticeSend: "Envoyer l'avis",
+      noticeSent: 'Avis envoyé.',
       recoveryCopyHint: "L'e-mail est désactivé, remettez-les donc à l'utilisateur en toute sécurité. Chacun fonctionne une fois et nécessite toujours son mot de passe.",
       recoveryCopy: 'Copier les codes',
       remote: 'De {{domain}}',
@@ -1624,6 +1631,8 @@ export default {
     alphaTester: 'Testeur alpha',
     bot: 'Compte bot',
     botTag: 'Bot',
+    official: 'Compte officiel',
+    officialTag: 'Officiel',
   },
   userMenu: {
     acceptFriend: 'Accepter la demande d’ami',

@@ -153,6 +153,7 @@ function roomFromPayload(payload: unknown): Room | null {
         presence: p.presence as RoomParticipant['presence'],
         ...(typeof p.public_flags === 'number' ? { public_flags: p.public_flags } : {}),
         ...(p.bot === true ? { bot: true } : {}),
+        ...(p.system === true ? { system: true } : {}),
         ...(typeof p.home_domain === 'string' ? { home_domain: p.home_domain } : {}),
         ...(p.origin_id != null ? { origin_id: String(p.origin_id) } : {}),
       }))

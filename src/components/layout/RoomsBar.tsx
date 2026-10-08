@@ -30,6 +30,7 @@ import { incomingFriendRequests } from '../../lib/mobileNotifications';
 import { IconButton } from '../ui/IconButton';
 import { t } from '../../i18n';
 import { BotTag } from '../BotTag';
+import { OfficialTag } from '../OfficialTag';
 
 interface PaneButtonProps {
   href: string;
@@ -78,6 +79,8 @@ interface ConvItemProps {
   name: string;
   /** 1:1 PM with a bot: BOT tag after the name. */
   bot?: boolean;
+  /** 1:1 PM with the official account: OFFICIAL tag after the name. */
+  system?: boolean;
   /** Optional subtitle (e.g. custom status or @username) */
   subtitle?: string;
   href?: string;
@@ -122,6 +125,7 @@ const ConvItem: Component<ConvItemProps> = (props) => {
         >
           <span class="min-w-0 truncate">{props.name}</span>
           <BotTag bot={props.bot} size="xs" class="ms-0" />
+          <OfficialTag system={props.system} size="xs" class="ms-0" />
           <Show when={props.muted}>
             <i class="fa-solid fa-bell-slash shrink-0 text-[10px] text-muted-foreground/70" aria-hidden="true" />
           </Show>
@@ -257,6 +261,7 @@ export const RoomsBar: Component = () => {
                   <ConvItem
                     name={roomDisplayName(room, currentUserId())}
                     bot={!isGroup() && otherParticipant()?.bot === true}
+                    system={!isGroup() && otherParticipant()?.system === true}
                     subtitle={!isGroup() ? subtitle() : undefined}
                     href={`/rooms/${room.id}`}
                     roomId={room.id}

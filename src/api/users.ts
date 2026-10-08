@@ -24,6 +24,8 @@ export interface MeResponse {
   accent_color?: string;
   public_flags?: number;
   bot?: boolean;
+  /** The instance's official account. */
+  system?: boolean;
   /** When the account was created - a space's verification level can require a minimum age. */
   created_at?: string;
   presence?: unknown;
