@@ -9,6 +9,9 @@ import {
 } from '../api/threads';
 import { upsertSpaceRoomFromPayload } from '../stores/spaces';
 import { translateCaughtApiError } from '../lib/formatApiError';
+import { messagePreviewText } from './messageList';
+import { spaceMembers } from '../stores/spaceMembers';
+import { auth } from '../stores/auth';
 import { Button } from './ui/Button';
 import { Checkbox } from './ui/Checkbox';
 import { Input } from './ui/Input';
@@ -69,7 +72,9 @@ export const CreateThreadModal: Component<CreateThreadModalProps> = (props) => {
 
   async function handleSubmit(e: Event) {
     e.preventDefault();
-    const n = name().trim();
+    // A name is plain text: resolve any mention or emoji syntax typed or pasted into it the
+    // way a preview does, so `<#id>` becomes `#room` instead of staying unparsed.
+    const n = messagePreviewText(name().trim(), spaceMembers.bySpaceId[props.spaceId] ?? [], auth.user?.id, 1000).slice(0, MAX_THREAD_NAME_LENGTH).trim();
     if (!n) {
       setError(t('threads.nameRequired'));
       return;

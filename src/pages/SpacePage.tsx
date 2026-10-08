@@ -1,6 +1,6 @@
 import { RoomThreadsPanel } from '../components/room/RoomThreadsPanel';
 import { CreateThreadModal } from '../components/CreateThreadModal';
-import { deleteThread, joinThread, leaveThread, updateThread } from '../api/threads';
+import { MAX_THREAD_NAME_LENGTH, deleteThread, joinThread, leaveThread, updateThread } from '../api/threads';
 import { getMessage, type Message as ApiMessage } from '../api/messages';
 import { decryptServerMessages } from '../stores/messages';
 import type { ContextMenuItem } from '../stores/contextMenu';
@@ -647,7 +647,10 @@ const SpacePage: Component = () => {
     }
   }
   function handleCreateThread(msg: DecryptedMessage) {
-    setCreateThreadFor({ starter: { id: msg.id, preview: getMessageBodyText(msg).slice(0, 100) } });
+    // The suggested name is the message as people read it - mentions and emoji resolved,
+    // markdown stripped - never the wire form (`<#id>` would sit in the name verbatim).
+    const preview = messagePreviewText(getMessageBodyText(msg), visibleMembers(), auth.user?.id, MAX_THREAD_NAME_LENGTH);
+    setCreateThreadFor({ starter: { id: msg.id, preview } });
   }
   function openThread(threadId: string) {
     setThreadsOpen(false);
@@ -666,7 +669,7 @@ const SpacePage: Component = () => {
       try {
         const raw = (await getMessage(key.pid, key.mid)) as unknown as ApiMessage;
         const [m] = await decryptServerMessages([raw]);
-        return m ? getMessageBodyText(m) : null;
+        return m ? messagePreviewText(getMessageBodyText(m), visibleMembers(), auth.user?.id, 300) : null;
       } catch {
         return null;
       }
@@ -703,7 +706,9 @@ const SpacePage: Component = () => {
         label: t('threads.rename'),
         icon: 'fa-pen',
         onClick: () => {
-          const next = window.prompt(t('threads.renamePrompt'), r.name)?.trim();
+          const typed = window.prompt(t('threads.renamePrompt'), r.name)?.trim();
+          // Same plain-text rule as the create dialog: mention syntax becomes its readable form.
+          const next = typed ? messagePreviewText(typed, visibleMembers(), auth.user?.id, 1000).slice(0, MAX_THREAD_NAME_LENGTH).trim() : '';
           if (next && next !== r.name) void updateThread(r.id, { name: next }).catch((err) => console.error('Rename thread failed:', err));
         },
       });
