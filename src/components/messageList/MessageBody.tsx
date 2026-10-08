@@ -241,6 +241,7 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
     let found: { href: string; kind: MediaKind } | null = null;
     for (const s of segments()) {
       if (s.type === 'link') {
+        if (s.suppressed) return null; // <...>: the author asked for no embed
         if (mediaKind(s.href) !== 'gif' || found) return null; // not a lone GIF
         found = { href: s.href, kind: 'gif' };
       } else if (s.type === 'text' && s.content.trim() === '') {
@@ -312,7 +313,9 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
         }
         if (seg.type === 'link') {
           const href = seg.href;
-          const inviteCode = extractSpaceInviteCodeFromUrl(href);
+          // <https://…>: the author suppressed this link's embed, so it stays a bare link -
+          // no invite card, no inline image or video, no preview below it.
+          const inviteCode = seg.suppressed ? null : extractSpaceInviteCodeFromUrl(href);
           if (inviteCode) {
             return (
               <div class="block max-w-full my-1.5 space-y-1.5">
@@ -353,7 +356,7 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
           // A media link (GIF/image/video): keep the link and add the media (or, if the URL
           // turns out to be an HTML page, a preview card) below it. A message that is only a
           // GIF is handled by loneGif above and shows just the animation.
-          const kind = mediaKind(href);
+          const kind = seg.suppressed ? null : mediaKind(href);
           if (kind) {
             return (
               <div class="block max-w-full my-1.5 space-y-1.5">

@@ -20,7 +20,9 @@ export type MessageSegment =
   | { type: 'text'; content: string }
   | { type: 'code'; content: string }
   | { type: 'codeBlock'; lang: string; content: string }
-  | { type: 'link'; href: string; text: string }
+  /** `suppressed` is Discord's <https://example.com>: still a link, but no preview card,
+   * no inline image or video, and no invite card either. */
+  | { type: 'link'; href: string; text: string; suppressed?: boolean }
   | { type: 'mention'; userId: string }
   | { type: 'roleMention'; roleId: string }
   | { type: 'channelMention'; roomId: string }
@@ -192,6 +194,18 @@ function parseInline(text: string): MessageSegment[] {
       if (safe) {
         out.push({ type: 'link', href: safe, text: mdLink[1]! || safe });
         i += mdLink[0]!.length;
+        continue;
+      }
+    }
+
+    // <https://example.com>: the author asking for no embed. The brackets are not shown;
+    // everything that would normally unfurl this link checks the flag instead.
+    const wrapped = rest.match(/^<((?:https?:\/\/|www\.)[^\s<>]+)>/i);
+    if (wrapped) {
+      const safe = sanitizeHref(wrapped[1]!);
+      if (safe) {
+        out.push({ type: 'link', href: safe, text: wrapped[1]!, suppressed: true });
+        i += wrapped[0]!.length;
         continue;
       }
     }

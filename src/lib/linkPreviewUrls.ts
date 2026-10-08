@@ -17,7 +17,7 @@ export function previewUrlsFor(text: string): string[] {
   const out: string[] = [];
   // Walks into blocks and styling too: a link inside a quote or a bold run is still a link.
   walkSegments(parseMessageContent(text), (node) => {
-    if (node.type !== 'link' || out.length >= MAX_PREVIEWS_PER_MESSAGE) return;
+    if (node.type !== 'link' || node.suppressed || out.length >= MAX_PREVIEWS_PER_MESSAGE) return;
     if (mediaKind(node.href) || extractSpaceInviteCodeFromUrl(node.href)) return;
     if (!/^https?:\/\//i.test(node.href) || seen.has(node.href)) return;
     seen.add(node.href);
