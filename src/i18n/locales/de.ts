@@ -1351,6 +1351,11 @@ export default {
     tooMany: 'Zu viele Meldungen in kurzer Zeit. Warte eine Minute und versuch es erneut.',
   },
   discover: {
+    hostedOn: 'Auf {{domain}} zu Hause',
+    scope: {
+      all: 'Alle Instanzen',
+      local: 'Diese Instanz',
+    },
     title: 'Entdecken',
     subtitle: 'Spaces und Bots dieser Instanz, die gefunden werden möchten. Administratoren prüfen jeden Eintrag.',
     tabs: {
@@ -1370,6 +1375,8 @@ export default {
     loadFailed: 'Entdecken konnte nicht geladen werden.',
     joinFailed: 'Diesem Space konnte nicht beigetreten werden.',
     listing: {
+      federate: 'Auch auf anderen Instanzen zeigen',
+      federateHint: 'Instanzen, die mit dieser föderieren, können diesen Space auf ihrer eigenen Discover-Seite zeigen. Schalte es aus, um nur hier gefunden zu werden.',
       title: 'Entdecken',
       intro: 'Bitte darum, auf der Entdecken-Seite dieser Instanz zu erscheinen, wo dich jeder hier finden und beitreten kann. Ein Administrator prüft jeden Eintrag.',
       statusNone: 'Nicht eingetragen',

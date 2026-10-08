@@ -21,6 +21,9 @@ export interface DiscoverListing {
   reviewed_at?: string;
   /** The administrator's word to the applicant (why it was declined or removed). */
   note?: string;
+  /** Whether this listing is also shown on the Discover page of instances that federate
+   * with this one. On by default; the space's managers decide. */
+  federate?: boolean;
 }
 
 export interface DiscoverUser {
@@ -32,6 +35,9 @@ export interface DiscoverUser {
 }
 
 export interface DiscoverSpaceCard {
+  /** Set when another instance hosts and lists this space; `id` is then that instance's
+   * id for it, which is only meaningful together with this domain. */
+  origin_domain?: string;
   id: string;
   name: string;
   name_acronym: string;
@@ -60,6 +66,8 @@ export interface DiscoverEntry extends DiscoverListing {
 export interface ListingInput {
   tagline: string;
   tags: string[];
+  /** Left out, the listing keeps whatever it said (a new one is shared). */
+  federate?: boolean;
 }
 
 export const DISCOVER_TAGLINE_MAX = 140;
@@ -75,9 +83,12 @@ export function listDiscoverBots(q = '') {
   return api<DiscoverEntry[]>(withQuery('/discover/bots', q));
 }
 
-/** Join a listed space without an invite. */
-export function joinDiscoverSpace(spaceId: string) {
-  return api<{ id: string; name: string }>(`/discover/spaces/${encodeURIComponent(spaceId)}/join`, { method: 'POST' });
+/** Join a listed space without an invite. A space listed by another instance is addressed
+ * as `id@domain`, the same shape an invite code takes when it crosses instances; the reply
+ * carries this instance's own id for the space it mirrored. */
+export function joinDiscoverSpace(spaceId: string, originDomain?: string) {
+  const ref = originDomain ? `${spaceId}@${originDomain}` : spaceId;
+  return api<{ id: string; name: string }>(`/discover/spaces/${encodeURIComponent(ref)}/join`, { method: 'POST' });
 }
 
 // ---- the applicant's side (Manage Space, or the application's owner) ----

@@ -1359,6 +1359,11 @@ export default {
     tooMany: 'Trop de signalements en peu de temps. Attendez une minute et réessayez.',
   },
   discover: {
+    hostedOn: 'Hébergé sur {{domain}}',
+    scope: {
+      all: 'Toutes les instances',
+      local: 'Cette instance',
+    },
     title: 'Découvrir',
     subtitle: 'Les espaces et les bots de cette instance qui ont demandé à être trouvés. Les administrateurs examinent chaque demande.',
     tabs: {
@@ -1379,6 +1384,8 @@ export default {
     loadFailed: 'Impossible de charger Découvrir.',
     joinFailed: 'Impossible de rejoindre cet espace.',
     listing: {
+      federate: 'Afficher aussi sur les autres instances',
+      federateHint: "Les instances fédérées avec celle-ci peuvent montrer cet espace sur leur propre page Discover. Désactivez pour n'être trouvé qu'ici.",
       title: 'Découvrir',
       intro: 'Demandez à figurer sur la page Découvrir de cette instance, où n\'importe qui peut vous trouver et vous rejoindre. Un administrateur examine chaque demande.',
       statusNone: 'Non référencé',

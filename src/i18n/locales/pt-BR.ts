@@ -1359,6 +1359,11 @@ export default {
     tooMany: 'Muitas denúncias em pouco tempo. Espere um minuto e tente de novo.',
   },
   discover: {
+    hostedOn: 'Hospedado em {{domain}}',
+    scope: {
+      all: 'Todas as instâncias',
+      local: 'Esta instância',
+    },
     title: 'Descobrir',
     subtitle: 'Espaços e bots desta instância que pediram para ser encontrados. Os administradores revisam cada listagem.',
     tabs: {
@@ -1379,6 +1384,8 @@ export default {
     loadFailed: 'Não foi possível carregar o Descobrir.',
     joinFailed: 'Não foi possível entrar nesse espaço.',
     listing: {
+      federate: 'Mostrar também em outras instâncias',
+      federateHint: 'Instâncias federadas com esta podem mostrar este espaço na própria página do Discover. Desative para ser encontrado só aqui.',
       title: 'Descobrir',
       intro: 'Peça para aparecer na página Descobrir desta instância, onde qualquer pessoa pode encontrar e entrar. Um administrador revisa cada listagem.',
       statusNone: 'Não listado',

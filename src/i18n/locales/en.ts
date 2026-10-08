@@ -1354,6 +1354,11 @@ export default {
     tooMany: 'Too many reports in a short time. Wait a minute and try again.',
   },
   discover: {
+    hostedOn: 'Hosted on {{domain}}',
+    scope: {
+      all: 'All instances',
+      local: 'This instance',
+    },
     title: 'Discover',
     subtitle: 'Spaces and bots on this instance that asked to be found. Administrators review every listing.',
     tabs: {
@@ -1373,6 +1378,8 @@ export default {
     loadFailed: 'Could not load Discover.',
     joinFailed: 'Could not join that space.',
     listing: {
+      federate: 'Show on other instances too',
+      federateHint: 'Instances that federate with this one can show this space on their own Discover page. Turn it off to be found here only.',
       title: 'Discover',
       intro: 'Ask to be shown on this instance\'s Discover page, where anyone here can find and join. An administrator reviews every listing.',
       statusNone: 'Not listed',

@@ -41,9 +41,13 @@ const DiscoverPage: Component = () => {
   const [error, setError] = createSignal('');
 
   const q = createMemo(() => query().trim().toLowerCase());
+  /** Spaces from the instances we federate with share the page; this narrows it to ours. */
+  const [scope, setScope] = createSignal<'all' | 'local'>('all');
+  const anyRemote = createMemo(() => (spaceList() ?? []).some((e) => e.space?.origin_domain));
   const visible = createMemo(() => {
     const list = (tab() === 'spaces' ? spaceList() : botList()) ?? [];
-    return list.filter((e) => matches(e, q()));
+    const scoped = tab() === 'spaces' && scope() === 'local' ? list.filter((e) => !e.space?.origin_domain) : list;
+    return scoped.filter((e) => matches(e, q()));
   });
   const loading = () => (tab() === 'spaces' ? spaceList.loading : botList.loading);
   const failed = () => (tab() === 'spaces' ? spaceList.error : botList.error);
@@ -52,14 +56,16 @@ const DiscoverPage: Component = () => {
   async function join(e: DiscoverEntry) {
     const card = e.space;
     if (!card) return;
-    if (isMember(card.id)) {
+    // A space from another instance is only ours once we mirror it, so "already a member"
+    // is answered by the local id the join hands back, never by the origin's id.
+    if (!card.origin_domain && isMember(card.id)) {
       navigate(`/spaces/${card.id}`);
       return;
     }
     setJoining(card.id);
     setError('');
     try {
-      const joined = await joinDiscoverSpace(card.id);
+      const joined = await joinDiscoverSpace(card.id, card.origin_domain);
       addOrUpdateSpace(await getSpace(joined.id));
       navigate(`/spaces/${joined.id}`);
     } catch (err) {
@@ -109,6 +115,17 @@ const DiscoverPage: Component = () => {
       <div class="flex min-h-0 flex-1 flex-col overflow-y-auto">
         <div class="mx-auto w-full max-w-5xl space-y-4 p-4">
           <p class="text-sm text-muted-foreground">{t('discover.subtitle')}</p>
+          <Show when={tab() === 'spaces' && anyRemote()}>
+            <Tabs<'all' | 'local'>
+              size="sm"
+              value={scope()}
+              onChange={setScope}
+              items={[
+                { id: 'all', label: t('discover.scope.all') },
+                { id: 'local', label: t('discover.scope.local') },
+              ]}
+            />
+          </Show>
           <Input
             value={query()}
             placeholder={t('discover.search')}
@@ -150,6 +167,13 @@ const DiscoverPage: Component = () => {
                               </div>
                               <div class="min-w-0">
                                 <h2 class="truncate text-sm font-semibold text-foreground">{card().name}</h2>
+                                <Show when={card().origin_domain}>
+                                  {(domain) => (
+                                    <p class="truncate text-[11px] text-primary" title={t('discover.hostedOn', { domain: domain() })}>
+                                      <i class="fa-solid fa-globe text-[10px]" aria-hidden="true" /> {domain()}
+                                    </p>
+                                  )}
+                                </Show>
                                 <p class="text-xs text-muted-foreground">
                                   <span class="inline-block size-2 rounded-full bg-emerald-500 align-middle" aria-hidden="true" /> {t('discover.online', { count: card().online_count })} · {t('discover.members', { count: card().member_count })}
                                 </p>

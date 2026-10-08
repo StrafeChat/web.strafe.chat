@@ -4,6 +4,7 @@ import { DISCOVER_TAGLINE_MAX, DISCOVER_TAGS_MAX, parseTags, type DiscoverListin
 import { translateCaughtApiError } from '../../lib/formatApiError';
 import { confirmDialog } from '../../stores/confirmDialog';
 import { Button } from '../ui/Button';
+import { Checkbox } from '../ui/Checkbox';
 import { Input } from '../ui/Input';
 import { settingsGroupFrame, settingsSectionTitle } from './settingsChrome';
 import { formatDate, t } from '../../i18n';
@@ -34,6 +35,8 @@ export const DiscoverListingForm: Component<Props> = (props) => {
   const [loading, setLoading] = createSignal(true);
   const [tagline, setTagline] = createSignal('');
   const [tags, setTags] = createSignal('');
+  /** Also show this listing on the Discover page of instances we federate with. */
+  const [federate, setFederate] = createSignal(true);
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal('');
 
@@ -41,6 +44,8 @@ export const DiscoverListingForm: Component<Props> = (props) => {
     setListing(l);
     setTagline(l?.tagline ?? '');
     setTags((l?.tags ?? []).join(', '));
+    // A listing from before this setting existed, and a brand new one, are both shared.
+    setFederate(l?.federate ?? true);
   }
 
   onMount(async () => {
@@ -73,7 +78,7 @@ export const DiscoverListingForm: Component<Props> = (props) => {
     setBusy(true);
     setError('');
     try {
-      seed(await props.apply({ tagline: tagline().trim(), tags: parsedTags() }));
+      seed(await props.apply({ tagline: tagline().trim(), tags: parsedTags(), federate: federate() }));
     } catch (err) {
       setError(translateCaughtApiError(err, t).join(' ') || t('discover.listing.saveFailed'));
     } finally {
@@ -153,6 +158,13 @@ export const DiscoverListingForm: Component<Props> = (props) => {
               />
               <p class="mt-1 text-xs text-muted-foreground">{t('discover.listing.tagsHint')}</p>
             </div>
+            <Checkbox
+              checked={federate()}
+              disabled={busy()}
+              onChange={setFederate}
+              label={t('discover.listing.federate')}
+              description={t('discover.listing.federateHint')}
+            />
             <Show when={error()}>
               <p class="text-sm text-destructive" role="alert">{error()}</p>
             </Show>
