@@ -17,6 +17,7 @@ import { isRoomMuted } from './roomNotify';
 import type { Relationship } from '../api/relationships';
 
 const ROOM_TYPE_TEXT = 3;
+const ROOM_TYPE_THREAD = 6;
 
 export interface NotificationItem {
   roomId: string;
@@ -71,7 +72,7 @@ export function notificationItems(): NotificationItem[] {
 
   for (const space of spaces.spaces) {
     for (const room of spaces.spaceRoomsBySpaceId[space.id] ?? []) {
-      if (room.type !== ROOM_TYPE_TEXT) continue;
+      if (room.type !== ROOM_TYPE_TEXT && room.type !== ROOM_TYPE_THREAD) continue;
       // The rooms store copy carries this user's own mute/notify settings.
       const stored = rooms.rooms.find((r) => r.id === room.id);
       if (isRoomMuted(stored ?? room)) continue;

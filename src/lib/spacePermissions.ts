@@ -29,6 +29,15 @@ export const PermUseVAD = 1 << 21;
 export const PermPrioritySpeaker = 1 << 22;
 /** Appended after voice (bit positions are permanent): upload files and images with a message. */
 export const PermAttachFiles = 1 << 23;
+/** Threads (bits 24-27, Discord's four): Send Messages does not grant sending in a thread -
+ * Send Messages In Threads does; Manage Threads edits, archives, locks and deletes any
+ * thread and sees private ones. A thread otherwise takes its channel's permissions. */
+export const PermCreatePublicThreads = 1 << 24;
+export const PermCreatePrivateThreads = 1 << 25;
+export const PermSendMessagesInThreads = 1 << 26;
+export const PermManageThreads = 1 << 27;
+export const AllThreadsPermMask =
+  PermCreatePublicThreads | PermCreatePrivateThreads | PermSendMessagesInThreads | PermManageThreads;
 
 export const AllVoicePermMask =
   PermConnect |
@@ -91,6 +100,10 @@ export const SPACE_ROLE_PERM_GROUPS: { category: string; rows: PermRow[] }[] = [
     row(PermUseExternalEmojis, 'useExternalEmojis'),
     row(PermMentionEveryone, 'mentionEveryone'),
     row(PermManageMessages, 'manageMessages'),
+    row(PermCreatePublicThreads, 'createPublicThreads'),
+    row(PermCreatePrivateThreads, 'createPrivateThreads'),
+    row(PermSendMessagesInThreads, 'sendMessagesInThreads'),
+    row(PermManageThreads, 'manageThreads'),
   ]),
   group('voice', [
     row(PermConnect, 'connect'),
@@ -118,6 +131,10 @@ export const ROOM_OVERRIDE_PERM_ROWS: PermRow[] = [
   row(PermUseExternalEmojis, 'useExternalEmojis', 'roomRows'),
   row(PermMentionEveryone, 'mentionEveryone', 'roomRows'),
   row(PermManageMessages, 'manageMessages', 'roomRows'),
+  row(PermCreatePublicThreads, 'createPublicThreads', 'roomRows'),
+  row(PermCreatePrivateThreads, 'createPrivateThreads', 'roomRows'),
+  row(PermSendMessagesInThreads, 'sendMessagesInThreads', 'roomRows'),
+  row(PermManageThreads, 'manageThreads', 'roomRows'),
 ];
 
 /** Overrides that apply to a voice room: viewing it, plus every voice bit. */
@@ -197,6 +214,7 @@ export const AllRoomPermMask =
   PermMentionEveryone |
   PermManageMessages |
   PermAttachFiles |
+  AllThreadsPermMask |
   AllVoicePermMask;
 
 /** Discord-style overwrite stack (same as permissions.ApplyOverwrites). */
@@ -302,6 +320,7 @@ export function applyImplicitRoomRules(perms: number): number {
 export function channelOverridesSource(
   room:
     | {
+        type?: number;
         permission_overrides?: SpaceRoomOverride[];
         user_overrides?: SpaceRoomUserOverride[];
         permissions_synced?: boolean;
@@ -309,10 +328,23 @@ export function channelOverridesSource(
       }
     | undefined,
   allRooms:
-    | { id: string; permission_overrides?: SpaceRoomOverride[]; user_overrides?: SpaceRoomUserOverride[] }[]
+    | {
+        id: string;
+        type?: number;
+        permission_overrides?: SpaceRoomOverride[];
+        user_overrides?: SpaceRoomUserOverride[];
+        permissions_synced?: boolean;
+        parent_id?: string;
+      }[]
     | undefined
 ): { overrides: SpaceRoomOverride[] | undefined; userOverrides: SpaceRoomUserOverride[] | undefined } {
   if (!room) return { overrides: undefined, userOverrides: undefined };
+  // A thread has no overrides of its own: it resolves through its channel, and the channel
+  // through its section when synced - Discord's rule, mirrored by the server's snapshot.
+  if (room.type === 6 && room.parent_id && allRooms) {
+    const parent = allRooms.find((r) => r.id === room.parent_id);
+    if (parent) return channelOverridesSource(parent, allRooms);
+  }
   if (room.permissions_synced && room.parent_id && allRooms) {
     const parent = allRooms.find((r) => r.id === room.parent_id);
     if (parent) return { overrides: parent.permission_overrides, userOverrides: parent.user_overrides };

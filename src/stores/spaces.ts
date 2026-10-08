@@ -1,3 +1,4 @@
+import { auth } from './auth';
 import { createStore, produce } from 'solid-js/store';
 import {
   getSpaceRooms,
@@ -8,8 +9,10 @@ import {
   type SpaceRoom,
   type SpaceRoomOverride,
   type SpaceRoomUserOverride,
+  type ThreadInfo,
 } from '../api/spaces';
 import { onStargateEvent } from '../services/stargate/client';
+import { getThread } from '../api/threads';
 import { removeRoom } from './rooms';
 import { registerRoomIdentity } from './federationIds';
 import { setReadStateFromRoom } from './readState';
@@ -356,6 +359,7 @@ function spaceRoomFromReady(d: Record<string, unknown>): SpaceRoom | null {
   const permission_overrides = overridesFromPayload(d.permission_overrides);
   const user_overrides = userOverridesFromPayload(d.user_overrides);
   const federation = federationFromPayload(d.federation);
+  const thread = threadFromPayload(d.thread);
   // The E2EE engine keys a federated channel's sessions by its global identity.
   if (federation) registerRoomIdentity({ id, federation });
   return {
@@ -370,6 +374,7 @@ function spaceRoomFromReady(d: Record<string, unknown>): SpaceRoom | null {
     ...(typeof d.permissions_synced === 'boolean' && { permissions_synced: d.permissions_synced }),
     ...(typeof d.user_limit === 'number' && { user_limit: d.user_limit }),
     ...(typeof d.bitrate === 'number' && { bitrate: d.bitrate }),
+    ...(thread ? { thread } : {}),
     ...(permission_overrides ? { permission_overrides } : {}),
     ...(user_overrides ? { user_overrides } : {}),
     created_at,
@@ -380,6 +385,65 @@ function spaceRoomFromReady(d: Record<string, unknown>): SpaceRoom | null {
     ...(d.last_read_message_id != null && { last_read_message_id: String(d.last_read_message_id) }),
     ...(typeof d.mention_count === 'number' && { mention_count: d.mention_count }),
   };
+}
+
+/** The `thread` block of a thread room, or null when absent. */
+function threadFromPayload(raw: unknown): ThreadInfo | null {
+  if (!raw || typeof raw !== 'object') return null;
+  const t = raw as Record<string, unknown>;
+  return {
+    archived: t.archived === true,
+    ...(typeof t.archived_at === 'string' ? { archived_at: t.archived_at } : {}),
+    locked: t.locked === true,
+    private: t.private === true,
+    invitable: t.invitable !== false,
+    auto_archive_minutes: typeof t.auto_archive_minutes === 'number' ? t.auto_archive_minutes : 1440,
+    owner_id: t.owner_id != null ? String(t.owner_id) : '',
+    ...(t.starter_message_id != null ? { starter_message_id: String(t.starter_message_id) } : {}),
+    ...(typeof t.last_active_at === 'string' ? { last_active_at: t.last_active_at } : {}),
+    message_count: typeof t.message_count === 'number' ? t.message_count : 0,
+    member_count: typeof t.member_count === 'number' ? t.member_count : 0,
+    joined: t.joined === true,
+  };
+}
+
+/** Normalize a raw room record from any API response (same shape as READY space_rooms). */
+export function spaceRoomFromPayload(d: Record<string, unknown>): SpaceRoom | null {
+  return spaceRoomFromReady(d);
+}
+
+function upsertSpaceRoom(spaceId: string, room: SpaceRoom): void {
+  setSpaces('spaceRoomsBySpaceId', spaceId, (list) => {
+    const current = list ?? [];
+    if (current.some((r) => r.id === room.id)) return current.map((r) => (r.id === room.id ? { ...r, ...room } : r));
+    return [...current, room];
+  });
+}
+
+/** Normalize a raw room record and put it in the store (a thread just created or fetched). */
+export function upsertSpaceRoomFromPayload(spaceId: string, raw: Record<string, unknown>): SpaceRoom | null {
+  const room = spaceRoomFromReady(raw);
+  if (room) upsertSpaceRoom(spaceId, room);
+  return room;
+}
+
+/** Keep a thread's message_count in step with messages arriving and going. */
+export function bumpThreadMessageCount(roomId: string, delta: number): void {
+  setSpaces('spaceRoomsBySpaceId', (bySpaceId) => {
+    const next: Record<string, SpaceRoom[]> = {};
+    let changed = false;
+    for (const [sid, list] of Object.entries(bySpaceId)) {
+      let listChanged = false;
+      const updated = list.map((r) => {
+        if (r.id !== roomId || !r.thread) return r;
+        listChanged = true;
+        return { ...r, thread: { ...r.thread, message_count: Math.max(0, r.thread.message_count + delta) } };
+      });
+      next[sid] = listChanged ? updated : list;
+      changed = changed || listChanged;
+    }
+    return changed ? next : bySpaceId;
+  });
 }
 
 // ---- realtime -------------------------------------------------------------------------------
@@ -486,6 +550,78 @@ export function initSpaceHandlers(): () => void {
         const roomID = d.room_id != null ? String(d.room_id) : null;
         if (!roomID) return;
         setSpaces('spaceRoomsBySpaceId', spaceID, (list) => (list ?? []).filter((r) => r.id !== roomID));
+        return;
+      }
+      // Threads (Discord's THREAD_* events): a thread is a room of type 6 in this same list.
+      case 'THREAD_CREATE': {
+        const room = spaceRoomFromReady(d);
+        if (!room) return;
+        // A fresh thread's broadcast carries the creator's view and nobody else is in it yet
+        // (Discord's newly_created); a THREAD_CREATE sent to one person - on being added to
+        // a private thread - already describes that person's own membership.
+        if (room.thread && d.newly_created === true) {
+          room.thread = { ...room.thread, joined: room.thread.owner_id === auth.user?.id };
+        }
+        upsertSpaceRoom(spaceID, room);
+        return;
+      }
+      case 'THREAD_UPDATE': {
+        const roomID = d.room_id != null ? String(d.room_id) : d.id != null ? String(d.id) : null;
+        if (!roomID) return;
+        const incoming = threadFromPayload(d.thread);
+        patchRoom(spaceID, roomID, (r) => ({
+          ...r,
+          ...(typeof d.name === 'string' ? { name: d.name } : {}),
+          ...(typeof d.slowmode_seconds === 'number' ? { slowmode_seconds: d.slowmode_seconds } : {}),
+          // Membership is per viewer and does not ride on this broadcast: keep what we know.
+          ...(incoming ? { thread: { ...incoming, joined: r.thread?.joined ?? false } } : {}),
+          ...(d.updated_at != null ? { updated_at: String(d.updated_at) } : {}),
+        }));
+        return;
+      }
+      case 'THREAD_DELETE': {
+        const roomID = d.room_id != null ? String(d.room_id) : null;
+        if (!roomID) return;
+        setSpaces('spaceRoomsBySpaceId', spaceID, (list) => (list ?? []).filter((r) => r.id !== roomID));
+        return;
+      }
+      case 'THREAD_MEMBERS_UPDATE': {
+        const roomID = d.room_id != null ? String(d.room_id) : null;
+        if (!roomID) return;
+        const me = auth.user?.id;
+        const added = Array.isArray(d.added_members)
+          ? (d.added_members as { user_id?: unknown }[]).map((m) => (m?.user_id != null ? String(m.user_id) : ''))
+          : [];
+        const removed = Array.isArray(d.removed_member_ids) ? (d.removed_member_ids as unknown[]).map((x) => String(x)) : [];
+        const count = typeof d.member_count === 'number' ? d.member_count : undefined;
+        patchRoom(spaceID, roomID, (r) =>
+          r.thread
+            ? {
+                ...r,
+                thread: {
+                  ...r.thread,
+                  ...(count !== undefined ? { member_count: count } : {}),
+                  ...(me && added.includes(me) ? { joined: true } : {}),
+                  ...(me && removed.includes(me) ? { joined: false } : {}),
+                },
+              }
+            : r
+        );
+        return;
+      }
+      case 'THREAD_MEMBER_UPDATE': {
+        const roomID = d.room_id != null ? String(d.room_id) : null;
+        if (!roomID) return;
+        const known = spaces.spaceRoomsBySpaceId[spaceID]?.some((r) => r.id === roomID);
+        if (!known && d.joined === true) {
+          // Joined a thread this client has never seen (added while offline, or a private one
+          // whose THREAD_CREATE was missed): fetch it rather than patch nothing.
+          void getThread(roomID)
+            .then((raw) => upsertSpaceRoomFromPayload(spaceID, raw))
+            .catch((err) => console.error('Loading joined thread failed:', err));
+          return;
+        }
+        patchRoom(spaceID, roomID, (r) => (r.thread ? { ...r, thread: { ...r.thread, joined: d.joined === true } } : r));
         return;
       }
       default:
@@ -611,7 +747,11 @@ export function updateSpaceRoomLastMessage(roomId: string, messageId: string): v
         if (r.id !== roomId) return r;
         if (r.last_message_id === messageId) return r;
         listChanged = true;
-        return { ...r, last_message_id: messageId };
+        return {
+          ...r,
+          last_message_id: messageId,
+          ...(r.thread ? { thread: { ...r.thread, message_count: r.thread.message_count + 1 } } : {}),
+        };
       });
       next[sid] = listChanged ? updated : list;
       changed = changed || listChanged;

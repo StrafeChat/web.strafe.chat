@@ -1,3 +1,4 @@
+import type { SpaceRoom } from '../../api/spaces';
 import type { Component } from 'solid-js';
 import { incomingFriendRequests } from '../../lib/mobileNotifications';
 import { createSignal, For, Show } from 'solid-js';
@@ -214,6 +215,7 @@ export const SpaceBar: Component = () => {
       type: r.type,
       name: r.name ?? '',
       topic: r.topic,
+      thread: undefined as SpaceRoom['thread'],
       position: r.position ?? 0,
       parent_id: r.parent_id,
       last_message_id: r.last_message_id,
@@ -236,7 +238,8 @@ export const SpaceBar: Component = () => {
     const viewing = activeRoomId();
     let total = 0;
     for (const r of roomList) {
-      if (r.type === 3 && r.id !== viewing) {
+      // Threads count once joined (Discord: unjoined threads never light the space up).
+      if ((r.type === 3 || (r.type === 6 && r.thread?.joined)) && r.id !== viewing) {
         const roomMeta = rooms.rooms.find((x) => x.id === r.id) ?? r;
         const list = messages.byRoom[r.id] ?? [];
         total += getUnreadCountForDisplay(r.id, { ...roomMeta, space_id: roomMeta.space_id ?? spaceId }, list, uid);
@@ -250,10 +253,10 @@ export const SpaceBar: Component = () => {
     if (!currentUserId()) return 0;
     const roomIds = new Set<string>();
     for (const r of spaces.spaceRoomsBySpaceId[spaceId] ?? []) {
-      if (r.type === 3) roomIds.add(r.id);
+      if (r.type === 3 || (r.type === 6 && r.thread?.joined)) roomIds.add(r.id);
     }
     for (const r of rooms.rooms) {
-      if (r.space_id === spaceId && r.type === 3) roomIds.add(r.id);
+      if (r.space_id === spaceId && (r.type === 3 || r.type === 6)) roomIds.add(r.id);
     }
     let total = 0;
     for (const id of roomIds) {

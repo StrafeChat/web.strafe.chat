@@ -1,3 +1,5 @@
+import { MessageThreadFooter } from './messageList/MessageThreadFooter';
+import type { ThreadIntroInfo } from './messageList/MessageListIntro';
 import type { Component } from 'solid-js';
 import { createEffect, createMemo, createSignal, For, Show, on, onCleanup, onMount, untrack } from 'solid-js';
 import { Portal } from 'solid-js/web';
@@ -108,6 +110,11 @@ export interface MessageListProps {
   canReply?: boolean;
   /** When false, Pin message is omitted. Default true (DMs / non-space rooms). */
   canManageMessages?: boolean;
+  /** Space text channels: offers "Create thread" on a message (omitted in threads and for
+   * members without Create Public Threads). */
+  onCreateThread?: (message: DecryptedMessage) => void;
+  /** Threads: who started it and the starter message, for the intro. */
+  threadIntro?: ThreadIntroInfo;
   /** When false, adding a new reaction is disabled (existing reactions still show, and the
    * viewer can still remove their own). Default true (DMs / non-space rooms). */
   canReact?: boolean;
@@ -903,6 +910,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
             pmOther={pmOther()}
             isNotes={!!isNotes()}
             e2eeEnabled={props.e2eeEnabled}
+            thread={props.threadIntro}
           />
         </Show>
         <HistoryEdge
@@ -1030,6 +1038,15 @@ export const MessageList: Component<MessageListProps> = (props) => {
                               label: t('messages.actions.reply'),
                               icon: 'fa-reply',
                               onClick: () => props.onReply?.(msg),
+                            },
+                          ]
+                        : []),
+                      ...(props.onCreateThread && !msg.thread_id
+                        ? [
+                            {
+                              label: t('threads.createFromMessage'),
+                              icon: 'fa-comments',
+                              onClick: () => props.onCreateThread?.(msg),
                             },
                           ]
                         : []),
@@ -1220,6 +1237,9 @@ export const MessageList: Component<MessageListProps> = (props) => {
                     <Show when={msg.attachments?.length}>
                       <MessageAttachments attachments={msg.attachments!} />
                     </Show>
+                    <Show when={msg.thread_id}>
+                      {(tid) => <MessageThreadFooter threadId={tid()} spaceId={props.spaceId} />}
+                    </Show>
                     <Show when={msg.reactions?.length}>
                       <MessageReactions
                         roomId={props.roomId!}
@@ -1285,6 +1305,9 @@ export const MessageList: Component<MessageListProps> = (props) => {
                     <Show when={msg.attachments?.length}>
                       <MessageAttachments attachments={msg.attachments!} />
                     </Show>
+                    <Show when={msg.thread_id}>
+                      {(tid) => <MessageThreadFooter threadId={tid()} spaceId={props.spaceId} />}
+                    </Show>
                     <Show when={msg.reactions?.length}>
                       <MessageReactions
                         roomId={props.roomId!}
@@ -1323,6 +1346,20 @@ export const MessageList: Component<MessageListProps> = (props) => {
                         onClick={(e) => {
                           e.preventDefault();
                           props.onReply?.(msg);
+                        }}
+                      />
+                    </Tooltip>
+                  </Show>
+                  <Show when={props.onCreateThread && !msg.thread_id}>
+                    <Tooltip label={t('threads.createFromMessage')} inline side="top">
+                      <IconButton
+                        size="sm"
+                        icon="fa-solid fa-comments"
+                        label={t('threads.createFromMessage')}
+                        title=""
+                        onClick={(e) => {
+                          e.preventDefault();
+                          props.onCreateThread?.(msg);
                         }}
                       />
                     </Tooltip>

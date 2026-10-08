@@ -15,6 +15,16 @@ export interface MessageListIntroProps {
   isNotes?: boolean;
   /** Space text rooms: whether messages here are end-to-end encrypted. */
   e2eeEnabled?: boolean;
+  /** Threads (room type 6): who started it and, when started from a message, what it said. */
+  thread?: ThreadIntroInfo;
+}
+
+export interface ThreadIntroInfo {
+  name: string;
+  ownerName: string;
+  private?: boolean;
+  /** The starter message's text, once loaded; null when there is none. */
+  starter?: string | null;
 }
 
 export const MessageListIntro: Component<MessageListIntroProps> = (props) => (
@@ -55,6 +65,24 @@ export const MessageListIntro: Component<MessageListIntroProps> = (props) => (
         <p class="text-base font-semibold text-foreground">{props.roomName || t('intro.groupTitle')}</p>
         <p class="text-sm text-muted-foreground mt-5">{t('intro.groupBody')}</p>
       </div>
+    </Show>
+    <Show when={props.roomType === 6 && props.thread}>
+      {(th) => (
+        <div class="flex flex-col items-center pb-6 text-center shrink-0">
+          <div class="mb-3 flex size-16 shrink-0 items-center justify-center rounded-full bg-primary/20">
+            <i class={`fa-solid ${th().private ? 'fa-lock' : 'fa-comments'} text-2xl text-foreground`} aria-hidden="true" />
+          </div>
+          <p class="text-2xl font-bold text-foreground">{th().name}</p>
+          <p class="mt-1 text-sm text-muted-foreground">{t('threads.startedBy', { name: th().ownerName })}</p>
+          <Show when={th().starter}>
+            {(text) => (
+              <blockquote class="mt-3 max-w-md rounded-xl border border-border/70 bg-muted/20 px-4 py-2.5 text-start text-sm text-foreground/90">
+                {text()}
+              </blockquote>
+            )}
+          </Show>
+        </div>
+      )}
     </Show>
     <Show when={props.roomType === 3}>
       <div class="flex flex-col items-start pb-4 shrink-0">

@@ -37,6 +37,10 @@ Add the values of the bits you need to build a mask; test a bit with `(mask & bi
 | 21 | `2097152` | Use Voice Activity | room | Talk without push-to-talk |
 | 22 | `4194304` | Priority Speaker | room | Lower everyone else while speaking |
 | 23 | `8388608` | Attach Files | room | Upload files and images with a message |
+| 24 | `16777216` | Create Public Threads | room | Start a thread anyone in the channel can see |
+| 25 | `33554432` | Create Private Threads | room | Start an invite-only thread |
+| 26 | `67108864` | Send Messages In Threads | room | Talk in threads (Send Messages alone does not grant it) |
+| 27 | `134217728` | Manage Threads | room | Rename, archive, lock and delete any thread; see private threads |
 
 New permissions are only ever appended; existing values never change meaning.
 
@@ -57,7 +61,8 @@ For a member in a space:
 2. **Space-wide mask** = `@everyone.permissions | role₁.permissions | role₂.permissions …` over the member's roles.
 3. **Administrator?** If bit 11 is set, the member has every permission in every room; stop here.
 4. **Room overrides**, applied in order to the space-wide mask for that room: the `@everyone` override, then overrides of the member's other roles (every deny first, then every allow), then the member's own user override (deny, then allow). Overrides can only touch room-scoped bits.
-5. **Two implicit rules**, the same as Discord's: without View Room the member has no permission at all in that room, whatever the bits say; and without Send Messages they cannot Attach Files or Mention @everyone either.
+5. **Threads** have no overrides of their own: a thread resolves against its channel's effective overrides (and so a synced section's), with the thread bits above on top. A private thread yields no permissions at all to anyone who is neither a member nor a Manage Threads holder.
+6. **Two implicit rules**, the same as Discord's: without View Room the member has no permission at all in that room, whatever the bits say; and without Send Messages they cannot Attach Files or Mention @everyone either.
 
 Administrator also grants every space-scoped permission for management actions (adding bots, editing the space, invites, emoji, roles, kicks and bans), though role hierarchy still applies to Administrators - only the owner is above it.
 

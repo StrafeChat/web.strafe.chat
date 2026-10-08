@@ -161,6 +161,18 @@ Room events reach every subscriber of the room; space events reach every subscri
 | `SPACE_ROOM_CREATE` | space | The new room, with overrides |
 | `SPACE_ROOM_UPDATE` | space | The room (name, topic, slowmode, position, encryption, voice limits) |
 | `SPACE_ROOM_DELETE` | space | `{"space_id", "room_id"}` |
+
+### Threads
+
+Sent space-wide when everyone can view the parent channel, otherwise only to the members who can; a private thread's events go to its members alone.
+
+| `t` | `d` |
+| --- | --- |
+| `THREAD_CREATE` | The thread room (type `6`, with its `thread` block and `parent_id`). A fresh thread's broadcast carries `newly_created: true` and the creator's `joined`; the same event goes to one person when they are added to a private thread, with their own `joined` |
+| `THREAD_UPDATE` | The thread room after a change (name, archive, lock, timer) |
+| `THREAD_DELETE` | `{"space_id", "room_id", "parent_id"}` |
+| `THREAD_MEMBERS_UPDATE` | `{"room_id", "added_members": [{"user_id", "joined_at"}], "removed_member_ids", "member_count"}` |
+| `THREAD_MEMBER_UPDATE` | To one user: `{"room_id", "joined"}` - their own membership changed |
 | `SPACE_ROOM_OVERRIDE_UPDATE` / `_DELETE` | space | `{"space_id", "room_id", "role_id", "allow", "deny"}` |
 | `SPACE_ROOM_USER_OVERRIDE_UPDATE` / `_DELETE` | space | `{"space_id", "room_id", "user_id", "allow", "deny"}` |
 | `ROOM_CREATE` | account | A PM or group PM was opened with you |

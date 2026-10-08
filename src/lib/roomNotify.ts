@@ -27,6 +27,7 @@ export interface RoomLike {
 }
 
 const ROOM_TYPE_SPACE_TEXT = 3;
+const ROOM_TYPE_THREAD = 6;
 
 /** True if the room is currently muted - indefinitely, or under a timed mute that hasn't
  * expired yet. A timed mute past its expiry reads as unmuted with no cleanup needed. */
@@ -44,7 +45,7 @@ export function effectiveNotifyMode(room: RoomLike | null | undefined): 'all' | 
   if (mode === NotifyModeAll) return 'all';
   if (mode === NotifyModeMentions) return 'mentions';
   if (mode === NotifyModeNone) return 'none';
-  if (room?.type === ROOM_TYPE_SPACE_TEXT) return notificationPrefs.spaceMode;
+  if (room?.type === ROOM_TYPE_SPACE_TEXT || room?.type === ROOM_TYPE_THREAD) return notificationPrefs.spaceMode;
   return notificationPrefs.pmMode;
 }
 

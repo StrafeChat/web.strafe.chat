@@ -1,3 +1,9 @@
+import { RoomThreadsPanel } from '../components/room/RoomThreadsPanel';
+import { CreateThreadModal } from '../components/CreateThreadModal';
+import { deleteThread, joinThread, leaveThread, updateThread } from '../api/threads';
+import { getMessage, type Message as ApiMessage } from '../api/messages';
+import { decryptServerMessages } from '../stores/messages';
+import type { ContextMenuItem } from '../stores/contextMenu';
 import type { Component } from 'solid-js';
 import {
   createMemo,
@@ -92,6 +98,10 @@ import {
   PermReadMessageHistory,
   PermUseExternalEmojis,
   PermViewChannel,
+  PermCreatePublicThreads,
+  PermCreatePrivateThreads,
+  PermSendMessagesInThreads,
+  PermManageThreads,
 } from '../lib/spacePermissions';
 import { instance } from '../stores/instance';
 import { VoiceStage } from '../components/voice/VoiceStage';
@@ -101,6 +111,9 @@ import { translateCaughtApiError } from '../lib/formatApiError';
 import { isApiError } from '../api/ApiError';
 
 const ROOM_TYPE_TEXT = 3;
+const ROOM_TYPE_THREAD = 6;
+/** Text channels and threads both hold a message list. */
+const isTextLike = (type: number | undefined) => type === ROOM_TYPE_TEXT || type === ROOM_TYPE_THREAD;
 const ROOM_TYPE_VOICE = 4;
 
 /** Seconds the server told us to wait (slowmode and the per-account limiter both answer
@@ -208,7 +221,7 @@ const SpacePage: Component = () => {
     const key = `${room?.id ?? ''}|${room?.type ?? ''}|${room?.e2ee_enabled ? 1 : 0}|${sid ?? ''}`;
     if (key === lastSpaceRoomSync) return;
     lastSpaceRoomSync = key;
-    if (!room || !sid || room.type !== ROOM_TYPE_TEXT) return;
+    if (!room || !sid || !isTextLike(room.type)) return;
     addOrUpdateRoom(spaceRoomToRoom(room, sid));
     lastSpaceRoom.set(sid, room.id);
   });
@@ -453,7 +466,14 @@ const SpacePage: Component = () => {
     });
   }
 
-  const isTextChannel = () => currentRoom()?.type === ROOM_TYPE_TEXT;
+  const isTextChannel = () => isTextLike(currentRoom()?.type);
+  const isThread = () => currentRoom()?.type === ROOM_TYPE_THREAD;
+  /** The channel a thread lives in. */
+  const parentRoom = createMemo(() => {
+    const r = currentRoom();
+    if (!r || r.type !== ROOM_TYPE_THREAD || !r.parent_id) return null;
+    return spaceRooms().find((x) => x.id === r.parent_id) ?? null;
+  });
   const isVoiceChannel = () => currentRoom()?.type === ROOM_TYPE_VOICE;
 
   // Space text rooms get the same composer behaviour as PMs: focused on arrival, and a
@@ -481,19 +501,19 @@ const SpacePage: Component = () => {
   // server payload): consumers stay permissive and the list is refreshed once.
   const roomOverridesRes = createMemo(() => {
     const r = currentRoom();
-    if (!r || r.type !== ROOM_TYPE_TEXT) return undefined;
+    if (!r || !isTextLike(r.type)) return undefined;
     return channelOverridesSource(r, spaceRooms()).overrides;
   });
   const roomUserOverridesRes = createMemo(() => {
     const r = currentRoom();
-    if (!r || r.type !== ROOM_TYPE_TEXT) return undefined;
+    if (!r || !isTextLike(r.type)) return undefined;
     return channelOverridesSource(r, spaceRooms()).userOverrides;
   });
   const refreshedForMissingOverrides = new Set<string>();
   createEffect(() => {
     const sid = spaceId();
     const r = currentRoom();
-    if (!sid || !r || r.type !== ROOM_TYPE_TEXT) return;
+    if (!sid || !r || !isTextLike(r.type)) return;
     if (r.permission_overrides !== undefined && r.user_overrides !== undefined) return;
     if (refreshedForMissingOverrides.has(sid)) return;
     refreshedForMissingOverrides.add(sid);
@@ -508,7 +528,7 @@ const SpacePage: Component = () => {
     const userOvs = roomUserOverridesRes();
     const sp = space();
     const rid = roomId();
-    if (!rid || !sp || currentRoom()?.type !== ROOM_TYPE_TEXT) {
+    if (!rid || !sp || !isTextLike(currentRoom()?.type)) {
       return members;
     }
     if (roles === undefined || ovs === undefined || userOvs === undefined) {
@@ -586,7 +606,143 @@ const SpacePage: Component = () => {
       userOverrides: userOvs,
     });
   });
-  const canSendMessages = createMemo(() => canSendMessagesInChannel(myChannelMask()));
+  const canSendMessages = createMemo(() => {
+    const mask = myChannelMask();
+    const room = currentRoom();
+    if (room?.type !== ROOM_TYPE_THREAD) return canSendMessagesInChannel(mask);
+    // In a thread, Send Messages In Threads is what counts (Discord's rule); a locked thread
+    // takes nothing from members without Manage Threads. An archived one still takes a
+    // message - sending unarchives it.
+    if (mask === null) return true;
+    if (!hasPerm(mask, PermViewChannel) || !hasPerm(mask, PermSendMessagesInThreads)) return false;
+    if (room.thread?.locked && !hasPerm(mask, PermManageThreads)) return false;
+    return true;
+  });
+  const canCreatePublicThreads = createMemo(() => {
+    const mask = myChannelMask();
+    return mask === null ? false : hasPerm(mask, PermViewChannel) && hasPerm(mask, PermCreatePublicThreads);
+  });
+  const canCreatePrivateThreads = createMemo(() => {
+    const mask = myChannelMask();
+    return mask === null ? false : hasPerm(mask, PermViewChannel) && hasPerm(mask, PermCreatePrivateThreads);
+  });
+  const canManageThreads = createMemo(() => {
+    const mask = myChannelMask();
+    return mask === null ? false : hasPerm(mask, PermManageThreads);
+  });
+  /** Active threads of the open text channel, for its thread browser. */
+  const channelThreads = createMemo(() => {
+    const rid = roomId();
+    if (!rid || isThread()) return [] as SpaceRoom[];
+    return spaceRooms().filter((r) => r.type === ROOM_TYPE_THREAD && r.parent_id === rid && !r.thread?.archived);
+  });
+  const [threadsOpen, setThreadsOpen] = createSignal(false);
+  const [createThreadFor, setCreateThreadFor] = createSignal<{ starter?: { id: string; preview: string }; privateDefault?: boolean } | null>(null);
+  function handleToggleThreads() {
+    const next = !threadsOpen();
+    setThreadsOpen(next);
+    if (next) {
+      setSearchOpen(false);
+      setPinnedOpen(false);
+    }
+  }
+  function handleCreateThread(msg: DecryptedMessage) {
+    setCreateThreadFor({ starter: { id: msg.id, preview: getMessageBodyText(msg).slice(0, 100) } });
+  }
+  function openThread(threadId: string) {
+    setThreadsOpen(false);
+    navigate(`/spaces/${spaceId()}/rooms/${threadId}`);
+  }
+  /** The starter message's text for the thread intro, read from the parent channel. */
+  const [threadStarter] = createResource(
+    () => {
+      const r = currentRoom();
+      return r?.type === ROOM_TYPE_THREAD && r.thread?.starter_message_id && r.parent_id
+        ? { pid: r.parent_id, mid: r.thread.starter_message_id }
+        : null;
+    },
+    async (key) => {
+      if (!key) return null;
+      try {
+        const raw = (await getMessage(key.pid, key.mid)) as unknown as ApiMessage;
+        const [m] = await decryptServerMessages([raw]);
+        return m ? getMessageBodyText(m) : null;
+      } catch {
+        return null;
+      }
+    }
+  );
+  const threadIntro = createMemo(() => {
+    const r = currentRoom();
+    if (!r || r.type !== ROOM_TYPE_THREAD) return undefined;
+    const owner = spaceMembers.bySpaceId[spaceId()]?.find((m) => m.id === r.thread?.owner_id);
+    return {
+      name: r.name,
+      ownerName: owner?.display_name || owner?.username || t('common.someone'),
+      private: r.thread?.private,
+      starter: threadStarter() ?? null,
+    };
+  });
+  /** The thread's own actions, Discord's thread menu: membership for anyone, archive and
+   * rename for the owner or Manage Threads, lock and delete for Manage Threads. */
+  const threadActions = createMemo(() => {
+    const r = currentRoom();
+    if (!r || r.type !== ROOM_TYPE_THREAD) return [] as ContextMenuItem[];
+    const th = r.thread;
+    const owner = th?.owner_id === auth.user?.id;
+    const manage = canManageThreads();
+    const items: ContextMenuItem[] = [
+      {
+        label: th?.joined ? t('threads.leave') : t('threads.join'),
+        icon: th?.joined ? 'fa-right-from-bracket' : 'fa-right-to-bracket',
+        onClick: () => void (th?.joined ? leaveThread(r.id) : joinThread(r.id)).catch((err) => console.error('Thread membership change failed:', err)),
+      },
+    ];
+    if (manage || owner) {
+      items.push({
+        label: t('threads.rename'),
+        icon: 'fa-pen',
+        onClick: () => {
+          const next = window.prompt(t('threads.renamePrompt'), r.name)?.trim();
+          if (next && next !== r.name) void updateThread(r.id, { name: next }).catch((err) => console.error('Rename thread failed:', err));
+        },
+      });
+      items.push({
+        label: th?.archived ? t('threads.unarchive') : t('threads.archive'),
+        icon: th?.archived ? 'fa-box-open' : 'fa-box-archive',
+        onClick: () => void updateThread(r.id, { archived: !th?.archived }).catch((err) => console.error('Archive thread failed:', err)),
+      });
+    }
+    if (manage) {
+      items.push({
+        label: th?.locked ? t('threads.unlock') : t('threads.lock'),
+        icon: th?.locked ? 'fa-lock-open' : 'fa-lock',
+        onClick: () => void updateThread(r.id, { locked: !th?.locked }).catch((err) => console.error('Lock thread failed:', err)),
+      });
+      items.push({
+        label: t('threads.delete'),
+        icon: 'fa-trash',
+        danger: true,
+        onClick: async () => {
+          const ok = await confirmDialog({
+            title: t('threads.delete'),
+            body: t('threads.deleteConfirm', { name: r.name }),
+            confirmLabel: t('threads.delete'),
+            tone: 'danger',
+          });
+          if (!ok) return;
+          const parent = r.parent_id;
+          try {
+            await deleteThread(r.id);
+            navigate(parent ? `/spaces/${spaceId()}/rooms/${parent}` : `/spaces/${spaceId()}`);
+          } catch (err) {
+            console.error('Delete thread failed:', err);
+          }
+        },
+      });
+    }
+    return items;
+  });
   /** What this space's verification level holds against the viewer, if anything. Steady
    * over time: an age rule reports when the wait ends rather than whether it has. */
   const verification = createMemo(() =>
@@ -897,9 +1053,17 @@ const SpacePage: Component = () => {
         }
       >
         <RoomHeader
-          headerIcon="fa-hashtag"
+          headerIcon={isThread() ? 'fa-comments' : 'fa-hashtag'}
           name={headerName()}
           topic={currentRoom()?.topic}
+          threadsOpen={threadsOpen()}
+          onToggleThreads={isThread() ? undefined : handleToggleThreads}
+          parentName={parentRoom()?.name}
+          onOpenParent={() => {
+            const p = parentRoom();
+            if (p) navigate(`/spaces/${spaceId()}/rooms/${p.id}`);
+          }}
+          threadActions={isThread() ? threadActions() : undefined}
           pmOtherUserId={undefined}
           e2ee={currentRoom()?.e2ee_enabled === true}
           isGroup={false}
@@ -970,6 +1134,30 @@ const SpacePage: Component = () => {
         </Show>
       </Show>
 
+      <Show when={roomId() && isTextChannel() && !isThread() && currentRoom() && threadsOpen()}>
+        <div class={`fixed md:absolute top-14 end-4 ${zLayer.drawer}`}>
+          <RoomThreadsPanel
+            spaceId={spaceId()!}
+            roomId={roomId()!}
+            threads={channelThreads()}
+            canCreate={canCreatePublicThreads()}
+            canCreatePrivate={canCreatePrivateThreads()}
+            onOpenThread={openThread}
+            onCreate={(privateThread) => setCreateThreadFor({ privateDefault: privateThread })}
+          />
+        </div>
+      </Show>
+      <CreateThreadModal
+        open={!!createThreadFor() && !!roomId()}
+        spaceId={spaceId()!}
+        roomId={roomId()!}
+        starter={createThreadFor()?.starter ?? null}
+        allowPrivate={canCreatePrivateThreads()}
+        privateDefault={createThreadFor()?.privateDefault}
+        onClose={() => setCreateThreadFor(null)}
+        onCreated={openThread}
+      />
+
       <Show when={roomId() && isTextChannel() && currentRoom() && pinnedOpen()}>
         <div class={`fixed md:absolute top-14 end-4 ${zLayer.drawer}`}>
           <RoomPinnedPanel
@@ -995,11 +1183,19 @@ const SpacePage: Component = () => {
               class="relative flex-1 flex flex-col min-h-0 min-w-0"
               style={{ '--composer-height': `${composerHeight()}px` }}
             >
+              <Show when={isThread() && currentRoom()?.thread?.archived}>
+                <div class="shrink-0 border-b border-border/60 bg-muted/20 px-4 py-2 text-center text-xs text-muted-foreground">
+                  <i class="fa-solid fa-box-archive me-1.5 text-[10px]" aria-hidden="true" />
+                  {currentRoom()?.thread?.locked ? t('threads.archivedBannerLocked') : t('threads.archivedBanner')}
+                </div>
+              </Show>
               <Show when={!isLoading()} fallback={<MessageSkeleton />}>
                 <MessageList
                   messages={roomMessages()}
                   roomId={roomId()!}
-                  roomType={ROOM_TYPE_TEXT}
+                  roomType={currentRoom()!.type}
+                  threadIntro={threadIntro()}
+                  onCreateThread={!isThread() && canCreatePublicThreads() ? handleCreateThread : undefined}
                   roomName={currentRoom()!.name}
                   e2eeEnabled={currentRoom()!.e2ee_enabled === true}
                   participants={visibleMembers()}
@@ -1065,7 +1261,7 @@ const SpacePage: Component = () => {
                 attachmentError={attachmentDraft.error()}
                 customEmojis={allCustomEmojis()}
                 slowmodeRemaining={slowmodeRemaining(roomId())}
-                noSendMessage={canSendMessages() ? verificationNotice() : t('space.noSendPermission')}
+                noSendMessage={canSendMessages() ? verificationNotice() : isThread() && currentRoom()?.thread?.locked ? t('threads.lockedNotice') : t('space.noSendPermission')}
                 onSendGif={handleSendGif}
               />
               </RoomComposerDock>

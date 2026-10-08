@@ -8,6 +8,9 @@ import { retryPendingDecrypts } from './messages';
 import { onStargateEvent } from '../services/stargate/client';
 
 const ROOM_TYPE_SPACE_TEXT = 3;
+const ROOM_TYPE_THREAD = 6;
+const isEncryptedSpaceRoom = (r: { type: number; e2ee_enabled?: boolean }) =>
+  (r.type === ROOM_TYPE_SPACE_TEXT || r.type === ROOM_TYPE_THREAD) && r.e2ee_enabled === true;
 
 export interface E2EESyncState {
   /** Set when the server reports that *this* session's own device was revoked (e.g. from
@@ -72,10 +75,10 @@ export function initE2EESyncHandlers() {
         const spaceId = String(data.space_id);
         const toRotate = new Set<string>();
         for (const r of spaces.spaceRoomsBySpaceId[spaceId] ?? []) {
-          if (r.type === ROOM_TYPE_SPACE_TEXT && r.e2ee_enabled === true) toRotate.add(r.id);
+          if (isEncryptedSpaceRoom(r)) toRotate.add(r.id);
         }
         for (const r of rooms.rooms) {
-          if (r.space_id === spaceId && r.type === ROOM_TYPE_SPACE_TEXT && r.e2ee_enabled === true) toRotate.add(r.id);
+          if (r.space_id === spaceId && isEncryptedSpaceRoom(r)) toRotate.add(r.id);
         }
         for (const id of toRotate) {
           rotateRoomSession(currentUserId, id).catch((e) =>

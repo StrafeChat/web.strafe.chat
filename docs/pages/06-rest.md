@@ -168,6 +168,30 @@ Broadcast a typing indicator (rate limited to one per 5 s per room).
 
 `{"message_id": "…"}` marks the room read up to that message (clears the caller's unread count and mention badge).
 
+## Threads
+
+A thread is a room of type `6` inside a text channel (Discord's model): started from a message - then it shares the message's id and the message carries `thread_id` - or on its own, public or private, with its own member list, an archive state that times out on its own, and a lock. Threads inherit the channel's permission overrides; four bits of their own apply (see [Permissions](/docs/permissions/)): Create Public Threads, Create Private Threads, Send Messages In Threads (Send Messages does not grant sending in a thread) and Manage Threads. Active threads the caller can see come in `READY.space_rooms` and `GET /spaces/:id/rooms` with a `thread` block: `{"archived", "archived_at", "locked", "private", "invitable", "auto_archive_minutes", "owner_id", "starter_message_id", "last_active_at", "message_count", "member_count", "joined"}`. Messages in a thread use the ordinary `/rooms/:thread_id/messages` endpoints.
+
+### `POST` /rooms/:id/messages/:msg_id/threads — *Create Public Threads*
+
+`{"name", "auto_archive_minutes"}` (60, 1440, 4320 or 10080; default 1440). `201` with the thread. The channel gets a `thread_created` system message.
+
+### `POST` /rooms/:id/threads — *Create Public Threads, or Create Private Threads with `private`*
+
+`{"name", "auto_archive_minutes", "private", "invitable"}`. A private thread starts with only its creator in it.
+
+### `GET` /rooms/:id/thread, `PATCH` /rooms/:id/thread, `DELETE` /rooms/:id/thread
+
+`PATCH` takes any of `{"name", "archived", "locked", "invitable", "auto_archive_minutes", "slowmode_seconds"}`. Name, archive state, auto-archive and invitable: Manage Threads or the thread's creator (unarchiving an unlocked thread: any member too). Lock and slowmode: Manage Threads. `DELETE`: Manage Threads. An archived thread only takes `archived: false` (a `locked` change may ride along); any other edit must unarchive in the same request or gets `400`. A message sent into an archived, unlocked thread unarchives it; a locked thread takes nothing from members without Manage Threads.
+
+### Thread members
+
+`GET /rooms/:id/thread-members` lists `[{"user_id", "joined_at", "user"}]`. `PUT` / `DELETE /rooms/:id/thread-members/@me` join and leave; `PUT` / `DELETE /rooms/:id/thread-members/:userId` add (any member of a public or invitable thread, else Manage Threads) and remove (Manage Threads or the creator). Posting in a thread, or being mentioned in one, joins it. Members are who gets unread and mention counts for the thread.
+
+### `GET` /spaces/:id/threads/active, `GET` /rooms/:id/threads/archived
+
+Every active thread in the space the caller can see, and a channel's archived threads (`?before=<RFC3339 archive time>&limit=`, newest first; private ones only for their members and Manage Threads holders). Both answer `{"threads": [...]}`, the archived list with `has_more`.
+
 ## Messages
 
 ### The message object

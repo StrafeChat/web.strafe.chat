@@ -10,6 +10,7 @@ import { MessageSearchBox } from './MessageSearchBox';
 import type { SearchChannel, SearchIdentity } from '../../lib/messageSearch';
 import { t } from '../../i18n';
 import { BotTag } from '../BotTag';
+import { showContextMenu, type ContextMenuItem } from '../../stores/contextMenu';
 
 export interface RoomHeaderProps {
   /** A 1:1 PM with a bot: the BOT tag follows the name. */
@@ -55,12 +56,34 @@ export interface RoomHeaderProps {
   onStartCall?: (video: boolean) => void;
   /** A call is already running in this room (buttons read "join"). */
   callActive?: boolean;
+  /** Space text channels: the thread browser toggle. */
+  threadsOpen?: boolean;
+  onToggleThreads?: () => void;
+  /** Threads: the channel the thread lives in (a crumb back to it) and the thread's own
+   * actions (join/leave, archive, lock, rename, delete) behind an ellipsis button. */
+  parentName?: string;
+  onOpenParent?: () => void;
+  threadActions?: ContextMenuItem[];
 }
 
 export const RoomHeader: Component<RoomHeaderProps> = (props) => (
   <div class={`${appPageHeader} justify-between gap-3`}>
     <div class="flex min-w-0 flex-1 items-center gap-2">
       <MobileRailsOpenButton />
+      <Show when={props.parentName}>
+        {(parent) => (
+          <button
+            type="button"
+            class="hidden shrink-0 items-center gap-1 text-sm text-muted-foreground hover:text-foreground sm:flex"
+            onClick={() => props.onOpenParent?.()}
+            title={parent()}
+          >
+            <i class="fa-solid fa-hashtag text-[11px]" aria-hidden="true" />
+            <span class="max-w-[10rem] truncate">{parent()}</span>
+            <i class="fa-solid fa-chevron-right text-[9px]" aria-hidden="true" />
+          </button>
+        )}
+      </Show>
       <i class={`fa-solid ${props.headerIcon} shrink-0 text-muted-foreground`} aria-hidden="true" />
       <h1 class={`flex min-w-0 items-center ${appPageTitle}`}>
         <span class="truncate">{props.name}</span>
@@ -119,6 +142,21 @@ export const RoomHeader: Component<RoomHeaderProps> = (props) => (
         onMute={props.onMute}
         onUnmute={props.onUnmute}
       />
+      <Show when={props.onToggleThreads}>
+        <IconButton
+          icon="fa-solid fa-comments"
+          label={t('threads.title')}
+          active={props.threadsOpen}
+          onClick={() => props.onToggleThreads?.()}
+        />
+      </Show>
+      <Show when={props.threadActions?.length}>
+        <IconButton
+          icon="fa-solid fa-ellipsis"
+          label={t('threads.actions')}
+          onClick={(e) => showContextMenu(e, props.threadActions!)}
+        />
+      </Show>
       <IconButton
         icon="fa-solid fa-thumbtack"
         label={t('room.pinned')}

@@ -68,6 +68,8 @@ export interface Message {
   pinned?: boolean;
   pinned_at?: string;
   pinned_by?: string;
+  /** The thread started from this message (its own id), when there is one. */
+  thread_id?: string;
   created_at: string;
   updated_at: string;
   deleted_at?: string;

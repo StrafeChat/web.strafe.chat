@@ -131,7 +131,7 @@ export function createSpace(input: CreateSpaceInput) {
 /** Room within a space (section, text channel, or voice channel). */
 export interface SpaceRoom {
   id: string;
-  type: number; // 3 = text, 4 = voice, 5 = section
+  type: number; // 3 = text, 4 = voice, 5 = section, 6 = thread
   name: string;
   topic?: string;
   slowmode_seconds?: number;
@@ -156,6 +156,9 @@ export interface SpaceRoom {
    * second (0 = the 64 kbps default). */
   user_limit?: number;
   bitrate?: number;
+  /** Threads (type 6): Discord's thread metadata plus the counts and whether the viewer has
+   * joined. Permissions come from the parent channel (`parent_id`). */
+  thread?: ThreadInfo;
   /** Per-room permission overrides, carried on the room like Discord's
    * `permission_overwrites` on a channel. Always present on READY / GET /spaces/:id/rooms
    * (empty arrays when there are none) and kept current by SPACE_ROOM_*OVERRIDE_* events,
@@ -221,6 +224,23 @@ export interface SpaceRole {
   bot_id?: string;
   created_at: string;
   updated_at: string;
+}
+
+/** A thread's state as the server keeps it (see api/threads.ts). */
+export interface ThreadInfo {
+  archived: boolean;
+  archived_at?: string;
+  locked: boolean;
+  private: boolean;
+  invitable: boolean;
+  auto_archive_minutes: number;
+  owner_id: string;
+  starter_message_id?: string;
+  last_active_at?: string;
+  message_count: number;
+  member_count: number;
+  /** Whether the viewer is a member (gets notified, sees it nested in the sidebar). */
+  joined: boolean;
 }
 
 export interface SpaceRoomOverride {

@@ -41,7 +41,7 @@ export { viewFromServerAttachment };
 import { auth } from './auth';
 import { settings } from './settings';
 import { rooms, updateRoomLastMessage, setRoomLastMessageId } from './rooms';
-import { spaces, updateSpaceRoomLastMessage, setSpaceRoomLastMessageId } from './spaces';
+import { spaces, updateSpaceRoomLastMessage, setSpaceRoomLastMessageId, bumpThreadMessageCount } from './spaces';
 import { onStargateEvent } from '../services/stargate/client';
 import { maybeNotifyMessage } from '../lib/notifications';
 import { setReadState, extractMentionedUserIds, extractMentionedRoleIds, mentionsEveryone, messageIdGt, isSnowflake } from './readState';
@@ -628,7 +628,8 @@ export async function sendMessage(
   const otherParticipant = participants.find((p) => p.id !== currentUserId);
   const isNotesRoom = !otherParticipant && participants.length === 1;
   const isGroupRoom = room.type === 2 && participants.length >= 2;
-  const isSpaceTextRoom = room.type === 3;
+  // Threads (6) take their channel's E2EE setting and are plaintext rooms otherwise.
+  const isSpaceTextRoom = room.type === 3 || room.type === 6;
   if (!otherParticipant && !isNotesRoom && !isGroupRoom && !isSpaceTextRoom) return null;
 
   // Sending while reading older history jumps back to the live tail first (Discord's behaviour),
@@ -908,6 +909,7 @@ export async function updateMessageFromEvent(payload: {
 /** Remove a message from local store (Stargate MESSAGE_DELETE) */
 export function removeMessageFromEvent(roomId: string, messageId: string) {
   setMessages('byRoom', roomId, (prev) => (prev ?? []).filter((m) => m.id !== messageId));
+  bumpThreadMessageCount(roomId, -1);
 }
 
 /** Decrypt (or pass through) raw server messages for display outside the room list - the pin
@@ -930,6 +932,20 @@ export function setMessagePinned(roomId: string, messageId: string, pinned: bool
       msg.pinned = pinned;
       msg.pinned_at = pinned ? pinnedAt : undefined;
       msg.pinned_by = pinned ? pinnedBy : undefined;
+    })
+  );
+}
+
+/** Point a loaded message at the thread started from it (THREAD_CREATE), or clear it
+ * (THREAD_DELETE); the footer under the message reads this. In place, like the pin flag. */
+export function setMessageThreadId(roomId: string, messageId: string, threadId: string | undefined) {
+  setMessages(
+    'byRoom',
+    roomId,
+    produce((prev) => {
+      const msg = (prev ?? []).find((m) => m.id === messageId);
+      if (!msg) return;
+      msg.thread_id = threadId;
     })
   );
 }
@@ -1030,7 +1046,8 @@ export async function editMessage(
   const otherParticipant = participants.find((p) => p.id !== currentUserId);
   const isNotesRoom = !otherParticipant && participants.length === 1;
   const isGroupRoom = room.type === 2 && participants.length >= 2;
-  const isSpaceTextRoom = room.type === 3;
+  // Threads (6) take their channel's E2EE setting and are plaintext rooms otherwise.
+  const isSpaceTextRoom = room.type === 3 || room.type === 6;
   if (!otherParticipant && !isNotesRoom && !isGroupRoom && !isSpaceTextRoom) return null;
 
   try {
@@ -1115,6 +1132,18 @@ export function initStargateMessageHandler() {
           updateRoomLastMessage(roomId, msgId);
           updateSpaceRoomLastMessage(roomId, msgId);
         }
+      }
+    } else if (evt.t === 'THREAD_CREATE' || evt.t === 'THREAD_DELETE') {
+      // A thread started from a message is that message's thread_id (same id); keep the
+      // starter in the parent channel in step so its footer appears and disappears live.
+      const payload = (evt.d as Record<string, unknown>)?.d ?? evt.d;
+      const data = payload as Record<string, unknown>;
+      const parentId = data?.parent_id != null ? String(data.parent_id) : '';
+      const threadId = data?.room_id != null ? String(data.room_id) : data?.id != null ? String(data.id) : '';
+      const starter = (data?.thread as { starter_message_id?: unknown } | undefined)?.starter_message_id;
+      const starterId = starter != null ? String(starter) : evt.t === 'THREAD_DELETE' ? threadId : '';
+      if (parentId && threadId && starterId) {
+        setMessageThreadId(parentId, starterId, evt.t === 'THREAD_CREATE' ? threadId : undefined);
       }
     } else if (evt.t === 'MESSAGE_UPDATE') {
       const payload = (evt.d as Record<string, unknown>)?.d ?? evt.d;

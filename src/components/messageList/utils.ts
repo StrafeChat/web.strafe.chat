@@ -98,6 +98,10 @@ export function formatSystemMessageText(
     }
     case 'message_pinned':
       return t('messages.system.pinned', { actor });
+    case 'thread_created':
+      return t('messages.system.threadCreated', { actor, name: payload.name ?? '?' });
+    case 'thread_renamed':
+      return t('messages.system.threadRenamed', { actor, name: payload.name ?? '?' });
     case 'room_renamed':
       return t('messages.system.roomRenamed', { actor, name: payload.new_name ?? '?' });
     case 'call_started':

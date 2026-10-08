@@ -35,6 +35,8 @@ import {
   canViewSpaceChannel,
 } from '../../lib/spacePermissions';
 import { SpaceRoomSettingsModal } from '../SpaceRoomSettingsModal';
+import { SpaceThreadRow } from './spaceRooms/SpaceThreadRow';
+import { joinThread, leaveThread } from '../../api/threads';
 import { InviteSpaceModal } from '../InviteSpaceModal';
 import { SpaceSettingsModal } from '../SpaceSettingsModal';
 import { CreateSpaceRoomModal, CreateSpaceSectionModal } from '../CreateSpaceChannelModal';
@@ -46,6 +48,7 @@ import { t } from '../../i18n';
 const ROOM_TYPE_TEXT = 3;
 const ROOM_TYPE_VOICE = 4;
 const ROOM_TYPE_SECTION = 5;
+const ROOM_TYPE_THREAD = 6;
 
 
 
@@ -218,6 +221,53 @@ export const SpaceRoomsBar: Component = () => {
       }
       return next;
     });
+  }
+
+  /** Active threads shown nested under a channel: the ones the viewer joined, and the one
+   * they are looking at (Discord lists joined threads under the channel; the rest live in
+   * the channel's thread browser). */
+  function threadsUnder(channel: SpaceRoom): SpaceRoom[] {
+    return spaceRooms()
+      .filter(
+        (r) =>
+          r.type === ROOM_TYPE_THREAD &&
+          r.parent_id === channel.id &&
+          !r.thread?.archived &&
+          (r.thread?.joined || r.id === activeRoomId())
+      )
+      .sort((a, b) => (b.thread?.last_active_at ?? b.created_at).localeCompare(a.thread?.last_active_at ?? a.created_at));
+  }
+
+  function openThreadMenu(e: MouseEvent, thread: SpaceRoom) {
+    const sid = spaceId();
+    if (!sid) return;
+    const msgId = latestMessageID(thread);
+    const uid = auth.user?.id ?? '';
+    const unread =
+      (readState.byRoom[thread.id]?.mentionCount ?? 0) > 0 ||
+      (!!uid && getUnreadCountForDisplay(thread.id, { ...thread, space_id: thread.space_id ?? sid }, messages.byRoom[thread.id] ?? [], uid) > 0);
+    showContextMenu(e, [
+      {
+        label: thread.thread?.joined ? t('threads.leave') : t('threads.join'),
+        icon: thread.thread?.joined ? 'fa-right-from-bracket' : 'fa-right-to-bracket',
+        onClick: () =>
+          void (thread.thread?.joined ? leaveThread(thread.id) : joinThread(thread.id)).catch((err) =>
+            console.error('Thread membership change failed:', err)
+          ),
+      },
+      ...(msgId && unread
+        ? [{ label: t('contextMenu.markAsRead'), icon: 'fa-check-double', onClick: () => ackRoomOptimistic(thread.id, msgId) }]
+        : []),
+      {
+        label: isRoomMuted(thread) ? t('contextMenu.unmute') : t('contextMenu.mute'),
+        icon: isRoomMuted(thread) ? 'fa-bell' : 'fa-bell-slash',
+        onClick: () =>
+          void (isRoomMuted(thread) ? unmuteRoom(thread.id) : muteRoom(thread.id, null)).catch((err) =>
+            console.error('Toggle mute failed:', err)
+          ),
+      },
+      { label: t('contextMenu.copyRoomId'), icon: 'fa-copy', onClick: () => navigator.clipboard.writeText(thread.id) },
+    ]);
   }
 
   function childrenOf(section: SpaceRoom) {
@@ -701,6 +751,9 @@ export const SpaceRoomsBar: Component = () => {
                       onReorderDragOverTarget={(e, id) => reorder.updateDropIndicatorForRow('top', id, e)}
                       onReorderDrop={(e, id) => reorder.commitReorderFromDropEvent(e, 'top', id)}
                     />
+                    <For each={threadsUnder(room)}>
+                      {(th) => <SpaceThreadRow room={th} spaceId={spaceId()!} activeRoomId={activeRoomId()} onContextMenu={openThreadMenu} />}
+                    </For>
                   </div>
                 )}
               </For>
@@ -818,6 +871,9 @@ export const SpaceRoomsBar: Component = () => {
                               onReorderDragOverTarget={(e, id) => reorder.updateDropIndicatorForRow(secScope, id, e)}
                               onReorderDrop={(e, id) => reorder.commitReorderFromDropEvent(e, secScope, id)}
                             />
+                            <For each={threadsUnder(room)}>
+                              {(th) => <SpaceThreadRow room={th} spaceId={spaceId()!} activeRoomId={activeRoomId()} onContextMenu={openThreadMenu} />}
+                            </For>
                           </div>
                         )}
                       </For>
