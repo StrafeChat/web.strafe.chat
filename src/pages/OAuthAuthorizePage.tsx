@@ -20,6 +20,20 @@ import {
 import { AuthBrandMark } from '../components/auth/AuthBrandMark';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/Card';
 import { t } from '../i18n';
+import { isDesktop } from '../desktop/env';
+import { closeCurrentWindow, desktopWindow } from '../desktop/native';
+
+/**
+ * Back to the app when the consent flow has nowhere else to go. In the desktop app this
+ * page opens in a window of its own (lib/openWindow.ts), so "done" means closing it.
+ */
+function goHome(): void {
+  if (isDesktop() && desktopWindow.isPopup()) {
+    void closeCurrentWindow();
+    return;
+  }
+  window.location.href = '/';
+}
 
 const SCOPE_ICON: Record<OAuthScope, string> = {
   identify: 'fa-id-badge',
@@ -153,7 +167,7 @@ const OAuthAuthorizePage: Component = () => {
       if (query().state) back += `&state=${encodeURIComponent(query().state!)}`;
       window.location.href = back;
     } else {
-      window.location.href = '/';
+      goHome();
     }
   }
 
@@ -228,7 +242,7 @@ const OAuthAuthorizePage: Component = () => {
                             variant="ghost"
                             class="flex-1"
                             onClick={() => {
-                              window.location.href = '/';
+                              goHome();
                             }}
                           >
                             {t('oauth.done')}

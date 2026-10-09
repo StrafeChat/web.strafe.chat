@@ -19,6 +19,9 @@ import { AuthBrandMark } from '../components/auth/AuthBrandMark';
 import { FormApiErrors } from '../components/auth/FormApiErrors';
 import { CaptchaWidget } from '../components/auth/CaptchaWidget';
 import { instance, loadInstanceInfo } from '../stores/instance';
+import { isDesktop } from '../desktop/env';
+import { getDesktopInstance } from '../desktop/instanceOverride';
+import { InstancePicker } from '../components/desktop/InstancePicker';
 import { AuthLanguageSwitcher, useReactiveTranslate } from '../i18n';
 import { translateCaughtApiError } from '../lib/formatApiError';
 
@@ -101,7 +104,11 @@ export default function Register() {
   }
   onCleanup(() => clearTimeout(inviteCheckTimer));
 
-  onMount(() => void loadInstanceInfo());
+  // The desktop app asks which instance first (InstancePicker); see Login.
+  const [instanceReady, setInstanceReady] = createSignal(!isDesktop() || !!getDesktopInstance());
+  onMount(() => {
+    if (instanceReady()) void loadInstanceInfo();
+  });
 
   function clearStep1Errors() {
     setEmailErr('');
@@ -236,6 +243,9 @@ export default function Register() {
           <Show when={step() === 1}>
             <form onSubmit={handleStep1Next}>
               <CardContent class={authCardContentClass}>
+                <Show when={isDesktop()}>
+                  <InstancePicker disabled={loading()} onReady={setInstanceReady} />
+                </Show>
                 <Input
                   type="email"
                   label={t('auth.register.emailLabel')}
@@ -257,7 +267,7 @@ export default function Register() {
                 />
               </CardContent>
               <CardFooter class={authCardFooterClass}>
-                <Button type="submit" class="w-full font-semibold" loading={loading()}>
+                <Button type="submit" class="w-full font-semibold" loading={loading()} disabled={!instanceReady()}>
                   {t('auth.register.next')}
                 </Button>
                 <A

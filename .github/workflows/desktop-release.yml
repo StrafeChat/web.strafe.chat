@@ -1,0 +1,73 @@
+# Builds and signs the desktop app for every platform and publishes a draft GitHub release
+# with the installers plus latest.json, the manifest the in-app updater reads from
+# https://github.com/StrafeChat/web.strafe.chat/releases/latest/download/latest.json.
+#
+# Trigger: push a tag `desktop-v<version>` where <version> matches package.json. Publish
+# the draft once the installers have been tried; the updater only sees published releases.
+#
+# Secrets: TAURI_SIGNING_PRIVATE_KEY (the contents of the key generated with
+# `npx tauri signer generate`) and TAURI_SIGNING_PRIVATE_KEY_PASSWORD (empty if the key
+# has none). The matching public key is in src-tauri/tauri.conf.json; an installed app
+# only accepts updates signed by it.
+name: Desktop release
+
+on:
+  push:
+    tags: ['desktop-v*']
+  workflow_dispatch:
+
+jobs:
+  build:
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: macos-latest
+            args: --target aarch64-apple-darwin
+          - platform: macos-latest
+            args: --target x86_64-apple-darwin
+          - platform: ubuntu-22.04
+            args: ''
+          - platform: windows-latest
+            args: ''
+    runs-on: ${{ matrix.platform }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          # Both macOS slices are built on the arm64 runner.
+          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin,x86_64-apple-darwin' || '' }}
+
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: './src-tauri -> target'
+
+      - name: Linux build dependencies
+        if: matrix.platform == 'ubuntu-22.04'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - run: npm ci
+
+      - uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        with:
+          tagName: desktop-v__VERSION__
+          releaseName: 'Strafe Desktop v__VERSION__'
+          releaseBody: 'Installers for Windows, macOS and Linux are below. Installed copies update themselves.'
+          releaseDraft: true
+          prerelease: false
+          includeUpdaterJson: true
+          args: ${{ matrix.args }}

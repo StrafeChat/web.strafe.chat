@@ -5,6 +5,8 @@
  */
 
 import { createStore } from 'solid-js/store';
+import { isDesktop } from '../desktop/env';
+import { flashWindow, nativeNotificationsGrantedSync, requestNativeNotifications, sendNativeNotification } from '../desktop/native';
 
 const STORAGE_KEY = 'strafe_notifications';
 
@@ -70,12 +72,20 @@ export function setNotificationPrefs(patch: Partial<NotificationPrefs>): void {
 
 export type DesktopPermission = NotificationPermission | 'unsupported';
 
+// In the desktop app notifications go through the shell (the webview's own Notification
+// API is missing or inert on most platforms); the permission is the OS's, cached by the
+// desktop module so this stays synchronous.
 export function desktopPermission(): DesktopPermission {
+  if (isDesktop()) {
+    const granted = nativeNotificationsGrantedSync();
+    return granted === null ? 'default' : granted ? 'granted' : 'denied';
+  }
   if (typeof Notification === 'undefined') return 'unsupported';
   return Notification.permission;
 }
 
 export async function requestDesktopPermission(): Promise<DesktopPermission> {
+  if (isDesktop()) return (await requestNativeNotifications()) ? 'granted' : 'denied';
   if (typeof Notification === 'undefined') return 'unsupported';
   if (Notification.permission !== 'default') return Notification.permission;
   try {
@@ -132,6 +142,17 @@ export interface DesktopNotificationOptions {
 /** Shows a system notification when permission has been granted. Returns whether it was shown. */
 export function showDesktopNotification(opts: DesktopNotificationOptions): boolean {
   if (desktopPermission() !== 'granted') return false;
+  if (isDesktop()) {
+    try {
+      sendNativeNotification(opts.title, opts.body);
+      // The OS notification cannot carry our onClick; a taskbar flash / dock bounce says
+      // where to look instead.
+      void flashWindow().catch(() => undefined);
+      return true;
+    } catch {
+      return false;
+    }
+  }
   try {
     const n = new Notification(opts.title, { body: opts.body, icon: opts.icon || undefined, tag: opts.tag, silent: true });
     n.onclick = () => {

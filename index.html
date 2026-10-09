@@ -16,7 +16,9 @@
         connect-src  any http(s)/ws(s) host. The API, gateway and CDN origins are chosen per
                      deployment and only known at runtime (config.js / VITE_*), and a dev
                      setup routinely points them at a LAN address so a phone can join in -
-                     which no CSP host expression can describe. Restricting this would only
+                     which no CSP host expression can describe. ipc: and http://ipc.localhost
+                     are the desktop app's bridge to its native shell (src-tauri/), which a
+                     browser never sees. Restricting this would only
                      break real setups while the sanitiser-bypass case it is meant to
                      contain still has img-src and every other route out; the protection
                      that matters here is script-src.
@@ -33,7 +35,7 @@
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://challenges.cloudflare.com; connect-src 'self' https: wss: http: ws:; img-src 'self' data: blob: https: http:; media-src 'self' data: blob: https: http:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; frame-src https://challenges.cloudflare.com https://www.youtube-nocookie.com https://player.vimeo.com https://www.dailymotion.com https://geo.dailymotion.com https://www.loom.com https://streamable.com https://player.twitch.tv https://clips.twitch.tv; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self';"
+      content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval' https://challenges.cloudflare.com; connect-src 'self' https: wss: http: ws: ipc: http://ipc.localhost; img-src 'self' data: blob: https: http:; media-src 'self' data: blob: https: http:; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; frame-src https://challenges.cloudflare.com https://www.youtube-nocookie.com https://player.vimeo.com https://www.dailymotion.com https://geo.dailymotion.com https://www.loom.com https://streamable.com https://player.twitch.tv https://clips.twitch.tv; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; form-action 'self';"
     />
     <title>Strafe</title>
     <link rel="manifest" href="/manifest.webmanifest" />

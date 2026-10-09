@@ -3,7 +3,7 @@ import { createSignal, createMemo, Show, createEffect } from 'solid-js';
 import { userSettingsOpen, closeUserSettings, takePendingSettingsSection, hasPendingSettingsSection } from '../stores/userSettingsModal';
 import { confirmDialog } from '../stores/confirmDialog';
 import { getInstanceCapabilities } from '../api/instance';
-import { ACCOUNT_ITEMS, APP_ITEMS, INSTANCE_ITEM, DEVELOPERS_ITEM, sectionDescription, sectionTitle, type SectionId, type SettingsNavItem } from './settings/types.js';
+import { ACCOUNT_ITEMS, APP_ITEMS, INSTANCE_ITEM, DEVELOPERS_ITEM, DESKTOP_ITEM, sectionDescription, sectionTitle, type SectionId, type SettingsNavItem } from './settings/types.js';
 import {
   SettingsShell,
   SettingsNav,
@@ -20,8 +20,10 @@ import {
   InstanceSettingsPage,
   DevelopersSettingsPage,
   AuthorizedAppsSettingsPage,
+  DesktopSettingsPage,
   type SettingsNavGroup,
 } from './settings';
+import { isDesktop } from '../desktop/env';
 import { SearchInput } from './ui/SearchInput';
 import { Button } from './ui/Button';
 import { t } from '../i18n';
@@ -59,7 +61,7 @@ export const UserSettingsModal: Component = () => {
     const q = searchQuery().trim();
     const toDef = (i: SettingsNavItem) => ({ id: i.id, label: t(i.labelKey), icon: i.icon });
     const account = ACCOUNT_ITEMS.filter((i) => navMatches(i, q)).map(toDef);
-    const app = APP_ITEMS.filter((i) => navMatches(i, q)).map(toDef);
+    const app = [...APP_ITEMS, ...(isDesktop() ? [DESKTOP_ITEM] : [])].filter((i) => navMatches(i, q)).map(toDef);
     const groups: SettingsNavGroup<SectionId>[] = [];
     if (account.length) groups.push({ label: t('settings.groups.account'), items: account });
     if (app.length) groups.push({ label: t('settings.groups.app'), items: app });
@@ -186,6 +188,9 @@ export const UserSettingsModal: Component = () => {
           </Show>
           <Show when={section() === 'keybinds'}>
             <KeybindsSettingsPage />
+          </Show>
+          <Show when={section() === 'desktop' && isDesktop()}>
+            <DesktopSettingsPage />
           </Show>
         </SettingsPanel>
       </SettingsShell>

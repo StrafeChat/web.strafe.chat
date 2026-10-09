@@ -51,7 +51,7 @@ export function AuthLanguageSwitcher() {
   const current = () => localeMeta(lang());
 
   return (
-    <div class="pointer-events-auto fixed top-4 end-4 z-[100]" ref={(el) => (rootEl = el)}>
+    <div class="pointer-events-auto fixed top-[calc(1rem+var(--desktop-titlebar-height))] end-4 z-[100]" ref={(el) => (rootEl = el)}>
       <span class="sr-only" id="auth-lang-label">
         {t('auth.language')}
       </span>

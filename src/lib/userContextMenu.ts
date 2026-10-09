@@ -8,6 +8,7 @@ import { confirmDialog } from '../stores/confirmDialog';
 import { t } from '../i18n';
 import { memberHighestRolePosition } from './spacePermissions';
 import type { SpaceRole } from '../api/spaces';
+import { openAppWindow } from './openWindow';
 
 export interface UserMenuContext {
   userId: string;
@@ -49,7 +50,7 @@ export function buildUserMenuItems(ctx: UserMenuContext): ContextMenuItem[] {
     items.push({
       label: t('profile.addToSpace'),
       icon: 'fa-robot',
-      onClick: () => window.open(authorizeUrl({ clientId: ctx.userId, scopes: ['bot'] }), '_blank', 'noopener'),
+      onClick: () => openAppWindow(authorizeUrl({ clientId: ctx.userId, scopes: ['bot'] })),
     });
   } else if (!isSelf && rel !== RelType.Friend && rel !== RelType.OutgoingRequest && rel !== RelType.Blocked) {
     items.push({

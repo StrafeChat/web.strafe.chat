@@ -5,6 +5,9 @@
  *   2. Vite env (VITE_API_URL / VITE_STARGATE_URL / VITE_CDN_URL) - local development;
  *   3. localhost defaults.
  */
+import { isDesktop } from '../desktop/env';
+import { getDesktopInstance } from '../desktop/instanceOverride';
+
 export interface RuntimeConfig {
   apiUrl?: string;
   stargateUrl?: string;
@@ -25,7 +28,21 @@ declare global {
 
 function runtime(): RuntimeConfig {
   if (typeof window === 'undefined') return {};
-  return window.__STRAFE_CONFIG__ ?? {};
+  const deployed = window.__STRAFE_CONFIG__ ?? {};
+  // The desktop app is one build for every instance: the account in use decides where the
+  // backends are, and that wins over anything baked into the build.
+  if (isDesktop()) {
+    const inst = getDesktopInstance();
+    if (inst) {
+      return {
+        ...deployed,
+        apiUrl: inst.apiUrl,
+        stargateUrl: inst.stargateUrl,
+        ...(inst.cdnUrl ? { cdnUrl: inst.cdnUrl } : {}),
+      };
+    }
+  }
+  return deployed;
 }
 
 function trimSlash(s: string): string {
@@ -44,14 +61,24 @@ export function stargateUrl(): string {
   if (fromRuntime) return trimSlash(fromRuntime);
   const fromEnv = import.meta.env.VITE_STARGATE_URL as string | undefined;
   if (fromEnv) return trimSlash(fromEnv);
-  // Derive from the API URL when only that was configured. Behind Caddy both live on the
-  // instance domain, so `<domain>/api` pairs with `<domain>/gateway/events` (https -> wss);
-  // a bare dev API on :4000 pairs with a standalone gateway on :4001 (/events).
-  const api = apiUrl();
+  return deriveStargateUrl(apiUrl());
+}
+
+/**
+ * The gateway that goes with an API URL, when only that was configured. Behind Caddy both
+ * live on the instance domain, so `<domain>/api` pairs with `<domain>/gateway/events`
+ * (https -> wss); a bare dev API on :4000 pairs with a standalone gateway on :4001
+ * (/events). Also what the desktop app uses for an instance that only named its API.
+ */
+export function deriveStargateUrl(api: string): string {
+  api = trimSlash(api);
   if (api.endsWith('/api')) {
     return api.slice(0, -'/api'.length).replace(/^http/, 'ws') + '/gateway/events';
   }
-  if (api.endsWith(':4000')) return api.replace(/^http/, 'ws').replace(/:4000$/, ':4001') + '/events';
+  // A bare API on a port is a development instance, and its gateway sits on the next port
+  // (4000/4001, 4100/4101, 4200/4201 - every dev config in the repo follows it).
+  const m = api.match(/^(https?):\/\/([^/]+):(\d+)$/);
+  if (m) return `${m[1] === 'https' ? 'wss' : 'ws'}://${m[2]}:${Number(m[3]) + 1}/events`;
   return 'ws://localhost:4001/events';
 }
 

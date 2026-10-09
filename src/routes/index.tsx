@@ -29,10 +29,13 @@ import { SafetyNumberModal } from '../components/SafetyNumberModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import { auth, hydrateAuth } from '../stores/auth';
 import { AppBackground } from '../components/auth/AppBackground';
+import { isDesktop } from '../desktop/env';
+import { DesktopTitleBar } from '../components/desktop/TitleBar';
+import { DesktopUpdateBanner } from '../components/desktop/DesktopUpdateBanner';
 
 function LoadingScreen() {
   return (
-    <div class="min-h-screen bg-background text-foreground flex items-center justify-center">
+    <div class="min-h-dvh bg-background text-foreground flex items-center justify-center">
       <div class="flex flex-col items-center gap-4">
         <span class="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         <p class="text-sm text-muted-foreground">Loading...</p>
@@ -63,13 +66,22 @@ function NotFound() {
 
 function RootLayout(props: { children?: import('solid-js').JSX.Element }) {
   onMount(() => hydrateAuth());
-  onMount(() => initUpdateCheck());
+  // The web client polls for a new deploy; the desktop app updates through its shell.
+  onMount(() => {
+    if (!isDesktop()) initUpdateCheck();
+  });
   return (
-    <StargateProvider>
+    <>
+      <Show when={isDesktop()}>
+        <DesktopTitleBar />
+      </Show>
+      <StargateProvider>
       <Show when={auth.hydrated} fallback={<LoadingScreen />}>
         <AppBackground />
         <ConnectionStatusBanner />
-        <UpdateAvailableBanner />
+        <Show when={!isDesktop()} fallback={<DesktopUpdateBanner />}>
+          <UpdateAvailableBanner />
+        </Show>
         {props.children}
         <RecoveryModal />
         <E2eeEnvironmentModal />
@@ -78,7 +90,8 @@ function RootLayout(props: { children?: import('solid-js').JSX.Element }) {
         <SafetyNumberModal />
         <ConfirmDialog />
       </Show>
-    </StargateProvider>
+      </StargateProvider>
+    </>
   );
 }
 

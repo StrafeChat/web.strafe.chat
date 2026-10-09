@@ -12,7 +12,8 @@ export type SectionId =
   | 'keybinds'
   | 'language'
   | 'developers'
-  | 'instance';
+  | 'instance'
+  | 'desktop';
 
 export interface SettingsNavItem {
   id: SectionId;
@@ -46,6 +47,16 @@ export const INSTANCE_ITEM: SettingsNavItem = {
   id: 'instance',
   labelKey: 'settings.sections.instance.title',
   icon: 'fa-server',
+};
+
+/**
+ * Shown only in the desktop app (updates, start-up, the tray), so it is not part of
+ * APP_ITEMS - the modal appends it when the shell is there.
+ */
+export const DESKTOP_ITEM: SettingsNavItem = {
+  id: 'desktop',
+  labelKey: 'settings.sections.desktop.title',
+  icon: 'fa-display',
 };
 
 export const APP_ITEMS: SettingsNavItem[] = [

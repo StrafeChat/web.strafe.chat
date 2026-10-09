@@ -343,3 +343,27 @@ html.underline-links a {
 .hljs-emphasis { font-style: italic; }
 .hljs-strong { font-weight: 600; }
 .hljs-link { text-decoration: underline; }
+
+/* Desktop app (src-tauri/): the shell draws no window title bar of its own, the client does
+   (components/desktop/TitleBar.tsx), fixed at the top. Everything that sizes itself to the
+   viewport leaves that strip free, and fixed-top elements offset by it (they read the
+   variable, which is 0 on the web). */
+:root {
+  --desktop-titlebar-height: 0px;
+}
+html.desktop {
+  --desktop-titlebar-height: 32px;
+}
+html.desktop body {
+  padding-top: var(--desktop-titlebar-height);
+}
+html.desktop .h-dvh {
+  height: calc(100dvh - var(--desktop-titlebar-height));
+}
+html.desktop .min-h-dvh {
+  min-height: calc(100dvh - var(--desktop-titlebar-height));
+}
+/* The webview is the app: no rubber-band overscroll of the whole page, no text cursor on chrome. */
+html.desktop {
+  overscroll-behavior: none;
+}

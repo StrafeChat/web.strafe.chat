@@ -25,6 +25,7 @@ import { spaceRoleColorHex } from '../lib/spacePermissions';
 import { appMenuItemDefault, appMenuPanel, appSectionLabel, zLayer } from '../theme/appChrome';
 import { isMdViewport } from '../stores/mobileShellLayout';
 import { t } from '../i18n';
+import { openAppWindow } from '../lib/openWindow';
 
 const EVERYONE_ROLE_NAME = '@everyone';
 /** How many role pills to show before a “+N” overflow chip (popover is narrow). */
@@ -71,7 +72,7 @@ export const UserProfilePopover: Component = () => {
   function addBotToSpace() {
     const s = subject();
     if (!s) return;
-    window.open(authorizeUrl({ clientId: s.userId, scopes: ['bot'] }), '_blank', 'noopener');
+    openAppWindow(authorizeUrl({ clientId: s.userId, scopes: ['bot'] }));
     closeUserProfilePopover();
   }
   const [rootRef, setRootRef] = createSignal<HTMLDivElement>();

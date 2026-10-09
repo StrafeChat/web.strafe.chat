@@ -57,6 +57,26 @@ interface IndexResponse {
 
 let inflight: Promise<void> | null = null;
 
+/**
+ * Forget what was loaded so the next loadInstanceInfo() asks again. The desktop app calls
+ * this when the sign-in page is pointed at a different instance: the captcha, invite and
+ * email settings the forms adapt to are that instance's, not the last one's.
+ */
+export function resetInstanceInfo(): void {
+  inflight = null;
+  setInstance({
+    loaded: false,
+    version: '',
+    federationEnabled: false,
+    domain: '',
+    captcha: { enabled: false, provider: '', siteKey: '', apiUrl: '' },
+    voiceEnabled: false,
+    inviteOnly: false,
+    email: { enabled: false, verificationRequired: false },
+    instanceAdmin: false,
+  });
+}
+
 /** Fetch GET / once (idempotent; safe to call from several places). */
 export function loadInstanceInfo(): Promise<void> {
   if (instance.loaded) return Promise.resolve();

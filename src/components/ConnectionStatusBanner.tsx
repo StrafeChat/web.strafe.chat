@@ -23,7 +23,7 @@ export const ConnectionStatusBanner: Component = () => {
 
   return (
     <Show when={visible()}>
-      <div class="pointer-events-none fixed inset-x-0 top-0 z-[350] flex justify-center px-3 pt-[max(0.5rem,env(safe-area-inset-top))]">
+      <div class="pointer-events-none fixed inset-x-0 top-[var(--desktop-titlebar-height)] z-[350] flex justify-center px-3 pt-[max(0.5rem,env(safe-area-inset-top))]">
         <div
           role="status"
           class="pointer-events-auto flex items-center gap-2 rounded-full border border-border bg-card/95 px-3.5 py-1.5 text-xs font-medium text-foreground shadow-lg shadow-black/20 backdrop-blur-md"

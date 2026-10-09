@@ -5,8 +5,6 @@
 import { ApiError } from './ApiError';
 import { apiUrl } from '../lib/runtimeConfig';
 
-const API_URL = apiUrl();
-
 export { ApiError } from './ApiError';
 
 function getToken(): string | null {
@@ -29,7 +27,9 @@ export async function api<T>(
     headers['Content-Type'] = 'application/json';
   }
 
-  const res = await fetch(`${API_URL}${path}`, {
+  // Read per request, not once at load: in the desktop app the instance can change
+  // (choosing one on the sign-in page, switching accounts) without a reload.
+  const res = await fetch(`${apiUrl()}${path}`, {
     ...reqInit,
     headers,
     body: json !== undefined ? JSON.stringify(json) : reqInit.body,
@@ -46,5 +46,5 @@ export async function api<T>(
 }
 
 export function getApiUrl(): string {
-  return API_URL;
+  return apiUrl();
 }

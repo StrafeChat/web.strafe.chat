@@ -14,6 +14,7 @@ import de from './i18n/locales/de';
 import ar from './i18n/locales/ar';
 import { applyDocumentLangDir, getInitialLanguage } from './i18n/config';
 import { bindI18nReactivity } from './i18n/t';
+import { isDesktop } from './desktop/env';
 
 const root = document.getElementById('root');
 
@@ -59,7 +60,8 @@ if (import.meta.env.PROD) {
   // public/sw.js), which is what stops a new deploy from breaking the client until site data
   // is cleared. When a new deploy activates a new worker and claims this page, reload once so
   // the tab runs the fresh build (guarded so a first install doesn't reload and it can't loop).
-  if ('serviceWorker' in navigator) {
+  // Not in the desktop app: it is installed already, and updates come through the shell.
+  if ('serviceWorker' in navigator && !isDesktop()) {
     const hadController = !!navigator.serviceWorker.controller;
     let reloading = false;
     navigator.serviceWorker.addEventListener('controllerchange', () => {

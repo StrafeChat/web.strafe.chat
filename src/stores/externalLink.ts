@@ -4,6 +4,8 @@
  */
 
 import { createStore } from 'solid-js/store';
+import { isDesktop } from '../desktop/env';
+import { openExternalUrl } from '../desktop/native';
 
 const TRUSTED_DOMAINS_KEY = 'externalLink_trustedDomains';
 
@@ -26,6 +28,15 @@ function saveTrustedDomains(domains: string[]) {
   } catch {
     // ignore
   }
+}
+
+/** A new tab in a browser; the system browser from the desktop app. */
+function openInBrowser(url: string): void {
+  if (isDesktop()) {
+    void openExternalUrl(url).catch(() => window.open(url, '_blank', 'noopener,noreferrer'));
+    return;
+  }
+  window.open(url, '_blank', 'noopener,noreferrer');
 }
 
 export function getDomainFromUrl(url: string): string {
@@ -66,7 +77,7 @@ export function requestOpenExternalLink(url: string): void {
   const domain = getDomainFromUrl(url);
   if (!domain) return;
   if (externalLink.trustedDomains.includes(domain)) {
-    window.open(url, '_blank', 'noopener,noreferrer');
+    openInBrowser(url);
     return;
   }
   setExternalLink('pendingUrl', url);
@@ -88,5 +99,5 @@ export function confirmExternalLink(trustDomain: boolean): void {
     setExternalLink('trustedDomains', next);
     saveTrustedDomains(next);
   }
-  window.open(url, '_blank', 'noopener,noreferrer');
+  openInBrowser(url);
 }

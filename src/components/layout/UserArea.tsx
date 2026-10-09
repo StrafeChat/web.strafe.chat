@@ -15,6 +15,8 @@ import { inputBaseClass } from '../ui/Input';
 import { instance } from '../../stores/instance';
 import { toggleDeafen, toggleMute, voice } from '../../stores/voice';
 import { t } from '../../i18n';
+import { isDesktop } from '../../desktop/env';
+import { DesktopAccountSection } from '../desktop/AccountSwitcher';
 
 const STATUS_OPTIONS: { id: UserPresence['status']; labelKey: string; color: string }[] = [
   { id: 'online', labelKey: 'presence.online', color: 'bg-primary' },
@@ -345,6 +347,16 @@ export const UserArea: Component = () => {
                   {t('userArea.copyUserId')}
                 </button>
               </div>
+
+              {/* Desktop app: every account on this device, and sign out */}
+              <Show when={isDesktop()}>
+                <DesktopAccountSection
+                  onClose={() => {
+                    setPopoverOpen(false);
+                    setStatusMenuOpen(false);
+                  }}
+                />
+              </Show>
 
               {/* Edit Profile */}
               <div class="border-t border-border/70 p-3">

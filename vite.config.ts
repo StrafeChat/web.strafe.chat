@@ -50,6 +50,11 @@ const prodProxy = {
 };
 
 export default defineConfig({
+  // The desktop app (src-tauri/) runs this same dev server inside its webview: keep the
+  // terminal readable for the Rust output, let the shell's TAURI_ENV_* reach the bundle,
+  // and never restart on the Rust side's own files.
+  clearScreen: false,
+  envPrefix: ['VITE_', 'TAURI_ENV_*'],
   define: {
     __BUILD_ID__: JSON.stringify(buildId),
     __APP_VERSION__: JSON.stringify(appVersion),
@@ -64,6 +69,7 @@ export default defineConfig({
   server: {
     port: 3000,
     strictPort: true,
+    watch: { ignored: ['**/src-tauri/**'] },
     // Dev-only: forward API, CDN and gateway traffic to the production instance, so the dev
     // client exercises app.strafe.chat without a deploy. The browser calls the dev server
     // same-origin (hence the relative /api in .env), so it applies no CORS check at all, and

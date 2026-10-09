@@ -29,6 +29,10 @@ import { AuthBrandMark } from '../components/auth/AuthBrandMark';
 import { FormApiErrors } from '../components/auth/FormApiErrors';
 import { AuthLanguageSwitcher, useReactiveTranslate } from '../i18n';
 import { translateCaughtApiError } from '../lib/formatApiError';
+import { isDesktop } from '../desktop/env';
+import { getDesktopInstance } from '../desktop/instanceOverride';
+import { InstancePicker } from '../components/desktop/InstancePicker';
+import { DesktopSavedAccounts } from '../components/desktop/SavedAccounts';
 
 export default function Login() {
   const [t] = useReactiveTranslate();
@@ -47,8 +51,17 @@ export default function Login() {
   const [errorLines, setErrorLines] = createSignal<string[]>([]);
   const [loading, setLoading] = createSignal(false);
 
+  // The desktop app has to be told which instance first (InstancePicker); until one has
+  // answered there is nowhere to send a password. A browser was served by its instance.
+  const [instanceReady, setInstanceReady] = createSignal(!isDesktop() || !!getDesktopInstance());
+  // Passkeys need the instance's domain as the page origin, which the desktop app's webview
+  // is not: when the account has one, only the other factors are offered there.
+  const [passkeyHidden, setPasskeyHidden] = createSignal(false);
+
   // Whether this instance can send email decides if "forgot your password?" exists.
-  onMount(() => void loadInstanceInfo());
+  onMount(() => {
+    if (instanceReady()) void loadInstanceInfo();
+  });
 
   // Second factor, once a password check comes back with mfa_required instead of a session;
   // or 'unverified', when the password was right but the instance wants the address
@@ -97,10 +110,13 @@ export default function Login() {
 
   function handleLoginResult(res: Awaited<ReturnType<typeof login>>) {
     if (isMFAChallenge(res)) {
+      const methods = isDesktop() ? res.methods.filter((m) => m !== 'webauthn') : res.methods;
+      setPasskeyHidden(methods.length !== res.methods.length);
       setMfaToken(res.mfa_token);
-      setMfaMethods(res.methods);
-      setActiveMethod(res.methods.includes('totp') ? 'totp' : 'webauthn');
-      setUseRecovery(false);
+      setMfaMethods(methods);
+      setActiveMethod(methods.includes('totp') ? 'totp' : 'webauthn');
+      // Nothing but a passkey on the account: the recovery code is the way in from here.
+      setUseRecovery(methods.length === 0);
       setMfaCode('');
       setStep('mfa');
       return;
@@ -234,17 +250,19 @@ export default function Login() {
           {activeMethod() === 'totp' ? t('auth.login.mfa.useWebauthn') : t('auth.login.mfa.useTotp')}
         </button>
       </Show>
-      <button
-        type="button"
-        class="text-muted-foreground underline underline-offset-4 hover:text-foreground"
-        onClick={() => {
-          setErrorLines([]);
-          setMfaCode('');
-          setUseRecovery(!useRecovery());
-        }}
-      >
-        {useRecovery() ? t('auth.login.mfa.backToTwoFactor') : t('auth.login.mfa.useRecovery')}
-      </button>
+      <Show when={mfaMethods().length > 0}>
+        <button
+          type="button"
+          class="text-muted-foreground underline underline-offset-4 hover:text-foreground"
+          onClick={() => {
+            setErrorLines([]);
+            setMfaCode('');
+            setUseRecovery(!useRecovery());
+          }}
+        >
+          {useRecovery() ? t('auth.login.mfa.backToTwoFactor') : t('auth.login.mfa.useRecovery')}
+        </button>
+      </Show>
       <button type="button" class="text-muted-foreground underline underline-offset-4 hover:text-foreground" onClick={backToPassword}>
         {t('auth.login.mfa.backToPassword')}
       </button>
@@ -273,6 +291,9 @@ export default function Login() {
                         {arrivalNotice()}
                       </p>
                     </Show>
+                    <Show when={isDesktop()}>
+                      <InstancePicker disabled={loading()} onReady={setInstanceReady} />
+                    </Show>
                     <Input
                       type="email"
                       label={t('auth.login.emailLabel')}
@@ -300,7 +321,7 @@ export default function Login() {
                     <FormApiErrors messages={errorLines()} id="login-api-errors" />
                   </CardContent>
                   <CardFooter class={authCardFooterClass}>
-                    <Button type="submit" class="w-full font-semibold" loading={loading()}>
+                    <Button type="submit" class="w-full font-semibold" loading={loading()} disabled={!instanceReady()}>
                       {t('auth.login.submit')}
                     </Button>
                     <A href="/register" class={authFooterLinkClass}>
@@ -321,6 +342,9 @@ export default function Login() {
               <CardDescription class="mt-2 text-base leading-relaxed">
                 {useRecovery() ? t('auth.login.mfa.recoverySubtitle') : t('auth.login.mfa.subtitle')}
               </CardDescription>
+              <Show when={passkeyHidden()}>
+                <p class="mt-2 text-xs text-muted-foreground">{t('desktop.passkeyUnavailable')}</p>
+              </Show>
             </CardHeader>
             <Show
               when={!useRecovery() && activeMethod() === 'webauthn'}
@@ -375,6 +399,9 @@ export default function Login() {
             <UnverifiedCard />
           </Show>
         </Card>
+        <Show when={isDesktop()}>
+          <DesktopSavedAccounts />
+        </Show>
       </div>
     </div>
   );
