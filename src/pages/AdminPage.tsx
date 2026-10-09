@@ -1,6 +1,6 @@
 import type { Component } from 'solid-js';
 import { formatHandle } from '../stores/instance';
-import { createEffect, createResource, createSignal, For, Show } from 'solid-js';
+import { createEffect, createMemo, createResource, createSignal, For, Show } from 'solid-js';
 import { A, Navigate, useNavigate } from '@solidjs/router';
 import { BADGES } from '../lib/badges';
 import {
@@ -25,6 +25,7 @@ import {
   type ReportDetail,
   type ReportRow,
   type ReportStatus,
+  type InstanceStats,
   type ResolveAction,
   type SpaceDetail,
   type UserDetail,
@@ -37,9 +38,18 @@ import {
   listFederationPolicy,
   setFederationPolicy,
   removeFederationPolicy,
+  type PeerPolicyRow,
 } from '../api/instance';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { DiscoverQueue } from '../components/admin/DiscoverQueue';
+import { AdminTabs, AdminFilterTabs } from '../components/admin/AdminTabs';
+import {
+  AdminLoadingScreen,
+  AdminOverviewSkeleton,
+  AdminListSkeleton,
+  AdminDetailSkeleton,
+} from '../components/admin/AdminLoading';
+import type { AdminTabItem } from '../components/admin/AdminTabs';
 import { Button } from '../components/ui/Button';
 import { Checkbox } from '../components/ui/Checkbox';
 import { Input } from '../components/ui/Input';
@@ -47,7 +57,6 @@ import { Toggle } from '../components/ui/Toggle';
 import { EmptyState } from '../components/ui/EmptyState';
 import { ResponsiveDialog } from '../components/ui/ResponsiveDialog';
 import { SearchInput } from '../components/ui/SearchInput';
-import { Tabs } from '../components/ui/Tabs';
 import { Textarea } from '../components/ui/Textarea';
 import { MessageAvatar } from '../components/messageList/MessageAvatar';
 import { confirmDialog } from '../stores/confirmDialog';
@@ -94,7 +103,7 @@ const AdminPage: Component = () => (
 const AdminGate: Component = () => {
   const [caps] = createResource(() => getInstanceCapabilities().catch(() => ({ instance_admin: false })));
   return (
-    <Show when={caps()} fallback={<div class="min-h-dvh" />}>
+    <Show when={caps()} fallback={<AdminLoadingScreen />}>
       {(c) => (
         <Show when={c().instance_admin} fallback={<Navigate href="/" />}>
           <Dashboard />
@@ -111,6 +120,10 @@ const Dashboard: Component = () => {
   const [focusUser, setFocusUser] = createSignal<string | null>(null);
   const [focusReport, setFocusReport] = createSignal<string | null>(null);
   const [focusSpace, setFocusSpace] = createSignal<string | null>(null);
+  // Stats live here rather than in Overview so the tab bar can badge open reports and bans,
+  // and so returning to Overview does not refetch what the header already has.
+  const [stats, { refetch: refetchStats }] = createResource(() => getInstanceStats().catch(() => null));
+  const statCount = (v?: number) => (v != null && v > 0 ? v : undefined);
 
   const goUser = (id: string) => {
     setFocusUser(id);
@@ -124,10 +137,27 @@ const Dashboard: Component = () => {
     setFocusSpace(id);
   };
 
+  const tabs = createMemo<AdminTabItem<Tab>[]>(() => [
+    { id: 'overview', icon: 'fa-gauge-high', label: t('admin.tabs.overview') },
+    { id: 'users', icon: 'fa-users', label: t('admin.tabs.users') },
+    { id: 'reports', icon: 'fa-flag', label: t('admin.tabs.reports'), count: statCount(stats()?.open_reports) },
+    { id: 'bans', icon: 'fa-ban', label: t('admin.tabs.bans'), count: statCount(stats()?.bans) },
+    { id: 'discover', icon: 'fa-compass', label: t('admin.tabs.discover') },
+    { id: 'audit', icon: 'fa-clock-rotate-left', label: t('admin.tabs.audit') },
+    { id: 'federation', icon: 'fa-globe', label: t('admin.federation.tab') },
+  ]);
+
   return (
-    <div class="relative z-10 min-h-dvh bg-background text-foreground">
-      <header class="border-b border-border/70 bg-card/60 backdrop-blur">
-        <div class="mx-auto flex max-w-6xl items-center gap-4 px-4 py-4">
+    <div class="relative z-10 min-h-dvh bg-background text-foreground" data-admin-page>
+      <header class="sticky top-0 z-20 border-b border-border/70 bg-background/85 backdrop-blur-xl">
+        <div
+          class="pointer-events-none absolute inset-x-0 -top-24 h-40 opacity-60"
+          style={{
+            'background-image': 'radial-gradient(60% 100% at 50% 100%, color-mix(in srgb, var(--color-primary) 22%, transparent), transparent 70%)',
+          }}
+          aria-hidden="true"
+        />
+        <div class="relative mx-auto flex max-w-6xl items-center gap-4 px-4 py-4">
           <button
             type="button"
             class="flex size-9 items-center justify-center rounded-lg text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
@@ -136,49 +166,53 @@ const Dashboard: Component = () => {
           >
             <i class="fa-solid fa-arrow-left" aria-hidden="true" />
           </button>
+          <div class="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary ring-1 ring-inset ring-primary/25">
+            <i class="fa-solid fa-shield-halved text-lg" aria-hidden="true" />
+          </div>
           <div class="min-w-0 flex-1">
             <h1 class="text-lg font-semibold leading-tight">{t('admin.title')}</h1>
             <p class="truncate text-xs text-muted-foreground">{t('admin.subtitle')}</p>
           </div>
         </div>
-        <div class="mx-auto max-w-6xl px-4 pb-3">
-          <Tabs<Tab>
-            size="sm"
-            value={tab()}
-            onChange={setTab}
-            items={[
-              { id: 'overview', label: t('admin.tabs.overview') },
-              { id: 'users', label: t('admin.tabs.users') },
-              { id: 'reports', label: t('admin.tabs.reports') },
-              { id: 'bans', label: t('admin.tabs.bans') },
-              { id: 'discover', label: t('admin.tabs.discover') },
-              { id: 'audit', label: t('admin.tabs.audit') },
-              { id: 'federation', label: t('admin.federation.tab') },
-            ]}
-          />
+        <div class="relative mx-auto max-w-6xl px-4 pb-3">
+          <AdminTabs<Tab> value={tab()} onChange={setTab} items={tabs()} />
         </div>
       </header>
       <main class="mx-auto max-w-6xl px-4 py-6">
         <Show when={tab() === 'overview'}>
-          <Overview onOpenReports={() => setTab('reports')} onOpenBans={() => setTab('bans')} />
+          <div class="admin-panel-in">
+            <Overview stats={stats()} onRefresh={() => void refetchStats()} onOpenReports={() => setTab('reports')} onOpenBans={() => setTab('bans')} />
+          </div>
         </Show>
         <Show when={tab() === 'users'}>
-          <Users focusUser={focusUser()} onOpenReport={goReport} onOpenSpace={goSpace} />
+          <div class="admin-panel-in">
+            <Users focusUser={focusUser()} onOpenReport={goReport} onOpenSpace={goSpace} />
+          </div>
         </Show>
         <Show when={tab() === 'reports'}>
-          <Reports focusReport={focusReport()} onOpenUser={goUser} onOpenSpace={goSpace} />
+          <div class="admin-panel-in">
+            <Reports focusReport={focusReport()} onOpenUser={goUser} onOpenSpace={goSpace} />
+          </div>
         </Show>
         <Show when={tab() === 'bans'}>
-          <Bans onOpenUser={goUser} />
+          <div class="admin-panel-in">
+            <Bans onOpenUser={goUser} />
+          </div>
         </Show>
         <Show when={tab() === 'discover'}>
-          <DiscoverQueue onOpenUser={goUser} onOpenSpace={goSpace} />
+          <div class="admin-panel-in">
+            <DiscoverQueue onOpenUser={goUser} onOpenSpace={goSpace} />
+          </div>
         </Show>
         <Show when={tab() === 'audit'}>
-          <Audit onOpenUser={goUser} />
+          <div class="admin-panel-in">
+            <Audit onOpenUser={goUser} />
+          </div>
         </Show>
         <Show when={tab() === 'federation'}>
-          <FederationPanel />
+          <div class="admin-panel-in">
+            <FederationPanel />
+          </div>
         </Show>
       </main>
       <SpaceDrawer spaceId={focusSpace()} onClose={() => setFocusSpace(null)} onOpenUser={goUser} onOpenReport={goReport} />
@@ -188,45 +222,100 @@ const Dashboard: Component = () => {
 
 // ---- overview ---------------------------------------------------------------------------
 
-const Overview: Component<{ onOpenReports: () => void; onOpenBans: () => void }> = (props) => {
-  const [stats, { refetch }] = createResource(() => getInstanceStats());
-  const stat = (label: string, value: string | number, onClick?: () => void) => (
-    <button
-      type="button"
-      class={`${settingsRowShell} w-full flex-col items-start gap-1 text-start ${onClick ? '' : 'cursor-default'}`}
-      onClick={onClick}
-      disabled={!onClick}
-    >
-      <span class="text-2xl font-semibold text-foreground">{value}</span>
-      <span class="text-xs text-muted-foreground">{label}</span>
-    </button>
-  );
+type StatTone = 'green' | 'blue' | 'violet' | 'amber' | 'red' | 'sky';
+
+const STAT_TONE: Record<StatTone, { chip: string; accent: string }> = {
+  green: { chip: 'bg-primary/15 text-primary', accent: 'from-primary/25' },
+  blue: { chip: 'bg-blue-500/15 text-blue-400', accent: 'from-blue-500/25' },
+  violet: { chip: 'bg-violet-500/15 text-violet-400', accent: 'from-violet-500/25' },
+  amber: { chip: 'bg-amber-500/15 text-amber-400', accent: 'from-amber-500/25' },
+  red: { chip: 'bg-destructive/15 text-destructive', accent: 'from-destructive/25' },
+  sky: { chip: 'bg-sky-500/15 text-sky-400', accent: 'from-sky-500/25' },
+};
+
+const Overview: Component<{
+  stats: InstanceStats | null | undefined;
+  onRefresh: () => void;
+  onOpenReports: () => void;
+  onOpenBans: () => void;
+}> = (props) => {
+  const stat = (opts: { label: string; value: string | number; icon: string; tone: StatTone; onClick?: () => void }) => {
+    const t0 = STAT_TONE[opts.tone];
+    return (
+      <button
+        type="button"
+        class={`group relative flex items-center gap-3 overflow-hidden rounded-2xl border border-border bg-card/40 px-4 py-4 text-start transition-all duration-200 ${
+          opts.onClick ? 'cursor-pointer hover:-translate-y-0.5 hover:border-border hover:bg-card/70 hover:shadow-lg hover:shadow-black/20' : 'cursor-default'
+        }`}
+        onClick={opts.onClick}
+        disabled={!opts.onClick}
+      >
+        <span
+          class={`pointer-events-none absolute inset-x-0 top-0 h-px bg-gradient-to-r ${t0.accent} to-transparent opacity-0 transition-opacity duration-200 group-hover:opacity-100`}
+          aria-hidden="true"
+        />
+        <span class={`flex size-11 shrink-0 items-center justify-center rounded-xl text-lg ${t0.chip}`}>
+          <i class={`fa-solid ${opts.icon}`} aria-hidden="true" />
+        </span>
+        <span class="min-w-0 flex-1">
+          <span class="block text-2xl font-semibold leading-tight tabular-nums">{opts.value}</span>
+          <span class="block truncate text-xs text-muted-foreground">{opts.label}</span>
+        </span>
+        <Show when={opts.onClick}>
+          <i
+            class="fa-solid fa-arrow-right shrink-0 text-xs text-muted-foreground opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100 -translate-x-1"
+            aria-hidden="true"
+          />
+        </Show>
+      </button>
+    );
+  };
   // -1 is the server saying "could not determine"; show a dash, never a wrong 0.
   const num = (v: number) => (v < 0 ? '\u2014' : v.toLocaleString());
+  const s = () => props.stats;
   return (
-    <div class="space-y-4">
-      <Show when={stats()} fallback={<p class="text-sm text-muted-foreground">…</p>}>
-        {(s) => (
-          <div class="space-y-3">
-            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {stat(t('admin.overview.accounts'), num(s().accounts))}
-              {stat(t('admin.overview.online'), num(s().online))}
-              {stat(t('admin.overview.spaces'), num(s().spaces))}
+    <div class="space-y-5">
+      <Show when={s()} fallback={<AdminOverviewSkeleton />}>
+        {(st) => (
+          <div class="space-y-4">
+            <div>
+              <div class={settingsSectionTitle}>{t('admin.overview.activity')}</div>
+              <div class="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {stat({ label: t('admin.overview.accounts'), value: num(st().accounts), icon: 'fa-users', tone: 'green' })}
+                {stat({ label: t('admin.overview.online'), value: num(st().online), icon: 'fa-signal', tone: 'sky' })}
+                {stat({ label: t('admin.overview.spaces'), value: num(st().spaces), icon: 'fa-layer-group', tone: 'blue' })}
+              </div>
             </div>
-            <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              {stat(t('admin.overview.openReports'), s().open_reports, props.onOpenReports)}
-              {stat(t('admin.overview.bans'), s().bans, props.onOpenBans)}
-              {stat(t('admin.overview.ipBans'), s().ip_bans ?? 0, props.onOpenBans)}
-              {stat(t('admin.overview.invites'), s().invites, () => openUserSettings('instance'))}
-              {stat(t('admin.overview.registration'), s().invite_only ? t('admin.overview.inviteOnly') : t('admin.overview.open'))}
+            <div>
+              <div class={settingsSectionTitle}>{t('admin.overview.moderation')}</div>
+              <div class="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {stat({ label: t('admin.overview.openReports'), value: st().open_reports, icon: 'fa-flag', tone: 'amber', onClick: props.onOpenReports })}
+                {stat({ label: t('admin.overview.bans'), value: st().bans, icon: 'fa-ban', tone: 'red', onClick: props.onOpenBans })}
+                {stat({ label: t('admin.overview.ipBans'), value: st().ip_bans ?? 0, icon: 'fa-network-wired', tone: 'red', onClick: props.onOpenBans })}
+              </div>
+            </div>
+            <div>
+              <div class={settingsSectionTitle}>{t('admin.overview.instance')}</div>
+              <div class="mt-2 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {stat({ label: t('admin.overview.invites'), value: st().invites, icon: 'fa-ticket', tone: 'violet', onClick: () => openUserSettings('instance') })}
+                {stat({
+                  label: t('admin.overview.registration'),
+                  value: st().invite_only ? t('admin.overview.inviteOnly') : t('admin.overview.open'),
+                  icon: st().invite_only ? 'fa-lock' : 'fa-door-open',
+                  tone: 'violet',
+                  onClick: () => openUserSettings('instance'),
+                })}
+              </div>
             </div>
           </div>
         )}
       </Show>
-      <p class="text-xs text-muted-foreground">{t('admin.overview.hint')}</p>
-      <Button variant="ghost" size="sm" onClick={() => void refetch()}>
-        {t('admin.refresh')}
-      </Button>
+      <div class="flex flex-wrap items-center gap-3">
+        <Button variant="outline" size="sm" onClick={props.onRefresh}>
+          <i class="fa-solid fa-rotate text-xs" aria-hidden="true" /> {t('admin.refresh')}
+        </Button>
+        <p class="text-xs text-muted-foreground">{t('admin.overview.hint')}</p>
+      </div>
     </div>
   );
 };
@@ -269,22 +358,30 @@ const Users: Component<{ focusUser: string | null; onOpenReport: (id: string) =>
   return (
     <div class="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
       <div class="space-y-3">
-        <form onSubmit={search} class="flex items-center gap-2">
-          <SearchInput value={query()} onValueChange={setQuery} placeholder={t('admin.users.searchPlaceholder')} wrapperClass="flex-1" />
-          <Button type="submit" size="sm" loading={searching()}>
-            {t('admin.users.search')}
-          </Button>
-        </form>
-        <p class="text-xs text-muted-foreground">{t('admin.users.searchHint')}</p>
+        <div class={`${settingsGroupFrame} space-y-3`}>
+          <form onSubmit={search} class="flex items-center gap-2">
+            <SearchInput value={query()} onValueChange={setQuery} placeholder={t('admin.users.searchPlaceholder')} wrapperClass="flex-1" />
+            <Button type="submit" size="sm" loading={searching()}>
+              <i class="fa-solid fa-magnifying-glass text-xs" aria-hidden="true" /> {t('admin.users.search')}
+            </Button>
+          </form>
+          <p class="text-xs text-muted-foreground">{t('admin.users.searchHint')}</p>
+        </div>
         <Show when={searchError()}>
           <p class="text-sm text-destructive">{searchError()}</p>
         </Show>
+        <Show when={results().length > 0}>
+          <div class={settingsSectionTitle}>{t('admin.users.results', { count: results().length })}</div>
+        </Show>
         <div class="space-y-1.5">
           <For each={results()}>
-            {(u) => (
+            {(u, i) => (
               <button
                 type="button"
-                class={`${settingsRowShell} w-full text-start ${selected() === u.id ? 'ring-1 ring-primary/40' : ''}`}
+                style={{ 'animation-delay': `${Math.min(i() * 30, 300)}ms` }}
+                class={`admin-row-in ${settingsRowShell} w-full text-start ${
+                  selected() === u.id ? 'bg-primary/10 ring-1 ring-inset ring-primary/30' : ''
+                }`}
                 onClick={() => setSelected(u.id)}
               >
                 <MessageAvatar name={nameOf(u)} avatar={u.avatar} class="size-9 text-sm" />
@@ -295,11 +392,14 @@ const Users: Component<{ focusUser: string | null; onOpenReport: (id: string) =>
                     <Show when={u.email}> · {u.email}</Show>
                   </div>
                 </div>
+                <Show when={selected() === u.id}>
+                  <i class="fa-solid fa-chevron-right shrink-0 text-xs text-primary" aria-hidden="true" />
+                </Show>
               </button>
             )}
           </For>
           <Show when={!searching() && query().trim() && results().length === 0 && !searchError()}>
-            <p class="px-1 text-sm text-muted-foreground">{t('admin.users.noResults')}</p>
+            <EmptyState icon="fa-user-slash" title={t('admin.users.noResults')} size="inline" />
           </Show>
         </div>
       </div>
@@ -409,40 +509,54 @@ const UserPanel: Component<{ userId: string; onOpenReport: (id: string) => void;
   }
 
   return (
-    <Show when={detail()} fallback={<p class="text-sm text-muted-foreground">…</p>}>
+    <Show when={detail()} fallback={<AdminDetailSkeleton />}>
       {(d) => (
         <div class="space-y-4">
-          <div class={`${settingsGroupFrame} flex items-start gap-4`}>
-            <MessageAvatar name={nameOf(d().user)} avatar={d().user.avatar} class="size-14 text-lg" />
-            <div class="min-w-0 flex-1 space-y-1">
-              <div class="flex flex-wrap items-center gap-2">
-                <span class="text-base font-semibold">{nameOf(d().user)}</span>
-                <span class="text-sm text-muted-foreground">{tag(d().user)}</span>
-                <Show when={d().instance_admin}>
-                  <span class="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-medium text-primary">{t('admin.users.adminBadge')}</span>
-                </Show>
-                <Show when={d().user.home_domain}>
-                  <span class="rounded-full bg-muted/60 px-2 py-0.5 text-[11px] text-muted-foreground">
-                    {t('admin.users.remote', { domain: d().user.home_domain ?? '' })}
-                  </span>
-                </Show>
-                <Show when={d().ban}>
-                  <span class="rounded-full bg-destructive/15 px-2 py-0.5 text-[11px] font-medium text-destructive">{t('admin.users.bannedBadge')}</span>
-                </Show>
-              </div>
-              <dl class="grid gap-x-4 gap-y-0.5 text-xs text-muted-foreground sm:grid-cols-2">
-                <div><dt class="inline font-medium text-foreground/80">{t('admin.users.id')}: </dt><dd class="inline font-mono">{d().user.id}</dd></div>
-                <div>
-                  <dt class="inline font-medium text-foreground/80">{t('admin.users.email')}: </dt>
-                  <dd class="inline">{d().user.email || '—'}</dd>
-                  <Show when={!d().user.home_domain && !d().user.bot}>
-                    <button type="button" class="ml-1.5 text-[11px] font-medium text-primary hover:underline" onClick={() => setEmailOpen(true)}>
-                      {t('admin.users.changeEmail')}
-                    </button>
+          <div class="relative overflow-hidden rounded-2xl border border-border bg-card/40">
+            <div
+              class="h-16 w-full"
+              style={{
+                'background-image':
+                  'linear-gradient(120deg, color-mix(in srgb, var(--color-primary) 28%, transparent), color-mix(in srgb, var(--color-primary) 4%, transparent))',
+              }}
+              aria-hidden="true"
+            />
+            <div class="-mt-8 flex items-start gap-4 px-4 pb-4">
+              <MessageAvatar name={nameOf(d().user)} avatar={d().user.avatar} class="size-16 text-lg ring-4 ring-card" />
+              <div class="min-w-0 flex-1 space-y-1.5 pt-9">
+                <div class="flex flex-wrap items-center gap-2">
+                  <span class="text-base font-semibold">{nameOf(d().user)}</span>
+                  <span class="text-sm text-muted-foreground">{tag(d().user)}</span>
+                  <Show when={d().instance_admin}>
+                    <span class="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-medium text-primary">
+                      <i class="fa-solid fa-shield-halved text-[10px]" aria-hidden="true" /> {t('admin.users.adminBadge')}
+                    </span>
+                  </Show>
+                  <Show when={d().user.home_domain}>
+                    <span class="inline-flex items-center gap-1 rounded-full bg-muted/60 px-2 py-0.5 text-[11px] text-muted-foreground">
+                      <i class="fa-solid fa-globe text-[10px]" aria-hidden="true" /> {t('admin.users.remote', { domain: d().user.home_domain ?? '' })}
+                    </span>
+                  </Show>
+                  <Show when={d().ban}>
+                    <span class="inline-flex items-center gap-1 rounded-full bg-destructive/15 px-2 py-0.5 text-[11px] font-medium text-destructive">
+                      <i class="fa-solid fa-ban text-[10px]" aria-hidden="true" /> {t('admin.users.bannedBadge')}
+                    </span>
                   </Show>
                 </div>
-                <div><dt class="inline font-medium text-foreground/80">{t('admin.users.created')}: </dt><dd class="inline">{when(d().user.created_at) || '—'}</dd></div>
-              </dl>
+                <dl class="grid gap-x-4 gap-y-0.5 text-xs text-muted-foreground sm:grid-cols-2">
+                  <div><dt class="inline font-medium text-foreground/80">{t('admin.users.id')}: </dt><dd class="inline font-mono">{d().user.id}</dd></div>
+                  <div>
+                    <dt class="inline font-medium text-foreground/80">{t('admin.users.email')}: </dt>
+                    <dd class="inline">{d().user.email || '—'}</dd>
+                    <Show when={!d().user.home_domain && !d().user.bot}>
+                      <button type="button" class="ml-1.5 text-[11px] font-medium text-primary hover:underline" onClick={() => setEmailOpen(true)}>
+                        {t('admin.users.changeEmail')}
+                      </button>
+                    </Show>
+                  </div>
+                  <div><dt class="inline font-medium text-foreground/80">{t('admin.users.created')}: </dt><dd class="inline">{when(d().user.created_at) || '—'}</dd></div>
+                </dl>
+              </div>
             </div>
           </div>
 
@@ -811,38 +925,47 @@ const Reports: Component<{ focusReport: string | null; onOpenUser: (id: string) 
   return (
     <div class="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
       <div class="space-y-3">
-        <Tabs<ReportStatus>
-          size="sm"
+        <AdminFilterTabs<ReportStatus>
           value={status()}
           onChange={(s) => { setStatus(s); setSelected(null); }}
           items={[
-            { id: 'open', label: t('admin.reports.status.open') },
-            { id: 'resolved', label: t('admin.reports.status.resolved') },
-            { id: 'dismissed', label: t('admin.reports.status.dismissed') },
+            { id: 'open', icon: 'fa-inbox', label: t('admin.reports.status.open') },
+            { id: 'resolved', icon: 'fa-circle-check', label: t('admin.reports.status.resolved') },
+            { id: 'dismissed', icon: 'fa-circle-xmark', label: t('admin.reports.status.dismissed') },
           ]}
         />
-        <Show when={rows()} fallback={<p class="text-sm text-muted-foreground">…</p>}>
+        <Show when={rows()}>
           {(list) => (
             <Show when={list().length > 0} fallback={<EmptyState icon="fa-flag" title={t('admin.reports.empty')} size="inline" />}>
               <div class="space-y-1.5">
                 <For each={list()}>
-                  {(r) => (
+                  {(r, i) => (
                     <button
                       type="button"
-                      class={`${settingsRowShell} w-full text-start ${selected() === r.report.id ? 'ring-1 ring-primary/40' : ''}`}
+                      style={{ 'animation-delay': `${Math.min(i() * 30, 300)}ms` }}
+                      class={`admin-row-in ${settingsRowShell} w-full text-start ${
+                        selected() === r.report.id ? 'bg-primary/10 ring-1 ring-inset ring-primary/30' : ''
+                      }`}
                       onClick={() => setSelected(r.report.id)}
                     >
-                      <div class={settingsRowIcon}>
+                      <div class={`${settingsRowIcon} ${selected() === r.report.id ? 'bg-primary/15 text-primary' : ''}`}>
                         <i class={`fa-solid ${r.report.target_type === 'space' ? 'fa-layer-group' : 'fa-user'}`} aria-hidden="true" />
                       </div>
                       <div class="min-w-0 flex-1">
-                        <div class="truncate text-sm font-medium">
-                          {t(`report.reasons.${r.report.reason}`)} · {targetLabel(r)}
+                        <div class="flex items-center gap-1.5">
+                          <span class="inline-flex items-center gap-1 rounded-full bg-destructive/12 px-2 py-0.5 text-[11px] font-medium text-destructive">
+                            <i class="fa-solid fa-flag text-[9px]" aria-hidden="true" />
+                            {t(`report.reasons.${r.report.reason}`)}
+                          </span>
+                          <span class="truncate text-sm font-medium">{targetLabel(r)}</span>
                         </div>
                         <div class="truncate text-xs text-muted-foreground">
                           {t('admin.reports.by', { name: nameOf(r.reporter) })} · {when(r.report.created_at)}
                         </div>
                       </div>
+                      <Show when={selected() === r.report.id}>
+                        <i class="fa-solid fa-chevron-right shrink-0 text-xs text-primary" aria-hidden="true" />
+                      </Show>
                     </button>
                   )}
                 </For>
@@ -897,7 +1020,7 @@ const ReportPanel: Component<{ reportId: string; onOpenUser: (id: string) => voi
   }
 
   return (
-    <Show when={detail()} fallback={<p class="text-sm text-muted-foreground">…</p>}>
+    <Show when={detail()} fallback={<AdminDetailSkeleton banner={false} />}>
       {(d) => (
         <div class="space-y-4">
           <div class={`${settingsGroupFrame} space-y-3`}>
@@ -1115,14 +1238,14 @@ const IPBans: Component = () => {
           </Button>
         </div>
       </form>
-      <Show when={rows()} fallback={<p class="text-sm text-muted-foreground">…</p>}>
+      <Show when={rows()} fallback={<AdminListSkeleton rows={4} />}>
         {(list) => (
           <Show when={list().length > 0} fallback={<EmptyState icon="fa-network-wired" title={t('admin.bans.ipEmpty')} size="inline" />}>
             <div class="space-y-1.5">
               <For each={list()}>
-                {(row) => (
-                  <div class={settingsRowShell}>
-                    <div class={settingsRowIcon}><i class="fa-solid fa-network-wired" aria-hidden="true" /></div>
+                {(row, i) => (
+                  <div style={{ 'animation-delay': `${Math.min(i() * 30, 300)}ms` }} class={`admin-row-in ${settingsRowShell}`}>
+                    <div class={`${settingsRowIcon} bg-destructive/10 text-destructive`}><i class="fa-solid fa-network-wired" aria-hidden="true" /></div>
                     <div class="min-w-0 flex-1">
                       <div class="truncate font-mono text-sm">{row.ban.cidr}</div>
                       <div class="truncate text-xs text-muted-foreground">
@@ -1150,13 +1273,13 @@ const AccountBans: Component<{ onOpenUser: (id: string) => void }> = (props) => 
     void refetch();
   }
   return (
-    <Show when={rows()} fallback={<p class="text-sm text-muted-foreground">…</p>}>
+    <Show when={rows()} fallback={<AdminListSkeleton rows={4} />}>
       {(list) => (
         <Show when={list().length > 0} fallback={<EmptyState icon="fa-ban" title={t('admin.bans.empty')} size="inline" />}>
           <div class="space-y-1.5">
             <For each={list()}>
-              {(row) => (
-                <div class={settingsRowShell}>
+              {(row, i) => (
+                <div style={{ 'animation-delay': `${Math.min(i() * 30, 300)}ms` }} class={`admin-row-in ${settingsRowShell}`}>
                   <MessageAvatar name={nameOf(row.user)} avatar={row.user?.avatar} class="size-9 text-sm" />
                   <div class="min-w-0 flex-1">
                     <button type="button" class="truncate text-sm font-medium hover:underline" onClick={() => props.onOpenUser(row.ban.user_id)}>
@@ -1194,32 +1317,42 @@ const AUDIT_ICON: Record<string, string> = {
 const Audit: Component<{ onOpenUser: (id: string) => void }> = (props) => {
   const [rows] = createResource(() => listAudit());
   return (
-    <Show when={rows()} fallback={<p class="text-sm text-muted-foreground">…</p>}>
+    <Show when={rows()} fallback={<AdminListSkeleton rows={6} />}>
       {(list) => (
         <Show when={list().length > 0} fallback={<EmptyState icon="fa-clock-rotate-left" title={t('admin.audit.empty')} size="inline" />}>
-          <div class="space-y-1.5">
+          <ol class="space-y-1.5">
             <For each={list()}>
-              {(row) => (
-                <div class={settingsRowShell}>
-                  <div class={settingsRowIcon}><i class={`fa-solid ${AUDIT_ICON[row.entry.action] ?? 'fa-circle-info'}`} aria-hidden="true" /></div>
-                  <div class="min-w-0 flex-1">
-                    <div class="truncate text-sm">
-                      <button type="button" class="font-medium hover:underline" onClick={() => props.onOpenUser(row.entry.actor_id)}>{nameOf(row.actor)}</button>{' '}
-                      {t(`admin.audit.actions.${row.entry.action}`, { defaultValue: row.entry.action })}
-                      <Show when={row.entry.target_type === 'user' && row.entry.target_id !== '0'}>
-                        {' '}<button type="button" class="font-mono text-xs text-primary hover:underline" onClick={() => props.onOpenUser(row.entry.target_id)}>{row.entry.target_id}</button>
-                      </Show>
-                      <Show when={row.entry.target_type !== 'user' && row.entry.reason}> · <span class="font-mono text-xs">{row.entry.reason}</span></Show>
-                    </div>
-                    <div class="truncate text-xs text-muted-foreground">
-                      {when(row.entry.created_at)}
-                      <Show when={row.entry.target_type === 'user' && row.entry.reason}> · {row.entry.reason}</Show>
+              {(row, i) => (
+                <li
+                  style={{ 'animation-delay': `${Math.min(i() * 25, 300)}ms` }}
+                  class="admin-row-in relative flex gap-3"
+                >
+                  <div class="relative flex w-9 shrink-0 justify-center">
+                    <span class="absolute inset-y-0 w-px bg-border/70" aria-hidden="true" />
+                    <span class="relative mt-2.5 flex size-8 items-center justify-center rounded-full border border-border bg-card text-muted-foreground">
+                      <i class={`fa-solid ${AUDIT_ICON[row.entry.action] ?? 'fa-circle-info'} text-xs`} aria-hidden="true" />
+                    </span>
+                  </div>
+                  <div class={`${settingsRowShell} min-w-0 flex-1`}>
+                    <div class="min-w-0 flex-1">
+                      <div class="truncate text-sm">
+                        <button type="button" class="font-medium hover:underline" onClick={() => props.onOpenUser(row.entry.actor_id)}>{nameOf(row.actor)}</button>{' '}
+                        {t(`admin.audit.actions.${row.entry.action}`, { defaultValue: row.entry.action })}
+                        <Show when={row.entry.target_type === 'user' && row.entry.target_id !== '0'}>
+                          {' '}<button type="button" class="font-mono text-xs text-primary hover:underline" onClick={() => props.onOpenUser(row.entry.target_id)}>{row.entry.target_id}</button>
+                        </Show>
+                        <Show when={row.entry.target_type !== 'user' && row.entry.reason}> · <span class="font-mono text-xs">{row.entry.reason}</span></Show>
+                      </div>
+                      <div class="truncate text-xs text-muted-foreground">
+                        {when(row.entry.created_at)}
+                        <Show when={row.entry.target_type === 'user' && row.entry.reason}> · {row.entry.reason}</Show>
+                      </div>
                     </div>
                   </div>
-                </div>
+                </li>
               )}
             </For>
-          </div>
+          </ol>
         </Show>
       )}
     </Show>
@@ -1276,7 +1409,7 @@ const SpaceDrawer: Component<{ spaceId: string | null; onClose: () => void; onOp
   return (
     <Show when={props.spaceId}>
       <ResponsiveDialog size="md" zClass={zLayer.modalStacked} onClose={props.onClose} dismissible={!busy()} title={detail()?.space.name ?? '…'} icon="fa-solid fa-layer-group">
-        <Show when={detail()} fallback={<p class="text-sm text-muted-foreground">…</p>}>
+        <Show when={detail()} fallback={<AdminDetailSkeleton banner={false} />}>
           {(d) => (
             <div class="space-y-4">
               <dl class="space-y-1 text-sm">
@@ -1331,10 +1464,102 @@ export default AdminPage;
 /** Admin: the instance's federation allow/block list. Editable runtime entries are merged
  * with the read-only FEDERATION_ALLOWLIST/BLOCKLIST env lists by the server; a non-empty
  * allowlist (from either source) puts the instance in allowlist-only mode. */
+type FedKind = 'allow' | 'block';
+
+const FED_KIND: Record<FedKind, { icon: string; section: string; header: string }> = {
+  allow: { icon: 'fa-circle-check', section: 'border-primary/30', header: 'bg-primary/10 text-primary' },
+  block: { icon: 'fa-ban', section: 'border-destructive/30', header: 'bg-destructive/10 text-destructive' },
+};
+
+/** One domain line in a federation list. `removable` marks admin-added entries; the rest
+ * come from the environment and are read-only. */
+const FedRow: Component<{ dom: string; busy: boolean; removable: boolean; onRemove: (dom: string) => void }> = (props) => (
+  <div class="admin-row-in flex items-center justify-between gap-2 rounded-lg border border-border/60 bg-background/40 px-3 py-2">
+    <span class="truncate font-mono text-sm">{props.dom}</span>
+    <Show
+      when={props.removable}
+      fallback={
+        <span class="shrink-0 rounded-full bg-muted/50 px-2 py-0.5 text-[10px] uppercase tracking-wide text-muted-foreground">
+          {t('admin.federation.fromConfig')}
+        </span>
+      }
+    >
+      <Button variant="ghost" size="sm" disabled={props.busy} onClick={() => props.onRemove(props.dom)} aria-label={t('admin.federation.remove')}>
+        <i class="fa-solid fa-xmark text-xs" aria-hidden="true" /> {t('admin.federation.remove')}
+      </Button>
+    </Show>
+  </div>
+);
+
+/** One federation rule list: header, an add field that already knows whether it allows or
+ * blocks, the entries, and the read-only ones from the environment. Because each list
+ * carries its own form, there is no allow/block switch to miss. */
+const FederationDomainList: Component<{
+  kind: FedKind;
+  entries: PeerPolicyRow[];
+  envEntries: string[];
+  busy: boolean;
+  onAdd: (domain: string) => void;
+  onRemove: (domain: string) => void;
+}> = (props) => {
+  const [value, setValue] = createSignal('');
+  const meta = () => FED_KIND[props.kind];
+  const total = () => props.entries.length + props.envEntries.length;
+
+  function submit(e: Event) {
+    e.preventDefault();
+    const d = value().trim();
+    if (!d) return;
+    props.onAdd(d);
+    setValue('');
+  }
+
+  return (
+    <section class={`flex flex-col overflow-hidden rounded-2xl border bg-card/40 ${meta().section}`}>
+      <header class={`flex items-center gap-2 px-4 py-3 ${meta().header}`}>
+        <i class={`fa-solid ${meta().icon}`} aria-hidden="true" />
+        <h3 class="text-sm font-semibold">
+          {props.kind === 'allow' ? t('admin.federation.allowHeading') : t('admin.federation.blockHeading')}
+        </h3>
+        <span class="ml-auto rounded-full bg-background/50 px-2 py-0.5 text-[11px] font-semibold tabular-nums">{total()}</span>
+      </header>
+      <p class="px-4 pt-3 text-xs text-muted-foreground">
+        {props.kind === 'allow' ? t('admin.federation.allowHint') : t('admin.federation.blockHint')}
+      </p>
+      <form onSubmit={submit} class="flex items-center gap-2 px-4 py-3">
+        <input
+          value={value()}
+          onInput={(e) => setValue(e.currentTarget.value)}
+          placeholder={t('admin.federation.domainPlaceholder')}
+          class="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          autocapitalize="off"
+          autocomplete="off"
+          spellcheck={false}
+          aria-label={props.kind === 'allow' ? t('admin.federation.addAllow') : t('admin.federation.addBlock')}
+        />
+        <Button
+          type="submit"
+          size="sm"
+          variant={props.kind === 'allow' ? 'primary' : 'destructive'}
+          disabled={props.busy || !value().trim()}
+        >
+          <i class={`fa-solid ${props.kind === 'allow' ? 'fa-plus' : 'fa-ban'} text-xs`} aria-hidden="true" />
+          {props.kind === 'allow' ? t('admin.federation.addAllow') : t('admin.federation.addBlock')}
+        </Button>
+      </form>
+      <div class="space-y-1 px-4 pb-4">
+        <For each={props.entries}>{(e) => <FedRow dom={e.domain} busy={props.busy} removable onRemove={props.onRemove} />}</For>
+        <For each={props.envEntries}>{(d) => <FedRow dom={d} busy={props.busy} removable={false} onRemove={props.onRemove} />}</For>
+        <Show when={total() === 0}>
+          <p class="px-0.5 py-1 text-xs text-muted-foreground">{t('admin.federation.empty')}</p>
+        </Show>
+      </div>
+    </section>
+  );
+};
+
 const FederationPanel: Component = () => {
   const [policy, { refetch }] = createResource(listFederationPolicy);
-  const [domain, setDomain] = createSignal('');
-  const [kind, setKind] = createSignal<'allow' | 'block'>('block');
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal('');
 
@@ -1343,15 +1568,11 @@ const FederationPanel: Component = () => {
     return !!p && (p.allow.length > 0 || (p.env_allow?.length ?? 0) > 0);
   };
 
-  async function add(e: Event) {
-    e.preventDefault();
-    const dom = domain().trim();
-    if (!dom) return;
+  async function add(domain: string, kind: FedKind) {
     setBusy(true);
     setError('');
     try {
-      await setFederationPolicy(dom, kind());
-      setDomain('');
+      await setFederationPolicy(domain, kind);
       await refetch();
     } catch {
       setError(t('admin.federation.invalid'));
@@ -1372,111 +1593,71 @@ const FederationPanel: Component = () => {
     }
   }
 
-  const entryRow = (dom: string, onRemove?: () => void) => (
-    <div class={`${settingsRowShell} items-center justify-between`}>
-      <span class="truncate font-mono text-sm">{dom}</span>
-      <Show
-        when={onRemove}
-        fallback={
-          <span class="shrink-0 text-[10px] uppercase tracking-wide text-muted-foreground">
-            {t('admin.federation.fromConfig')}
-          </span>
-        }
-      >
-        <Button variant="ghost" size="sm" disabled={busy()} onClick={onRemove}>
-          <i class="fa-solid fa-xmark text-xs" aria-hidden="true" /> {t('admin.federation.remove')}
-        </Button>
-      </Show>
-    </div>
-  );
-
   return (
-    <div class="mx-auto max-w-2xl space-y-5">
-      <Show when={policy()} fallback={<p class="text-sm text-muted-foreground">{t('common.loading')}</p>}>
+    <div class="space-y-5">
+      <Show when={policy()} fallback={<AdminListSkeleton rows={3} />}>
         {(p) => (
           <Show
             when={p().enabled}
-            fallback={<div class={`${settingsGroupFrame} text-sm text-muted-foreground`}>{t('admin.federation.disabled')}</div>}
+            fallback={
+              <div class={`${settingsGroupFrame} flex items-center gap-3 text-sm text-muted-foreground`}>
+                <i class="fa-solid fa-plug-circle-xmark text-lg" aria-hidden="true" />
+                {t('admin.federation.disabled')}
+              </div>
+            }
           >
-            <div class="space-y-1">
-              <div class={settingsSectionTitle}>{t('admin.federation.title')}</div>
-              <p class="px-0.5 text-xs text-muted-foreground">{t('admin.federation.self', { domain: p().domain })}</p>
+            <div class="flex items-center gap-3">
+              <div class="flex size-11 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-lg text-primary">
+                <i class="fa-solid fa-globe" aria-hidden="true" />
+              </div>
+              <div class="min-w-0">
+                <h2 class="text-base font-semibold">{t('admin.federation.title')}</h2>
+                <p class="truncate text-xs text-muted-foreground">{t('admin.federation.self', { domain: p().domain })}</p>
+              </div>
             </div>
 
             <div
-              class={`rounded-lg border px-3 py-2 text-xs ${
+              class={`flex items-start gap-2.5 rounded-xl border px-3.5 py-3 text-xs ${
                 allowlistActive()
-                  ? 'border-yellow-500/40 bg-yellow-500/10 text-foreground'
-                  : 'border-border/70 bg-background/40 text-muted-foreground'
+                  ? 'border-amber-500/40 bg-amber-500/10 text-foreground'
+                  : 'border-primary/30 bg-primary/5 text-foreground'
               }`}
             >
-              {allowlistActive() ? t('admin.federation.allowlistMode') : t('admin.federation.openMode')}
+              <i
+                class={`fa-solid mt-0.5 ${allowlistActive() ? 'fa-lock text-amber-400' : 'fa-lock-open text-primary'}`}
+                aria-hidden="true"
+              />
+              <span>{allowlistActive() ? t('admin.federation.allowlistMode') : t('admin.federation.openMode')}</span>
             </div>
 
-            <form onSubmit={add} class="flex flex-wrap items-center gap-2">
-              <input
-                value={domain()}
-                onInput={(e) => setDomain(e.currentTarget.value)}
-                placeholder={t('admin.federation.domainPlaceholder')}
-                class="min-w-0 flex-1 rounded-lg border border-border bg-background px-3 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                autocapitalize="off"
-                autocomplete="off"
-                spellcheck={false}
-              />
-              <select
-                value={kind()}
-                onChange={(e) => setKind(e.currentTarget.value as 'allow' | 'block')}
-                class="rounded-lg border border-border bg-background px-2.5 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <option value="block">{t('admin.federation.block')}</option>
-                <option value="allow">{t('admin.federation.allow')}</option>
-              </select>
-              <Button type="submit" size="sm" disabled={busy() || !domain().trim()}>
-                {t('admin.federation.add')}
-              </Button>
-            </form>
             <Show when={error()}>
-              <p class="text-sm text-destructive">{error()}</p>
+              <p class="text-sm text-destructive" role="alert">{error()}</p>
             </Show>
 
-            <section class="space-y-2">
-              <div class={settingsSectionTitle}>{t('admin.federation.allowHeading')}</div>
-              <p class="px-0.5 text-xs text-muted-foreground">{t('admin.federation.allowHint')}</p>
-              <div class="space-y-1">
-                <For
-                  each={p().allow}
-                  fallback={
-                    <Show when={(p().env_allow?.length ?? 0) === 0}>
-                      <p class="px-0.5 text-xs text-muted-foreground">{t('admin.federation.empty')}</p>
-                    </Show>
-                  }
-                >
-                  {(e) => entryRow(e.domain, () => void remove(e.domain))}
-                </For>
-                <For each={p().env_allow}>{(d) => entryRow(d)}</For>
-              </div>
-            </section>
-
-            <section class="space-y-2">
-              <div class={settingsSectionTitle}>{t('admin.federation.blockHeading')}</div>
-              <p class="px-0.5 text-xs text-muted-foreground">{t('admin.federation.blockHint')}</p>
-              <div class="space-y-1">
-                <For
-                  each={p().block}
-                  fallback={
-                    <Show when={(p().env_block?.length ?? 0) === 0}>
-                      <p class="px-0.5 text-xs text-muted-foreground">{t('admin.federation.empty')}</p>
-                    </Show>
-                  }
-                >
-                  {(e) => entryRow(e.domain, () => void remove(e.domain))}
-                </For>
-                <For each={p().env_block}>{(d) => entryRow(d)}</For>
-              </div>
-            </section>
+            <div class="grid gap-5 lg:grid-cols-2">
+              <FederationDomainList
+                kind="allow"
+                entries={p().allow}
+                envEntries={p().env_allow ?? []}
+                busy={busy()}
+                onAdd={(d) => void add(d, 'allow')}
+                onRemove={(d) => void remove(d)}
+              />
+              <FederationDomainList
+                kind="block"
+                entries={p().block}
+                envEntries={p().env_block ?? []}
+                busy={busy()}
+                onAdd={(d) => void add(d, 'block')}
+                onRemove={(d) => void remove(d)}
+              />
+            </div>
 
             <Show when={(p().env_allow?.length ?? 0) + (p().env_block?.length ?? 0) > 0}>
-              <p class="px-0.5 text-xs text-muted-foreground">{t('admin.federation.envHint')}</p>
+              <p class="flex items-center gap-2 text-xs text-muted-foreground">
+                <i class="fa-solid fa-circle-info text-[11px]" aria-hidden="true" />
+                {t('admin.federation.envHint')}
+              </p>
             </Show>
           </Show>
         )}

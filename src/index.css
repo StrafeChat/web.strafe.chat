@@ -194,6 +194,17 @@ html[data-density='spacious'] {
   .dialog-panel-in.dialog-sheet { animation-name: dialog-sheet-in; }
 }
 
+/* Admin console: the whole panel fades up as you switch tabs, and list rows stagger in.
+   `both` on the rows keeps them at opacity 1 after the run (no retained transform on the
+   panel itself, so portaled dialogs are never trapped by a containing block). Reduce-motion
+   stills all of this via the html.reduce-motion rule above. */
+@keyframes admin-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.admin-panel-in { animation: admin-fade-up 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
+.admin-row-in { animation: admin-fade-up 0.26s cubic-bezier(0.22, 1, 0.36, 1) both; }
+
 /* Emoji drawn from an image provider (Twemoji etc.): inline, sized to the text, vertically
    centred on the x-height like a native glyph would be. Jumbo = an emoji-only message. */
 img.emoji {
