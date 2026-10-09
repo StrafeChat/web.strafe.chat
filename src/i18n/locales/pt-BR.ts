@@ -680,6 +680,14 @@ export default {
   },
   e2ee: {
     environmentTitle: 'Criptografia indisponível nesta aba',
+    storeTitle: 'A criptografia precisa ser redefinida neste dispositivo',
+    storeBody:
+      'O armazenamento de criptografia deste dispositivo não pode ser aberto, então mensagens criptografadas não podem ser lidas nem enviadas aqui. Isso acontece quando o mecanismo web do app é mais antigo do que o que criou o armazenamento (depois de trocar para outra compilação do app de desktop, por exemplo) ou quando o armazenamento está danificado.',
+    storeConsequence:
+      'Redefinir dá a este dispositivo uma nova identidade de criptografia. Seu histórico de mensagens volta do seu backup de recuperação assim que você digitar seu código de recuperação; o que nunca foi salvo no backup continua ilegível.',
+    storeReset: 'Redefinir criptografia',
+    storeLater: 'Agora não',
+    storeResetFailed: 'A redefinição não foi concluída: {{error}}',
   },
   recovery: {
     createTitle: 'Guarde seu código de recuperação',
@@ -2182,8 +2190,10 @@ export default {
       codeTitle: 'Seu código de criptografia',
       safetyNumber: 'Número de segurança deste dispositivo',
       safetyHint: 'Compartilhe com um contato (pessoalmente ou por outro canal) para que ele confira se bate com o que o app dele mostra sobre você.',
+      storeUnusable: 'O armazenamento de criptografia deste dispositivo não pode ser aberto. Redefina-o para voltar a usar mensagens criptografadas aqui.',
       backupTitle: 'Backup de recuperação',
       backupChecking: 'Verificando…',
+      backupUnknown: 'Não foi possível verificar: a criptografia não está funcionando neste dispositivo.',
       backupName: 'Backup do histórico de mensagens',
       backupOn: 'Ativado. Um novo dispositivo pode restaurar seu histórico de mensagens com seu código de recuperação.',
       backupMissing: 'Desativado. Um novo dispositivo ou navegador não conseguirá ler as mensagens que já existem nesta conta.',
@@ -2524,7 +2534,8 @@ export default {
     },
     passkeyUnavailable: 'Chaves de acesso ainda não estão disponíveis no app para desktop. Use o seu app autenticador ou um código de recuperação.',
     discord: {
-      inCall: 'Em uma chamada de voz',
+      tagline: 'Conversando com segurança com outros Strafers!',
+      stateInCall: '{{domain}} · Em uma chamada de voz',
     },
     settings: {
       updatesTitle: 'Atualizações',

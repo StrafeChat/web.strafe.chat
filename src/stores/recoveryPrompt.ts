@@ -38,12 +38,16 @@ export interface RecoveryPromptState {
   lastSubmitError: string | null;
   /** Web Crypto unavailable (an insecure context) - not a wrong answer, a broken environment. */
   e2eeEnvironmentError: string | null;
+  /** This device's encryption store cannot be opened (lib/e2ee/machine E2eeStoreUnusableError);
+   * the dialog offers the reset. `store` and `detail` are its fine print. */
+  e2eeStoreError: { store: string; detail: string } | null;
 }
 
 export const [recoveryPrompt, setRecoveryPrompt] = createStore<RecoveryPromptState>({
   pending: null,
   lastSubmitError: null,
   e2eeEnvironmentError: null,
+  e2eeStoreError: null,
 });
 
 function open(kind: RecoveryPromptKind, code: string | undefined, retainError: boolean): Promise<string> {

@@ -673,6 +673,14 @@ export default {
   },
   e2ee: {
     environmentTitle: 'Verschlüsselung in diesem Tab nicht verfügbar',
+    storeTitle: 'Die Verschlüsselung auf diesem Gerät muss zurückgesetzt werden',
+    storeBody:
+      'Der Verschlüsselungsspeicher dieses Geräts lässt sich nicht öffnen, daher können verschlüsselte Nachrichten hier weder gelesen noch gesendet werden. Das passiert, wenn die Web-Engine der App älter ist als die, die den Speicher angelegt hat (zum Beispiel nach dem Wechsel zu einem anderen Build der Desktop-App), oder wenn der Speicher beschädigt ist.',
+    storeConsequence:
+      'Beim Zurücksetzen erhält dieses Gerät eine neue Verschlüsselungsidentität. Dein Nachrichtenverlauf kommt aus deinem Wiederherstellungs-Backup zurück, sobald du deinen Wiederherstellungscode eingibst; was nie gesichert wurde, bleibt unlesbar.',
+    storeReset: 'Verschlüsselung zurücksetzen',
+    storeLater: 'Nicht jetzt',
+    storeResetFailed: 'Das Zurücksetzen ist fehlgeschlagen: {{error}}',
   },
   recovery: {
     createTitle: 'Sichere deinen Wiederherstellungscode',
@@ -2173,8 +2181,10 @@ export default {
       codeTitle: 'Dein Verschlüsselungscode',
       safetyNumber: 'Sicherheitsnummer dieses Geräts',
       safetyHint: 'Teile sie mit einem Kontakt (persönlich oder über einen anderen Kanal), damit er prüfen kann, ob sie mit dem übereinstimmt, was seine App für dich anzeigt.',
+      storeUnusable: 'Der Verschlüsselungsspeicher dieses Geräts lässt sich nicht öffnen. Setze ihn zurück, um hier wieder verschlüsselte Nachrichten zu nutzen.',
       backupTitle: 'Wiederherstellungs-Backup',
       backupChecking: 'Wird geprüft…',
+      backupUnknown: 'Konnte nicht geprüft werden - die Verschlüsselung funktioniert auf diesem Gerät nicht.',
       backupName: 'Backup des Nachrichtenverlaufs',
       backupOn: 'Ein. Ein neues Gerät kann deinen Nachrichtenverlauf mit deinem Wiederherstellungscode wiederherstellen.',
       backupMissing: 'Aus. Ein neues Gerät oder ein neuer Browser kann die bereits in diesem Konto vorhandenen Nachrichten nicht lesen.',
@@ -2515,7 +2525,8 @@ export default {
     },
     passkeyUnavailable: 'Passkeys sind in der Desktop-App noch nicht verfügbar. Nutze deine Authenticator-App oder einen Wiederherstellungscode.',
     discord: {
-      inCall: 'In einem Sprachanruf',
+      tagline: 'Sicher chatten mit anderen Strafern!',
+      stateInCall: '{{domain}} · In einem Sprachanruf',
     },
     settings: {
       updatesTitle: 'Updates',

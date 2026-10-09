@@ -674,6 +674,14 @@ export default {
   },
   e2ee: {
     environmentTitle: 'Encryption unavailable in this tab',
+    storeTitle: 'Encryption needs a reset on this device',
+    storeBody:
+      "This device's encryption store cannot be opened, so encrypted messages cannot be read or sent here. That happens when the app's web engine is older than the one that created the store (after switching to a different build of the desktop app, for example), or when the store is damaged.",
+    storeConsequence:
+      'Resetting gives this device a fresh encryption identity. Your message history comes back from your recovery backup once you enter your recovery code; anything that was never backed up stays unreadable.',
+    storeReset: 'Reset encryption',
+    storeLater: 'Not now',
+    storeResetFailed: 'The reset did not go through: {{error}}',
   },
   recovery: {
     createTitle: 'Save your recovery code',
@@ -2176,8 +2184,10 @@ export default {
       codeTitle: 'Your encryption code',
       safetyNumber: "This device's safety number",
       safetyHint: 'Share this with a contact (in person, or another channel) so they can verify it matches what their app shows for you.',
+      storeUnusable: "This device's encryption store cannot be opened. Reset it to use encrypted messages here again.",
       backupTitle: 'Recovery backup',
       backupChecking: 'Checking…',
+      backupUnknown: 'Could not check - encryption is not working on this device.',
       backupName: 'Message history backup',
       backupOn: 'On. A new device can restore your message history with your recovery code.',
       backupMissing: 'Off. A new device or browser will not be able to read the messages already in this account.',
@@ -2518,7 +2528,8 @@ export default {
     },
     passkeyUnavailable: 'Passkeys are not available in the desktop app yet. Use your authenticator app or a recovery code.',
     discord: {
-      inCall: 'In a voice call',
+      tagline: 'Securely chatting with other Strafers!',
+      stateInCall: '{{domain}} · In a voice call',
     },
     settings: {
       updatesTitle: 'Updates',

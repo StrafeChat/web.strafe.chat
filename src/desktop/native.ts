@@ -152,6 +152,18 @@ export const desktopAutostart = {
   disable: autostartDisable,
 };
 
+// ---- storage ------------------------------------------------------------------------------------
+
+/**
+ * Wipe the webview's IndexedDB for the app origin and relaunch. The shell does it at the next
+ * start, before the webview exists, because WebKit's database server crashes on a store it
+ * cannot read and takes every in-page deletion down with it (see E2eeEnvironmentModal).
+ * Never resolves on success: the process restarts.
+ */
+export function wipeWebviewStorageAndRestart(): Promise<void> {
+  return invoke('desktop_wipe_webview_storage');
+}
+
 // ---- Discord -----------------------------------------------------------------------------------
 
 /** What Discord shows under "Playing Strafe" (the shell owns the connection: src-tauri/src/discord.rs). */

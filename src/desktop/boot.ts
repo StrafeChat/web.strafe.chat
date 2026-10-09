@@ -10,6 +10,9 @@ import { markDesktopReady, nativeNotificationsGranted, setDiscordPresence, setUn
 import { scheduleDesktopUpdateChecks } from './updater';
 import { readState } from '../stores/readState';
 import { voice } from '../stores/voice';
+import { auth } from '../stores/auth';
+import { instance } from '../stores/instance';
+import { getDesktopInstance } from './instanceOverride';
 import { t } from '../i18n';
 
 let started = false;
@@ -45,16 +48,22 @@ async function start(): Promise<void> {
       void setUnreadBadge(n).catch(() => undefined);
     });
 
-    // What Discord shows under "Playing Strafe": whether we are in a call, and since when.
-    // That is all Discord ever learns - never which space, room or instance. The shell
-    // decides whether to show anything at all (the Settings toggle, the window being open).
+    // What Discord shows under "Playing Strafe": the tagline, and beneath it the instance the
+    // person is signed in to (its own name for itself, or the host it was reached at), with
+    // "in a voice call" and the call's start while one is on. Never a space or a room. The
+    // shell decides whether to show anything at all (the Settings toggle, the window open).
     let callSince = 0;
     createEffect(() => {
       const status = voice.session.status;
       const inCall = (status === 'connected' || status === 'reconnecting') && voice.session.roomId !== null;
       if (!inCall) callSince = 0;
       else if (!callSince) callSince = Date.now();
-      const presence: DiscordPresence = inCall ? { details: t('desktop.discord.inCall'), since: callSince } : {};
+      const domain = auth.user ? instance.domain || getDesktopInstance()?.domain || '' : '';
+      const presence: DiscordPresence = {
+        details: t('desktop.discord.tagline'),
+        ...(domain ? { state: inCall ? t('desktop.discord.stateInCall', { domain }) : domain } : {}),
+        ...(inCall ? { since: callSince } : {}),
+      };
       void setDiscordPresence(presence).catch(() => undefined);
     });
   });

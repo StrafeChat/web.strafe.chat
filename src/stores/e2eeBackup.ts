@@ -37,6 +37,7 @@ import { getBackupVersion } from '../api/devices';
 import { confirmDialog } from './confirmDialog';
 import { retryPendingDecrypts } from './messages';
 import { E2eeUnavailableError } from '../lib/e2ee/subtle';
+import { E2eeStoreUnusableError } from '../lib/e2ee/machine';
 import {
   cancelRecoveryPrompt,
   promptLegacyPin,
@@ -69,6 +70,21 @@ function scheduleDecryptResweep(): void {
  * three times in a row on a device whose user had done nothing wrong.
  */
 function handledAsEnvironmentFailure(e: unknown): boolean {
+  return surfaceE2eeEnvironmentFailure(e);
+}
+
+/**
+ * Show the person what is wrong with encryption on this device, if `e` is one of the two
+ * failures that are the device's and not theirs: Web Crypto missing (above), or a local store
+ * that cannot be opened (E2eeStoreUnusableError - the dialog offers the reset). Returns
+ * whether it was one of those; anything else is the caller's to handle.
+ */
+export function surfaceE2eeEnvironmentFailure(e: unknown): boolean {
+  if (e instanceof E2eeStoreUnusableError) {
+    setRecoveryPrompt('e2eeStoreError', { store: e.storeName, detail: e.detail });
+    cancelRecoveryPrompt();
+    return true;
+  }
   if (!(e instanceof E2eeUnavailableError)) return false;
   setRecoveryPrompt('e2eeEnvironmentError', e.message);
   cancelRecoveryPrompt();

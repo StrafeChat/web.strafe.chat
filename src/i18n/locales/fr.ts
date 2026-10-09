@@ -680,6 +680,14 @@ export default {
   },
   e2ee: {
     environmentTitle: 'Chiffrement indisponible dans cet onglet',
+    storeTitle: 'Le chiffrement doit être réinitialisé sur cet appareil',
+    storeBody:
+      "Le stockage de chiffrement de cet appareil ne peut pas être ouvert : les messages chiffrés ne peuvent donc ni être lus ni envoyés ici. Cela arrive quand le moteur web de l'application est plus ancien que celui qui a créé le stockage (après un changement de version de l'application de bureau, par exemple), ou quand le stockage est endommagé.",
+    storeConsequence:
+      "La réinitialisation donne à cet appareil une nouvelle identité de chiffrement. Votre historique revient depuis votre sauvegarde de récupération dès que vous saisissez votre code de récupération ; ce qui n'a jamais été sauvegardé reste illisible.",
+    storeReset: 'Réinitialiser le chiffrement',
+    storeLater: 'Pas maintenant',
+    storeResetFailed: "La réinitialisation n'a pas abouti : {{error}}",
   },
   recovery: {
     createTitle: 'Enregistrez votre code de récupération',
@@ -2182,8 +2190,10 @@ export default {
       codeTitle: 'Votre code de chiffrement',
       safetyNumber: 'Numéro de sécurité de cet appareil',
       safetyHint: "Partagez-le avec un contact (en personne ou par un autre canal) pour qu'il vérifie qu'il correspond à ce que son application affiche pour vous.",
+      storeUnusable: 'Le stockage de chiffrement de cet appareil ne peut pas être ouvert. Réinitialisez-le pour réutiliser les messages chiffrés ici.',
       backupTitle: 'Sauvegarde de récupération',
       backupChecking: 'Vérification…',
+      backupUnknown: 'Vérification impossible : le chiffrement ne fonctionne pas sur cet appareil.',
       backupName: 'Sauvegarde de l’historique',
       backupOn: 'Activée. Un nouvel appareil peut restaurer votre historique de messages avec votre code de récupération.',
       backupMissing: 'Désactivée. Un nouvel appareil ou navigateur ne pourra pas lire les messages déjà présents sur ce compte.',
@@ -2524,7 +2534,8 @@ export default {
     },
     passkeyUnavailable: "Les clés d'accès ne sont pas encore disponibles dans l'application de bureau. Utilisez votre application d'authentification ou un code de récupération.",
     discord: {
-      inCall: 'En appel vocal',
+      tagline: "Discussions sécurisées avec d'autres Strafers !",
+      stateInCall: '{{domain}} · En appel vocal',
     },
     settings: {
       updatesTitle: 'Mises à jour',

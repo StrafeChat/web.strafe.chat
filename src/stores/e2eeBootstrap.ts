@@ -11,13 +11,20 @@
  */
 import { ensureDevice } from '../lib/e2ee';
 import { claimBackupBootstrap } from '../lib/e2ee/keyBackup';
-import { runBackupFlow } from './e2eeBackup';
+import { runBackupFlow, surfaceE2eeEnvironmentFailure } from './e2eeBackup';
 
 /** Runs once per user per session; sign-out clears the claim so a re-login runs it again. */
 export async function bootstrapE2EEDevice(userId: string): Promise<void> {
   if (!claimBackupBootstrap(userId)) return;
 
-  await ensureDevice(userId);
+  try {
+    await ensureDevice(userId);
+  } catch (e) {
+    // A store this device cannot open, or no Web Crypto: tell the person (with the way out)
+    // rather than leaving a blank safety number and unreadable rooms to speak for it.
+    if (surfaceE2eeEnvironmentFailure(e)) return;
+    throw e;
+  }
 
   try {
     await runBackupFlow(userId);

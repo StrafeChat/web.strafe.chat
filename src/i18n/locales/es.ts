@@ -680,6 +680,14 @@ export default {
   },
   e2ee: {
     environmentTitle: 'Cifrado no disponible en esta pestaña',
+    storeTitle: 'Hay que restablecer el cifrado en este dispositivo',
+    storeBody:
+      'No se puede abrir el almacén de cifrado de este dispositivo, así que aquí no se pueden leer ni enviar mensajes cifrados. Ocurre cuando el motor web de la app es más antiguo que el que creó el almacén (por ejemplo, tras cambiar a otra compilación de la app de escritorio) o cuando el almacén está dañado.',
+    storeConsequence:
+      'Al restablecer, este dispositivo recibe una identidad de cifrado nueva. Tu historial de mensajes vuelve desde tu copia de seguridad de recuperación en cuanto introduzcas tu código de recuperación; lo que nunca se respaldó seguirá sin poder leerse.',
+    storeReset: 'Restablecer cifrado',
+    storeLater: 'Ahora no',
+    storeResetFailed: 'El restablecimiento no se completó: {{error}}',
   },
   recovery: {
     createTitle: 'Guarda tu código de recuperación',
@@ -2182,8 +2190,10 @@ export default {
       codeTitle: 'Tu código de cifrado',
       safetyNumber: 'Número de seguridad de este dispositivo',
       safetyHint: 'Compártelo con un contacto (en persona o por otro canal) para que compruebe que coincide con lo que su app muestra de ti.',
+      storeUnusable: 'No se puede abrir el almacén de cifrado de este dispositivo. Restablécelo para volver a usar mensajes cifrados aquí.',
       backupTitle: 'Copia de recuperación',
       backupChecking: 'Comprobando…',
+      backupUnknown: 'No se pudo comprobar: el cifrado no funciona en este dispositivo.',
       backupName: 'Copia del historial de mensajes',
       backupOn: 'Activada. Un dispositivo nuevo puede restaurar tu historial de mensajes con tu código de recuperación.',
       backupMissing: 'Desactivada. Un dispositivo o navegador nuevo no podrá leer los mensajes que ya hay en esta cuenta.',
@@ -2524,7 +2534,8 @@ export default {
     },
     passkeyUnavailable: 'Las llaves de acceso aún no están disponibles en la app de escritorio. Usa tu app de autenticación o un código de recuperación.',
     discord: {
-      inCall: 'En una llamada de voz',
+      tagline: '¡Chateando de forma segura con otros Strafers!',
+      stateInCall: '{{domain}} · En una llamada de voz',
     },
     settings: {
       updatesTitle: 'Actualizaciones',

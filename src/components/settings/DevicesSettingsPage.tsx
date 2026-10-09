@@ -1,7 +1,8 @@
 import type { Component } from 'solid-js';
 import { createSignal, onMount, For, Show } from 'solid-js';
 import { listOwnDevices, revokeDevice, type DeviceInfo } from '../../api/devices';
-import { getMachine, getCurrentDeviceId } from '../../lib/e2ee/machine';
+import { E2eeStoreUnusableError, getMachine, getCurrentDeviceId } from '../../lib/e2ee/machine';
+import { setRecoveryPrompt } from '../../stores/recoveryPrompt';
 import { getOwnFingerprint, getBackupStatus, hasLegacyPinBackup, type BackupStatus } from '../../lib/e2ee';
 import {
   createBackupWithPrompt,
@@ -34,6 +35,9 @@ export const DevicesSettingsPage: Component = () => {
   const [backupBusy, setBackupBusy] = createSignal(false);
   const [backupError, setBackupError] = createSignal('');
   const [copied, setCopied] = createSignal(false);
+  // The engine could not open this device's store: the safety-number row says so and offers
+  // the reset dialog, instead of a dash and a backup that is forever "checking".
+  const [storeError, setStoreError] = createSignal<E2eeStoreUnusableError | null>(null);
 
   const thisDeviceId = () => getCurrentDeviceId();
 
@@ -52,10 +56,16 @@ export const DevicesSettingsPage: Component = () => {
       }
     } catch (e) {
       console.error('[e2ee] failed to load devices', e);
-      setError(t('settings.devices.loadFailed'));
+      if (e instanceof E2eeStoreUnusableError) setStoreError(e);
+      else setError(t('settings.devices.loadFailed'));
     } finally {
       setLoading(false);
     }
+  }
+
+  function openStoreReset() {
+    const err = storeError();
+    if (err) setRecoveryPrompt('e2eeStoreError', { store: err.storeName, detail: err.detail });
   }
 
   onMount(refresh);
@@ -80,7 +90,7 @@ export const DevicesSettingsPage: Component = () => {
 
   const backupSummary = () => {
     const status = backup();
-    if (!status) return t('settings.devices.backupChecking');
+    if (!status) return loading() ? t('settings.devices.backupChecking') : t('settings.devices.backupUnknown');
     return status.exists ? t('settings.devices.backupOn') : t('settings.devices.backupMissing');
   };
 
@@ -132,11 +142,25 @@ export const DevicesSettingsPage: Component = () => {
               {ownFingerprint() || (loading() ? t('common.loading') : '—')}
             </p>
             <p class="mt-1.5 text-xs leading-snug text-muted-foreground">{t('settings.devices.safetyHint')}</p>
+            <Show when={storeError()}>
+              <p class="mt-2 text-xs leading-snug text-destructive" role="alert">
+                {t('settings.devices.storeUnusable')}
+              </p>
+            </Show>
           </div>
-          <Button size="sm" variant="outline" class="shrink-0" disabled={!ownFingerprint()} onClick={copyFingerprint}>
-            <i class={`fa-solid ${copied() ? 'fa-check' : 'fa-copy'} text-xs`} aria-hidden="true" />
-            {copied() ? t('common.copied') : t('common.copy')}
-          </Button>
+          <Show
+            when={storeError()}
+            fallback={
+              <Button size="sm" variant="outline" class="shrink-0" disabled={!ownFingerprint()} onClick={copyFingerprint}>
+                <i class={`fa-solid ${copied() ? 'fa-check' : 'fa-copy'} text-xs`} aria-hidden="true" />
+                {copied() ? t('common.copied') : t('common.copy')}
+              </Button>
+            }
+          >
+            <Button size="sm" variant="outline" class="shrink-0" onClick={openStoreReset}>
+              {t('e2ee.storeReset')}
+            </Button>
+          </Show>
         </div>
       </section>
 

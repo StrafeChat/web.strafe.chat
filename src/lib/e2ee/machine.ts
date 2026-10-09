@@ -7,6 +7,39 @@ const DB_NAME_PREFIX = 'strafe-e2ee-';
 const PASSPHRASE_DB = 'strafe-e2ee-store-key';
 const PASSPHRASE_STORE = 'passphrase';
 
+/**
+ * The local store exists but cannot be used: IndexedDB refused to open it, or the engine
+ * could not read it. Seen in the field when the web engine is *older* than the one that
+ * wrote the store - the desktop app's bundled WebKitGTK after switching from a locally built
+ * AppImage (2.52) to the CI one (2.50), whose IndexedDB files carry a metadata version the
+ * older engine rejects - and it would equally cover a damaged file or a lost passphrase.
+ *
+ * Nothing in the account is lost: room keys come back from the recovery backup. What has to
+ * go is this device's identity, so the fix (resetLocalE2eeStore) is offered to the person
+ * rather than applied silently. Until then every encrypt/decrypt rejects with this, which is
+ * what lets the UI say what is wrong instead of showing a blank safety number and a backup
+ * status that never finishes "checking".
+ */
+export class E2eeStoreUnusableError extends Error {
+  /** `name: message` of the underlying failure, for the dialog's fine print. */
+  readonly detail: string;
+
+  constructor(
+    readonly storeName: string,
+    cause: unknown,
+  ) {
+    const detail = describeError(cause);
+    super(`E2EE store ${storeName} cannot be used: ${detail}`);
+    this.name = 'E2eeStoreUnusableError';
+    this.detail = detail;
+  }
+}
+
+function describeError(e: unknown): string {
+  if (e instanceof Error) return e.name && e.name !== 'Error' ? `${e.name}: ${e.message}` : e.message;
+  return String(e);
+}
+
 let wasmInitialized: Promise<void> | null = null;
 function ensureWasm(): Promise<void> {
   if (!wasmInitialized) wasmInitialized = initAsync().then(() => undefined);
@@ -38,6 +71,14 @@ function passphraseKey(userId: string): string {
 }
 
 async function getOrCreateStorePassphrase(userId: string): Promise<string> {
+  try {
+    return await readOrCreateStorePassphrase(userId);
+  } catch (e) {
+    throw new E2eeStoreUnusableError(PASSPHRASE_DB, e);
+  }
+}
+
+function readOrCreateStorePassphrase(userId: string): Promise<string> {
   return new Promise((resolve, reject) => {
     const req = indexedDB.open(PASSPHRASE_DB, 1);
     req.onupgradeneeded = () => {
@@ -179,14 +220,109 @@ function deleteDatabase(name: string): Promise<void> {
  * Wipe the engine's local store for one store name. The wasm SDK keeps a store as two
  * IndexedDB databases named `<store>::matrix-sdk-crypto` and `<store>::matrix-sdk-crypto-meta`
  * - deleting only `<store>` itself is a silent no-op, which leaves the next initialize
- * tripping over the very account the wipe was meant to discard.
+ * tripping over the very account the wipe was meant to discard. `strict` rethrows a failed
+ * delete instead of logging it, for the reset a person asked for.
  */
-async function deleteStore(storeName: string): Promise<void> {
+async function deleteStore(storeName: string, opts: { strict?: boolean } = {}): Promise<void> {
   await Promise.all([
     `${storeName}::matrix-sdk-crypto`,
     `${storeName}::matrix-sdk-crypto-meta`,
     storeName,
-  ].map((name) => deleteDatabase(name).catch((err) => console.warn('[e2ee] could not delete store', name, err))));
+  ].map((name) =>
+    deleteDatabase(name).catch((err) => {
+      if (opts.strict) throw err;
+      console.warn('[e2ee] could not delete store', name, err);
+    }),
+  ));
+}
+
+/**
+ * Can the passphrase database be opened at all? It is shared by every account on this
+ * origin, so a reset leaves it alone when it works (the other accounts' stores stay
+ * readable) and drops it only when it is as unreadable as the store that triggered the
+ * reset. Opening a database that does not exist creates an empty one; that case reports
+ * false so the caller deletes the empty shell and the next start creates it properly.
+ */
+function passphraseDbUsable(): Promise<boolean> {
+  return new Promise((resolve) => {
+    let created = false;
+    let req: IDBOpenDBRequest;
+    try {
+      req = indexedDB.open(PASSPHRASE_DB);
+    } catch {
+      resolve(false);
+      return;
+    }
+    req.onupgradeneeded = () => {
+      created = true;
+    };
+    req.onsuccess = () => {
+      req.result.close();
+      resolve(!created);
+    };
+    req.onerror = () => resolve(false);
+    // Another page holds it open: it exists and works.
+    req.onblocked = () => resolve(true);
+  });
+}
+
+/**
+ * Throw away this device's encryption identity because its store cannot be used (see
+ * E2eeStoreUnusableError), so the next start provisions a fresh device and the backup flow
+ * offers to restore history. The old device is revoked server-side (best effort) so peers
+ * stop encrypting to keys nobody can read any more. The caller reloads the page afterwards:
+ * every store, the gateway and the engine belong to one device identity.
+ */
+export async function resetLocalE2eeStore(userId: string): Promise<void> {
+  // The scope needs the instance's domain, which getMachine had loaded before it failed;
+  // make sure of it in case this runs from a page that never got that far.
+  await loadInstanceInfo();
+  const scope = identityScope(userId);
+  const oldDeviceId = readLocalDeviceId(scope);
+  await deleteStore(storeNameFor(userId), { strict: true });
+  if (!(await passphraseDbUsable())) await deleteDatabase(PASSPHRASE_DB);
+  try {
+    localStorage.removeItem(`${LOCAL_DEVICE_KEY}:${scope}`);
+  } catch {
+    // Worst case the next start finds the old id, fails to open the (now missing) store
+    // and provisions a fresh device through the mismatch path.
+  }
+  if (oldDeviceId) {
+    revokeDevice(oldDeviceId).catch((err) => console.warn('[e2ee] could not revoke device', oldDeviceId, 'after a store reset', err));
+  }
+  machinePromise = null;
+  currentUserId = null;
+  currentDeviceId = null;
+  console.warn('[e2ee] local store reset for', toMatrixUserId(userId), '- a fresh device will be provisioned');
+}
+
+/**
+ * The part of a reset that does not touch IndexedDB, for when something else wipes the
+ * stores (the desktop shell, at restart): revoke this user's device and forget *every*
+ * account's device id on this origin. All of their stores go with the wipe, and a device id
+ * that outlives its store would make the engine recreate that device with new keys under the
+ * old id - which the server already holds keys for, so peers would keep encrypting to keys
+ * nobody has. A fresh id per account avoids that.
+ */
+export async function forgetLocalDeviceIdentities(userId: string): Promise<void> {
+  await loadInstanceInfo();
+  const oldDeviceId = readLocalDeviceId(identityScope(userId));
+  if (oldDeviceId) {
+    try {
+      await revokeDevice(oldDeviceId);
+    } catch (err) {
+      console.warn('[e2ee] could not revoke device', oldDeviceId, 'before a storage wipe', err);
+    }
+  }
+  try {
+    const keys = Object.keys(localStorage).filter((k) => k.startsWith(`${LOCAL_DEVICE_KEY}:`));
+    for (const k of keys) localStorage.removeItem(k);
+  } catch {
+    // The mismatch path still ends up provisioning a fresh device.
+  }
+  machinePromise = null;
+  currentUserId = null;
+  currentDeviceId = null;
 }
 
 /**
@@ -220,7 +356,8 @@ async function openMachine(userId: string, deviceId: string, passphrase: string)
       return { machine, deviceId: created.device_id };
     }
     const storedDeviceId = mismatchedStoreDeviceId(e);
-    if (!storedDeviceId) throw e;
+    // Not a device or user mismatch: the store itself cannot be opened or read.
+    if (!storedDeviceId) throw new E2eeStoreUnusableError(storeName, e);
     let storedStillRegistered = false;
     try {
       storedStillRegistered = (await listOwnDevices()).some((d) => d.device_id === storedDeviceId);
