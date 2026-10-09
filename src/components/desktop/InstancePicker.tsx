@@ -1,9 +1,9 @@
 import type { Component } from 'solid-js';
-import { createSignal, onCleanup, onMount, Show } from 'solid-js';
+import { createEffect, createSignal, on, onCleanup, onMount, Show } from 'solid-js';
 import { fieldLabelClass, inputBaseClass, inputErrorClass } from '../ui/Input';
 import { InstanceResolveError, resolveInstance, type InstanceResolveCode, type ResolvedInstance } from '../../desktop/instance';
 import { setDesktopInstance } from '../../desktop/instanceOverride';
-import { lastDesktopInstance } from '../../desktop/accounts';
+import { desktopAccountsLoaded, lastDesktopInstance } from '../../desktop/accounts';
 import { loadInstanceInfo, resetInstanceInfo } from '../../stores/instance';
 import { t } from '../../i18n';
 
@@ -27,6 +27,25 @@ export const InstancePicker: Component<{ disabled?: boolean; onReady: (ready: bo
   let inflight: AbortController | undefined;
 
   onMount(() => props.onReady(status() === 'ok'));
+
+  // The account file is read after the page is up. Once it is, an empty field takes the
+  // instance of the most recent account - the way a browser is already "on" its instance -
+  // so a cold start lands with the right one chosen and the form ready.
+  createEffect(
+    on(desktopAccountsLoaded, (loaded) => {
+      if (!loaded || value().trim() || status() !== 'idle') return;
+      const inst = lastDesktopInstance();
+      if (!inst) return;
+      setValue(inst.domain);
+      setResolved(inst);
+      setStatus('ok');
+      setDesktopInstance({ domain: inst.domain, apiUrl: inst.apiUrl, stargateUrl: inst.stargateUrl });
+      resetInstanceInfo();
+      void loadInstanceInfo();
+      props.onReady(true);
+    }),
+  );
+
   onCleanup(() => {
     inflight?.abort();
     if (timer) window.clearTimeout(timer);
