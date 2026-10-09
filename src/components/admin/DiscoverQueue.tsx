@@ -9,9 +9,10 @@ import {
 import { Button } from '../ui/Button';
 import { EmptyState } from '../ui/EmptyState';
 import { ResponsiveDialog } from '../ui/ResponsiveDialog';
-import { Tabs } from '../ui/Tabs';
 import { Textarea } from '../ui/Textarea';
 import { MessageAvatar } from '../messageList/MessageAvatar';
+import { AdminFilterTabs } from './AdminTabs';
+import { AdminListSkeleton } from './AdminLoading';
 import { confirmDialog } from '../../stores/confirmDialog';
 import { settingsRowShell } from '../settings/settingsChrome';
 import { appDialogActions, zLayer } from '../../theme/appChrome';
@@ -69,26 +70,29 @@ export const DiscoverQueue: Component<{ onOpenUser: (id: string) => void; onOpen
 
   return (
     <div class="space-y-4" data-admin-discover>
-      <Tabs<DiscoverStatus>
-        size="sm"
+      <AdminFilterTabs<DiscoverStatus>
         value={status()}
         onChange={setStatus}
         items={[
-          { id: 'pending', label: t('admin.discover.pending') },
-          { id: 'approved', label: t('admin.discover.approved') },
-          { id: 'denied', label: t('admin.discover.denied') },
+          { id: 'pending', icon: 'fa-hourglass-half', label: t('admin.discover.pending') },
+          { id: 'approved', icon: 'fa-circle-check', label: t('admin.discover.approved') },
+          { id: 'denied', icon: 'fa-circle-xmark', label: t('admin.discover.denied') },
         ]}
       />
       <Show when={error()}>
         <p class="text-sm text-destructive" role="alert">{error()}</p>
       </Show>
-      <Show when={rows()} fallback={<p class="text-sm text-muted-foreground">…</p>}>
+      <Show when={rows()} fallback={<AdminListSkeleton rows={5} />}>
         {(list) => (
           <Show when={list().length > 0} fallback={<EmptyState icon="fa-compass" title={t('admin.discover.empty')} size="inline" />}>
             <div class="space-y-1.5">
               <For each={list()}>
-                {(e) => (
-                  <div class={settingsRowShell} data-discover-row={`${e.kind}:${e.id}`}>
+                {(e, i) => (
+                  <div
+                    style={{ 'animation-delay': `${Math.min(i() * 30, 300)}ms` }}
+                    class={`admin-row-in ${settingsRowShell}`}
+                    data-discover-row={`${e.kind}:${e.id}`}
+                  >
                     <MessageAvatar name={nameOf(e)} avatar={avatarOf(e)} class="size-10 text-sm" />
                     <div class="min-w-0 flex-1">
                       <div class="flex flex-wrap items-center gap-2 text-sm font-medium">
