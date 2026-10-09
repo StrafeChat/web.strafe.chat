@@ -579,7 +579,8 @@ export default {
       screenFailed: 'Não foi possível iniciar o compartilhamento de tela.',
       joinFailed: 'Não foi possível conectar à voz. Tente de novo.',
       e2eeUnsupported: 'Este navegador não consegue criptografar chamadas, então não pode entrar. As chamadas são criptografadas de ponta a ponta e nunca são enviadas sem criptografia. Tente a versão mais recente do Chrome, Edge, Firefox ou Safari.',
-      desktopNoWebRtc: 'Chamadas não estão disponíveis no app para desktop neste sistema: o motor web em que ele roda (WebKitGTK) foi compilado sem WebRTC, e é assim que as distribuições Linux e o AppImage o entregam. Use o Strafe em um navegador para chamadas; os apps para Windows e macOS não são afetados.',
+      desktopNoWebRtc:
+        'As chamadas precisam de um mecanismo web com WebRTC, e esta versão do app de desktop não tem um. Atualize para a versão atual do Strafe Desktop ou faça a chamada no navegador.',
       desktopNoE2ee: 'O app para desktop não consegue criptografar chamadas neste sistema: seu motor web tem WebRTC, mas não as transformações de quadros de que a criptografia precisa. Use o Strafe em um navegador para chamadas.',
       keyShareFailed: 'Não foi possível enviar sua chave de criptografia para todos. Algumas pessoas podem não ouvir você.',
     },

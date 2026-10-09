@@ -58,7 +58,8 @@ update banner), plus `src/components/settings/DesktopSettingsPage.tsx`.
   origin, which is not the instance's domain); TOTP and recovery codes work. A hosted
   captcha (Turnstile, Friendly) must allow the host `tauri.localhost` / `localhost` in its
   site settings; the default ALTCHA needs nothing.
-- Voice and video do not work in the Linux app: the WebKitGTK that distributions and the
-  AppImage ship has no WebRTC (no `RTCPeerConnection` at all, checked at 2.52 on Arch and
-  Ubuntu). The app says so when a call is attempted; Linux users take calls in a browser.
-  Windows (WebView2) and macOS are unaffected.
+- Voice and video work in the Linux app from Strafe Desktop v1.2.0 on, which bundles a
+  WebKitGTK built with WebRTC (no distribution ships one; see `scripts/build-webrtc-stack.sh`
+  in StrafeChat/desktop). An older AppImage cannot make calls at all - the engine it carries
+  has no `RTCPeerConnection` - and says so when one is tried. Windows (WebView2) and macOS
+  were never affected.
