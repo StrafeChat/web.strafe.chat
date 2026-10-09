@@ -579,6 +579,8 @@ export default {
       screenFailed: 'No se pudo iniciar la compartición de pantalla.',
       joinFailed: 'No se pudo conectar a la voz. Inténtalo de nuevo.',
       e2eeUnsupported: 'Este navegador no puede cifrar llamadas, así que no puede unirse. Las llamadas son cifradas de extremo a extremo y nunca se envían sin cifrar. Prueba con la última versión de Chrome, Edge, Firefox o Safari.',
+      desktopNoWebRtc: 'Las llamadas no están disponibles en la app de escritorio en este sistema: el motor web en el que se ejecuta (WebKitGTK) se compiló sin WebRTC, y así lo distribuyen las distribuciones de Linux y el AppImage. Usa Strafe en un navegador para las llamadas; las apps de Windows y macOS no se ven afectadas.',
+      desktopNoE2ee: 'La app de escritorio no puede cifrar llamadas en este sistema: su motor web tiene WebRTC pero no las transformaciones de fotogramas que necesita el cifrado. Usa Strafe en un navegador para las llamadas.',
       keyShareFailed: 'No se pudo enviar tu clave de cifrado a todos. Puede que algunas personas no te oigan.',
     },
     incoming: {

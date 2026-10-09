@@ -32,6 +32,7 @@ import { Button } from '../ui/Button';
 import { Tooltip } from '../ui/Tooltip';
 import { ApiError } from '../../api/ApiError';
 import { t } from '../../i18n';
+import { isDesktop } from '../../desktop/env';
 
 export interface VoiceStageProps {
   roomId: string;
@@ -175,7 +176,14 @@ export const VoiceStage: Component<VoiceStageProps> = (props) => {
       await joinVoiceRoom(props.roomId, { video });
     } catch (err) {
       if (err instanceof CallEncryptionUnsupportedError) {
-        setJoinError(t('voice.errors.e2eeUnsupported'));
+        // In the desktop app "try another browser" is no help: the engine is the shell's.
+        // Say which part is missing - WebRTC altogether (distribution WebKitGTK builds on
+        // Linux leave it out), or only the encoded-frame transforms encryption needs.
+        setJoinError(
+          isDesktop()
+            ? t(typeof RTCPeerConnection === 'undefined' ? 'voice.errors.desktopNoWebRtc' : 'voice.errors.desktopNoE2ee')
+            : t('voice.errors.e2eeUnsupported'),
+        );
       } else if (err instanceof ApiError) {
         if (err.status === 403) setJoinError(t('voice.noConnect'));
         else if (err.status === 409) setJoinError(t('voice.full'));

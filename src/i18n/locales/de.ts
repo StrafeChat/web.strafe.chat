@@ -572,6 +572,8 @@ export default {
       screenFailed: 'Die Bildschirmfreigabe konnte nicht gestartet werden.',
       joinFailed: 'Keine Sprachverbindung möglich. Versuch es erneut.',
       e2eeUnsupported: 'Dieser Browser kann Anrufe nicht verschlüsseln und daher nicht beitreten. Anrufe sind Ende-zu-Ende-verschlüsselt und werden nie unverschlüsselt gesendet. Versuch das neueste Chrome, Edge, Firefox oder Safari.',
+      desktopNoWebRtc: 'Anrufe sind in der Desktop-App auf diesem System nicht verfügbar: Die zugrunde liegende Web-Engine (WebKitGTK) wurde ohne WebRTC gebaut – so liefern Linux-Distributionen und das AppImage sie aus. Nutze Strafe für Anrufe im Browser; die Windows- und macOS-Apps sind nicht betroffen.',
+      desktopNoE2ee: 'Die Desktop-App kann Anrufe auf diesem System nicht verschlüsseln: Ihre Web-Engine hat WebRTC, aber nicht die Frame-Transformationen, die die Verschlüsselung braucht. Nutze Strafe für Anrufe im Browser.',
       keyShareFailed: 'Dein Schlüssel konnte nicht an alle gesendet werden. Manche hören dich möglicherweise nicht.',
     },
     incoming: {

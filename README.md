@@ -103,3 +103,11 @@ desktop set (.icns, .ico and every PNG size) from the master.
   origin, which is not the instance's domain); TOTP and recovery codes work. A hosted
   captcha (Turnstile, Friendly) must allow the host `tauri.localhost` / `localhost` in its
   site settings; the default ALTCHA needs nothing.
+- **Voice and video do not work in the Linux app.** The webview there is WebKitGTK, and the
+  builds that distributions ship (Arch, Debian, Ubuntu, checked at 2.52) leave WebRTC out
+  entirely - no `RTCPeerConnection`, let alone the encoded-frame transforms encrypted calls
+  need - and the AppImage bundles the WebKitGTK of the machine it was built on, so it carries
+  the same gap. The app says so when a call is attempted; use the web client in a browser for
+  calls on Linux. Windows (WebView2, Chromium) and macOS (WebKit with WebRTC and
+  `RTCRtpScriptTransform`) are unaffected. `src-tauri/src/lib.rs` still switches WebRTC on
+  in the WebKitGTK settings, so a WebKitGTK built with `ENABLE_WEB_RTC=ON` would work.

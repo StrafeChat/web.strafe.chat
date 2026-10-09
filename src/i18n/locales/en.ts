@@ -573,6 +573,8 @@ export default {
       joinFailed: 'Could not connect to voice. Try again.',
       e2eeUnsupported:
         'This browser cannot encrypt calls, so it cannot join. Calls are end-to-end encrypted and are never sent unencrypted. Try the latest Chrome, Edge, Firefox or Safari.',
+      desktopNoWebRtc: 'Calls are not available in the desktop app on this system: the web engine it runs on (WebKitGTK) was built without WebRTC, which is how Linux distributions and the AppImage ship it. Use Strafe in a browser for calls; the Windows and macOS apps are unaffected.',
+      desktopNoE2ee: 'The desktop app cannot encrypt calls on this system: its web engine has WebRTC but not the encoded-frame transforms that encryption needs. Use Strafe in a browser for calls.',
       keyShareFailed: 'Your encryption key could not be sent to everyone. Some people may not hear you.',
     },
     incoming: {

@@ -579,6 +579,8 @@ export default {
       screenFailed: "Le partage d'écran n'a pas pu démarrer.",
       joinFailed: 'Connexion vocale impossible. Réessayez.',
       e2eeUnsupported: "Ce navigateur ne peut pas chiffrer les appels, il ne peut donc pas rejoindre. Les appels sont chiffrés de bout en bout et ne sont jamais envoyés en clair. Essayez la dernière version de Chrome, Edge, Firefox ou Safari.",
+      desktopNoWebRtc: 'Les appels ne sont pas disponibles dans l\'application de bureau sur ce système : le moteur web qui la fait tourner (WebKitGTK) a été compilé sans WebRTC, tel que le livrent les distributions Linux et l\'AppImage. Utilisez Strafe dans un navigateur pour les appels ; les applications Windows et macOS ne sont pas concernées.',
+      desktopNoE2ee: 'L\'application de bureau ne peut pas chiffrer les appels sur ce système : son moteur web a WebRTC mais pas les transformations de trames dont le chiffrement a besoin. Utilisez Strafe dans un navigateur pour les appels.',
       keyShareFailed: "Votre clé de chiffrement n'a pas pu être envoyée à tout le monde. Certaines personnes risquent de ne pas vous entendre.",
     },
     incoming: {
