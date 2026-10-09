@@ -64,6 +64,9 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
         with:
+          # The repository carries a bun.lock next to package-lock.json, and the action
+          # would pick bun from that; the runners only have npm (npm ci above).
+          tauriScript: npm run tauri
           tagName: desktop-v__VERSION__
           releaseName: 'Strafe Desktop v__VERSION__'
           releaseBody: 'Installers for Windows, macOS and Linux are below. Installed copies update themselves.'
