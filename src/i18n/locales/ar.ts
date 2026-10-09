@@ -2596,6 +2596,9 @@ export default {
       never: 'يتم البحث عن التحديثات في الخلفية.',
     },
     passkeyUnavailable: 'مفاتيح المرور غير متاحة بعد في تطبيق سطح المكتب. استخدم تطبيق المصادقة أو رمز استرداد.',
+    discord: {
+      inCall: 'في مكالمة صوتية',
+    },
     settings: {
       updatesTitle: 'التحديثات',
       version: 'Strafe Desktop v{{version}}',
@@ -2606,6 +2609,10 @@ export default {
       startMinimizedHint: 'عند التشغيل التلقائي، البقاء في شريط النظام بدلًا من فتح النافذة.',
       closeToTray: 'الإغلاق إلى شريط النظام',
       closeToTrayHint: 'إغلاق النافذة يُبقي Strafe يعمل في شريط النظام كي تصلك المكالمات والإشعارات. أنهِ التطبيق من أيقونة شريط النظام.',
+      discordTitle: 'Discord',
+      discordPresence: 'إظهار Strafe في ملفك الشخصي على Discord',
+      discordPresenceHint: 'ما دامت النافذة مفتوحة، يعرض Discord في ملفك الشخصي "يلعب Strafe" وما إذا كنت في مكالمة. يجب أن يكون Discord قيد التشغيل على هذا الجهاز.',
+      discordPresenceUnavailable: 'هذا الإصدار من Strafe Desktop لا يتضمن معرّف تطبيق Discord، لذا لا يمكنه الظهور على Discord.',
       autostartFailed: 'تعذّر تغيير إعداد بدء التشغيل: {{error}}',
     },
   },

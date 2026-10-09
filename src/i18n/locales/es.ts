@@ -2523,6 +2523,9 @@ export default {
       never: 'Las actualizaciones se buscan en segundo plano.',
     },
     passkeyUnavailable: 'Las llaves de acceso aún no están disponibles en la app de escritorio. Usa tu app de autenticación o un código de recuperación.',
+    discord: {
+      inCall: 'En una llamada de voz',
+    },
     settings: {
       updatesTitle: 'Actualizaciones',
       version: 'Strafe Desktop v{{version}}',
@@ -2533,6 +2536,10 @@ export default {
       startMinimizedHint: 'Al abrirse automáticamente, quedarse en la bandeja en lugar de abrir la ventana.',
       closeToTray: 'Cerrar a la bandeja',
       closeToTrayHint: 'Al cerrar la ventana, Strafe sigue en la bandeja del sistema para que las llamadas y notificaciones te lleguen. Sal desde el icono de la bandeja.',
+      discordTitle: 'Discord',
+      discordPresence: 'Mostrar Strafe en tu perfil de Discord',
+      discordPresenceHint: 'Mientras la ventana esté abierta, Discord muestra «Jugando a Strafe» en tu perfil y si estás en una llamada. Discord tiene que estar abierto en este equipo.',
+      discordPresenceUnavailable: 'Esta versión de Strafe Desktop no incluye un ID de aplicación de Discord, así que no puede aparecer en Discord.',
       autostartFailed: 'No se pudo cambiar el ajuste de inicio: {{error}}',
     },
   },

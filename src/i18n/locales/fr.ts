@@ -2523,6 +2523,9 @@ export default {
       never: 'Les mises à jour sont recherchées en arrière-plan.',
     },
     passkeyUnavailable: "Les clés d'accès ne sont pas encore disponibles dans l'application de bureau. Utilisez votre application d'authentification ou un code de récupération.",
+    discord: {
+      inCall: 'En appel vocal',
+    },
     settings: {
       updatesTitle: 'Mises à jour',
       version: 'Strafe Desktop v{{version}}',
@@ -2533,6 +2536,10 @@ export default {
       startMinimizedHint: "Au lancement automatique, rester dans la zone de notification au lieu d'ouvrir la fenêtre.",
       closeToTray: 'Fermer vers la zone de notification',
       closeToTrayHint: "Fermer la fenêtre laisse Strafe tourner dans la zone de notification, pour que les appels et notifications vous parviennent. Quittez depuis l'icône.",
+      discordTitle: 'Discord',
+      discordPresence: 'Afficher Strafe sur votre profil Discord',
+      discordPresenceHint: "Tant que la fenêtre est ouverte, Discord affiche « Joue à Strafe » sur votre profil, et si vous êtes en appel. Discord doit être lancé sur cet ordinateur.",
+      discordPresenceUnavailable: "Cette version de Strafe Desktop n'inclut pas d'identifiant d'application Discord, elle ne peut donc pas apparaître sur Discord.",
       autostartFailed: 'Impossible de modifier le réglage de démarrage : {{error}}',
     },
   },

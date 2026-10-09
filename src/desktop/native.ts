@@ -132,7 +132,11 @@ export async function setUnreadBadge(count: number): Promise<void> {
 export interface DesktopPrefs {
   closeToTray: boolean;
   startMinimized: boolean;
+  /** "Playing Strafe" on the person's Discord profile while the window is open. */
+  discordPresence: boolean;
 }
+
+export const DEFAULT_DESKTOP_PREFS: DesktopPrefs = { closeToTray: true, startMinimized: true, discordPresence: true };
 
 export function loadDesktopPrefs(): Promise<DesktopPrefs> {
   return invoke<DesktopPrefs>('desktop_prefs_load');
@@ -147,3 +151,24 @@ export const desktopAutostart = {
   enable: autostartEnable,
   disable: autostartDisable,
 };
+
+// ---- Discord -----------------------------------------------------------------------------------
+
+/** What Discord shows under "Playing Strafe" (the shell owns the connection: src-tauri/src/discord.rs). */
+export interface DiscordPresence {
+  /** First line ("In a voice call"). */
+  details?: string;
+  /** Second line. */
+  state?: string;
+  /** Unix ms the activity started, for Discord's "elapsed" counter; the app's launch when absent. */
+  since?: number;
+}
+
+export function setDiscordPresence(presence: DiscordPresence): Promise<void> {
+  return invoke('desktop_discord_presence_set', { presence });
+}
+
+/** False when this build carries no Discord application ID, so the Settings toggle can say so. */
+export function discordPresenceAvailable(): Promise<boolean> {
+  return invoke<boolean>('desktop_discord_presence_available');
+}

@@ -4,14 +4,21 @@ import { getVersion } from '@tauri-apps/api/app';
 import { Button } from '../ui/Button';
 import { Toggle } from '../ui/Toggle';
 import { settingsRowIcon, settingsRowShell, settingsSectionTitle } from './settingsChrome';
-import { desktopAutostart, loadDesktopPrefs, saveDesktopPrefs, type DesktopPrefs } from '../../desktop/native';
+import {
+  DEFAULT_DESKTOP_PREFS,
+  desktopAutostart,
+  discordPresenceAvailable,
+  loadDesktopPrefs,
+  saveDesktopPrefs,
+  type DesktopPrefs,
+} from '../../desktop/native';
 import { checkForDesktopUpdate, desktopUpdate, installDesktopUpdate } from '../../desktop/updater';
 import { t } from '../../i18n';
 
 const Row: Component<{ icon: string; title: string; description: string; control: JSX.Element }> = (props) => (
   <div class={settingsRowShell}>
     <div class={settingsRowIcon}>
-      <i class={`fa-solid ${props.icon} text-sm`} aria-hidden="true" />
+      <i class={`${props.icon} text-sm`} aria-hidden="true" />
     </div>
     <div class="min-w-0 flex-1">
       <p class="text-[15px] font-semibold text-foreground">{props.title}</p>
@@ -27,6 +34,8 @@ export const DesktopSettingsPage: Component = () => {
   // null until the shell has answered; the toggle is disabled meanwhile.
   const [autostart, setAutostart] = createSignal<boolean | null>(null);
   const [autostartError, setAutostartError] = createSignal('');
+  // Whether this build can show up on Discord at all (it needs an application ID baked in).
+  const [discordAvailable, setDiscordAvailable] = createSignal<boolean | null>(null);
   // The shell's version (StrafeChat/desktop), not the web client's build.
   const [appVersion, setAppVersion] = createSignal(__APP_VERSION__);
 
@@ -36,7 +45,10 @@ export const DesktopSettingsPage: Component = () => {
       .catch(() => undefined);
     void loadDesktopPrefs()
       .then(setPrefs)
-      .catch(() => setPrefs({ closeToTray: true, startMinimized: true }));
+      .catch(() => setPrefs({ ...DEFAULT_DESKTOP_PREFS }));
+    void discordPresenceAvailable()
+      .then(setDiscordAvailable)
+      .catch(() => setDiscordAvailable(false));
     void desktopAutostart
       .isEnabled()
       .then(setAutostart)
@@ -94,7 +106,7 @@ export const DesktopSettingsPage: Component = () => {
       <section class="space-y-3">
         <h3 class={settingsSectionTitle}>{t('desktop.settings.updatesTitle')}</h3>
         <Row
-          icon="fa-rocket"
+          icon="fa-solid fa-rocket"
           title={t('desktop.settings.version', { version: appVersion() })}
           description={updateText()}
           control={
@@ -122,7 +134,7 @@ export const DesktopSettingsPage: Component = () => {
       <section class="space-y-3">
         <h3 class={settingsSectionTitle}>{t('desktop.settings.startupTitle')}</h3>
         <Row
-          icon="fa-power-off"
+          icon="fa-solid fa-power-off"
           title={t('desktop.settings.launchAtStartup')}
           description={t('desktop.settings.launchAtStartupHint')}
           control={<Toggle checked={autostart() === true} disabled={autostart() === null} label={t('desktop.settings.launchAtStartup')} onChange={(v) => void toggleAutostart(v)} />}
@@ -133,7 +145,7 @@ export const DesktopSettingsPage: Component = () => {
           </p>
         </Show>
         <Row
-          icon="fa-window-minimize"
+          icon="fa-solid fa-window-minimize"
           title={t('desktop.settings.startMinimized')}
           description={t('desktop.settings.startMinimizedHint')}
           control={
@@ -146,10 +158,27 @@ export const DesktopSettingsPage: Component = () => {
           }
         />
         <Row
-          icon="fa-xmark"
+          icon="fa-solid fa-xmark"
           title={t('desktop.settings.closeToTray')}
           description={t('desktop.settings.closeToTrayHint')}
           control={<Toggle checked={!!prefs()?.closeToTray} disabled={!prefs()} label={t('desktop.settings.closeToTray')} onChange={(v) => void savePref({ closeToTray: v })} />}
+        />
+      </section>
+
+      <section class="space-y-3">
+        <h3 class={settingsSectionTitle}>{t('desktop.settings.discordTitle')}</h3>
+        <Row
+          icon="fa-brands fa-discord"
+          title={t('desktop.settings.discordPresence')}
+          description={discordAvailable() === false ? t('desktop.settings.discordPresenceUnavailable') : t('desktop.settings.discordPresenceHint')}
+          control={
+            <Toggle
+              checked={!!prefs()?.discordPresence && discordAvailable() !== false}
+              disabled={!prefs() || discordAvailable() !== true}
+              label={t('desktop.settings.discordPresence')}
+              onChange={(v) => void savePref({ discordPresence: v })}
+            />
+          }
         />
       </section>
     </div>

@@ -2517,6 +2517,9 @@ export default {
       never: 'Updates are checked for in the background.',
     },
     passkeyUnavailable: 'Passkeys are not available in the desktop app yet. Use your authenticator app or a recovery code.',
+    discord: {
+      inCall: 'In a voice call',
+    },
     settings: {
       updatesTitle: 'Updates',
       version: 'Strafe Desktop v{{version}}',
@@ -2527,6 +2530,10 @@ export default {
       startMinimizedHint: 'When launched at start-up, stay in the tray instead of opening the window.',
       closeToTray: 'Close to tray',
       closeToTrayHint: 'Closing the window keeps Strafe running in the tray, so calls and notifications still reach you. Quit from the tray icon.',
+      discordTitle: 'Discord',
+      discordPresence: 'Show Strafe on your Discord profile',
+      discordPresenceHint: 'While the window is open, Discord shows "Playing Strafe" on your profile, and whether you are in a call. Discord has to be running on this computer.',
+      discordPresenceUnavailable: 'This build of Strafe Desktop carries no Discord application ID, so it cannot appear on Discord.',
       autostartFailed: 'Could not change the start-up setting: {{error}}',
     },
   },

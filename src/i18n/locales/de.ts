@@ -2514,6 +2514,9 @@ export default {
       never: 'Updates werden im Hintergrund geprüft.',
     },
     passkeyUnavailable: 'Passkeys sind in der Desktop-App noch nicht verfügbar. Nutze deine Authenticator-App oder einen Wiederherstellungscode.',
+    discord: {
+      inCall: 'In einem Sprachanruf',
+    },
     settings: {
       updatesTitle: 'Updates',
       version: 'Strafe Desktop v{{version}}',
@@ -2524,6 +2527,10 @@ export default {
       startMinimizedHint: 'Beim automatischen Start im Tray bleiben, statt das Fenster zu öffnen.',
       closeToTray: 'In den Tray schließen',
       closeToTrayHint: 'Beim Schließen des Fensters läuft Strafe im Tray weiter, damit Anrufe und Benachrichtigungen dich weiterhin erreichen. Beenden über das Tray-Symbol.',
+      discordTitle: 'Discord',
+      discordPresence: 'Strafe in deinem Discord-Profil anzeigen',
+      discordPresenceHint: 'Solange das Fenster offen ist, zeigt Discord in deinem Profil „Spielt Strafe“ und ob du in einem Anruf bist. Discord muss auf diesem Computer laufen.',
+      discordPresenceUnavailable: 'Diese Version von Strafe Desktop enthält keine Discord-Anwendungs-ID und kann daher nicht auf Discord erscheinen.',
       autostartFailed: 'Die Starteinstellung konnte nicht geändert werden: {{error}}',
     },
   },

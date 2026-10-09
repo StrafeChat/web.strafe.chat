@@ -6,9 +6,11 @@
 import { createEffect, createMemo, createRoot } from 'solid-js';
 import { desktopPlatform, isDesktop } from './env';
 import { initDesktopAccounts } from './accounts';
-import { markDesktopReady, nativeNotificationsGranted, setUnreadBadge } from './native';
+import { markDesktopReady, nativeNotificationsGranted, setDiscordPresence, setUnreadBadge, type DiscordPresence } from './native';
 import { scheduleDesktopUpdateChecks } from './updater';
 import { readState } from '../stores/readState';
+import { voice } from '../stores/voice';
+import { t } from '../i18n';
 
 let started = false;
 
@@ -41,6 +43,19 @@ async function start(): Promise<void> {
     createEffect(() => {
       const n = total();
       void setUnreadBadge(n).catch(() => undefined);
+    });
+
+    // What Discord shows under "Playing Strafe": whether we are in a call, and since when.
+    // That is all Discord ever learns - never which space, room or instance. The shell
+    // decides whether to show anything at all (the Settings toggle, the window being open).
+    let callSince = 0;
+    createEffect(() => {
+      const status = voice.session.status;
+      const inCall = (status === 'connected' || status === 'reconnecting') && voice.session.roomId !== null;
+      if (!inCall) callSince = 0;
+      else if (!callSince) callSince = Date.now();
+      const presence: DiscordPresence = inCall ? { details: t('desktop.discord.inCall'), since: callSince } : {};
+      void setDiscordPresence(presence).catch(() => undefined);
     });
   });
 
