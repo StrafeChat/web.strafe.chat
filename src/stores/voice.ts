@@ -902,7 +902,14 @@ export async function joinVoiceRoom(roomId: string, opts: { video?: boolean } = 
   live.room = room;
   wireRoom(room, gen);
   try {
-    await room.connect(res.url, res.token, { autoSubscribe: true });
+    await room.connect(res.url, res.token, {
+      autoSubscribe: true,
+      // One ICE credential for the whole connection. The spec default lets an engine give
+      // each media section its own, and the SFU refuses such an offer outright ("multiple
+      // conflicting ice-ufrag values") - which is what the Linux desktop app's engine does
+      // otherwise, so no call there could connect. Browsers already bundle this way.
+      rtcConfig: { bundlePolicy: 'max-bundle' },
+    });
   } catch (err) {
     if (gen === live.gen) {
       teardownLocal();
