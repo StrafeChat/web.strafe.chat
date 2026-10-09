@@ -1,6 +1,0 @@
-# Cargo build output and the schemas the Tauri CLI regenerates on every run.
-/target/
-/gen/schemas/
-# Mobile icon sets the CLI also generates; there is no mobile build.
-/icons/android/
-/icons/ios/

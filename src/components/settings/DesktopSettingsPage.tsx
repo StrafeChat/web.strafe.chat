@@ -1,5 +1,6 @@
 import type { Component, JSX } from 'solid-js';
 import { createSignal, onMount, Show } from 'solid-js';
+import { getVersion } from '@tauri-apps/api/app';
 import { Button } from '../ui/Button';
 import { Toggle } from '../ui/Toggle';
 import { settingsRowIcon, settingsRowShell, settingsSectionTitle } from './settingsChrome';
@@ -26,8 +27,13 @@ export const DesktopSettingsPage: Component = () => {
   // null until the shell has answered; the toggle is disabled meanwhile.
   const [autostart, setAutostart] = createSignal<boolean | null>(null);
   const [autostartError, setAutostartError] = createSignal('');
+  // The shell's version (StrafeChat/desktop), not the web client's build.
+  const [appVersion, setAppVersion] = createSignal(__APP_VERSION__);
 
   onMount(() => {
+    void getVersion()
+      .then(setAppVersion)
+      .catch(() => undefined);
     void loadDesktopPrefs()
       .then(setPrefs)
       .catch(() => setPrefs({ closeToTray: true, startMinimized: true }));
@@ -89,7 +95,7 @@ export const DesktopSettingsPage: Component = () => {
         <h3 class={settingsSectionTitle}>{t('desktop.settings.updatesTitle')}</h3>
         <Row
           icon="fa-rocket"
-          title={t('desktop.settings.version', { version: __APP_VERSION__ })}
+          title={t('desktop.settings.version', { version: appVersion() })}
           description={updateText()}
           control={
             <Show
