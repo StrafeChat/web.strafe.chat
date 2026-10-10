@@ -720,9 +720,21 @@ function otherParticipantUserIds(roomId: string): string[] {
   return [...ids];
 }
 
-/** Stable signature of the room's participant set, to spot membership changes. */
+/**
+ * Stable signature of the room's participant set, to spot membership changes. By identity
+ * rather than user id: someone who reloads the page keeps their user id but comes back on a
+ * new session, and the key we handed their old one was a to-device message they consumed and
+ * cannot read again. Signing by user id, the leave and the rejoin cancelled out inside the
+ * debounce below and they sat on "waiting for encryption keys" until somebody else rejoined.
+ */
 function memberSignature(roomId: string): string {
-  return otherParticipantUserIds(roomId).sort().join(',');
+  const me = auth.user?.id;
+  const identities: string[] = [];
+  for (const st of voice.byRoom[roomId] ?? []) {
+    if (st.user_id === me) continue;
+    identities.push(st.identity ?? `${st.user_id}.${st.session_id}`);
+  }
+  return identities.sort().join(',');
 }
 
 function markKeyed(identity: string): void {
@@ -760,7 +772,7 @@ async function distributeMediaKey(announce?: { key: Uint8Array; index: number })
   const keyIndex = announce?.index ?? live.mediaKeyIndex;
   if (!me || !roomId || !identity || !key) return;
   const targets = otherParticipantUserIds(roomId);
-  live.keyedMemberSig = targets.slice().sort().join(',');
+  live.keyedMemberSig = memberSignature(roomId);
   if (targets.length === 0) return;
   try {
     await sendMediaKey(me, { roomId, identity, keyIndex, key }, targets);
