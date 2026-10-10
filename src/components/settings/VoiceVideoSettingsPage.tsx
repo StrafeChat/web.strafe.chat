@@ -20,6 +20,7 @@ import { Select } from '../ui/Select';
 import { Toggle } from '../ui/Toggle';
 import { Tabs } from '../ui/Tabs';
 import { settingsGroupFrame, settingsRowIcon, settingsRowShell, settingsSectionTitle } from './settingsChrome';
+import { isDesktop } from '../../desktop/env';
 import { t } from '../../i18n';
 
 const Row: Component<{ icon: string; title: string; description: string; control: JSX.Element }> = (props) => (
@@ -76,6 +77,11 @@ export const VoiceVideoSettingsPage: Component = () => {
 
   onMount(() => {
     void enumerate();
+    // Some engines list nothing - no speakers at all, and devices without names - until a
+    // capture has been granted once. The desktop app answers that request itself, so ask on
+    // the way in and the pickers are populated when the page appears. In a browser it would
+    // mean an unprompted permission dialog, so there it stays behind the button below.
+    if (isDesktop()) void requestAccess(false);
     navigator.mediaDevices?.addEventListener?.('devicechange', enumerate);
   });
 
