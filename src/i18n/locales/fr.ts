@@ -537,6 +537,11 @@ export default {
       fpsValue: '{{fps}} fps',
       hintDetail: 'Moins d’images par seconde garde le texte net : idéal pour les diapositives et le code.',
       hintMotion: 'Plus d’images par seconde reste fluide : idéal pour la vidéo et les jeux, et demande plus de débit montant.',
+      whatToShare: 'Que partager',
+      screens: 'Écrans',
+      windows: 'Fenêtres',
+      loadingSources: 'Recherche des écrans et des fenêtres…',
+      noSources: 'Il n’y a rien à partager pour le moment.',
     },
     stats: {
       title: 'Statistiques vocales',

@@ -15,6 +15,7 @@ import ar from './i18n/locales/ar';
 import { applyDocumentLangDir, getInitialLanguage } from './i18n/config';
 import { bindI18nReactivity } from './i18n/t';
 import { isDesktop } from './desktop/env';
+import { restoreDesktopSession } from './desktop/accounts';
 
 const root = document.getElementById('root');
 
@@ -37,22 +38,29 @@ const i18nResources = {
   ar: { translation: ar },
 };
 
-render(
-  () => (
-    <TransProvider
-      lng={initialLng}
-      options={{
-        resources: i18nResources,
-        fallbackLng: 'en',
-        supportedLngs: Object.keys(i18nResources),
-        interpolation: { escapeValue: false },
-      }}
-    >
-      <App />
-    </TransProvider>
-  ),
-  root!,
-);
+function start() {
+  render(
+    () => (
+      <TransProvider
+        lng={initialLng}
+        options={{
+          resources: i18nResources,
+          fallbackLng: 'en',
+          supportedLngs: Object.keys(i18nResources),
+          interpolation: { escapeValue: false },
+        }}
+      >
+        <App />
+      </TransProvider>
+    ),
+    root!,
+  );
+}
+
+// The desktop app first puts back a session its storage lost (desktop/accounts.ts); the
+// browser starts at once.
+if (isDesktop()) void restoreDesktopSession().finally(start);
+else start();
 
 // Deploy resilience (production only; tree-shaken out of dev).
 if (import.meta.env.PROD) {
@@ -76,9 +84,17 @@ if (import.meta.env.PROD) {
     });
   }
 
-  // A failed dynamic import is almost always a stale tab whose code-split chunk a new deploy
-  // replaced; reload once (rate-limited so it can't loop) to pick up the current build.
-  window.addEventListener('vite:preloadError', () => {
+  // A chunk that failed to load is almost always a stale tab whose code-split chunk a new
+  // deploy replaced; reload once (rate-limited so it can't loop) to pick up the current build.
+  // Only that, though: Vite reports every failed dynamic import here, including a library's
+  // own optional one it catches itself (@mbarzda/solid-i18next probing for html-parse-string,
+  // which we do not install) - and reloading for that cost every fresh page, and every start
+  // of the desktop app, a second load.
+  const CHUNK_LOAD_FAILED = /dynamically imported module|importing a module script failed|unable to preload css/i;
+  window.addEventListener('vite:preloadError', (event: Event) => {
+    const payload = (event as Event & { payload?: unknown }).payload;
+    const message = payload instanceof Error ? payload.message : String(payload ?? '');
+    if (!CHUNK_LOAD_FAILED.test(message)) return;
     let last = 0;
     try {
       last = Number(sessionStorage.getItem('sw-preload-reload-at') || 0);

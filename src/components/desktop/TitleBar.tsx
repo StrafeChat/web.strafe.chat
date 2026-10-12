@@ -1,12 +1,12 @@
 import type { Component } from 'solid-js';
 import { createSignal, onCleanup, onMount, Show } from 'solid-js';
-import { desktopPlatform } from '../../desktop/env';
+import { desktopPlatform, desktopShell } from '../../desktop/env';
 import { desktopWindow } from '../../desktop/native';
 import { authGlassTint } from '../auth/authLayout';
 import { t } from '../../i18n';
 
 const controlClass =
-  'flex h-full w-11 items-center justify-center text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground focus-visible:bg-accent/70 focus-visible:outline-none';
+  'desktop-no-drag flex h-full w-11 items-center justify-center text-muted-foreground transition-colors hover:bg-accent/70 hover:text-foreground focus-visible:bg-accent/70 focus-visible:outline-none';
 
 /** The three window glyphs, drawn as 1px lines (an icon font's are too heavy at this size). */
 const Glyph: Component<{ kind: 'minimize' | 'maximize' | 'restore' | 'close' }> = (props) => (
@@ -32,12 +32,27 @@ const Glyph: Component<{ kind: 'minimize' | 'maximize' | 'restore' | 'close' }> 
  * drags the window and carries the window buttons, so the OS chrome is not a different
  * colour and style from everything under it. On macOS the native traffic lights stay (the
  * window is created with an overlay title bar) and the strip just leaves room for them.
- * Dragging and the double-click-to-maximise are the shell's doing, through the
- * data-tauri-drag-region attribute.
+ *
+ * Dragging is the shell's doing, marked up for both: Tauri (Windows, macOS) reads the
+ * data-tauri-drag-region attribute and also maximises on a double-click there; Electron
+ * (Linux) reads the CSS drag region the desktop-drag-region class turns on (index.css), with
+ * the buttons opted out by desktop-no-drag so they still take clicks.
  */
 export const DesktopTitleBar: Component = () => {
   const mac = desktopPlatform() === 'mac';
+  const electron = desktopShell() === 'electron';
   const [maximized, setMaximized] = createSignal(false);
+
+  // Electron only (Tauri does this itself). Chromium treats a drag region as the window's
+  // title bar, so a double-click there normally goes to the window system, which maximises
+  // (or does whatever the desktop's title-bar setting says) without the page hearing of it.
+  // One that does reach the page - drag regions are unreliable while DevTools is open, say -
+  // does the same here, so the bar behaves alike either way. Never on a button: two quick
+  // clicks on maximise are not a request to maximise twice.
+  function onBarDoubleClick(e: MouseEvent) {
+    if (!electron || (e.target as HTMLElement).closest('button')) return;
+    void desktopWindow.toggleMaximize();
+  }
 
   onMount(() => {
     void desktopWindow.isMaximized().then(setMaximized).catch(() => undefined);
@@ -50,7 +65,8 @@ export const DesktopTitleBar: Component = () => {
   return (
     <div
       data-tauri-drag-region
-      class={`fixed inset-x-0 top-0 z-[500] flex h-[var(--desktop-titlebar-height)] select-none items-center border-b border-border ${authGlassTint} ${
+      onDblClick={onBarDoubleClick}
+      class={`desktop-drag-region fixed inset-x-0 top-0 z-[500] flex h-[var(--desktop-titlebar-height)] select-none items-center border-b border-border ${authGlassTint} ${
         mac ? 'ps-[78px]' : 'ps-3'
       }`}
     >

@@ -5,6 +5,7 @@
 
 import { createStore } from 'solid-js/store';
 import { getMe, toAuthUser } from '../api/users';
+import { ApiError } from '../api/ApiError';
 import { setUserPresence } from './presence';
 import { loadRooms, clearRooms, hydrateRoomsFromReady } from './rooms';
 import { loadRelationships, clearRelationships, hydrateRelationshipsFromReady } from './relationships';
@@ -167,6 +168,31 @@ export async function hydrateAuth() {
   // bootstrapFromRest() is the fallback if READY never comes.
 }
 
+/** How long the REST fallback waits before trying again after a failure that was not the
+ * server refusing the token; doubles up to the cap. */
+const REST_RETRY_MS = 5_000;
+const REST_RETRY_MAX_MS = 60_000;
+let restRetryDelay = REST_RETRY_MS;
+let restRetryTimer: number | undefined;
+let restRetryOnline: (() => void) | undefined;
+
+function scheduleRestRetry(): void {
+  const again = () => {
+    window.clearTimeout(restRetryTimer);
+    if (restRetryOnline) window.removeEventListener('online', restRetryOnline);
+    restRetryTimer = undefined;
+    restRetryOnline = undefined;
+    if (!auth.hydrated && auth.token) void bootstrapFromRest();
+  };
+  window.clearTimeout(restRetryTimer);
+  restRetryTimer = window.setTimeout(again, restRetryDelay);
+  restRetryDelay = Math.min(restRetryDelay * 2, REST_RETRY_MAX_MS);
+  if (!restRetryOnline) {
+    restRetryOnline = again;
+    window.addEventListener('online', restRetryOnline);
+  }
+}
+
 /** Fallback when READY unavailable (WS failed, etc.). Fetches getMe + rooms + relationships. */
 export async function bootstrapFromRest() {
   const token = auth.token;
@@ -188,9 +214,18 @@ export async function bootstrapFromRest() {
         });
       }
     }
+    restRetryDelay = REST_RETRY_MS;
     setAuth({ user: toAuthUser(me), loading: false, hydrated: true });
-  } catch {
-    localStorage.removeItem('session_token');
-    setAuth({ token: null, user: null, loading: false, hydrated: true });
+  } catch (e) {
+    // Only the instance refusing the token ends the session. Anything else - no network yet
+    // (the desktop app starting at login before the Wi-Fi is up), the instance briefly down -
+    // keeps it and tries again; READY hydrates instead if the gateway gets through first.
+    // Signing out here used to throw the session away, and on desktop the saved account too.
+    if (e instanceof ApiError && e.status === 401) {
+      localStorage.removeItem('session_token');
+      setAuth({ token: null, user: null, loading: false, hydrated: true });
+      return;
+    }
+    scheduleRestRetry();
   }
 }

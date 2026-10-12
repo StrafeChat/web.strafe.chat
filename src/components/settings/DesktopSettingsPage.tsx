@@ -1,11 +1,11 @@
 import type { Component, JSX } from 'solid-js';
 import { createSignal, onMount, Show } from 'solid-js';
-import { getVersion } from '@tauri-apps/api/app';
 import { Button } from '../ui/Button';
 import { Toggle } from '../ui/Toggle';
 import { settingsRowIcon, settingsRowShell, settingsSectionTitle } from './settingsChrome';
 import {
   DEFAULT_DESKTOP_PREFS,
+  desktopAppVersion,
   desktopAutostart,
   discordPresenceAvailable,
   loadDesktopPrefs,
@@ -40,7 +40,7 @@ export const DesktopSettingsPage: Component = () => {
   const [appVersion, setAppVersion] = createSignal(__APP_VERSION__);
 
   onMount(() => {
-    void getVersion()
+    void desktopAppVersion()
       .then(setAppVersion)
       .catch(() => undefined);
     void loadDesktopPrefs()

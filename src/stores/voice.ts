@@ -847,6 +847,8 @@ export async function joinVoiceRoom(roomId: string, opts: { video?: boolean } = 
       roomId,
       status: 'connecting',
       error: null,
+      // This call gets a fresh key provider below: nothing installed in the last one counts.
+      keyed: [],
       audioBlocked: false,
       videoBlocked: false,
       camera: false,
@@ -947,7 +949,11 @@ export async function joinVoiceRoom(roomId: string, opts: { video?: boolean } = 
   if (gen !== live.gen) return;
   batch(() => {
     setVoice('session', 'encrypted', true);
-    setVoice('session', 'keyed', [live.identity!]);
+    // Merge, never overwrite: a peer who saw us join hands us their key while we are
+    // still connecting, and it is installed the moment it lands. Overwriting here forgot
+    // it, so their name sat under "waiting for encryption keys" all call long although
+    // their audio and video decrypted fine - often, on the Linux app's slower engine.
+    setVoice('session', 'keyed', (list) => [live.identity!, ...list.filter((id) => id !== live.identity)]);
   });
   flushPendingKeys();
 

@@ -344,10 +344,10 @@ html.underline-links a {
 .hljs-strong { font-weight: 600; }
 .hljs-link { text-decoration: underline; }
 
-/* Desktop app (src-tauri/): the shell draws no window title bar of its own, the client does
-   (components/desktop/TitleBar.tsx), fixed at the top. Everything that sizes itself to the
-   viewport leaves that strip free, and fixed-top elements offset by it (they read the
-   variable, which is 0 on the web). */
+/* Desktop app (Tauri on Windows and macOS, Electron on Linux): the shell draws no window
+   title bar of its own, the client does (components/desktop/TitleBar.tsx), fixed at the top.
+   Everything that sizes itself to the viewport leaves that strip free, and fixed-top
+   elements offset by it (they read the variable, which is 0 on the web). */
 :root {
   --desktop-titlebar-height: 0px;
 }
@@ -366,4 +366,15 @@ html.desktop .min-h-dvh {
 /* The webview is the app: no rubber-band overscroll of the whole page, no text cursor on chrome. */
 html.desktop {
   overscroll-behavior: none;
+}
+/* Electron moves the window by CSS region rather than Tauri's data-tauri-drag-region: the
+   title bar drags, and anything on it that must still take a click opts out. Scoped to the
+   Electron shell so a browser or Tauri never sees a drag region. */
+html.desktop-electron .desktop-drag-region {
+  -webkit-app-region: drag;
+  app-region: drag;
+}
+html.desktop-electron .desktop-no-drag {
+  -webkit-app-region: no-drag;
+  app-region: no-drag;
 }

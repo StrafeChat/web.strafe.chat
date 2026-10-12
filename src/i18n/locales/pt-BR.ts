@@ -537,6 +537,11 @@ export default {
       fpsValue: '{{fps}} fps',
       hintDetail: 'Menos quadros mantêm o texto nítido - bom para slides e código.',
       hintMotion: 'Mais quadros ficam mais fluidos - bom para vídeo e jogos, e exigem mais upload.',
+      whatToShare: 'O que compartilhar',
+      screens: 'Telas',
+      windows: 'Janelas',
+      loadingSources: 'Procurando telas e janelas…',
+      noSources: 'Não há nada para compartilhar agora.',
     },
     stats: {
       title: 'Estatísticas de voz',

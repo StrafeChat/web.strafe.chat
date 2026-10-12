@@ -2,12 +2,13 @@
  * The accounts the desktop app can switch between - on this instance or any other.
  *
  * The web client has one session: the token in localStorage, for the instance that served
- * the page. The desktop app keeps a list, one entry per (instance, user), in a file on the
- * Rust side (owner-only, next to the app's config), and "switching" is writing that entry's
- * token and instance into the places the web client already reads them from, then
- * reloading. A reload rather than an in-place swap on purpose: every store, the gateway
- * socket, the E2EE engine and the voice session belong to one account, and a fresh page
- * is the one way to be sure none of them leaks into the next.
+ * the page. The desktop app keeps a list, one entry per (instance, user), in a file the shell
+ * keeps (owner-only, next to the app's config: the Rust side under Tauri, the main process
+ * under Electron), and "switching" is writing that entry's token and instance into the
+ * places the web client already reads them from, then reloading. A reload rather than an
+ * in-place swap on purpose: every store, the gateway socket, the E2EE engine and the voice
+ * session belong to one account, and a fresh page is the one way to be sure none of them
+ * leaks into the next.
  *
  * Nothing here runs in a browser (see boot.ts); the signals just stay empty.
  */
@@ -15,7 +16,9 @@
 import { createEffect, createRoot, createSignal, on } from 'solid-js';
 import { invoke } from '@tauri-apps/api/core';
 import { auth } from '../stores/auth';
+import { electronBridge } from './electronBridge';
 import { getDesktopInstance, setDesktopInstance, type DesktopInstance } from './instanceOverride';
+import { isDesktop } from './env';
 
 export interface DesktopAccount {
   /** `${instance.domain}:${userId}` - the same person on two instances is two accounts. */
@@ -75,6 +78,18 @@ function isAccount(v: unknown): v is DesktopAccount {
   );
 }
 
+/** The file, through whichever shell is underneath; both keep the bytes and leave the shape to us. */
+const accountsFile = {
+  load(): Promise<unknown> {
+    const bridge = electronBridge();
+    return bridge ? bridge.accounts.load() : invoke<unknown>('desktop_accounts_load');
+  },
+  save(value: AccountsFile): Promise<void> {
+    const bridge = electronBridge();
+    return bridge ? bridge.accounts.save(value) : invoke<void>('desktop_accounts_save', { value });
+  },
+};
+
 let saving: Promise<void> = Promise.resolve();
 
 /** Writes are serialised so two quick changes cannot land out of order. */
@@ -82,7 +97,7 @@ function persist(): Promise<void> {
   const file: AccountsFile = { version: 1, active: activeId(), accounts: accounts() };
   saving = saving
     .catch(() => undefined)
-    .then(() => invoke<void>('desktop_accounts_save', { value: file }))
+    .then(() => accountsFile.save(file))
     .catch((e) => console.warn('[desktop] could not save accounts', e));
   return saving;
 }
@@ -118,12 +133,46 @@ function upsertSignedIn(token: string): void {
 }
 
 /**
+ * Before the client starts: when the page's own storage has no session but the accounts file
+ * names an active account, put that account's token and instance back. That happens when the
+ * engine under the page changes (the Linux app moving from WebKitGTK to Chromium, which cannot
+ * read the old storage) or site data is cleared, and without this someone who never signed out
+ * would be greeted by the sign-in form. "Add an account" clears `active` before it goes to the
+ * sign-in page and a sign-out removes the account, so neither is undone; a token the instance
+ * no longer accepts is signed out as usual. Runs before render, so nothing has read the session
+ * yet and no reload is needed. A no-op in a browser.
+ */
+export async function restoreDesktopSession(): Promise<void> {
+  if (!isDesktop()) return;
+  try {
+    if (window.localStorage.getItem(SESSION_KEY)) return;
+  } catch {
+    return;
+  }
+  let raw: AccountsFile | null = null;
+  try {
+    raw = ((await accountsFile.load()) as AccountsFile | null) ?? null;
+  } catch {
+    return;
+  }
+  if (!raw || typeof raw.active !== 'string' || !Array.isArray(raw.accounts)) return;
+  const acc = raw.accounts.filter(isAccount).find((a) => a.id === raw.active);
+  if (!acc) return;
+  setDesktopInstance(acc.instance);
+  try {
+    window.localStorage.setItem(SESSION_KEY, acc.token);
+  } catch {
+    /* no storage: the sign-in form it is */
+  }
+}
+
+/**
  * Load the file and keep it in step with the session. Called once at start-up by the
  * desktop runtime; the effects it installs live for the page.
  */
 export async function initDesktopAccounts(): Promise<void> {
   try {
-    const raw = (await invoke<AccountsFile | null>('desktop_accounts_load')) ?? null;
+    const raw = ((await accountsFile.load()) as AccountsFile | null) ?? null;
     if (raw && Array.isArray(raw.accounts)) {
       setAccounts(raw.accounts.filter(isAccount));
       setActiveId(typeof raw.active === 'string' ? raw.active : null);

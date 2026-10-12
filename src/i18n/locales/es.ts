@@ -537,6 +537,11 @@ export default {
       fpsValue: '{{fps}} fps',
       hintDetail: 'Menos fotogramas mantienen el texto nítido: ideal para diapositivas y código.',
       hintMotion: 'Más fotogramas se ven más fluidos: ideal para vídeo y juegos, y consumen más subida.',
+      whatToShare: 'Qué compartir',
+      screens: 'Pantallas',
+      windows: 'Ventanas',
+      loadingSources: 'Buscando pantallas y ventanas…',
+      noSources: 'Ahora mismo no hay nada que compartir.',
     },
     stats: {
       title: 'Estadísticas de voz',

@@ -4,9 +4,9 @@
  */
 
 import { createEffect, createMemo, createRoot } from 'solid-js';
-import { desktopPlatform, isDesktop } from './env';
+import { desktopPlatform, desktopShell, isDesktop } from './env';
 import { initDesktopAccounts } from './accounts';
-import { markDesktopReady, nativeNotificationsGranted, setDiscordPresence, setUnreadBadge, type DiscordPresence } from './native';
+import { desktopWindow, markDesktopReady, nativeNotificationsGranted, setDiscordPresence, setUnreadBadge, type DiscordPresence } from './native';
 import { scheduleDesktopUpdateChecks } from './updater';
 import { readState } from '../stores/readState';
 import { voice } from '../stores/voice';
@@ -20,8 +20,9 @@ let started = false;
 export function initDesktop(): void {
   if (started || !isDesktop()) return;
   started = true;
-  // Styling hooks: the title bar's height, and the traffic-light inset on macOS.
-  document.documentElement.classList.add('desktop', `desktop-${desktopPlatform()}`);
+  // Styling hooks: the title bar's height, the traffic-light inset on macOS, and the
+  // drag regions only the Electron shell needs (Tauri drags by attribute instead).
+  document.documentElement.classList.add('desktop', `desktop-${desktopPlatform()}`, `desktop-${desktopShell() ?? 'tauri'}`);
   void start();
 }
 
@@ -38,7 +39,9 @@ async function start(): Promise<void> {
   // Prime the notification permission so showDesktopNotification can answer synchronously.
   void nativeNotificationsGranted();
 
-  scheduleDesktopUpdateChecks();
+  // One window checks for updates: a popup (the OAuth consent page) runs this same start-up,
+  // and its own check would race the main window's download in the one updater there is.
+  if (!desktopWindow.isPopup()) scheduleDesktopUpdateChecks();
 
   createRoot(() => {
     // Unread mentions on the app icon, summed over every room we know about.

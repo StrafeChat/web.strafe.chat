@@ -530,6 +530,11 @@ export default {
       fpsValue: '{{fps}} fps',
       hintDetail: 'Lower frame rates keep text sharp - good for slides and code.',
       hintMotion: 'Higher frame rates stay smooth - good for video and games, and they need more upload.',
+      whatToShare: 'What to share',
+      screens: 'Screens',
+      windows: 'Windows',
+      loadingSources: 'Looking for screens and windows…',
+      noSources: 'There is nothing to share right now.',
     },
     stats: {
       title: 'Voice statistics',

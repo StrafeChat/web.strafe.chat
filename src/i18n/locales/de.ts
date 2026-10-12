@@ -530,6 +530,11 @@ export default {
       fpsValue: '{{fps}} fps',
       hintDetail: 'Niedrige Bildraten halten Text scharf - gut für Folien und Code.',
       hintMotion: 'Hohe Bildraten bleiben flüssig - gut für Video und Spiele, brauchen aber mehr Upload.',
+      whatToShare: 'Was geteilt wird',
+      screens: 'Bildschirme',
+      windows: 'Fenster',
+      loadingSources: 'Bildschirme und Fenster werden gesucht…',
+      noSources: 'Gerade gibt es nichts zu teilen.',
     },
     stats: {
       title: 'Sprachstatistiken',
