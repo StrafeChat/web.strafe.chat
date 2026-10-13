@@ -65,9 +65,8 @@ function scheduleDecryptResweep(): void {
 
 /**
  * Web Crypto is missing, so nothing here can run - typically the app was opened over a LAN
- * address, which is not a secure context. E2eeUnavailableError carries a real explanation
- * and a fix; until now nothing ever surfaced it, so this showed up as "something went wrong"
- * three times in a row on a device whose user had done nothing wrong.
+ * address, which is not a secure context. Until this surfaced it, it showed up as "something
+ * went wrong" three times in a row on a device whose user had done nothing wrong.
  */
 function handledAsEnvironmentFailure(e: unknown): boolean {
   return surfaceE2eeEnvironmentFailure(e);
@@ -86,7 +85,10 @@ export function surfaceE2eeEnvironmentFailure(e: unknown): boolean {
     return true;
   }
   if (!(e instanceof E2eeUnavailableError)) return false;
-  setRecoveryPrompt('e2eeEnvironmentError', e.message);
+  // The error's own text is English and for developers; the dialog shows a translated
+  // explanation, so all it needs from here is that this happened.
+  console.warn('[e2ee]', e.message);
+  setRecoveryPrompt('e2eeEnvironmentError', 'insecureContext');
   cancelRecoveryPrompt();
   return true;
 }

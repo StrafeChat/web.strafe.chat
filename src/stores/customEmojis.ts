@@ -1,4 +1,6 @@
+import { createSignal } from 'solid-js';
 import { createStore, produce } from 'solid-js/store';
+import { ApiError } from '../api/ApiError';
 import { listMyEmojis, lookupEmoji, type CustomEmoji } from '../api/emojis';
 import { onStargateEvent } from '../services/stargate/client';
 import { stargateEventInnerRecord } from './spaceSync';
@@ -54,6 +56,23 @@ export function allCustomEmojis(): CustomEmoji[] {
 const pendingLookups = new Set<string>();
 
 /**
+ * Lookups that failed for a reason that says nothing about the emoji - offline, a 5xx, a 429
+ * from a PM full of foreign emoji - are asked again after a backoff rather than written off
+ * as deleted for the session. Failures per id, and when that id may be asked again.
+ */
+const LOOKUP_RETRY_BASE_MS = 5_000;
+const LOOKUP_RETRY_MAX_MS = 5 * 60_000;
+const failedLookups = new Map<string, number>();
+const lookupRetryAt = new Map<string, number>();
+/** Bumped when a backoff ends, so the renders still waiting on an emoji ask again. */
+const [lookupRetryTick, setLookupRetryTick] = createSignal(0);
+
+/** The server's answer for an id that names no emoji: gone (404) or not an id it accepts (400). */
+function lookupSaysMissing(err: unknown): boolean {
+  return err instanceof ApiError && (err.status === 404 || err.status === 400);
+}
+
+/**
  * Reactive resolution of an emoji id. Returns immediately from cache; for an unknown id
  * it kicks off one lookup and returns undefined until the store updates (callers that
  * read this inside a tracking scope re-render when it lands).
@@ -61,11 +80,28 @@ const pendingLookups = new Set<string>();
 export function resolveCustomEmoji(id: string): CustomEmoji | undefined {
   const hit = customEmojis.byId[id];
   if (hit) return hit;
-  if (customEmojis.missing[id] || pendingLookups.has(id) || !/^\d+$/.test(id)) return undefined;
+  if (customEmojis.missing[id] || !/^\d+$/.test(id)) return undefined;
+  // Tracked, so a caller whose lookup failed re-runs - and asks again - when the backoff ends.
+  lookupRetryTick();
+  if (pendingLookups.has(id) || Date.now() < (lookupRetryAt.get(id) ?? 0)) return undefined;
   pendingLookups.add(id);
   lookupEmoji(id)
-    .then((e) => setCustomEmojis('byId', id, e))
-    .catch(() => setCustomEmojis('missing', id, true))
+    .then((e) => {
+      failedLookups.delete(id);
+      lookupRetryAt.delete(id);
+      setCustomEmojis('byId', id, e);
+    })
+    .catch((err) => {
+      if (lookupSaysMissing(err)) {
+        setCustomEmojis('missing', id, true);
+        return;
+      }
+      const failures = (failedLookups.get(id) ?? 0) + 1;
+      failedLookups.set(id, failures);
+      const wait = Math.min(LOOKUP_RETRY_MAX_MS, LOOKUP_RETRY_BASE_MS * 2 ** (failures - 1));
+      lookupRetryAt.set(id, Date.now() + wait);
+      setTimeout(() => setLookupRetryTick((n) => n + 1), wait);
+    })
     .finally(() => pendingLookups.delete(id));
   return undefined;
 }

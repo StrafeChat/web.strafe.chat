@@ -93,13 +93,13 @@ export const KeybindsSettingsPage: Component = () => {
             icon="fa-rotate-left"
             title={t('settings.keybinds.restoreLast')}
             description={t('settings.keybinds.restoreLastHint')}
-            control={<Toggle checked={settings.restoreLastVisited} onChange={setRestoreLastVisited} />}
+            control={<Toggle label={t('settings.keybinds.restoreLast')} checked={settings.restoreLastVisited} onChange={setRestoreLastVisited} />}
           />
           <Row
             icon="fa-spell-check"
             title={t('settings.keybinds.spellcheck')}
             description={t('settings.keybinds.spellcheckHint')}
-            control={<Toggle checked={settings.spellcheck} onChange={setSpellcheck} />}
+            control={<Toggle label={t('settings.keybinds.spellcheck')} checked={settings.spellcheck} onChange={setSpellcheck} />}
           />
         </div>
       </section>

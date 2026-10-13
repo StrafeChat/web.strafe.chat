@@ -54,10 +54,11 @@ function childrenOf(node: MessageSegment): MessageSegment[] | undefined {
   return CONTAINER_TYPES.has(node.type) ? (node as { children: MessageSegment[] }).children : undefined;
 }
 
-/** Depth-first walk over a parsed message, containers included. */
-export function walkSegments(nodes: MessageSegment[], visit: (node: MessageSegment) => void): void {
+/** Depth-first walk over a parsed message, containers included. A visitor that returns
+ * `false` for a container skips everything inside it. */
+export function walkSegments(nodes: MessageSegment[], visit: (node: MessageSegment) => boolean | void): void {
   for (const node of nodes) {
-    visit(node);
+    if (visit(node) === false) continue;
     const kids = childrenOf(node);
     if (kids) walkSegments(kids, visit);
   }

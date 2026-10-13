@@ -111,6 +111,7 @@ export const NotificationsSettingsPage: Component = () => {
             description={permissionHint()}
             control={
               <Toggle
+                label={t('settings.notifications.desktop')}
                 checked={notificationPrefs.desktop && permission() === 'granted'}
                 disabled={permission() === 'denied' || permission() === 'unsupported'}
                 onChange={(on) => void toggleDesktop(on)}
@@ -121,13 +122,13 @@ export const NotificationsSettingsPage: Component = () => {
             icon="fa-eye"
             title={t('settings.notifications.preview')}
             description={t('settings.notifications.previewHint')}
-            control={<Toggle checked={notificationPrefs.preview} onChange={(on) => setNotificationPrefs({ preview: on })} />}
+            control={<Toggle label={t('settings.notifications.preview')} checked={notificationPrefs.preview} onChange={(on) => setNotificationPrefs({ preview: on })} />}
           />
           <Row
             icon="fa-window-maximize"
             title={t('settings.notifications.whileFocused')}
             description={t('settings.notifications.whileFocusedHint')}
-            control={<Toggle checked={notificationPrefs.whileFocused} onChange={(on) => setNotificationPrefs({ whileFocused: on })} />}
+            control={<Toggle label={t('settings.notifications.whileFocused')} checked={notificationPrefs.whileFocused} onChange={(on) => setNotificationPrefs({ whileFocused: on })} />}
           />
         </div>
       </section>
@@ -139,7 +140,7 @@ export const NotificationsSettingsPage: Component = () => {
             icon="fa-volume-high"
             title={t('settings.notifications.sounds')}
             description={t('settings.notifications.soundsHint')}
-            control={<Toggle checked={notificationPrefs.sounds} onChange={(on) => setNotificationPrefs({ sounds: on })} />}
+            control={<Toggle label={t('settings.notifications.sounds')} checked={notificationPrefs.sounds} onChange={(on) => setNotificationPrefs({ sounds: on })} />}
           />
           <div class={settingsGroupFrame}>
             <RangeField

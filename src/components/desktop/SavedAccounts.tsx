@@ -4,7 +4,7 @@ import { MessageAvatar } from '../messageList/MessageAvatar';
 import { IconButton } from '../ui/IconButton';
 import { authGlassSurface } from '../auth/authLayout';
 import { appListRow, appListRowIdle, appSectionLabel } from '../../theme/appChrome';
-import { removeDesktopAccount, sortedDesktopAccounts, switchDesktopAccount, type DesktopAccount } from '../../desktop/accounts';
+import { forgetDesktopAccount, sortedDesktopAccounts, switchDesktopAccount, type DesktopAccount } from '../../desktop/accounts';
 import { confirmDialog } from '../../stores/confirmDialog';
 import { t } from '../../i18n';
 
@@ -20,7 +20,8 @@ export const DesktopSavedAccounts: Component = () => {
       confirmLabel: t('desktop.accounts.remove'),
       tone: 'danger',
     });
-    if (ok) await removeDesktopAccount(acc.id);
+    // Ends the session on its instance too, not just here.
+    if (ok) await forgetDesktopAccount(acc.id);
   }
 
   return (

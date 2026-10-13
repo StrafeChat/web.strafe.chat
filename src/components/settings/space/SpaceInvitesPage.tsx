@@ -10,6 +10,7 @@ import { EmptyState } from '../../ui/EmptyState';
 import { appTable, appTableCell, appTableFrame, appTableHeadCell, appTableRow } from '../../../theme/appChrome';
 import { settingsGroupFrame, settingsSectionTitle } from '../settingsChrome';
 import { formatDate, t } from '../../../i18n';
+import { publicWebOrigin } from '../../../lib/runtimeConfig';
 
 interface Props {
   spaceId: string;
@@ -20,8 +21,9 @@ interface Props {
 const EXPIRY_OPTIONS = [0, 1800, 3600, 21600, 43200, 86400, 604800] as const;
 const USES_OPTIONS = [0, 1, 5, 10, 25, 50, 100] as const;
 
+/** The link people are sent - the instance's own address, not the desktop app's page. */
 function inviteUrl(code: string): string {
-  return `${window.location.origin}/invite/${code}`;
+  return `${publicWebOrigin()}/invite/${code}`;
 }
 
 /** Space settings → Invites: every live invite with uses/expiry, create new ones, revoke. */

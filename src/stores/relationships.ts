@@ -3,6 +3,7 @@ import { notificationPrefs, playNotificationSound } from './notificationPrefs';
 import { listRelationships, type Relationship, type RelationshipUser, type RelationshipType } from '../api/relationships';
 import { setUserPresence, notificationsSuppressedByStatus, type UserPresence } from './presence';
 import { onStargateEvent } from '../services/stargate/client';
+import { t } from '../i18n';
 
 export const RelType = {
   None: 0,
@@ -78,7 +79,7 @@ export function updatePresence(userId: string, p: UserPresence): void {
 }
 
 export function friendDisplayName(rel: Relationship): string {
-  return rel.user.display_name || rel.user.username || 'Unknown';
+  return rel.user.display_name || rel.user.username || t('common.unknown');
 }
 
 /** Normalize to string id (backend may send number in JSON). */

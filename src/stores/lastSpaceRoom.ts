@@ -38,5 +38,14 @@ export const lastSpaceRoom = {
       return next;
     });
   },
+  /** Sign-out: the map is of the leaving account's spaces and rooms. */
+  clear() {
+    setMap({});
+    try {
+      localStorage.removeItem(KEY);
+    } catch {
+      // ignore
+    }
+  },
 };
 

@@ -2,7 +2,7 @@ import type { Component } from 'solid-js';
 import { createEffect, createSignal, on, onCleanup, onMount, Show } from 'solid-js';
 import { fieldLabelClass, inputBaseClass, inputErrorClass } from '../ui/Input';
 import { InstanceResolveError, resolveInstance, type InstanceResolveCode, type ResolvedInstance } from '../../desktop/instance';
-import { setDesktopInstance } from '../../desktop/instanceOverride';
+import { setDesktopInstance, type DesktopInstance } from '../../desktop/instanceOverride';
 import { desktopAccountsLoaded, lastDesktopInstance } from '../../desktop/accounts';
 import { loadInstanceInfo, resetInstanceInfo } from '../../stores/instance';
 import { t } from '../../i18n';
@@ -10,6 +10,21 @@ import { t } from '../../i18n';
 type Status = 'idle' | 'resolving' | 'ok' | 'error';
 
 const DEBOUNCE_MS = 700;
+
+/**
+ * The instance to switch to, without the lookup's extras (its version). The web origin goes
+ * along when the lookup found one: invite and room links copied in the app are built on it,
+ * and without it they fall back to a guess from the API address, which is wrong wherever the
+ * API lives on a host of its own.
+ */
+function instanceToSave(inst: DesktopInstance): DesktopInstance {
+  return {
+    domain: inst.domain,
+    apiUrl: inst.apiUrl,
+    stargateUrl: inst.stargateUrl,
+    ...(inst.webOrigin ? { webOrigin: inst.webOrigin } : {}),
+  };
+}
 
 /**
  * The first field of the sign-in and sign-up forms in the desktop app: which instance.
@@ -39,7 +54,7 @@ export const InstancePicker: Component<{ disabled?: boolean; onReady: (ready: bo
       setValue(inst.domain);
       setResolved(inst);
       setStatus('ok');
-      setDesktopInstance({ domain: inst.domain, apiUrl: inst.apiUrl, stargateUrl: inst.stargateUrl });
+      setDesktopInstance(instanceToSave(inst));
       resetInstanceInfo();
       void loadInstanceInfo();
       props.onReady(true);
@@ -70,7 +85,7 @@ export const InstancePicker: Component<{ disabled?: boolean; onReady: (ready: bo
       if (mine.signal.aborted) return;
       setResolved(inst);
       setStatus('ok');
-      setDesktopInstance({ domain: inst.domain, apiUrl: inst.apiUrl, stargateUrl: inst.stargateUrl });
+      setDesktopInstance(instanceToSave(inst));
       // The captcha, invite and email settings the forms adapt to belong to this instance.
       resetInstanceInfo();
       void loadInstanceInfo();

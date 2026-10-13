@@ -37,15 +37,20 @@ const DiscoverPage: Component = () => {
   const [query, setQuery] = createSignal('');
   const [spaceList] = createResource(() => listDiscoverSpaces());
   const [botList] = createResource(() => listDiscoverBots());
+  // Read the listings through these, never the resources directly: a failed resource rethrows
+  // its error when read, and with nothing above the page to catch it the update was dropped
+  // before the "could not load" state below (`failed`) could ever render.
+  const spacesLoaded = () => (spaceList.state === 'errored' ? undefined : spaceList());
+  const botsLoaded = () => (botList.state === 'errored' ? undefined : botList());
   const [joining, setJoining] = createSignal('');
   const [error, setError] = createSignal('');
 
   const q = createMemo(() => query().trim().toLowerCase());
   /** Spaces from the instances we federate with share the page; this narrows it to ours. */
   const [scope, setScope] = createSignal<'all' | 'local'>('all');
-  const anyRemote = createMemo(() => (spaceList() ?? []).some((e) => e.space?.origin_domain));
+  const anyRemote = createMemo(() => (spacesLoaded() ?? []).some((e) => e.space?.origin_domain));
   const visible = createMemo(() => {
-    const list = (tab() === 'spaces' ? spaceList() : botList()) ?? [];
+    const list = (tab() === 'spaces' ? spacesLoaded() : botsLoaded()) ?? [];
     const scoped = tab() === 'spaces' && scope() === 'local' ? list.filter((e) => !e.space?.origin_domain) : list;
     return scoped.filter((e) => matches(e, q()));
   });

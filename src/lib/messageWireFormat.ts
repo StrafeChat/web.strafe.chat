@@ -19,10 +19,6 @@ import { rooms } from '../stores/rooms';
 import { spaces } from '../stores/spaces';
 import { spaceMembers } from '../stores/spaceMembers';
 
-const LEGACY_PLACEHOLDER = '[Message used a retired encryption scheme and can no longer be read]';
-const PENDING_PLACEHOLDER = '[Waiting for encryption key…]';
-const BEFORE_JOIN_PLACEHOLDER = '[Sent before you joined this space]';
-
 /** Mirrors equinox's messages.Service.roomE2EEOff: group PMs default to E2EE on (must be
  * explicitly disabled), space channels default to E2EE off (must be explicitly enabled).
  * Keep this truth table in sync with the backend or a send/edit will populate the column
@@ -116,29 +112,47 @@ function attachmentsFromContent(content: Record<string, unknown> | undefined): A
 export interface ResolvedFields {
   plaintext?: string;
   decryptError?: boolean;
+  /** Waiting for the room key (see DecryptedMessage.decryptPending). */
   decryptPending?: boolean;
+  /** With decryptPending: sent before the reader joined the space, so the key never comes. */
+  sentBeforeJoin?: boolean;
   notEncrypted?: boolean;
   legacyUndecryptable?: boolean;
   attachments: AttachmentView[];
 }
 
+/**
+ * Every state flag, off. Each result spells all of them out, so spreading a fresh result over
+ * a stored message also clears the state it has left - a key that arrived, an edit replacing a
+ * body that couldn't be read. Left out, a key would keep its old value through the spread and
+ * a message that had just been decrypted still said it was waiting for its key.
+ */
+const NO_STATE = {
+  decryptError: false,
+  decryptPending: false,
+  sentBeforeJoin: false,
+  notEncrypted: false,
+  legacyUndecryptable: false,
+} as const;
+
 /** Resolve a message's displayable plaintext (and attachments), dispatching on its wire
  * format. Shared by history load, realtime create, and realtime update so all three paths
- * stay in sync. */
+ * stay in sync. A message that can't be read yet - or ever - gets an empty plaintext and a
+ * flag saying why; the reader's language is the renderer's business (getMessageBodyText). */
 export async function resolvePlaintext(currentUserId: string, m: EncryptedMessageLike): Promise<ResolvedFields> {
   // Server-readable attachments (plaintext rooms). Encrypted ones are skipped here: their
   // real metadata and key only exist inside the ciphertext.
   const serverAttachments = (m.attachments ?? []).filter((a) => !a.encrypted).map(viewFromServerAttachment);
   if (m.plaintext != null && m.plaintext !== '') {
-    return { plaintext: m.plaintext, notEncrypted: true, attachments: serverAttachments };
+    return { ...NO_STATE, plaintext: m.plaintext, notEncrypted: true, attachments: serverAttachments };
   }
   const ctext = m.ciphertext ?? '';
   if (!ctext) {
     // Attachment-only message in a plaintext room (no text, so no plaintext column either).
-    return { plaintext: '', notEncrypted: true, attachments: serverAttachments };
+    return { ...NO_STATE, plaintext: '', notEncrypted: true, attachments: serverAttachments };
   }
   if (isLegacyCiphertext(ctext)) {
-    return { plaintext: LEGACY_PLACEHOLDER, legacyUndecryptable: true, attachments: [] };
+    return { ...NO_STATE, plaintext: '', legacyUndecryptable: true, attachments: [] };
   }
   const notEncrypted = ctext.startsWith(PLAINTEXT_PREFIX);
   try {
@@ -148,19 +162,23 @@ export async function resolvePlaintext(currentUserId: string, m: EncryptedMessag
       createdAt: m.created_at,
     });
     if (result.pending) {
-      const placeholder = sentBeforeSpaceJoin(m.room_id, m.created_at, currentUserId)
-        ? BEFORE_JOIN_PLACEHOLDER
-        : PENDING_PLACEHOLDER;
-      return { plaintext: placeholder, decryptPending: true, attachments: [] };
+      return {
+        ...NO_STATE,
+        plaintext: '',
+        decryptPending: true,
+        sentBeforeJoin: sentBeforeSpaceJoin(m.room_id, m.created_at, currentUserId),
+        attachments: [],
+      };
     }
     return {
+      ...NO_STATE,
       plaintext: result.plaintext,
       notEncrypted,
       attachments: notEncrypted ? serverAttachments : attachmentsFromContent(result.content),
     };
   } catch (e) {
     console.error('[E2EE] Decrypt failed for message', m.id, 'from', m.sender_id, e);
-    return { plaintext: '', decryptError: true, attachments: [] };
+    return { ...NO_STATE, plaintext: '', decryptError: true, attachments: [] };
   }
 }
 
@@ -177,6 +195,7 @@ export function preferResolved(existing: Readonly<Partial<ResolvedFields>>, inco
         plaintext: existing.plaintext,
         decryptError: existing.decryptError,
         decryptPending: existing.decryptPending,
+        sentBeforeJoin: existing.sentBeforeJoin,
         notEncrypted: existing.notEncrypted,
         legacyUndecryptable: existing.legacyUndecryptable,
         attachments: existing.attachments ?? [],

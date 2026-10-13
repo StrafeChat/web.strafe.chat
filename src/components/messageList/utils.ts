@@ -44,9 +44,12 @@ export function augmentParticipants(
 }
 
 export function getMessageBodyText(msg: DecryptedMessage): string {
-  // A failed decrypt leaves plaintext as '' (not null), so this has to win over the
-  // plaintext check or the message renders as a blank line with no explanation.
+  // A message that can't be read carries a flag and an empty plaintext (not null), so the
+  // explanation is said here, in the reader's language, and has to win over the plaintext
+  // check or the message renders as a blank line with no explanation.
   if (msg.decryptError) return decryptErrorPlaceholder();
+  if (msg.legacyUndecryptable) return t('messages.legacyUndecryptable');
+  if (msg.decryptPending) return msg.sentBeforeJoin ? t('messages.sentBeforeJoin') : t('messages.waitingForKey');
   if (msg.plaintext != null) return msg.plaintext;
   return LOADING_PLACEHOLDER;
 }

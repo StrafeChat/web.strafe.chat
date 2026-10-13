@@ -31,6 +31,9 @@ export interface CreateThreadModalProps {
   allowPrivate: boolean;
   /** Preselect the private option (the "New private thread" entry point). */
   privateDefault?: boolean;
+  /** The channel is end-to-end encrypted. A thread's name is not: the server stores it and
+   * sends it to every member and federated instance in the clear. */
+  encrypted?: boolean;
   onClose: () => void;
   onCreated: (threadId: string) => void;
 }
@@ -49,7 +52,10 @@ export const CreateThreadModal: Component<CreateThreadModalProps> = (props) => {
       () => props.open,
       (open) => {
         if (!open) return;
-        setName(props.starter ? props.starter.preview.slice(0, MAX_THREAD_NAME_LENGTH) : '');
+        // The suggested name is the starter message's own text. In an encrypted channel that
+        // text was decrypted on this device, and pressing Create would hand it to the server
+        // as the thread's plaintext name, so the field starts empty there.
+        setName(props.starter && !props.encrypted ? props.starter.preview.slice(0, MAX_THREAD_NAME_LENGTH) : '');
         setAutoArchive(String(DEFAULT_THREAD_AUTO_ARCHIVE));
         setIsPrivate(!!props.privateDefault && props.allowPrivate && !props.starter);
         setError('');
@@ -124,6 +130,12 @@ export const CreateThreadModal: Component<CreateThreadModalProps> = (props) => {
             disabled={loading()}
             error={error()}
           />
+          <Show when={props.encrypted}>
+            <p class="-mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
+              <i class="fa-solid fa-lock-open mt-0.5 text-[10px]" aria-hidden="true" />
+              {t('threads.nameNotEncrypted')}
+            </p>
+          </Show>
           <Select label={t('threads.autoArchiveLabel')} value={autoArchive()} onValueChange={setAutoArchive}>
             <For each={THREAD_AUTO_ARCHIVE_OPTIONS}>{(m) => <option value={String(m)}>{durationLabel(m)}</option>}</For>
           </Select>

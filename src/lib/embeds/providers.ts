@@ -50,9 +50,14 @@ function youtube(u: URL): VideoEmbed | null {
   if (h === 'youtu.be') {
     id = segs[0] || '';
   } else if (h === 'youtube.com' || h === 'm.youtube.com' || h === 'music.youtube.com' || h === 'youtube-nocookie.com') {
-    if (u.pathname === '/watch') id = u.searchParams.get('v') || '';
-    else if (segs[0] === 'shorts') (id = segs[1] || ''), (portrait = true);
-    else if (segs[0] === 'embed' || segs[0] === 'live' || segs[0] === 'v') id = segs[1] || '';
+    if (u.pathname === '/watch') {
+      id = u.searchParams.get('v') || '';
+    } else if (segs[0] === 'shorts') {
+      id = segs[1] || '';
+      portrait = true;
+    } else if (segs[0] === 'embed' || segs[0] === 'live' || segs[0] === 'v') {
+      id = segs[1] || '';
+    }
   } else {
     return null;
   }

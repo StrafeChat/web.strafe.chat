@@ -6,7 +6,7 @@
  * next, and a URL with a path is taken as the API itself (a developer's :4000).
  */
 
-import { deriveStargateUrl } from '../lib/runtimeConfig';
+import { deriveStargateUrl, webOriginForApi } from '../lib/runtimeConfig';
 import type { DesktopInstance } from './instanceOverride';
 
 export interface ResolvedInstance extends DesktopInstance {
@@ -126,7 +126,15 @@ export async function resolveInstance(raw: string, signal?: AbortSignal): Promis
       throw new InstanceResolveError('unreachable', host);
     }
     if (version === null) throw new InstanceResolveError('not_strafe', host);
-    return { domain: host, apiUrl, stargateUrl: deriveStargateUrl(apiUrl), version };
+    return {
+      domain: host,
+      apiUrl,
+      stargateUrl: deriveStargateUrl(apiUrl),
+      // A bare API on a port (a developer's :4000) says nothing about where its client is;
+      // its own origin is the best guess there is.
+      webOrigin: webOriginForApi(apiUrl, new URL(apiUrl).origin),
+      version,
+    };
   }
 
   const schemes = mayBeInsecure(host) ? ['https', 'http'] : ['https'];
@@ -151,6 +159,8 @@ export async function resolveInstance(raw: string, signal?: AbortSignal): Promis
         domain: (doc.domain || host).toLowerCase(),
         apiUrl,
         stargateUrl,
+        // The client sits beside an /api API; otherwise on the host that answered for it.
+        webOrigin: webOriginForApi(apiUrl, `${scheme}://${host}`),
         version: doc.software?.version,
       };
     }
@@ -162,7 +172,15 @@ export async function resolveInstance(raw: string, signal?: AbortSignal): Promis
     try {
       const version = await probeApi(apiUrl, signal);
       reachedSomething = true;
-      if (version !== null) return { domain: host, apiUrl, stargateUrl: deriveStargateUrl(apiUrl), version };
+      if (version !== null) {
+        return {
+          domain: host,
+          apiUrl,
+          stargateUrl: deriveStargateUrl(apiUrl),
+          webOrigin: `${scheme}://${host}`,
+          version,
+        };
+      }
     } catch {
       /* next scheme */
     }

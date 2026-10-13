@@ -14,6 +14,7 @@ import {
   type CreateMessageInput,
   type MessageReaction,
 } from '../api/messages';
+import type { Room } from '../api/rooms';
 import { ensureDevice, encryptMessage } from '../lib/e2ee';
 import { getCurrentDeviceId } from '../lib/e2ee/machine';
 import { encryptAttachment } from '../lib/attachments/crypto';
@@ -41,7 +42,10 @@ export { viewFromServerAttachment };
 import { auth } from './auth';
 import { settings } from './settings';
 import { rooms, updateRoomLastMessage, setRoomLastMessageId } from './rooms';
-import { spaces, updateSpaceRoomLastMessage, setSpaceRoomLastMessageId, bumpThreadMessageCount } from './spaces';
+import { spaces, spaceRoles, updateSpaceRoomLastMessage, setSpaceRoomLastMessageId, bumpThreadMessageCount } from './spaces';
+import { spaceMembers } from './spaceMembers';
+import { resolveMessageRoom, spaceIdOfRoom } from './spaceRoomMirror';
+import { t } from '../i18n';
 import { onStargateEvent } from '../services/stargate/client';
 import { maybeNotifyMessage } from '../lib/notifications';
 import { setReadState, extractMentionedUserIds, extractMentionedRoleIds, mentionsEveryone, messageIdGt, isSnowflake } from './readState';
@@ -101,6 +105,151 @@ function mergeMessages(existing: DecryptedMessage[] | undefined, incoming: Decry
   return sortByCreatedAt(merged);
 }
 
+/** A server timestamp in milliseconds. Messages are stored to the millisecond, but the copy a
+ * client gets live (the MESSAGE_CREATE event, the send's response) still carries the
+ * nanoseconds it was made with, so the strings differ for the same instant. */
+function timestampMs(value: string | undefined): number {
+  const m = value ? /^([^.]+?)(?:\.(\d+))?(Z|[+-]\d\d:\d\d)$/.exec(value) : null;
+  if (!m) return value ? Date.parse(value) : NaN;
+  return Date.parse(`${m[1]}.${(m[2] ?? '').slice(0, 3).padEnd(3, '0')}${m[3]}`);
+}
+
+function sameJson(a: unknown, b: unknown): boolean {
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
+/**
+ * What changed in a room while a page of it was in flight - live events (reactions, pins,
+ * threads, deletions) and this device's own reactions and pins. The gateway is already
+ * delivering while the page is fetched, decrypted and has its previews warmed, so for these
+ * messages the page is older than what is loaded: writing its copy back would leave a reaction
+ * count off by one (reaction events are deltas, so nothing corrects it until the next refresh),
+ * take back the user's own reaction, un-pin, drop a thread link, or bring a deleted message
+ * back. One per page in flight - a reconnect's refresh and re-entering the room can overlap.
+ */
+interface LiveChanges {
+  reactions: Set<string>;
+  pins: Set<string>;
+  threads: Set<string>;
+  deleted: Set<string>;
+}
+
+const liveChangesByRoom = new Map<string, Set<LiveChanges>>();
+
+function trackLiveChanges(roomId: string): LiveChanges {
+  const changes: LiveChanges = { reactions: new Set(), pins: new Set(), threads: new Set(), deleted: new Set() };
+  let set = liveChangesByRoom.get(roomId);
+  if (!set) liveChangesByRoom.set(roomId, (set = new Set()));
+  set.add(changes);
+  return changes;
+}
+
+function untrackLiveChanges(roomId: string, changes: LiveChanges): void {
+  const set = liveChangesByRoom.get(roomId);
+  if (!set) return;
+  set.delete(changes);
+  if (set.size === 0) liveChangesByRoom.delete(roomId);
+}
+
+function noteLiveChange(roomId: string, kind: keyof LiveChanges, messageId: string): void {
+  for (const changes of liveChangesByRoom.get(roomId) ?? []) changes[kind].add(messageId);
+}
+
+/**
+ * Bring a loaded row up to date with a freshly fetched copy of the same message, in place:
+ * only what differs is written, so an unchanged row costs nothing and a changed one updates
+ * without being rebuilt (the list keys rows by object identity - see patchReaction). A newer
+ * edit, or a key that has arrived since the row was read, takes the fetched text, attachments
+ * and mentions - never an older version, which is what the page holds when an edit landed live
+ * while it was in flight. Reactions, the pin and the thread are taken whenever they differ,
+ * unless they changed live meanwhile (`live`).
+ */
+function patchRow(row: DecryptedMessage, fresh: DecryptedMessage, live: LiveChanges): void {
+  const rowAt = timestampMs(row.updated_at);
+  const freshAt = timestampMs(fresh.updated_at);
+  const older = rowAt > freshAt;
+  // Same instant (or no usable timestamp): only a different body says it was edited.
+  const edited = freshAt > rowAt || (!older && row.ciphertext !== fresh.ciphertext);
+  const unlocked = !older && (row.decryptPending || row.decryptError) && !fresh.decryptPending && !fresh.decryptError;
+  if (edited || unlocked) {
+    row.ciphertext = fresh.ciphertext;
+    row.plaintext = fresh.plaintext;
+    row.updated_at = fresh.updated_at;
+    row.decryptError = fresh.decryptError;
+    row.decryptPending = fresh.decryptPending;
+    row.sentBeforeJoin = fresh.sentBeforeJoin;
+    row.legacyUndecryptable = fresh.legacyUndecryptable;
+    row.notEncrypted = fresh.notEncrypted;
+    row.attachments = fresh.attachments;
+    row.mentions = fresh.mentions;
+    row.mention_roles = fresh.mention_roles;
+    row.mention_everyone = fresh.mention_everyone;
+    row.mention_users = fresh.mention_users;
+  }
+  // The server leaves reactions out when there are none.
+  if (!live.reactions.has(row.id) && !sameJson(row.reactions ?? [], fresh.reactions ?? [])) row.reactions = fresh.reactions;
+  if (!live.pins.has(row.id) && (row.pinned ?? false) !== (fresh.pinned ?? false)) {
+    row.pinned = fresh.pinned;
+    row.pinned_at = fresh.pinned_at;
+    row.pinned_by = fresh.pinned_by;
+  }
+  if (!live.threads.has(row.id) && row.thread_id !== fresh.thread_id) row.thread_id = fresh.thread_id;
+}
+
+/**
+ * Refresh what is loaded from a room's newest page (a reconnect, re-entering the room). The
+ * gateway doesn't replay what happened while this client wasn't listening, so the page is the
+ * only word on edits, deletions, reactions, pins and threads made meanwhile - and merging it
+ * by id alone kept every loaded row exactly as it was. Rows the page holds are patched in
+ * place (patchRow). A row that was loaded when the page was asked for (`loadedBefore`) and that
+ * the page should hold but doesn't was deleted: one within the page's span, or any older one
+ * when the page reaches back to the room's first message. A row that arrived while the page was
+ * in flight may have been written after the page was read, so it stays, as do own sends in
+ * flight and rows newer than the page.
+ */
+function reconcileNewestPage(
+  roomId: string,
+  fetched: DecryptedMessage[],
+  reachesStart: boolean,
+  loadedBefore: Set<string>,
+  live: LiveChanges
+): void {
+  const byId = new Map(fetched.map((m) => [m.id, m]));
+  let oldest: string | undefined;
+  let newest: string | undefined;
+  for (const m of fetched) {
+    if (!isSnowflake(m.id)) continue;
+    if (!oldest || messageIdGt(oldest, m.id)) oldest = m.id;
+    if (!newest || messageIdGt(m.id, newest)) newest = m.id;
+  }
+  // An empty page has no span to hold the loaded rows against.
+  if (!oldest || !newest) return;
+  const from = oldest;
+  const to = newest;
+  const deleted = (m: DecryptedMessage) =>
+    !m.pending &&
+    loadedBefore.has(m.id) &&
+    isSnowflake(m.id) &&
+    !byId.has(m.id) &&
+    !messageIdGt(m.id, to) &&
+    (reachesStart || !messageIdGt(from, m.id));
+  batch(() => {
+    setMessages(
+      'byRoom',
+      roomId,
+      produce((list) => {
+        for (const row of list ?? []) {
+          const fresh = byId.get(row.id);
+          if (fresh) patchRow(row, fresh, live);
+        }
+      })
+    );
+    if ((messages.byRoom[roomId] ?? []).some(deleted)) {
+      setMessages('byRoom', roomId, (prev) => (prev ?? []).filter((m) => !deleted(m)));
+    }
+  });
+}
+
 export interface DecryptedMessage extends Omit<Message, 'attachments'> {
   plaintext?: string;
   /** Attachments in display form. In E2EE rooms these came out of the decrypted body and
@@ -110,6 +259,9 @@ export interface DecryptedMessage extends Omit<Message, 'attachments'> {
   /** True when the Megolm room key for this message hasn't arrived yet - a "waiting for
    * key" state, not an error; it resolves itself once the to-device share is processed. */
   decryptPending?: boolean;
+  /** With decryptPending: the message predates the reader joining the space, so the key
+   * was never shared with them and never will be - said as such, not as "waiting". */
+  sentBeforeJoin?: boolean;
   /** True when the message predates the current engine (old static-key scheme) and can no
    * longer be decrypted - that engine's key material was deleted along with it. */
   legacyUndecryptable?: boolean;
@@ -221,6 +373,43 @@ export function leaveRoomView(roomId: string, around: { anchorId: string | null;
   queueMicrotask(() => trimIdleRoom(roomId, around));
 }
 
+/**
+ * Object URLs of files this device sent, by room and then message. The sent message keeps
+ * showing the local file rather than flashing over to the uploaded copy, and the URL keeps
+ * the file's bytes in memory until it is revoked - for a pasted screenshot or a recorded voice
+ * clip that is the only copy, so without this every one sent stayed alive for the session.
+ * Revoked once no loaded message shows it any more (trimmed out of the cache, deleted, its
+ * attachments re-read from the server); a later load of the message shows the uploaded copy.
+ */
+const sentPreviewUrls = new Map<string, Map<string, string[]>>();
+
+function holdSentPreviews(roomId: string, messageId: string, attachments: AttachmentView[]): void {
+  const urls = attachments.map((a) => a.previewUrl).filter((u): u is string => !!u);
+  if (urls.length === 0) return;
+  let byMessage = sentPreviewUrls.get(roomId);
+  if (!byMessage) sentPreviewUrls.set(roomId, (byMessage = new Map()));
+  byMessage.set(messageId, urls);
+  // The gateway's echo can land before this and already have swapped the files for the
+  // uploaded copies.
+  releaseSentPreviews(roomId);
+}
+
+/** Revoke the held URLs of a room that none of its loaded messages show any more. Called
+ * wherever messages leave a room's cache or have their attachments replaced. */
+function releaseSentPreviews(roomId: string): void {
+  const byMessage = sentPreviewUrls.get(roomId);
+  if (!byMessage) return;
+  const list = messages.byRoom[roomId] ?? [];
+  for (const [messageId, urls] of byMessage) {
+    const shown = new Set((list.find((m) => m.id === messageId)?.attachments ?? []).map((a) => a.previewUrl));
+    const kept = urls.filter((u) => shown.has(u));
+    for (const u of urls) if (!shown.has(u)) URL.revokeObjectURL(u);
+    if (kept.length) byMessage.set(messageId, kept);
+    else byMessage.delete(messageId);
+  }
+  if (byMessage.size === 0) sentPreviewUrls.delete(roomId);
+}
+
 function setTempAttachmentProgress(roomId: string, tempId: string, localId: string, progress: number) {
   setMessages('byRoom', roomId, (prev) =>
     (prev ?? []).map((m) =>
@@ -246,8 +435,8 @@ export async function retryPendingDecrypts(): Promise<void> {
     if (waiting.length === 0) continue;
     const resolved = await Promise.all(
       waiting.map(async (m) => {
-        // Not the stored object: its `plaintext` is the placeholder, which resolvePlaintext
-        // would otherwise take for server-stored plaintext.
+        // Not the stored object: only the wire fields, so nothing the client filled in locally
+        // is taken by resolvePlaintext for server-stored plaintext.
         const fields = await resolvePlaintext(currentUserId, {
           id: m.id,
           room_id: m.room_id,
@@ -272,7 +461,7 @@ const PREVIEW_WARM_OLDER_MS = 600;
 
 /** Mirrors MessageList's gate: plain rooms always preview; encrypted rooms only by choice. */
 function linkPreviewsAllowedIn(roomId: string): boolean {
-  const room = rooms.rooms.find((r) => r.id === roomId);
+  const room = resolveMessageRoom(roomId);
   if (!room) return false;
   return room.e2ee_enabled !== true || !!settings.linkPreviewsInEncrypted;
 }
@@ -319,6 +508,7 @@ function trimHead(roomId: string): void {
       setMessages('hasMoreOlder', roomId, true);
     });
     if (container && anchor) restoreScrollAnchor(container, anchor);
+    releaseSentPreviews(roomId);
   };
   if (view && container) view.programmatic(apply);
   else apply();
@@ -344,6 +534,7 @@ function trimIdleRoom(roomId: string, around: { anchorId: string | null; atBotto
     if (start > 0) setMessages('hasMoreOlder', roomId, true);
     if (end < list.length) setMessages('hasMoreNewer', roomId, true);
   });
+  releaseSentPreviews(roomId);
 }
 
 /**
@@ -380,19 +571,23 @@ export async function loadMessages(
     return;
   }
 
+  const live = trackLiveChanges(roomId);
   try {
     try {
       await ensureDevice(currentUserId);
     } catch (e) {
       console.warn('ensureDevice failed, decryption may fail:', e);
     }
+    const loadedBefore = new Set((messages.byRoom[roomId] ?? []).map((m) => m.id));
     const list = await listMessages(roomId, { before, limit: MESSAGES_PAGE_SIZE });
-    const decrypted = await decryptPage(list, currentUserId);
+    const page = await decryptPage(list, currentUserId);
     // Fetch this page's link previews before showing it, so the cards are in place when the
     // messages appear instead of popping in one by one and shoving the conversation around
     // (the same page of history would otherwise reflow once per link). Bounded: a slow site
     // can't hold the room back, its card just arrives late as before.
-    await warmPagePreviews(roomId, decrypted, isInitialLoad ? PREVIEW_WARM_INITIAL_MS : PREVIEW_WARM_OLDER_MS);
+    await warmPagePreviews(roomId, page, isInitialLoad ? PREVIEW_WARM_INITIAL_MS : PREVIEW_WARM_OLDER_MS);
+    // A message deleted while the page was in flight is still on it; merging it would bring it back.
+    const decrypted = page.filter((m) => !live.deleted.has(m.id));
 
     const existing = messages.byRoom[roomId] ?? [];
     if (isInitialLoad && existing.length > 0 && list.length >= MESSAGES_PAGE_SIZE) {
@@ -407,9 +602,14 @@ export async function loadMessages(
       }
     }
 
+    // A refresh of rows already loaded: what changed or went away while they sat here is
+    // applied before the new ones are merged in.
+    if (isInitialLoad && existing.length > 0) {
+      reconcileNewestPage(roomId, decrypted, list.length < MESSAGES_PAGE_SIZE, loadedBefore, live);
+    }
     const container = getScrollContainer?.();
     const anchor = container ? captureScrollAnchor(container) : null;
-    let merged = mergeMessages(existing, decrypted);
+    let merged = mergeMessages(messages.byRoom[roomId], decrypted);
     let droppedTail = false;
     if (!isInitialLoad && container && merged.length > MAX_LOADED_MESSAGES) {
       const tail = merged.slice(MAX_LOADED_MESSAGES);
@@ -426,8 +626,10 @@ export async function loadMessages(
       else setMessages('loadingOlder', roomId, false);
     });
     if (!isInitialLoad && container && anchor) restoreScrollAnchor(container, anchor);
+    releaseSentPreviews(roomId);
     if (isInitialLoad) trimHead(roomId);
   } finally {
+    untrackLiveChanges(roomId, live);
     if (isInitialLoad) {
       setMessages('loading', roomId, false);
     } else {
@@ -496,6 +698,7 @@ export async function loadMessagesAround(roomId: string, messageId: string): Pro
       setMessages('jumpTarget', roomId, { id: messageId, nonce: ++jumpNonce, smooth: false });
       setMessages('loading', roomId, false);
     });
+    releaseSentPreviews(roomId);
     return true;
   } finally {
     setMessages('loading', roomId, false);
@@ -550,6 +753,7 @@ export async function loadNewerMessages(
       setMessages('loadingNewer', roomId, false);
     });
     if (container && anchor) restoreScrollAnchor(container, anchor);
+    if (droppedHead) releaseSentPreviews(roomId);
     return true;
   } finally {
     setMessages('loadingNewer', roomId, false);
@@ -607,10 +811,22 @@ export async function jumpToPresent(roomId: string): Promise<void> {
       setMessages('loadingNewer', roomId, false);
       setMessages('scrollToBottomForce', roomId, (t) => (t ?? 0) + 1);
     });
+    releaseSentPreviews(roomId);
   } catch (err) {
     setMessages('hasMoreNewer', roomId, true);
     throw err;
   }
+}
+
+/**
+ * The room a send or an edit goes to, or an error when it can't be worked out. Thrown, not a
+ * null return: the composer has already cleared the draft by the time it calls, and only a
+ * rejection gives it back - a null was taken for success and the message silently vanished.
+ */
+function roomForMessage(roomId: string): Room {
+  const room = resolveMessageRoom(roomId);
+  if (!room) throw new Error(t('messages.roomUnavailable'));
+  return room;
 }
 
 export async function sendMessage(
@@ -619,10 +835,10 @@ export async function sendMessage(
   replyToId?: string,
   pendingAttachments: PendingAttachment[] = []
 ): Promise<Message | null> {
-  const room = rooms.rooms.find((r) => r.id === roomId);
   const currentUserId = auth.user?.id;
-  if (!room || !currentUserId) return null;
+  if (!currentUserId) return null;
   if (!plaintext && pendingAttachments.length === 0) return null;
+  const room = roomForMessage(roomId);
 
   const participants = room.participants ?? [];
   const otherParticipant = participants.find((p) => p.id !== currentUserId);
@@ -630,7 +846,7 @@ export async function sendMessage(
   const isGroupRoom = room.type === 2 && participants.length >= 2;
   // Threads (6) take their channel's E2EE setting and are plaintext rooms otherwise.
   const isSpaceTextRoom = room.type === 3 || room.type === 6;
-  if (!otherParticipant && !isNotesRoom && !isGroupRoom && !isSpaceTextRoom) return null;
+  if (!otherParticipant && !isNotesRoom && !isGroupRoom && !isSpaceTextRoom) throw new Error(t('messages.roomUnavailable'));
 
   // Sending while reading older history jumps back to the live tail first (Discord's behaviour),
   // so the optimistic message lands at the present and its server echo - gated on hasMoreNewer -
@@ -747,7 +963,18 @@ export async function sendMessage(
 
     const msg = await createMessage(roomId, input);
 
-    const confirmed: DecryptedMessage = { ...msg, plaintext, notEncrypted: e2eeOff, attachments: sentAttachments };
+    // This device wrote the text, so whatever state the gateway's echo of it landed in (its key
+    // not processed yet, say) is over.
+    const confirmed: DecryptedMessage = {
+      ...msg,
+      plaintext,
+      notEncrypted: e2eeOff,
+      decryptError: false,
+      decryptPending: false,
+      sentBeforeJoin: false,
+      legacyUndecryptable: false,
+      attachments: sentAttachments,
+    };
     let didReplaceInPlace = false;
     setMessages('byRoom', roomId, (prev) => {
       const list = prev ?? [];
@@ -755,7 +982,11 @@ export async function sendMessage(
       const existingIdx = list.findIndex((m) => m.id === msg.id);
       if (existingIdx >= 0) {
         didReplaceInPlace = true;
-        return list.map((m, i) => (i === existingIdx ? { ...m, ...confirmed, plaintext } : m));
+        // The echo arrived first without being matched to the optimistic row (it couldn't be
+        // read yet); that row is this same message, so it goes rather than sending forever.
+        return list
+          .map((m, i) => (i === existingIdx ? { ...m, ...confirmed, plaintext } : m))
+          .filter((m) => m.id !== nonce);
       }
       if (tempIdx >= 0) {
         didReplaceInPlace = true;
@@ -765,6 +996,7 @@ export async function sendMessage(
       }
       return sortByCreatedAt([...list, confirmed]);
     });
+    holdSentPreviews(roomId, msg.id, sentAttachments);
     if (!didReplaceInPlace) {
       setMessages('scrollToBottomForce', roomId, (t) => (t ?? 0) + 1);
       trimHead(roomId);
@@ -787,12 +1019,40 @@ export function clearMessages(roomId?: string) {
     setMessages('loadingNewer', roomId, false);
     setMessages('jumpTarget', roomId, null);
     forgetScrollPosition(roomId);
+    releaseSentPreviews(roomId);
   } else {
-    setMessages('byRoom', {});
-    setMessages('hasMoreNewer', {});
-    setMessages('loadingNewer', {});
-    setMessages('jumpTarget', {});
+    // `produce`: a store setter handed a plain object merges it, so `{}` cleared nothing.
+    setMessages(
+      produce((s) => {
+        s.byRoom = {};
+        s.hasMoreNewer = {};
+        s.loadingNewer = {};
+        s.jumpTarget = {};
+      })
+    );
+    for (const id of [...sentPreviewUrls.keys()]) releaseSentPreviews(id);
   }
+}
+
+/**
+ * Drop everything cached for a room this account can no longer see (removed from a group PM,
+ * or left it from another device): its history would otherwise stay in memory and be
+ * re-requested - and refused - on every reconnect.
+ */
+function forgetRoomMessages(roomId: string): void {
+  setMessages(
+    produce((s) => {
+      delete s.byRoom[roomId];
+      delete s.loading[roomId];
+      delete s.loadingOlder[roomId];
+      delete s.hasMoreOlder[roomId];
+      delete s.hasMoreNewer[roomId];
+      delete s.loadingNewer[roomId];
+      delete s.jumpTarget[roomId];
+    })
+  );
+  forgetScrollPosition(roomId);
+  releaseSentPreviews(roomId);
 }
 
 /** Add a message from Stargate MESSAGE_CREATE event */
@@ -875,6 +1135,9 @@ export async function addMessageFromEvent(payload: {
   if (!didReplaceInPlace) {
     setMessages('scrollToBottomTick', roomId, (t) => (t ?? 0) + 1);
     trimHead(roomId);
+  } else {
+    // An echo of our own send that came after the send confirmed replaced its attachments.
+    releaseSentPreviews(roomId);
   }
 }
 
@@ -904,12 +1167,15 @@ export async function updateMessageFromEvent(payload: {
     const updated: DecryptedMessage = { ...existing, ...payload, ...resolved };
     return list.map((m, i) => (i === idx ? updated : m));
   });
+  releaseSentPreviews(roomId);
 }
 
 /** Remove a message from local store (Stargate MESSAGE_DELETE) */
 export function removeMessageFromEvent(roomId: string, messageId: string) {
+  noteLiveChange(roomId, 'deleted', messageId);
   setMessages('byRoom', roomId, (prev) => (prev ?? []).filter((m) => m.id !== messageId));
   bumpThreadMessageCount(roomId, -1);
+  releaseSentPreviews(roomId);
 }
 
 /** Decrypt (or pass through) raw server messages for display outside the room list - the pin
@@ -923,6 +1189,7 @@ export function decryptServerMessages(list: Message[]): Promise<DecryptedMessage
 /** Flip a loaded message's pinned flag in place (ROOM_PINS_UPDATE, optimistic toggles). Mutates
  * rather than replaces the message object - see patchReaction for why. */
 export function setMessagePinned(roomId: string, messageId: string, pinned: boolean, pinnedAt?: string, pinnedBy?: string) {
+  noteLiveChange(roomId, 'pins', messageId);
   setMessages(
     'byRoom',
     roomId,
@@ -939,6 +1206,7 @@ export function setMessagePinned(roomId: string, messageId: string, pinned: bool
 /** Point a loaded message at the thread started from it (THREAD_CREATE), or clear it
  * (THREAD_DELETE); the footer under the message reads this. In place, like the pin flag. */
 export function setMessageThreadId(roomId: string, messageId: string, threadId: string | undefined) {
+  noteLiveChange(roomId, 'threads', messageId);
   setMessages(
     'byRoom',
     roomId,
@@ -968,6 +1236,7 @@ export function setMessageThreadId(roomId: string, messageId: string, threadId: 
  */
 function patchReaction(roomId: string, messageId: string, emoji: string, userId: string, added: boolean) {
   const currentUserId = auth.user?.id;
+  noteLiveChange(roomId, 'reactions', messageId);
   setMessages(
     'byRoom',
     roomId,
@@ -1016,6 +1285,7 @@ export async function toggleReaction(roomId: string, messageId: string, emoji: s
       : await addReactionApi(roomId, messageId, emoji);
     // Same reasoning as patchReaction: write just the `reactions` field so the message row
     // is patched in place rather than remounted.
+    noteLiveChange(roomId, 'reactions', messageId);
     setMessages(
       'byRoom',
       roomId,
@@ -1038,9 +1308,9 @@ export async function editMessage(
   msgId: string,
   newPlaintext: string
 ): Promise<Message | null> {
-  const room = rooms.rooms.find((r) => r.id === roomId);
   const currentUserId = auth.user?.id;
-  if (!room || !currentUserId) return null;
+  if (!currentUserId) return null;
+  const room = roomForMessage(roomId);
 
   const participants = room.participants ?? [];
   const otherParticipant = participants.find((p) => p.id !== currentUserId);
@@ -1048,7 +1318,7 @@ export async function editMessage(
   const isGroupRoom = room.type === 2 && participants.length >= 2;
   // Threads (6) take their channel's E2EE setting and are plaintext rooms otherwise.
   const isSpaceTextRoom = room.type === 3 || room.type === 6;
-  if (!otherParticipant && !isNotesRoom && !isGroupRoom && !isSpaceTextRoom) return null;
+  if (!otherParticipant && !isNotesRoom && !isGroupRoom && !isSpaceTextRoom) throw new Error(t('messages.roomUnavailable'));
 
   try {
     await ensureDevice(currentUserId);
@@ -1076,6 +1346,11 @@ export async function editMessage(
       ...msg,
       plaintext: newPlaintext,
       notEncrypted: e2eeOff,
+      // The new text is this device's own, so no earlier unreadable state still applies.
+      decryptError: false,
+      decryptPending: false,
+      sentBeforeJoin: false,
+      legacyUndecryptable: false,
       attachments: existing?.attachments ?? (msg.attachments ?? []).filter((a) => !a.encrypted).map(viewFromServerAttachment),
     };
     setMessages('byRoom', roomId, (prev) => {
@@ -1092,11 +1367,31 @@ export async function editMessage(
 }
 
 /**
+ * Whether a message's role mentions reach the current user: a role they hold in the room's
+ * space, other than @everyone, that is mentionable. The server also lets a sender who may
+ * mention everyone ping an unmentionable role; that case isn't knowable here and shows on
+ * the next READY. Unknown (no member list loaded for the space yet) counts as no.
+ */
+function mentionsHeldRole(roomId: string, roleIds: string[], currentUserId: string): boolean {
+  if (roleIds.length === 0) return false;
+  const spaceId = spaceIdOfRoom(roomId);
+  if (!spaceId) return false;
+  const held = spaceMembers.bySpaceId[spaceId]?.find((m) => m.id === currentUserId)?.roles ?? [];
+  if (held.length === 0) return false;
+  const everyoneRoleId = spaces.spaces.find((s) => s.id === spaceId)?.everyone_role_id;
+  const roles = spaceRoles(spaceId) ?? [];
+  return roleIds.some(
+    (id) => id !== everyoneRoleId && held.includes(id) && roles.some((r) => r.id === id && r.mentionable)
+  );
+}
+
+/**
  * Bump the local mention badge when an incoming message pings the current user - the
  * server already incremented room_mention_counts (so a reload/other device sees it
  * regardless), this just makes the sidebar react immediately without waiting for one.
  * Mirrors the server's own notify-set rule (messages.Service.resolveMentionNotifySet):
- * direct mention OR @everyone/@here, never for your own messages.
+ * direct mention, a mention of a role they hold, or @everyone/@here - never for your own
+ * messages.
  */
 function applyIncomingMentionSignal(roomId: string, data: Record<string, unknown>) {
   const currentUserId = auth.user?.id;
@@ -1104,8 +1399,9 @@ function applyIncomingMentionSignal(roomId: string, data: Record<string, unknown
   const senderId = data.sender_id != null ? String(data.sender_id) : '';
   if (senderId === currentUserId) return;
   const mentions = Array.isArray(data.mentions) ? (data.mentions as unknown[]).map(String) : [];
+  const mentionRoles = Array.isArray(data.mention_roles) ? (data.mention_roles as unknown[]).map(String) : [];
   const everyone = data.mention_everyone === true;
-  if (!everyone && !mentions.includes(currentUserId)) return;
+  if (!everyone && !mentions.includes(currentUserId) && !mentionsHeldRole(roomId, mentionRoles, currentUserId)) return;
   setReadState('byRoom', roomId, (prev) => ({
     lastReadMessageId: prev?.lastReadMessageId ?? null,
     mentionCount: (prev?.mentionCount ?? 0) + 1,
@@ -1171,6 +1467,11 @@ export function initStargateMessageHandler() {
           setSpaceRoomLastMessageId(roomId, next);
         }
       }
+    } else if (evt.t === 'ROOM_LEAVE') {
+      // The rooms store drops the room itself; its cached history goes with it here.
+      const payload = (evt.d as Record<string, unknown>)?.d ?? evt.d;
+      const raw = (payload as { room_id?: unknown } | undefined)?.room_id;
+      if (raw != null) forgetRoomMessages(String(raw));
     } else if (evt.t === 'MESSAGE_REACTION_ADD' || evt.t === 'MESSAGE_REACTION_REMOVE') {
       const payload = (evt.d as Record<string, unknown>)?.d ?? evt.d;
       const data = payload as Record<string, unknown>;

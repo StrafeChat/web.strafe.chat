@@ -130,7 +130,7 @@ export const SpaceChannelRow: Component<SpaceChannelRowProps> = (props) => {
           (baseUnread() > 0 || mentions() > 0) && !muted() ? 'font-semibold text-foreground' : ''
         }`}
       >
-        {props.room.name || 'unnamed'}
+        {props.room.name || t('space.unnamed')}
       </span>
       {/* Hover actions (invite + settings). Shown only when the parent passes the handler, i.e.
           the viewer has the permission. The name is flex-1, so these shrink it on hover rather

@@ -145,7 +145,7 @@ export const SpaceDangerZone: Component<Props> = (props) => {
             </Select>
             <label class="flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-card/20 p-3">
               <span class="text-sm text-foreground">{t('spaceSettings.danger.transferConfirm')}</span>
-              <Toggle checked={acknowledged()} disabled={busy()} onChange={setAcknowledged} />
+              <Toggle label={t('spaceSettings.danger.transferConfirm')} checked={acknowledged()} disabled={busy()} onChange={setAcknowledged} />
             </label>
             <Show when={error()}>
               <p class="text-xs text-destructive">{error()}</p>

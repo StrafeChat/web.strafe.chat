@@ -30,4 +30,13 @@ export const lastVisited = {
       // localStorage unavailable: nothing to restore.
     }
   },
+  /** Sign-out: it can name the leaving account's last PM, which the next account must not open on. */
+  clear() {
+    setPath('/');
+    try {
+      localStorage.removeItem(KEY);
+    } catch {
+      // ignore
+    }
+  },
 };

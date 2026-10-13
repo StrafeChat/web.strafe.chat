@@ -33,13 +33,21 @@ import { isDesktop } from '../desktop/env';
 import { getDesktopInstance } from '../desktop/instanceOverride';
 import { InstancePicker } from '../components/desktop/InstancePicker';
 import { DesktopSavedAccounts } from '../components/desktop/SavedAccounts';
+import { redirectQuery, safeRedirectPath } from '../components/auth/authRedirect';
 
 export default function Login() {
   const [t] = useReactiveTranslate();
   const navigate = useNavigate();
   // ?reason=banned|revoked: set by the gateway handler that signed us out. Read once;
   // it is a one-line explanation, not state.
-  const [params] = useSearchParams<{ reason?: string }>();
+  // ?redirect=<path>: where the person was going when a page sent them here to sign in (an
+  // invite, the OAuth consent page). Same-site paths only; see safeRedirectPath.
+  const [params] = useSearchParams<{ reason?: string; redirect?: string }>();
+  const redirectTo = () => safeRedirectPath(params.redirect);
+  const withRedirect = (path: string) => {
+    const q = redirectQuery(redirectTo());
+    return q ? `${path}?${q}` : path;
+  };
   const arrivalNotice = () =>
     params.reason === 'banned'
       ? t('auth.login.bannedNotice')
@@ -86,7 +94,7 @@ export default function Login() {
       loading: false,
       hydrated: true,
     });
-    navigate('/', { replace: true });
+    navigate(redirectTo(), { replace: true });
   }
 
   async function handleSubmit(e: Event) {
@@ -324,7 +332,7 @@ export default function Login() {
                     <Button type="submit" class="w-full font-semibold" loading={loading()} disabled={!instanceReady()}>
                       {t('auth.login.submit')}
                     </Button>
-                    <A href="/register" class={authFooterLinkClass}>
+                    <A href={withRedirect('/register')} class={authFooterLinkClass}>
                       {t('auth.login.registerLink')}
                     </A>
                     <Show when={instance.email.enabled}>

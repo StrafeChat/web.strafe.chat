@@ -1,4 +1,5 @@
 import { api, getApiUrl } from './client';
+import { publicWebOrigin } from '../lib/runtimeConfig';
 import { ApiError } from './ApiError';
 
 /**
@@ -209,19 +210,33 @@ export function revokeGrant(appId: string) {
   return api<void>(`/oauth2/@me/grants/${encodeURIComponent(appId)}`, { method: 'DELETE' });
 }
 
-/** The in-app consent page for an application, for install links and the URL generator. */
-export function authorizeUrl(opts: {
+export interface AuthorizeUrlOptions {
   clientId: string;
   scopes: string[];
   redirectUri?: string;
   permissions?: number;
   spaceId?: string;
   state?: string;
-}): string {
+}
+
+function authorizeQuery(opts: AuthorizeUrlOptions): string {
   const params = new URLSearchParams({ response_type: 'code', client_id: opts.clientId, scope: opts.scopes.join(' ') });
   if (opts.redirectUri) params.set('redirect_uri', opts.redirectUri);
   if (opts.permissions) params.set('permissions', String(opts.permissions));
   if (opts.spaceId) params.set('space_id', opts.spaceId);
   if (opts.state) params.set('state', opts.state);
-  return `${window.location.origin}/oauth2/authorize?${params.toString()}`;
+  return params.toString();
+}
+
+/** The consent page for an application, opened inside the app (a tab, or the desktop app's
+ * own popup window, which only shows pages of the app's origin). */
+export function authorizeUrl(opts: AuthorizeUrlOptions): string {
+  return `${window.location.origin}/oauth2/authorize?${authorizeQuery(opts)}`;
+}
+
+/** The same consent page as a link to hand to other people - the URL generator and the
+ * "add my bot" link. On the instance's own address: in the desktop app the page's origin is
+ * tauri://localhost, which opens nothing for anyone else. */
+export function shareableAuthorizeUrl(opts: AuthorizeUrlOptions): string {
+  return `${publicWebOrigin()}/oauth2/authorize?${authorizeQuery(opts)}`;
 }

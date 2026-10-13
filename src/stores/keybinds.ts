@@ -143,6 +143,16 @@ function inTextField(target: EventTarget | null): boolean {
   return target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target.isContentEditable;
 }
 
+/** Input types that take typed text - not a slider, checkbox or button. */
+const TEXT_INPUT_TYPES = new Set(['text', 'search', 'email', 'url', 'tel', 'password', 'number']);
+
+/** Whether a key event is aimed at something that takes typed text. */
+export function isTextEntry(target: EventTarget | null): boolean {
+  if (!(target instanceof HTMLElement)) return false;
+  if (target instanceof HTMLTextAreaElement || target.isContentEditable) return true;
+  return target instanceof HTMLInputElement && TEXT_INPUT_TYPES.has(target.type);
+}
+
 /**
  * Global dispatcher. Ignores repeats, events already handled, and combos without a
  * strong modifier while typing. Returns a disposer.

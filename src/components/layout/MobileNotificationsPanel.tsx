@@ -33,9 +33,14 @@ export const MobileNotificationsPanel: Component = () => {
   async function respond(userId: string, accept: boolean) {
     setBusy(userId);
     try {
-      if (accept) await putRelationship(userId);
-      else await removeRelationship(userId);
-      removeRelationshipLocally(userId);
+      if (accept) {
+        // RELATIONSHIP_ADD turns the request into a friend, and the server sends it before this
+        // request returns - removing the entry here would delete the new friend.
+        await putRelationship(userId);
+      } else {
+        await removeRelationship(userId);
+        removeRelationshipLocally(userId);
+      }
     } catch (err) {
       console.error('Friend request action failed:', err);
     } finally {

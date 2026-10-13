@@ -7,16 +7,15 @@
  * undefined. Desktop dev on localhost works; a phone opening the LAN IP does not.
  */
 
+/**
+ * Web Crypto is missing. The message is for the console and whoever is debugging; what the
+ * user sees is the localized e2ee.environmentBody (E2eeEnvironmentModal).
+ */
 export class E2eeUnavailableError extends Error {
   constructor() {
     super(
-      [
-        'This browser only exposes encryption (Web Crypto) on HTTPS or http://localhost.',
-        '',
-        'If you opened the app using your computer\'s LAN address (http://192.168.… or http://10.…), that is not a secure context on a phone — your PIN is correct, but decryption cannot run.',
-        '',
-        'Fix: use HTTPS in dev (e.g. mkcert + vite --https), use adb reverse / SSH tunnel so the phone uses http://localhost, or deploy behind HTTPS.',
-      ].join('\n')
+      'Web Crypto is unavailable: this page is not a secure context. Serve it over HTTPS or open it at http://localhost ' +
+        '(in development: mkcert + vite --https, or adb reverse / an SSH tunnel so a phone reaches localhost).'
     );
     this.name = 'E2eeUnavailableError';
   }

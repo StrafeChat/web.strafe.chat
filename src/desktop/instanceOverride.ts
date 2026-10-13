@@ -19,6 +19,10 @@ export interface DesktopInstance {
   stargateUrl: string;
   /** Left unset to derive from apiUrl, as runtimeConfig does for the web client. */
   cdnUrl?: string;
+  /** Where the instance's web client is served (https://chat.example.org), the origin of
+   * links that leave the app. Unset on instances saved before it was recorded; runtimeConfig's
+   * publicWebOrigin derives it then. */
+  webOrigin?: string;
 }
 
 const KEY = 'strafe.desktop.instance';

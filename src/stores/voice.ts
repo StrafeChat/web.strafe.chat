@@ -40,7 +40,7 @@ import { auth } from './auth';
 import { registerUserIdentity } from './federationIds';
 import { onStargateEvent } from '../services/stargate/client';
 import { audioConstraints, setVoiceSettings, voiceSettings } from './voiceSettings';
-import { comboFromEvent } from './keybinds';
+import { comboFromEvent, hasStrongModifier, isTextEntry } from './keybinds';
 import { createMicPipeline, createVadGate, createVoiceAudioContext, type MicPipeline } from '../lib/voice/micPipeline';
 import { screenShareCaptureOptions, screenShareEncoding } from '../lib/voice/screenShare';
 import type { ScreenShareFps, ScreenShareResolution } from './voiceSettings';
@@ -274,6 +274,17 @@ const live = {
   mediaKeyIndex: 0,
   /** Our LiveKit participant identity ("<user id>.<session id>") for this call. */
   identity: null as string | null,
+  /**
+   * The server's session id for this device's join. Another of our devices joining gets a
+   * new one, while a moderator move keeps it, so this is how a dropped connection tells
+   * "I was moved" apart from "another device took the call".
+   */
+  sessionId: null as string | null,
+  /** The join request in flight, so a hang-up can wait for it and undo what it created. */
+  joinRequest: null as Promise<unknown> | null,
+  /** A media key that did not reach everyone is retried on a backoff (see scheduleKeyRetry). */
+  keyRetryTimer: 0 as number,
+  keyRetries: 0,
   /** Keys that arrived before the provider existed, replayed once it does. */
   pendingKeys: [] as IncomingMediaKey[],
   /** The participant set our key was last distributed to, to spot membership changes. */
@@ -350,7 +361,10 @@ function callAudioContext(): AudioContext {
     ctx = createVoiceAudioContext();
     live.audioContext = ctx;
   }
-  if (ctx.state !== 'running') void ctx.resume().catch(() => undefined);
+  // Whatever the state reads: the suspend() a teardown just issued (the call this join
+  // replaces) still says 'running' until it lands, and only a resume queued behind it
+  // keeps the context running. On one that is already running this does nothing.
+  void ctx.resume().catch(() => undefined);
   return ctx;
 }
 
@@ -421,6 +435,9 @@ async function publishMicrophone(room: Room, gen: number) {
       pipeline.close();
       return;
     }
+    // Nothing should still be here, but a pipeline overwritten rather than closed keeps its
+    // microphone open with a gate nothing can reach any more - so close it, not lose it.
+    if (live.mic && live.mic !== pipeline) live.mic.close();
     live.mic = pipeline;
     // Losing the device (unplugged) shows as the source track ending.
     pipeline.source.addEventListener('ended', () => {
@@ -504,6 +521,13 @@ function wireRoom(room: Room, gen: number) {
     if (pub.source === Track.Source.Camera || pub.source === Track.Source.ScreenShare) {
       live.tracks.delete(pub.trackSid);
       setMedia(uid, pub.source === Track.Source.ScreenShare ? 'screen' : 'camera', undefined);
+      // A full reconnect (network change, waking from sleep) unpublishes every track and
+      // publishes the same one straight back, keeping it running. Only a track that really
+      // stopped - our own stop, the browser's "Stop sharing", a server revoke - means the
+      // camera or screen is off; treating a republish as one showed them as off while they
+      // were still being sent to everyone.
+      const ended = !pub.track || pub.track.mediaStreamTrack.readyState === 'ended';
+      if (!ended) return;
       // The browser's own "Stop sharing" button ends the screen track; keep our state
       // and the server's in step with what is actually published.
       if (pub.source === Track.Source.ScreenShare && voice.session.screen) {
@@ -606,6 +630,7 @@ function wireRoom(room: Room, gen: number) {
   room.on(RoomEvent.Disconnected, (reason?: DisconnectReason) => {
     if (!mine()) return;
     const wasIn = voice.session.roomId;
+    const wasSession = live.sessionId;
     const moving = live.movingTo;
     teardownLocal();
     if (moving) {
@@ -623,9 +648,16 @@ function wireRoom(room: Room, gen: number) {
       if (voice.session.status !== 'idle') return; // something else already reconnected
       const me = auth.user?.id;
       const now = me ? voiceRoomOfUser(me) : undefined;
-      if (now && now !== wasIn) {
+      if (!now) return;
+      // Only a state carrying *this* device's session is ours to act on. A move keeps the
+      // session; another of our devices joining gets a new one, and both following it
+      // (rejoining from here) and clearing it (the leave is account-wide) threw that device
+      // out of the call it had just taken over.
+      const st = voice.byRoom[now]?.find((x) => x.user_id === me);
+      if (!wasSession || st?.session_id !== wasSession) return;
+      if (now !== wasIn) {
         void joinVoiceRoom(now).catch((err) => console.warn('[voice] rejoin after move failed', err));
-      } else if (now && now === wasIn) {
+      } else {
         void leaveVoice().catch(() => undefined);
       }
     }, 1500);
@@ -660,12 +692,15 @@ function teardownLocal() {
   if (live.audioContext?.state === 'running') void live.audioContext.suspend().catch(() => undefined);
   // Drop this call's key material and the worker holding it.
   window.clearTimeout(live.rotateTimer);
+  window.clearTimeout(live.keyRetryTimer);
+  live.keyRetries = 0;
   live.keyProvider = null;
   live.e2eeWorker?.terminate();
   live.e2eeWorker = null;
   live.mediaKey = null;
   live.mediaKeyIndex = 0;
   live.identity = null;
+  live.sessionId = null;
   live.pendingKeys = [];
   live.keyedMemberSig = '';
   live.rotation = Promise.resolve();
@@ -763,23 +798,65 @@ function flushPendingKeys(): void {
   for (const key of pending) applyIncomingKey(key);
 }
 
-/** Hand a key (ours, or the one we are about to switch to) to everyone now in the room. */
-async function distributeMediaKey(announce?: { key: Uint8Array; index: number }): Promise<void> {
+/** First and longest wait before retrying a media key that did not go out. */
+const KEY_RETRY_BASE_MS = 2_000;
+const KEY_RETRY_MAX_MS = 30_000;
+
+/**
+ * Hand a key (ours, or the one we are about to switch to) to everyone now in the room.
+ * Returns whether it reached them.
+ *
+ * The participant set is only recorded as keyed once the send succeeded. Recording it up
+ * front meant a send that failed (a network blip, the key endpoints' rate limit) looked
+ * done: syncCallKeys saw no membership change and never tried again, and everyone stayed
+ * unable to hear or see us until some unrelated join or leave.
+ */
+async function distributeMediaKey(announce?: { key: Uint8Array; index: number }): Promise<boolean> {
   const me = auth.user?.id;
   const roomId = voice.session.roomId;
   const identity = live.identity;
   const key = announce?.key ?? live.mediaKey;
   const keyIndex = announce?.index ?? live.mediaKeyIndex;
-  if (!me || !roomId || !identity || !key) return;
+  if (!me || !roomId || !identity || !key) return false;
   const targets = otherParticipantUserIds(roomId);
-  live.keyedMemberSig = memberSignature(roomId);
-  if (targets.length === 0) return;
-  try {
-    await sendMediaKey(me, { roomId, identity, keyIndex, key }, targets);
-  } catch (err) {
-    console.error('[voice-e2ee] could not distribute media key', err);
-    setVoice('session', 'error', 'voice.errors.keyShareFailed');
+  // Taken with the targets, not after the send: someone who joins while it is in flight
+  // did not get this key and must still look like a change.
+  const sig = memberSignature(roomId);
+  if (targets.length > 0) {
+    try {
+      await sendMediaKey(me, { roomId, identity, keyIndex, key }, targets);
+    } catch (err) {
+      console.error('[voice-e2ee] could not distribute media key', err);
+      if (live.identity === identity) setVoice('session', 'error', 'voice.errors.keyShareFailed');
+      return false;
+    }
   }
+  if (live.identity !== identity) return false;
+  live.keyedMemberSig = sig;
+  live.keyRetries = 0;
+  window.clearTimeout(live.keyRetryTimer);
+  // A retry got through: the warning no longer describes the call.
+  if (voice.session.error === 'voice.errors.keyShareFailed') setVoice('session', 'error', null);
+  return true;
+}
+
+/**
+ * Try the key again later, backing off: the usual causes (a dropped request, the rate limit
+ * on the key endpoints) clear up on their own, and hammering the latter only extends it.
+ * The retry is an ordinary membership sync, which finds the room still un-keyed and rotates.
+ */
+function scheduleKeyRetry(): void {
+  const provider = live.keyProvider;
+  if (!provider) return;
+  live.keyedMemberSig = '';
+  const delay = Math.min(KEY_RETRY_MAX_MS, KEY_RETRY_BASE_MS * 2 ** live.keyRetries);
+  live.keyRetries += 1;
+  window.clearTimeout(live.keyRetryTimer);
+  live.keyRetryTimer = window.setTimeout(() => {
+    // Hung up or rejoined since: that call's keys are gone, and the new one keys itself.
+    if (live.keyProvider !== provider) return;
+    syncCallKeys();
+  }, delay);
 }
 
 /**
@@ -798,9 +875,16 @@ async function rotateMediaKey(): Promise<void> {
   if (!provider || !identity) return;
   const key = generateMediaKey();
   const index = (live.mediaKeyIndex + 1) % MEDIA_KEY_RING_SIZE;
-  await distributeMediaKey({ key, index });
+  const delivered = await distributeMediaKey({ key, index });
   // Hung up (or rejoined) while the key was in flight: that call's provider is gone.
   if (live.keyProvider !== provider || live.identity !== identity) return;
+  if (!delivered) {
+    // Switching to a key nobody received would silence us for everyone. Stay on the one
+    // they have - which means someone who just left can still read us until a retry gets
+    // through - and try again shortly.
+    scheduleKeyRetry();
+    return;
+  }
   live.mediaKey = key;
   live.mediaKeyIndex = index;
   await provider.setParticipantKey(key, identity, index);
@@ -821,7 +905,9 @@ function syncCallKeys(): void {
     const rid = voice.session.roomId;
     if (!live.keyProvider || !rid || memberSignature(rid) === live.keyedMemberSig) return;
     live.rotation = live.rotation
-      .then(() => rotateMediaKey())
+      // Checked again once it is this one's turn: the send ahead of it may already have
+      // covered this membership, and the set is only recorded once a send succeeds.
+      .then(() => (memberSignature(rid) === live.keyedMemberSig ? undefined : rotateMediaKey()))
       .catch((err) => console.error('[voice-e2ee] rotation failed', err));
   }, 300);
 }
@@ -836,10 +922,16 @@ export async function joinVoiceRoom(roomId: string, opts: { video?: boolean } = 
   // Calls are end-to-end encrypted, with no plaintext fallback: a browser that cannot
   // encrypt media is told so rather than quietly joining in the clear.
   if (!callEncryptionSupported()) throw new CallEncryptionUnsupportedError();
+  // Whatever this device still holds goes first - the same room included. A rejoin of the
+  // room we are in (READY finding our state swept while LiveKit was still reconnecting)
+  // used to skip this, and the old Room, its microphone and its key worker lived on: a
+  // second microphone that mute could not reach, republished under the old identity if
+  // that Room ever got back in. Before the audio context below, so the teardown's
+  // suspend cannot undo the resume this click is allowed to make.
+  if (live.room || live.mic || live.keyProvider) teardownLocal();
   // Before the first await, i.e. still inside the click that started this join: the
   // audio context must be started by a gesture on browsers that require one.
   const audioContext = callAudioContext();
-  if (live.room && voice.session.roomId !== roomId) teardownLocal();
   const gen = ++live.gen;
   batch(() => {
     setVoice('session', {
@@ -849,6 +941,9 @@ export async function joinVoiceRoom(roomId: string, opts: { video?: boolean } = 
       error: null,
       // This call gets a fresh key provider below: nothing installed in the last one counts.
       keyed: [],
+      // Per call: set only once this call's frame encryption is on (see below), and what
+      // gates the camera and screen until then.
+      encrypted: false,
       audioBlocked: false,
       videoBlocked: false,
       camera: false,
@@ -858,11 +953,15 @@ export async function joinVoiceRoom(roomId: string, opts: { video?: boolean } = 
   });
   stopRingtone();
   let res;
+  const request = joinVoice(roomId, { self_mute: voice.session.selfMute, self_deaf: voice.session.selfDeaf });
+  live.joinRequest = request;
   try {
-    res = await joinVoice(roomId, { self_mute: voice.session.selfMute, self_deaf: voice.session.selfDeaf });
+    res = await request;
   } catch (err) {
     if (gen === live.gen) setVoice('session', { ...voice.session, roomId: null, status: 'idle' });
     throw err;
+  } finally {
+    if (live.joinRequest === request) live.joinRequest = null;
   }
   if (gen !== live.gen) return;
   applyStates(res.states);
@@ -886,6 +985,7 @@ export async function joinVoiceRoom(roomId: string, opts: { video?: boolean } = 
   // The identity the token was minted for - federated form in a room shared with
   // another instance - must be what our own media key is published under.
   live.identity = res.state.identity ?? `${res.state.user_id}.${res.state.session_id}`;
+  live.sessionId = res.state.session_id;
   live.mediaKey = generateMediaKey();
   live.mediaKeyIndex = 0;
   live.keyedMemberSig = '';
@@ -963,9 +1063,19 @@ export async function joinVoiceRoom(roomId: string, opts: { video?: boolean } = 
   }
   applyAllVolumes();
   // Everyone already here needs our key before they can make sense of a single frame
-  // from us, so it goes out before the microphone is published - not after.
-  await distributeMediaKey();
+  // from us, so it goes out before the microphone is published - not after. In the
+  // rotation queue, so a membership change landing meanwhile waits for it rather than
+  // rotating alongside it.
+  const initial = distributeMediaKey();
+  live.rotation = initial.then(
+    () => undefined,
+    () => undefined
+  );
+  const delivered = await initial;
   if (gen !== live.gen) return;
+  // Not sent: the room stays un-keyed, so the sync below rotates to a key that does get
+  // through, and the backoff covers it if that fails as well.
+  if (!delivered) scheduleKeyRetry();
   // Through the same queue as every later rebuild, so a settings change made while this
   // is in flight waits its turn instead of publishing a second microphone.
   await queueMicWork(() => publishMicrophone(room, gen));
@@ -978,7 +1088,17 @@ export async function joinVoiceRoom(roomId: string, opts: { video?: boolean } = 
 /** Leave whatever voice room we are in. */
 export async function leaveVoiceRoom(): Promise<void> {
   live.movingTo = null;
+  const pending = live.joinRequest;
   teardownLocal();
+  // Hung up while the join request was still out: a leave sent now reaches the server
+  // first, finds nothing, and the join then creates the state anyway - in a PM, ringing
+  // the other side for a call nobody is in. Let the join land, then undo it, unless a
+  // newer join has started in the meantime (only a join takes the session out of idle)
+  // and the state is now that one's.
+  if (pending) {
+    await pending.catch(() => undefined);
+    if (voice.session.status !== 'idle') return;
+  }
   // Unconditional, not guarded on the session's room: if the client desynced (a
   // Disconnected handler or a stale-state sweep reset the session while the server
   // still holds our state), guarding on session.roomId would skip the one call that
@@ -1042,9 +1162,20 @@ export function toggleDeafen(): void {
   void setDeafened(!voice.session.selfDeaf);
 }
 
+/**
+ * Whether video may be published on this connection yet. The Room exists from the moment
+ * a join starts, but frame encryption only comes on once it has connected; a camera or
+ * screen published before that went out with no encryption at all, to the SFU and to
+ * everyone subscribed, for as long as it took to switch on.
+ */
+function canPublishVideo(room: Room): boolean {
+  return voice.session.status !== 'connecting' && voice.session.encrypted && room.localParticipant.isE2EEEnabled;
+}
+
 export async function setCameraEnabled(on: boolean): Promise<void> {
   const room = live.room;
   if (!room) return;
+  if (on && !canPublishVideo(room)) return;
   try {
     setVoice('session', 'error', null);
     await room.localParticipant.setCameraEnabled(
@@ -1080,6 +1211,7 @@ export async function setScreenShareEnabled(
 ): Promise<void> {
   const room = live.room;
   if (!room) return;
+  if (on && !canPublishVideo(room)) return;
   const resolution = quality?.resolution ?? voiceSettings.screenShareResolution;
   const fps = quality?.fps ?? voiceSettings.screenShareFps;
   try {
@@ -1280,6 +1412,11 @@ function applyOwnState(st: VoiceState & { left?: boolean; moved_to?: string }) {
     return;
   }
   if (s.status === 'idle') return;
+  // A state under another session is another of our devices taking the call over, here or
+  // in another room - not a moderator acting on this one, since a move keeps the session.
+  // Read as a move, it made this device rejoin and throw the other one out (the "left" for
+  // our own session can arrive after it when the two rooms are in different spaces).
+  if (live.sessionId && st.session_id !== live.sessionId) return;
   if (st.room_id !== s.roomId) {
     // Moved by a moderator: rejoin there with a fresh token. LiveKit may already have
     // dropped the old connection (the server removes the old participant), in which
@@ -1328,7 +1465,9 @@ function readCall(d: Record<string, unknown>): VoiceCall | null {
   };
 }
 
-function maybeRing(call: VoiceCall, rerung: boolean) {
+/** `since`: when the ring began - now for a live event, the call's start when READY
+ * brings in one that was already ringing, so the prompt still gives up on schedule. */
+function maybeRing(call: VoiceCall, rerung: boolean, since = Date.now()) {
   const me = auth.user?.id;
   if (!me) return;
   const ringingMe = call.ringing.includes(me) && call.started_by !== me;
@@ -1337,7 +1476,7 @@ function maybeRing(call: VoiceCall, rerung: boolean) {
   if (ringingMe && !alreadyIn && !onAnotherDevice) {
     const current = voice.incoming;
     if (!current || current.roomId !== call.room_id || rerung) {
-      setVoice('incoming', { roomId: call.room_id, startedBy: call.started_by, since: Date.now() });
+      setVoice('incoming', { roomId: call.room_id, startedBy: call.started_by, since });
       playRingtone();
       window.setTimeout(() => {
         const inc = voice.incoming;
@@ -1345,7 +1484,7 @@ function maybeRing(call: VoiceCall, rerung: boolean) {
           setVoice('incoming', null);
           stopRingtone();
         }
-      }, RING_TIMEOUT_MS);
+      }, Math.max(0, RING_TIMEOUT_MS - (Date.now() - since)));
     }
   } else if (voice.incoming?.roomId === call.room_id) {
     setVoice('incoming', null);
@@ -1371,12 +1510,51 @@ export function hydrateVoiceFromReady(states: unknown, calls: unknown): void {
     setVoice('byRoom', reconcile(byRoom));
     setVoice('calls', reconcile(callMap));
   });
-  // A reconnect while we are in a room: the server may have swept our state (the
-  // gateway was down long enough for the reconciler to act); rejoin if so.
+  // The prompt used to follow CALL_* events only, and the gateway has no resume: a page
+  // opened (from a call notification, say) or a reconnect while we were being rung showed
+  // no prompt, and one whose call ended during the gap rang on, then answered into a call
+  // that no longer existed. The server never stops ringing by itself, so only a call still
+  // inside the ring window rings again - a call ignored earlier must not start over on
+  // each load.
+  const incoming = voice.incoming;
+  if (incoming && !callMap[incoming.roomId]) {
+    setVoice('incoming', null);
+    stopRingtone();
+  }
+  const now = Date.now();
+  for (const call of Object.values(callMap)) {
+    const started = Math.min(now, Date.parse(call.started_at) || now);
+    // The prompt already up keeps its own clock; this only clears it when we stopped
+    // being rung (answered elsewhere, declined) during the gap.
+    if (voice.incoming?.roomId === call.room_id) maybeRing(call, false);
+    else if (now - started < RING_TIMEOUT_MS) maybeRing(call, false, started);
+  }
   const me = auth.user?.id;
   const rid = voice.session.roomId;
-  if (me && rid && voice.session.status !== 'idle' && !byRoom[rid]?.some((s) => s.user_id === me)) {
+  if (!me || !rid || voice.session.status === 'idle') return;
+  const where = voiceRoomOfUser(me);
+  // A reconnect while we are in a room: the server may have swept our state (the
+  // gateway was down long enough for the reconciler to act); rejoin if so. Only when we
+  // are in no room at all: somewhere else is a move or another device, sorted out below.
+  if (!where) {
     void joinVoiceRoom(rid).catch(() => undefined);
+    return;
+  }
+  // Still here: anyone who joined or left while the gateway was down was missed by the
+  // per-event sync, so our key may not have reached them or rotated away from them.
+  if (where === rid) {
+    syncCallKeys();
+    return;
+  }
+  // Somewhere else under this device's session is a moderator's move we missed: follow it.
+  // The old room dropping us does not always say so - LiveKit answers a removed
+  // participant's resume with a full reconnect on a token that is still valid, which put
+  // this device back in the old room, heard and hearing there while listed in none. Under
+  // another session it is another of our devices that took the call over (rejoining from
+  // here would take it back). A move already being followed (`movingTo`) rejoins by itself.
+  const st = voice.byRoom[where]?.find((x) => x.user_id === me);
+  if (live.sessionId && st?.session_id === live.sessionId && !live.movingTo) {
+    void joinVoiceRoom(where).catch((err) => console.warn('[voice] rejoin after move failed', err));
   }
 }
 
@@ -1447,7 +1625,7 @@ export function initVoiceHandlers(): () => void {
   };
 }
 
-/** Sign-out / account switch: drop the connection and everything we knew. */
+/** Sign-out: drop the connection and everything we knew, per-person volumes and mutes included. */
 export function clearVoice(): void {
   live.movingTo = null;
   teardownLocal();
@@ -1459,8 +1637,17 @@ export function clearVoice(): void {
       s.byRoom = {};
       s.calls = {};
       s.incoming = null;
+      // Keyed by the people this account has been in calls with: not for whoever signs in next.
+      s.userVolumes = {};
+      s.localMuted = {};
     })
   );
+  try {
+    localStorage.removeItem(VOLUMES_KEY);
+    localStorage.removeItem(LOCAL_MUTED_KEY);
+  } catch {
+    /* ignore */
+  }
 }
 
 // ---- push to talk + settings reactions ----------------------------------------------------
@@ -1468,6 +1655,15 @@ export function clearVoice(): void {
 function pttMainKey(combo: string): string {
   const parts = combo.split('+');
   return parts[parts.length - 1] ?? '';
+}
+
+/** Keys that edit a text field besides single characters: a dead key composing one, Space,
+ * Enter, Tab and the deletions. F-keys, Insert, Pause and the like type nothing. */
+const TEXT_EDITING_KEYS = new Set(['Space', 'Enter', 'Backspace', 'Delete', 'Tab', 'Dead']);
+
+function pttKeyTypesText(combo: string): boolean {
+  const main = pttMainKey(combo);
+  return main.length === 1 || TEXT_EDITING_KEYS.has(main);
 }
 
 function keyMatchesPtt(e: KeyboardEvent): boolean {
@@ -1481,6 +1677,14 @@ export function initPushToTalk(): () => void {
   const onDown = (e: KeyboardEvent) => {
     if (voiceSettings.inputMode !== 'ptt' || !live.room) return;
     if (!keyMatchesPtt(e)) return;
+    // A key that types something (the default backtick, a letter, Space) belongs to the
+    // text field it is pressed in: swallowing it there made that character impossible to
+    // type during a call, and opened the microphone instead. A key that types nothing (an
+    // F-key, Insert, Pause) has no use in a text field and keeps working wherever focus is,
+    // as any key does on a slider or checkbox: the composer holds focus through a call, so
+    // ignoring those too left the microphone shut with no sign why.
+    const pttKey = voiceSettings.pttKey;
+    if (pttKeyTypesText(pttKey) && isTextEntry(e.target) && !hasStrongModifier(pttKey)) return;
     e.preventDefault();
     window.clearTimeout(live.pttReleaseTimer);
     if (!live.pttHeld) {

@@ -47,6 +47,7 @@ export const UserArea: Component = () => {
   const [customStatusDraft, setCustomStatusDraft] = createSignal('');
   const [statusMenuOpen, setStatusMenuOpen] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
+  const [statusError, setStatusError] = createSignal('');
   let areaEl: HTMLDivElement | undefined;
 
   const userId = () => auth.user?.id ?? '';
@@ -80,12 +81,27 @@ export const UserArea: Component = () => {
     navigator.clipboard.writeText(username());
   }
 
+  /** Put back the presence we had before an optimistic change the server refused. Both fields
+   * are written explicitly: the store merges, so a key left out would keep the failed value. */
+  function rollBackPresence(prev: UserPresence | undefined) {
+    if (!prev) return;
+    setUserPresence(userId(), { status: prev.status, custom_status: prev.custom_status });
+  }
+
   async function setStatus(status: UserPresence['status']) {
+    // A plain copy: p() is a live store proxy and would read the new value after the update.
+    const cur = p();
+    const prev = cur ? { ...cur } : undefined;
     setUserPresence(userId(), { ...p(), status });
     setStatusMenuOpen(false);
+    setStatusError('');
     setSaving(true);
     try {
       await patchMe({ presence: { status } });
+    } catch (err) {
+      console.error('Set status failed:', err);
+      rollBackPresence(prev);
+      setStatusError(t('common.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -93,15 +109,26 @@ export const UserArea: Component = () => {
 
   async function setCustomStatus() {
     const text = customStatusDraft().trim();
-    const current = p();
+    const cur = p();
+    const prev = cur ? { ...cur } : undefined;
     setUserPresence(userId(), {
-      status: current?.status ?? 'online',
+      status: prev?.status ?? 'online',
       custom_status: text || undefined,
     });
-    setCustomStatusDraft('');
+    // Leave the saved text in the field. Emptying it here made the blur that follows Enter
+    // look like a cleared status and wipe the one just set.
+    setCustomStatusDraft(text);
+    setStatusError('');
     setSaving(true);
     try {
-      await patchMe({ presence: { custom_status: text || undefined } });
+      // Send the empty string to clear: the server reads "" as "no custom status", while an
+      // undefined field is dropped from the JSON and the request is refused as empty.
+      await patchMe({ presence: { custom_status: text } });
+    } catch (err) {
+      console.error('Set custom status failed:', err);
+      rollBackPresence(prev);
+      setCustomStatusDraft(prev?.custom_status ?? '');
+      setStatusError(t('common.saveFailed'));
     } finally {
       setSaving(false);
     }
@@ -123,6 +150,11 @@ export const UserArea: Component = () => {
     } else {
       setPopoverPos(null);
     }
+  });
+
+  // A failed save's message belongs to that visit to the popover.
+  createEffect(() => {
+    if (!popoverOpen()) setStatusError('');
   });
 
   createEffect(() => {
@@ -282,6 +314,11 @@ export const UserArea: Component = () => {
                     }}
                   />
                 </div>
+                <Show when={statusError()}>
+                  <p class="mt-1.5 px-1 text-xs text-destructive" role="alert">
+                    {statusError()}
+                  </p>
+                </Show>
               </div>
 
               {/* Menu items */}

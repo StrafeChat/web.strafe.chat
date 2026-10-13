@@ -10,6 +10,7 @@ import { PresenceDot } from './PresenceDot';
 import { createPM } from '../api/rooms';
 import { authorizeUrl, getPublicApplication } from '../api/developers';
 import { sendMessage } from '../stores/messages';
+import { addOrUpdateRoom } from '../stores/rooms';
 import {
   closeUserProfilePopover,
   remeasureUserProfilePopover,
@@ -322,7 +323,16 @@ export const UserProfilePopover: Component = () => {
     setQuickError('');
     try {
       const room = await createPM(s.userId);
-      await sendMessage(room.id, text);
+      // A brand-new PM is announced over the gateway to the other person only, so put it in
+      // our own rooms store here - sendMessage looks the room up there and quietly does nothing
+      // when it is missing.
+      addOrUpdateRoom(room);
+      const sent = await sendMessage(room.id, text);
+      if (!sent) {
+        // Keep the draft and the popover open: nothing went out.
+        setQuickError(t('room.sendFailed'));
+        return;
+      }
       setQuickDraft('');
       closeUserProfilePopover();
     } catch (err) {

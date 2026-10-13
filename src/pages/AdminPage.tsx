@@ -48,6 +48,9 @@ import {
   AdminOverviewSkeleton,
   AdminListSkeleton,
   AdminDetailSkeleton,
+  AdminLoadFailed,
+  loadFailed,
+  settledValue,
 } from '../components/admin/AdminLoading';
 import type { AdminTabItem } from '../components/admin/AdminTabs';
 import { Button } from '../components/ui/Button';
@@ -413,7 +416,8 @@ const Users: Component<{ focusUser: string | null; onOpenReport: (id: string) =>
 };
 
 const UserPanel: Component<{ userId: string; onOpenReport: (id: string) => void; onOpenSpace: (id: string) => void }> = (props) => {
-  const [detail, { refetch }] = createResource(() => props.userId, (id) => getUserDetail(id));
+  const [detailRes, { refetch }] = createResource(() => props.userId, (id) => getUserDetail(id));
+  const detail = () => settledValue(detailRes);
   const [banOpen, setBanOpen] = createSignal(false);
   const [error, setError] = createSignal('');
   // Badge flags, edited optimistically and saved on each toggle. `null` until a detail
@@ -509,7 +513,10 @@ const UserPanel: Component<{ userId: string; onOpenReport: (id: string) => void;
   }
 
   return (
-    <Show when={detail()} fallback={<AdminDetailSkeleton />}>
+    <Show
+      when={detail()}
+      fallback={loadFailed(detailRes) ? <AdminLoadFailed onRetry={() => void refetch()} /> : <AdminDetailSkeleton />}
+    >
       {(d) => (
         <div class="space-y-4">
           <div class="relative overflow-hidden rounded-2xl border border-border bg-card/40">
@@ -910,7 +917,8 @@ const EmailDialog: Component<{ user: AdminUser | null; onClose: () => void; onCh
 
 const Reports: Component<{ focusReport: string | null; onOpenUser: (id: string) => void; onOpenSpace: (id: string) => void }> = (props) => {
   const [status, setStatus] = createSignal<ReportStatus>('open');
-  const [rows, { refetch }] = createResource(status, (s) => listReports(s));
+  const [rowsRes, { refetch }] = createResource(status, (s) => listReports(s));
+  const rows = () => settledValue(rowsRes);
   const [selected, setSelected] = createSignal<string | null>(props.focusReport);
   // Same shape as Users: the tab's <Show> keeps this mounted, so a later "open report"
   // changes focusReport without a remount and the one-shot seed would keep the old one.
@@ -934,7 +942,7 @@ const Reports: Component<{ focusReport: string | null; onOpenUser: (id: string) 
             { id: 'dismissed', icon: 'fa-circle-xmark', label: t('admin.reports.status.dismissed') },
           ]}
         />
-        <Show when={rows()}>
+        <Show when={rows()} fallback={loadFailed(rowsRes) ? <AdminLoadFailed onRetry={() => void refetch()} /> : undefined}>
           {(list) => (
             <Show when={list().length > 0} fallback={<EmptyState icon="fa-flag" title={t('admin.reports.empty')} size="inline" />}>
               <div class="space-y-1.5">
@@ -991,7 +999,8 @@ const Reports: Component<{ focusReport: string | null; onOpenUser: (id: string) 
 };
 
 const ReportPanel: Component<{ reportId: string; onOpenUser: (id: string) => void; onOpenSpace: (id: string) => void; onChanged: () => void }> = (props) => {
-  const [detail] = createResource(() => props.reportId, (id) => getReport(id));
+  const [detailRes, { refetch }] = createResource(() => props.reportId, (id) => getReport(id));
+  const detail = () => settledValue(detailRes);
   const [note, setNote] = createSignal('');
   const [seconds, setSeconds] = createSignal(0);
   const [busy, setBusy] = createSignal(false);
@@ -1020,7 +1029,10 @@ const ReportPanel: Component<{ reportId: string; onOpenUser: (id: string) => voi
   }
 
   return (
-    <Show when={detail()} fallback={<AdminDetailSkeleton banner={false} />}>
+    <Show
+      when={detail()}
+      fallback={loadFailed(detailRes) ? <AdminLoadFailed onRetry={() => void refetch()} /> : <AdminDetailSkeleton banner={false} />}
+    >
       {(d) => (
         <div class="space-y-4">
           <div class={`${settingsGroupFrame} space-y-3`}>
@@ -1150,7 +1162,8 @@ const Bans: Component<{ onOpenUser: (id: string) => void }> = (props) => (
 
 /** Banned networks: the list plus the form that adds one. Lifting asks first. */
 const IPBans: Component = () => {
-  const [rows, { refetch }] = createResource(() => listIPBans());
+  const [rowsRes, { refetch }] = createResource(() => listIPBans());
+  const rows = () => settledValue(rowsRes);
   const [cidr, setCidr] = createSignal('');
   const [reason, setReason] = createSignal('');
   const [seconds, setSeconds] = createSignal(0);
@@ -1238,7 +1251,10 @@ const IPBans: Component = () => {
           </Button>
         </div>
       </form>
-      <Show when={rows()} fallback={<AdminListSkeleton rows={4} />}>
+      <Show
+        when={rows()}
+        fallback={loadFailed(rowsRes) ? <AdminLoadFailed onRetry={() => void refetch()} /> : <AdminListSkeleton rows={4} />}
+      >
         {(list) => (
           <Show when={list().length > 0} fallback={<EmptyState icon="fa-network-wired" title={t('admin.bans.ipEmpty')} size="inline" />}>
             <div class="space-y-1.5">
@@ -1265,7 +1281,8 @@ const IPBans: Component = () => {
 };
 
 const AccountBans: Component<{ onOpenUser: (id: string) => void }> = (props) => {
-  const [rows, { refetch }] = createResource(() => listBans());
+  const [rowsRes, { refetch }] = createResource(() => listBans());
+  const rows = () => settledValue(rowsRes);
   async function lift(userId: string, name: string) {
     const ok = await confirmDialog({ title: t('admin.users.unbanTitle', { name }), body: t('admin.users.unbanBody'), confirmLabel: t('admin.users.unban') });
     if (!ok) return;
@@ -1273,7 +1290,10 @@ const AccountBans: Component<{ onOpenUser: (id: string) => void }> = (props) => 
     void refetch();
   }
   return (
-    <Show when={rows()} fallback={<AdminListSkeleton rows={4} />}>
+    <Show
+      when={rows()}
+      fallback={loadFailed(rowsRes) ? <AdminLoadFailed onRetry={() => void refetch()} /> : <AdminListSkeleton rows={4} />}
+    >
       {(list) => (
         <Show when={list().length > 0} fallback={<EmptyState icon="fa-ban" title={t('admin.bans.empty')} size="inline" />}>
           <div class="space-y-1.5">
@@ -1315,9 +1335,13 @@ const AUDIT_ICON: Record<string, string> = {
 };
 
 const Audit: Component<{ onOpenUser: (id: string) => void }> = (props) => {
-  const [rows] = createResource(() => listAudit());
+  const [rowsRes, { refetch }] = createResource(() => listAudit());
+  const rows = () => settledValue(rowsRes);
   return (
-    <Show when={rows()} fallback={<AdminListSkeleton rows={6} />}>
+    <Show
+      when={rows()}
+      fallback={loadFailed(rowsRes) ? <AdminLoadFailed onRetry={() => void refetch()} /> : <AdminListSkeleton rows={6} />}
+    >
       {(list) => (
         <Show when={list().length > 0} fallback={<EmptyState icon="fa-clock-rotate-left" title={t('admin.audit.empty')} size="inline" />}>
           <ol class="space-y-1.5">
@@ -1362,7 +1386,8 @@ const Audit: Component<{ onOpenUser: (id: string) => void }> = (props) => {
 // ---- space drawer -----------------------------------------------------------------------
 
 const SpaceDrawer: Component<{ spaceId: string | null; onClose: () => void; onOpenUser: (id: string) => void; onOpenReport: (id: string) => void }> = (props) => {
-  const [detail] = createResource(() => props.spaceId, (id) => (id ? getSpaceDetail(id) : null));
+  const [detailRes, { refetch }] = createResource(() => props.spaceId, (id) => (id ? getSpaceDetail(id) : null));
+  const detail = () => settledValue(detailRes);
   const [reason, setReason] = createSignal('');
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal('');
@@ -1409,7 +1434,10 @@ const SpaceDrawer: Component<{ spaceId: string | null; onClose: () => void; onOp
   return (
     <Show when={props.spaceId}>
       <ResponsiveDialog size="md" zClass={zLayer.modalStacked} onClose={props.onClose} dismissible={!busy()} title={detail()?.space.name ?? '…'} icon="fa-solid fa-layer-group">
-        <Show when={detail()} fallback={<AdminDetailSkeleton banner={false} />}>
+        <Show
+          when={detail()}
+          fallback={loadFailed(detailRes) ? <AdminLoadFailed onRetry={() => void refetch()} /> : <AdminDetailSkeleton banner={false} />}
+        >
           {(d) => (
             <div class="space-y-4">
               <dl class="space-y-1 text-sm">
@@ -1438,7 +1466,7 @@ const SpaceDrawer: Component<{ spaceId: string | null; onClose: () => void; onOp
                   <div class="text-sm font-medium text-foreground">{t('admin.space.official')}</div>
                   <p class="text-xs text-muted-foreground">{t('admin.space.officialHint')}</p>
                 </div>
-                <Toggle checked={official()} disabled={busy()} onChange={(on) => void toggleOfficial(on)} />
+                <Toggle label={t('admin.space.official')} checked={official()} disabled={busy()} onChange={(on) => void toggleOfficial(on)} />
               </div>
               <div class={`${settingsGroupFrame} space-y-3 border-destructive/40`}>
                 <div class="text-sm font-medium text-destructive">{t('admin.space.takeDown')}</div>
@@ -1559,7 +1587,8 @@ const FederationDomainList: Component<{
 };
 
 const FederationPanel: Component = () => {
-  const [policy, { refetch }] = createResource(listFederationPolicy);
+  const [policyRes, { refetch }] = createResource(listFederationPolicy);
+  const policy = () => settledValue(policyRes);
   const [busy, setBusy] = createSignal(false);
   const [error, setError] = createSignal('');
 
@@ -1595,7 +1624,10 @@ const FederationPanel: Component = () => {
 
   return (
     <div class="space-y-5">
-      <Show when={policy()} fallback={<AdminListSkeleton rows={3} />}>
+      <Show
+        when={policy()}
+        fallback={loadFailed(policyRes) ? <AdminLoadFailed onRetry={() => void refetch()} /> : <AdminListSkeleton rows={3} />}
+      >
         {(p) => (
           <Show
             when={p().enabled}

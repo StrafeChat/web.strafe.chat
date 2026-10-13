@@ -61,6 +61,20 @@ export function localRoomIdFor(fid: string): string {
   return originId!;
 }
 
+/**
+ * Whether two federated user ids name the same person, compared as written rather than
+ * through the registry. Only this instance's own users have two spellings: its domain,
+ * and the name used before federation was switched on.
+ */
+export function sameFederatedUser(a: string, b: string): boolean {
+  const ma = /^@([^:]+):(.+)$/.exec(a);
+  const mb = /^@([^:]+):(.+)$/.exec(b);
+  if (!ma || !mb || ma[1] !== mb[1]) return false;
+  if (ma[2] === mb[2]) return true;
+  const isLocal = (domain: string) => domain === localServer() || domain === LEGACY_SERVER;
+  return isLocal(ma[2]!) && isLocal(mb[2]!);
+}
+
 /** Local user id for a federated id, when this client has seen that user (else the raw id part). */
 export function localUserIdFor(fid: string): string {
   const m = /^@([^:]+):(.+)$/.exec(fid);

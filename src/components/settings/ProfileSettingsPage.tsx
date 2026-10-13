@@ -1,6 +1,7 @@
 import type { Component } from 'solid-js';
 import { createSignal, onMount, createEffect, createMemo, Show } from 'solid-js';
-import { auth, setAuthUser, logout } from '../../stores/auth';
+import { auth, setAuthUser, signOut } from '../../stores/auth';
+import { desktopAccountsSaved } from '../../desktop/accounts';
 import { getMe, patchMe, toAuthUser, uploadAvatar, uploadBanner } from '../../api/users';
 import { MessageAvatar } from '../messageList/MessageAvatar';
 import { Button } from '../ui/Button';
@@ -9,8 +10,6 @@ import { Textarea } from '../ui/Textarea';
 import { Toggle } from '../ui/Toggle';
 import { PresenceDot } from '../PresenceDot';
 import { settingsSectionTitle } from './settingsChrome';
-import { useNavigate } from '@solidjs/router';
-import { closeUserSettings } from '../../stores/userSettingsModal';
 import { markdownAndHtmlToSanitizedBioHtml } from '../../lib/profileRichText';
 import { formatBirthday } from '../../lib/utils/birthday';
 import { t } from '../../i18n';
@@ -28,11 +27,16 @@ export interface ProfileSettingsPageProps {
 }
 
 export const ProfileSettingsPage: Component<ProfileSettingsPageProps> = (props) => {
-  const navigate = useNavigate();
+  // Seeded from the signed-in user so a save made before GET /users/@me answers (or after it
+  // failed) sends the account's own text back, not empty fields that would clear it.
   const [displayNameDraft, setDisplayNameDraft] = createSignal(getInitialName());
-  const [bioDraft, setBioDraft] = createSignal('');
-  const [aboutMeDraft, setAboutMeDraft] = createSignal('');
-  const [pronounsDraft, setPronounsDraft] = createSignal('');
+  const [bioDraft, setBioDraft] = createSignal(auth.user?.bio ?? '');
+  const [aboutMeDraft, setAboutMeDraft] = createSignal(auth.user?.about_me ?? '');
+  const [pronounsDraft, setPronounsDraft] = createSignal(auth.user?.pronouns ?? '');
+  // Whether the bio and About Me drafts are known to hold what the server has: set once GET
+  // /users/@me (or a save) returns the profile. Until then an empty one is left out of the save
+  // rather than sent as a clear, since empty may only mean it was never loaded.
+  const [profileLoaded, setProfileLoaded] = createSignal(false);
   const [savingProfile, setSavingProfile] = createSignal(false);
   const [profileError, setProfileError] = createSignal('');
   const [avatarUploading, setAvatarUploading] = createSignal(false);
@@ -47,6 +51,7 @@ export const ProfileSettingsPage: Component<ProfileSettingsPageProps> = (props) 
   const [birthdayOptIn, setBirthdayOptIn] = createSignal(false);
   const [birthdayBusy, setBirthdayBusy] = createSignal(false);
   const [birthdayError, setBirthdayError] = createSignal('');
+  const [signingOut, setSigningOut] = createSignal(false);
 
   const profileImageMaxBytes = 8 * 1024 * 1024;
 
@@ -76,6 +81,7 @@ export const ProfileSettingsPage: Component<ProfileSettingsPageProps> = (props) 
         setPronounsDraft(me.pronouns ?? '');
         setBirthday(me.birthday);
         setBirthdayOptIn(me.birthday_opt_in === true);
+        setProfileLoaded(true);
         const u = auth.user;
         if (u) setAuthUser({ ...u, ...toAuthUser(me) });
         markClean();
@@ -83,6 +89,8 @@ export const ProfileSettingsPage: Component<ProfileSettingsPageProps> = (props) 
       .catch(() => {
         const u = auth.user;
         setDisplayNameDraft(u?.display_name || u?.username || '');
+        setBioDraft(u?.bio ?? '');
+        setAboutMeDraft(u?.about_me ?? '');
         setPronounsDraft(u?.pronouns ?? '');
         setBirthday(u?.birthday);
         setBirthdayOptIn(u?.birthday_opt_in === true);
@@ -100,15 +108,25 @@ export const ProfileSettingsPage: Component<ProfileSettingsPageProps> = (props) 
     setSavingProfile(true);
     props.onSavingChange?.(true);
     try {
+      // Every field is sent even when empty: an empty string is how the server is told to
+      // clear it, while omitting the key would leave whatever was there before (an emptied bio
+      // that stayed on the profile). An empty display name falls back to the username. The one
+      // exception is a bio or About Me the page never loaded: empty there is not a choice the
+      // person made, so the key is left out and the server keeps what it has.
+      const loaded = profileLoaded();
       const me = await patchMe({
-        display_name: name || undefined,
-        bio: bio || undefined,
-        about_me: about || undefined,
-        // Sent even when empty: an empty string is how the server is told to clear it, while
-        // omitting the key would leave whatever was there before.
+        display_name: name,
+        bio: loaded ? bio : bio || undefined,
+        about_me: loaded ? about : about || undefined,
         pronouns: pronounsDraft().trim(),
       });
       setAuthUser({ ...u, ...toAuthUser(me) });
+      setProfileLoaded(true);
+      // Show what was saved, as the page shows it on open.
+      setDisplayNameDraft(me.display_name || me.username || '');
+      setBioDraft(me.bio ?? '');
+      setAboutMeDraft(me.about_me ?? '');
+      setPronounsDraft(me.pronouns ?? '');
       markClean();
     } catch (err) {
       setProfileError(err instanceof Error ? err.message : t('settings.profile.saveFailed'));
@@ -190,10 +208,15 @@ export const ProfileSettingsPage: Component<ProfileSettingsPageProps> = (props) 
     }
   }
 
-  function handleLogout() {
-    logout();
-    closeUserSettings();
-    navigate('/login');
+  async function handleLogout() {
+    if (signingOut()) return;
+    setSigningOut(true);
+    await signOut();
+    // On desktop the account leaves the accounts file with the sign-out; let that write land.
+    await desktopAccountsSaved();
+    // A fresh page rather than a route change, so nothing the account had in memory (its
+    // decrypted messages, members, presence) is still there for whoever signs in next.
+    window.location.assign('/login');
   }
 
   const fieldIcon = 'flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground';
@@ -451,7 +474,7 @@ export const ProfileSettingsPage: Component<ProfileSettingsPageProps> = (props) 
               </Button>
             </div>
             <div class="pt-1">
-              <Button variant="destructive" size="md" onClick={handleLogout}>
+              <Button variant="destructive" size="md" loading={signingOut()} onClick={() => void handleLogout()}>
                 <i class="fa-solid fa-right-from-bracket me-2" />
                 {t('settings.profile.logOut')}
               </Button>

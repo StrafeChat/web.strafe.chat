@@ -1,5 +1,5 @@
 import type { Component } from 'solid-js';
-import { createEffect, createMemo, createSignal, For, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js';
 import {
   patchSpace,
   uploadSpaceIcon,
@@ -33,8 +33,26 @@ interface Props {
 
 /** Space settings → Overview: icon, name, description, birthday announcements, and the owner's danger zone. */
 export const SpaceOverviewPage: Component<Props> = (props) => {
-  const [name, setName] = createSignal('');
-  const [description, setDescription] = createSignal('');
+  /**
+   * A draft seeded from the server that follows the server's value only while it is untouched.
+   * The space object is replaced on every update to any space (an icon upload, saving the other
+   * group below, a SPACE_UPDATE from another moderator), so re-seeding on every change wiped
+   * whatever was being typed. The memo means only a real change to this field gets here; a
+   * draft still equal to the value it was seeded from has not been edited.
+   */
+  function createServerDraft(server: () => string | undefined) {
+    const [draft, setDraft] = createSignal('');
+    const value = createMemo(() => server() ?? '');
+    createEffect(
+      on([() => props.spaceId, value], ([id, v], prev) => {
+        if (!prev || prev[0] !== id || draft().trim() === prev[1]) setDraft(v);
+      }),
+    );
+    return [draft, setDraft] as const;
+  }
+
+  const [name, setName] = createServerDraft(() => props.space?.name);
+  const [description, setDescription] = createServerDraft(() => props.space?.description);
   const [saving, setSaving] = createSignal(false);
   const [iconBusy, setIconBusy] = createSignal(false);
   const [bannerBusy, setBannerBusy] = createSignal(false);
@@ -43,18 +61,11 @@ export const SpaceOverviewPage: Component<Props> = (props) => {
 
   // Drafted together with the identity fields above and saved on one button: the greeting
   // template is free text, so saving it on every keystroke would mean a PATCH per character.
-  const [birthdayChannelId, setBirthdayChannelId] = createSignal('');
-  const [birthdayMessage, setBirthdayMessage] = createSignal('');
+  const [birthdayChannelId, setBirthdayChannelId] = createServerDraft(() => props.space?.birthday_channel_id);
+  const [birthdayMessage, setBirthdayMessage] = createServerDraft(() => props.space?.birthday_message);
   const [birthdaySaving, setBirthdaySaving] = createSignal(false);
 
   const textRooms = createMemo(() => props.rooms.filter((r) => r.type === ROOM_TYPE_TEXT));
-
-  createEffect(() => {
-    setName(props.space?.name ?? '');
-    setDescription(props.space?.description ?? '');
-    setBirthdayChannelId(props.space?.birthday_channel_id ?? '');
-    setBirthdayMessage(props.space?.birthday_message ?? '');
-  });
 
   const dirty = () =>
     name().trim() !== (props.space?.name ?? '') || description().trim() !== (props.space?.description ?? '');
@@ -72,6 +83,10 @@ export const SpaceOverviewPage: Component<Props> = (props) => {
     try {
       const updated = await patchSpace(props.spaceId, { name: n, description: description().trim() });
       addOrUpdateSpace(updated);
+      // What the server kept, so the form is clean again (the drafts no longer equal the value
+      // they were seeded from, so createServerDraft leaves them alone).
+      setName(updated.name ?? '');
+      setDescription(updated.description ?? '');
     } catch (e) {
       props.onError(e instanceof Error ? e.message : t('spaceSettings.saveNameFailed'));
     } finally {
@@ -85,12 +100,13 @@ export const SpaceOverviewPage: Component<Props> = (props) => {
     props.onError('');
     try {
       // An empty channel id is how the server is told to stop announcing birthdays.
-      addOrUpdateSpace(
-        await patchSpace(props.spaceId, {
-          birthday_channel_id: birthdayChannelId(),
-          birthday_message: birthdayMessage().trim(),
-        })
-      );
+      const updated = await patchSpace(props.spaceId, {
+        birthday_channel_id: birthdayChannelId(),
+        birthday_message: birthdayMessage().trim(),
+      });
+      addOrUpdateSpace(updated);
+      setBirthdayChannelId(updated.birthday_channel_id ?? '');
+      setBirthdayMessage(updated.birthday_message ?? '');
     } catch (e) {
       props.onError(e instanceof Error ? e.message : t('spaceSettings.overview.birthdaySaveFailed'));
     } finally {

@@ -130,6 +130,18 @@ function identityScope(userId: string): string {
   return instance.federationEnabled && instance.domain ? `${userId}@${instance.domain}` : userId;
 }
 
+/**
+ * Make sure the instance's federation settings are known before anything derives the scope
+ * or the engine's user id from them. When GET / can't be reached they stay unknown, and
+ * guessing "no federation" would look up the device under the wrong key, find none and
+ * provision a stray device under the wrong name (or, for a reset, revoke the wrong one) - so
+ * fail instead, and let the next attempt ask again.
+ */
+async function requireInstanceInfo(): Promise<void> {
+  await loadInstanceInfo();
+  if (!instance.loaded) throw new Error('[e2ee] instance info unavailable - not deriving this device identity yet');
+}
+
 function readLocalDeviceId(scope: string): string | null {
   try {
     return localStorage.getItem(`${LOCAL_DEVICE_KEY}:${scope}`);
@@ -276,7 +288,7 @@ function passphraseDbUsable(): Promise<boolean> {
 export async function resetLocalE2eeStore(userId: string): Promise<void> {
   // The scope needs the instance's domain, which getMachine had loaded before it failed;
   // make sure of it in case this runs from a page that never got that far.
-  await loadInstanceInfo();
+  await requireInstanceInfo();
   const scope = identityScope(userId);
   const oldDeviceId = readLocalDeviceId(scope);
   await deleteStore(storeNameFor(userId), { strict: true });
@@ -305,7 +317,7 @@ export async function resetLocalE2eeStore(userId: string): Promise<void> {
  * nobody has. A fresh id per account avoids that.
  */
 export async function forgetLocalDeviceIdentities(userId: string): Promise<void> {
-  await loadInstanceInfo();
+  await requireInstanceInfo();
   const oldDeviceId = readLocalDeviceId(identityScope(userId));
   if (oldDeviceId) {
     try {
@@ -392,7 +404,7 @@ export async function getMachine(userId: string): Promise<OlmMachine> {
     await ensureWasm();
     // The engine's user id depends on whether this instance federates (its domain) - make
     // sure that's known before the first UserId is built.
-    await loadInstanceInfo();
+    await requireInstanceInfo();
     await migrateLegacyIdentity(userId);
     let deviceId = getLocalDeviceId(userId);
     if (!deviceId) {
@@ -406,6 +418,16 @@ export async function getMachine(userId: string): Promise<OlmMachine> {
     return opened.machine;
   })();
   machinePromise = promise;
+  // A failure that can pass - the instance info or the API out of reach, a device request
+  // that didn't go through - must not stick for the session: forget the promise so the next
+  // caller (the resync on reconnect, a send, a history load) tries again. An unusable store
+  // does stick, on purpose: every encrypt and decrypt reports it until the person resets it
+  // (see E2eeStoreUnusableError), and reopening it on every call would change nothing.
+  promise.catch((e) => {
+    if (e instanceof E2eeStoreUnusableError || machinePromise !== promise) return;
+    machinePromise = null;
+    currentUserId = null;
+  });
   return promise;
 }
 

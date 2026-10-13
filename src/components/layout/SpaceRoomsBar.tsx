@@ -44,6 +44,7 @@ import { createRoomReorder } from './spaceRooms/createRoomReorder';
 import { ChevronDownIcon } from './spaceRooms/RoomTypeIcon';
 import { SpaceChannelRow } from './spaceRooms/SpaceChannelRow';
 import { t } from '../../i18n';
+import { publicWebOrigin } from '../../lib/runtimeConfig';
 
 const ROOM_TYPE_TEXT = 3;
 const ROOM_TYPE_VOICE = 4;
@@ -308,6 +309,19 @@ export const SpaceRoomsBar: Component = () => {
     return latest.id;
   }
 
+  /** Say that a delete from a context menu failed and offer to try again. The menu does not
+   * await its items, so without this the error would vanish with nobody told. */
+  function retryAfterDeleteFailed(err: unknown): Promise<boolean> {
+    console.error('Delete failed:', err);
+    return confirmDialog({
+      title: t('common.deleteFailed'),
+      body: err instanceof Error ? err.message : undefined,
+      cancelLabel: t('common.close'),
+      confirmLabel: t('common.retry'),
+      tone: 'danger',
+    });
+  }
+
   function openRoomMenu(e: MouseEvent, room: SpaceRoom) {
     const sid = spaceId();
     if (!sid) return;
@@ -351,7 +365,8 @@ export const SpaceRoomsBar: Component = () => {
       {
         label: t('contextMenu.copyRoomLink'),
         icon: 'fa-link',
-        onClick: () => navigator.clipboard.writeText(`${window.location.origin}/spaces/${sid}/rooms/${room.id}`),
+        // The instance's address, not the desktop app's tauri://localhost page.
+        onClick: () => navigator.clipboard.writeText(`${publicWebOrigin()}/spaces/${sid}/rooms/${room.id}`),
       },
       {
         label: t('contextMenu.copyRoomId'),
@@ -365,7 +380,23 @@ export const SpaceRoomsBar: Component = () => {
         disabled: !canManageRooms(),
         onClick: async () => {
           if (!canManageRooms()) return;
-          await deleteSpaceRoom(sid, room.id);
+          // The room and its whole history go, so ask first - it sits right under "Copy room ID".
+          const ok = await confirmDialog({
+            title: t('space.deleteRoom'),
+            body: t('space.deleteRoomConfirm', { name: room.name || t('space.unnamed') }),
+            confirmLabel: t('space.deleteRoom'),
+            tone: 'danger',
+            icon: 'fa-solid fa-trash',
+          });
+          if (!ok) return;
+          for (;;) {
+            try {
+              await deleteSpaceRoom(sid, room.id);
+              break;
+            } catch (err) {
+              if (!(await retryAfterDeleteFailed(err))) return;
+            }
+          }
           setSpaceRooms(sid, (spaceRooms().filter((r) => r.id !== room.id)));
           if (activeRoomId() === room.id) {
             const fallback = spaceRooms().find((r) => r.type === ROOM_TYPE_TEXT || r.type === ROOM_TYPE_VOICE);
@@ -449,7 +480,14 @@ export const SpaceRoomsBar: Component = () => {
             icon: 'fa-solid fa-trash',
           });
           if (!ok) return;
-          await deleteSpaceRoom(sid, section.id);
+          for (;;) {
+            try {
+              await deleteSpaceRoom(sid, section.id);
+              break;
+            } catch (err) {
+              if (!(await retryAfterDeleteFailed(err))) return;
+            }
+          }
           // The channels inside move to the top level - the server sends their parent-cleared
           // updates; drop just the section here so it disappears immediately.
           setSpaceRooms(sid, spaceRooms().filter((r) => r.id !== section.id));
@@ -723,8 +761,9 @@ export const SpaceRoomsBar: Component = () => {
           <Show when={roomsRes.loading}>
             <div class="px-2 py-1.5 text-xs text-muted-foreground">{t('common.loading')}</div>
           </Show>
+          {/* `when` takes the value itself: a function there is an object, always truthy. */}
           <Show
-            when={() =>
+            when={
               !roomsRes.loading &&
               (topLevelRooms().length > 0 || (canManageRooms() && activeReorderDrag()?.kind === 'channel'))
             }
@@ -757,7 +796,7 @@ export const SpaceRoomsBar: Component = () => {
                   </div>
                 )}
               </For>
-              <Show when={() => canManageRooms() && activeReorderDrag()?.kind === 'channel'}>
+              <Show when={canManageRooms() && activeReorderDrag()?.kind === 'channel'}>
                 <div
                   data-reorder-end="top"
                   class="relative h-2 shrink-0 -mt-0.5 rounded-sm"
@@ -877,7 +916,7 @@ export const SpaceRoomsBar: Component = () => {
                           </div>
                         )}
                       </For>
-                      <Show when={() => canManageRooms() && activeReorderDrag()?.kind === 'channel'}>
+                      <Show when={canManageRooms() && activeReorderDrag()?.kind === 'channel'}>
                         <div
                           data-reorder-end={secScope}
                           class="relative h-2 shrink-0 -mt-0.5 rounded-sm"
@@ -892,11 +931,7 @@ export const SpaceRoomsBar: Component = () => {
               );
             }}
           </For>
-          <Show
-            when={() =>
-              canManageRooms() && sections().length > 0 && activeReorderDrag()?.kind === 'section'
-            }
-          >
+          <Show when={canManageRooms() && sections().length > 0 && activeReorderDrag()?.kind === 'section'}>
             <div
               data-reorder-end="sections"
               class="relative h-2 shrink-0 rounded-sm"

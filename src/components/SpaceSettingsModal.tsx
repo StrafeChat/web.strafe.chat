@@ -1,6 +1,6 @@
 import type { Component } from 'solid-js';
 import { userOptionLabel } from '../stores/instance';
-import { createSignal, createEffect, createMemo, For, Show } from 'solid-js';
+import { createSignal, createEffect, createMemo, For, Show, untrack } from 'solid-js';
 import {
   createSpaceRole,
   deleteSpaceRole,
@@ -59,6 +59,7 @@ import {
   SpaceModerationPage,
 } from './settings/space';
 import { appSectionLabel } from '../theme/appChrome';
+import { confirmDialog } from '../stores/confirmDialog';
 import { t } from '../i18n';
 
 const EVERYONE = '@everyone';
@@ -84,6 +85,8 @@ function hexToInt(h: string): number {
 
 type SpaceSettingsSection = 'general' | 'system' | 'discover' | 'roles' | 'emojis' | 'moderation' | 'members' | 'invites' | 'bans' | 'audit';
 type RolesSubTab = 'display' | 'permissions' | 'members' | 'channel';
+/** The parts of a role the Display/Permissions draft edits. */
+type RoleFields = Pick<SpaceRole, 'id' | 'name' | 'color' | 'hoist' | 'mentionable' | 'permissions'>;
 
 interface SpaceSettingsModalProps {
   open: boolean;
@@ -212,17 +215,44 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
     }
   });
 
+  /** True when the role draft (name, colour, toggles, permissions) differs from `r`. */
+  function roleDraftDiffers(r: RoleFields): boolean {
+    return (
+      (r.name !== EVERYONE && roleName().trim() !== r.name && roleName().trim() !== '') ||
+      hexToInt(roleColorHex()) !== (r.color ?? 0) ||
+      roleHoist() !== !!r.hoist ||
+      roleMentionable() !== !!r.mentionable ||
+      permMask() !== r.permissions
+    );
+  }
+
+  /** The stored values the role draft was last seeded from. */
+  let seededRole: RoleFields | undefined;
   createEffect(() => {
     const id = selectedRoleId();
     const list = roles();
     if (!id || !list) return;
     const r = list.find((x) => x.id === id);
     if (!r) return;
-    setRoleName(r.name);
-    setRoleColorHex(intToHex(r.color ?? 0));
-    setRoleHoist(!!r.hoist);
-    setRoleMentionable(!!r.mentionable);
-    setPermMask(r.permissions);
+    const next: RoleFields = {
+      id: r.id,
+      name: r.name,
+      color: r.color,
+      hoist: r.hoist,
+      mentionable: r.mentionable,
+      permissions: r.permissions,
+    };
+    const prev = seededRole;
+    seededRole = next;
+    // Any role change in the space (another admin's edit, a new role, a reorder) hands us a
+    // new roles list. Picking a role always reseeds; an update to the same role only reseeds
+    // when nothing is unsaved against what was seeded before, or the edits would be wiped.
+    if (prev && prev.id === next.id && untrack(() => roleDraftDiffers(prev))) return;
+    setRoleName(next.name);
+    setRoleColorHex(intToHex(next.color ?? 0));
+    setRoleHoist(!!next.hoist);
+    setRoleMentionable(!!next.mentionable);
+    setPermMask(next.permissions);
   });
 
   createEffect(() => {
@@ -311,6 +341,9 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
         if (n) body.name = n;
       }
       upsertSpaceRole(sid, await patchSpaceRole(sid, rid, body));
+      // Show what the server stored: the seeding effect keeps a draft that differed from the
+      // role before the save, which this one did by definition.
+      if (selectedRoleId() === rid) resetRoleEdits();
     } catch (e) {
       setErr(e instanceof Error ? e.message : t('common.saveFailed'));
     } finally {
@@ -341,6 +374,16 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
     const rid = selectedRoleId();
     const r = roles()?.find((x) => x.id === rid);
     if (!rid || !r || r.name === EVERYONE || !props.canManageRoles) return;
+    // Asked first, like deleting a room or a section: the role comes off everyone who has it,
+    // with what it granted, and there is no undo.
+    const ok = await confirmDialog({
+      title: t('spaceSettings.deleteRole'),
+      body: t('spaceSettings.deleteRoleConfirm', { name: r.name }),
+      confirmLabel: t('spaceSettings.deleteRole'),
+      tone: 'danger',
+      icon: 'fa-solid fa-trash',
+    });
+    if (!ok) return;
     setBusy(true);
     setErr('');
     try {
@@ -524,14 +567,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
   // --- Unsaved-changes bar for the Display/Permissions tabs (Discord auto-tracks edits) ---
   const roleDirty = createMemo(() => {
     const r = currentRole();
-    if (!r) return false;
-    return (
-      (r.name !== EVERYONE && roleName().trim() !== r.name && roleName().trim() !== '') ||
-      hexToInt(roleColorHex()) !== (r.color ?? 0) ||
-      roleHoist() !== !!r.hoist ||
-      roleMentionable() !== !!r.mentionable ||
-      permMask() !== r.permissions
-    );
+    return !!r && roleDraftDiffers(r);
   });
   function resetRoleEdits() {
     const r = currentRole();
@@ -843,14 +879,24 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                               <p class="text-sm font-medium text-foreground">{t('spaceSettings.hoist')}</p>
                               <p class="text-xs text-muted-foreground">{t('spaceSettings.hoistHint')}</p>
                             </div>
-                            <Toggle checked={roleHoist()} disabled={!props.canManageRoles} onChange={setRoleHoist} />
+                            <Toggle
+                              checked={roleHoist()}
+                              disabled={!props.canManageRoles}
+                              label={t('spaceSettings.hoist')}
+                              onChange={setRoleHoist}
+                            />
                           </div>
                           <div class="flex items-center justify-between gap-4 border-t border-border/40 pt-4">
                             <div>
                               <p class="text-sm font-medium text-foreground">{t('spaceSettings.mentionable')}</p>
                               <p class="text-xs text-muted-foreground">{t('spaceSettings.mentionableHint')}</p>
                             </div>
-                            <Toggle checked={roleMentionable()} disabled={!props.canManageRoles} onChange={setRoleMentionable} />
+                            <Toggle
+                              checked={roleMentionable()}
+                              disabled={!props.canManageRoles}
+                              label={t('spaceSettings.mentionable')}
+                              onChange={setRoleMentionable}
+                            />
                           </div>
                         </div>
                       </div>
@@ -882,6 +928,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                                   <Show when={props.canManageRoles}>
                                     <Toggle
                                       checked={group.rows.every((row) => hasPerm(permMask(), row.bit))}
+                                      label={group.category}
                                       onChange={(on) =>
                                         setPermMask((m) => group.rows.reduce((acc, row) => togglePerm(acc, row.bit, on), m))
                                       }
@@ -899,6 +946,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                                         <Toggle
                                           checked={hasPerm(permMask(), row.bit)}
                                           disabled={!props.canManageRoles}
+                                          label={row.label}
                                           onChange={(on) => setPermMask(togglePerm(permMask(), row.bit, on))}
                                         />
                                       </div>

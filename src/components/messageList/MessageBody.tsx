@@ -1,5 +1,5 @@
 import type { Component } from 'solid-js';
-import { For, Show, createMemo, createSignal, onCleanup, onMount } from 'solid-js';
+import { For, Show, createMemo, createSignal, onCleanup, onMount, untrack } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import { parseMessageContent, walkSegments, type MessageSegment } from '../../lib/utils/markdown';
 import { CodeBlock } from './CodeBlock';
@@ -47,7 +47,7 @@ const brandPillClickable = `${brandPill} cursor-pointer transition-colors hover:
 function findChannel(roomId: string): { spaceId: string; name: string } | null {
   for (const [spaceId, list] of Object.entries(spaces.spaceRoomsBySpaceId)) {
     const r = list.find((x) => x.id === roomId);
-    if (r) return { spaceId, name: r.name || 'unnamed' };
+    if (r) return { spaceId, name: r.name || t('messages.preview.unnamed') };
   }
   return null;
 }
@@ -55,8 +55,16 @@ function findChannel(roomId: string): { spaceId: string; name: string } | null {
 /** Discord-style "jumbo" emoji: a message that is nothing but a few emoji renders them big. */
 const JUMBO_MAX = 10;
 
-/** ||spoiler||: blacked out until clicked, and it stays open once opened. */
-const Spoiler: Component<{ children: import('solid-js').JSX.Element }> = (props) => {
+/**
+ * ||spoiler||: blacked out until clicked, and it stays open once opened.
+ *
+ * The content is hidden with `visibility`, not just transparent text: a link, a mention pill, a
+ * timestamp or an emoji inside sets its own colour or is an image, so `text-transparent` alone
+ * left all of those readable on the black bar. Hidden content also takes no clicks, so the first
+ * click on a spoilered link reveals it instead of following it. Embeds of spoilered links (inline
+ * media, invite cards) are rendered only once revealed, which is what `open` is passed down for.
+ */
+const Spoiler: Component<{ children: (open: () => boolean) => import('solid-js').JSX.Element }> = (props) => {
   const [open, setOpen] = createSignal(false);
   return (
     <span
@@ -79,7 +87,7 @@ const Spoiler: Component<{ children: import('solid-js').JSX.Element }> = (props)
         setOpen(true);
       }}
     >
-      {props.children}
+      <span class={open() ? undefined : 'invisible'}>{untrack(() => props.children(open))}</span>
     </span>
   );
 };
@@ -123,6 +131,7 @@ const MediaEmbed: Component<{ href: string; kind: MediaKind; allowLinkPreviews?:
   const [failed, setFailed] = createSignal(hasRecentMediaFailure(props.href));
   const [shown, setShown] = createSignal(false);
   let imgEl: HTMLImageElement | undefined;
+  let frameEl: HTMLButtonElement | undefined;
   let ready = false; // set once the media actually loads (img onload, or the player's onReady)
   let timer: number | undefined;
   // Reserve the box from a size we cached the last time we saw this link, so a re-render (scrolling
@@ -134,9 +143,31 @@ const MediaEmbed: Component<{ href: string; kind: MediaKind; allowLinkPreviews?:
     if (failed()) return;
     // A timeout is not remembered: a slow connection must not turn a working image into a
     // card for the next ten minutes. Only a real load error (onFail) is.
-    timer = window.setTimeout(() => {
-      if (!isReady()) setFailed(true);
-    }, MEDIA_LOAD_TIMEOUT_MS);
+    const arm = () => {
+      timer = window.setTimeout(() => {
+        if (!isReady()) setFailed(true);
+      }, MEDIA_LOAD_TIMEOUT_MS);
+    };
+    // The image is loading="lazy", so the browser does not even request it while it sits far
+    // up the scroller. A clock started at mount ran out on media nobody had asked for yet, and
+    // older GIFs and images came back as bare links or small cards when you scrolled up to
+    // them. So the clock starts once the embed nears view, when its load has really begun. A
+    // video player fetches its metadata straight away, so its clock starts now.
+    const el = frameEl;
+    if (props.kind === 'video' || !el || typeof IntersectionObserver === 'undefined') {
+      arm();
+      return;
+    }
+    const io = new IntersectionObserver(
+      (entries) => {
+        if (!entries.some((e) => e.isIntersecting)) return;
+        io.disconnect();
+        if (!isReady()) arm();
+      },
+      { rootMargin: '200px' }
+    );
+    io.observe(el);
+    onCleanup(() => io.disconnect());
   });
   onCleanup(() => clearTimeout(timer));
   const onLoaded = () => {
@@ -178,6 +209,7 @@ const MediaEmbed: Component<{ href: string; kind: MediaKind; allowLinkPreviews?:
         when={props.kind === 'video'}
         fallback={
           <button
+            ref={(el) => (frameEl = el)}
             type="button"
             class="relative my-1.5 block w-fit max-w-full cursor-zoom-in overflow-hidden rounded-lg border border-border/50 bg-muted/30 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
             style={box ? { width: `${box.width}px`, height: `${box.height}px` } : undefined}
@@ -259,14 +291,25 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
 
 
     /** One node, recursively: an inline container renders its children through the same
-     * function, which is what lets **bold with *italic* inside** nest at all. */
-    const renderSegment = (seg: MessageSegment): import('solid-js').JSX.Element => {
-      const kids = () => <For each={(seg as { children: MessageSegment[] }).children}>{(c) => renderSegment(c)}</For>;
+     * function, which is what lets **bold with *italic* inside** nest at all. `revealed` is set
+     * inside a spoiler and says whether every spoiler around this node has been opened. */
+    const renderSegment = (seg: MessageSegment, revealed?: () => boolean): import('solid-js').JSX.Element => {
+      const kids = () => (
+        <For each={(seg as { children: MessageSegment[] }).children}>{(c) => renderSegment(c, revealed)}</For>
+      );
       if (seg.type === 'bold') return <strong class="font-semibold">{kids()}</strong>;
       if (seg.type === 'italic') return <em class="italic">{kids()}</em>;
       if (seg.type === 'underline') return <u class="underline underline-offset-2">{kids()}</u>;
       if (seg.type === 'strike') return <s class="line-through opacity-90">{kids()}</s>;
-      if (seg.type === 'spoiler') return <Spoiler>{kids()}</Spoiler>;
+      if (seg.type === 'spoiler') {
+        return (
+          <Spoiler>
+            {(open) => (
+              <For each={seg.children}>{(c) => renderSegment(c, () => open() && (revealed?.() ?? true))}</For>
+            )}
+          </Spoiler>
+        );
+      }
       if (seg.type === 'heading') {
         const size = seg.level === 1 ? 'text-xl' : seg.level === 2 ? 'text-lg' : 'text-base';
         return (
@@ -313,31 +356,39 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
         }
         if (seg.type === 'link') {
           const href = seg.href;
+          // Inside a spoiler that is still closed, the embed below a link would give away what
+          // the spoiler hides (the image itself, the space's name), so it waits for the reveal.
+          const embedShown = () => revealed?.() ?? true;
           // <https://…>: the author suppressed this link's embed, so it stays a bare link -
           // no invite card, no inline image or video, no preview below it.
           const inviteCode = seg.suppressed ? null : extractSpaceInviteCodeFromUrl(href);
           if (inviteCode) {
+            const inviteAnchor = () => (
+              <a
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                class="text-primary underline underline-offset-2 break-all hover:text-primary/90 cursor-pointer"
+                onClick={(e) => {
+                  if (!isExternalLink(href)) return;
+                  if (e.shiftKey) return;
+                  e.preventDefault();
+                  requestOpenExternalLink(href);
+                }}
+              >
+                {seg.text}
+              </a>
+            );
             return (
-              <div class="block max-w-full my-1.5 space-y-1.5">
-                <a
-                  href={href}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="text-primary underline underline-offset-2 break-all hover:text-primary/90 cursor-pointer"
-                  onClick={(e) => {
-                    if (!isExternalLink(href)) return;
-                    if (e.shiftKey) return;
-                    e.preventDefault();
-                    requestOpenExternalLink(href);
-                  }}
-                >
-                  {seg.text}
-                </a>
-                <SpaceInviteLinkEmbed code={inviteCode} />
-              </div>
+              <Show when={embedShown()} fallback={inviteAnchor()}>
+                <div class="block max-w-full my-1.5 space-y-1.5">
+                  {inviteAnchor()}
+                  <SpaceInviteLinkEmbed code={inviteCode} />
+                </div>
+              </Show>
             );
           }
-          const linkAnchor = (
+          const linkAnchor = () => (
             <a
               href={href}
               target="_blank"
@@ -359,13 +410,15 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
           const kind = seg.suppressed ? null : mediaKind(href);
           if (kind) {
             return (
-              <div class="block max-w-full my-1.5 space-y-1.5">
-                {linkAnchor}
-                <MediaEmbed href={href} kind={kind} allowLinkPreviews={props.allowLinkPreviews} />
-              </div>
+              <Show when={embedShown()} fallback={linkAnchor()}>
+                <div class="block max-w-full my-1.5 space-y-1.5">
+                  {linkAnchor()}
+                  <MediaEmbed href={href} kind={kind} allowLinkPreviews={props.allowLinkPreviews} />
+                </div>
+              </Show>
             );
           }
-          return linkAnchor;
+          return linkAnchor();
         }
         if (seg.type === 'mention') {
           // Accessor, not a one-shot lookup: participants often finish loading after the
@@ -423,7 +476,7 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
               when={channel()}
               fallback={
                 <span class={`${pillBase} bg-muted text-muted-foreground`} title={t('messages.roomUnavailable')}>
-                  #unknown
+                  #{t('messages.unknownRoom')}
                 </span>
               }
             >

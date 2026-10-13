@@ -4,6 +4,9 @@
  * properties on <html>, so it restyles everything without touching component code.
  */
 
+// The plain t() module rather than the i18n index, which re-exports Solid components.
+import { t } from '../i18n/t';
+
 export type ThemeTokenKey =
   | 'background'
   | 'foreground'
@@ -75,6 +78,9 @@ export interface ThemeDefinition {
   colors: ThemeColors;
   /** Built-in themes are read-only; users duplicate them to customize. */
   builtin?: boolean;
+  /** A built-in theme's blurb, in English. What the person sees is the translation under
+   * `settings.appearance.theme.descriptions.<id>` (in all six locale files); this is only
+   * the fallback for a built-in that has no key there yet. */
   description?: string;
 }
 
@@ -223,6 +229,8 @@ export function exportTheme(theme: ThemeDefinition): string {
 /**
  * Parse a pasted theme. Missing colors fall back to `base` so a partial theme (just a few
  * overrides) still produces something usable; anything that isn't a hex color is rejected.
+ * The error and the name an unnamed theme gets are translated here rather than by the caller,
+ * so the signature stays the one the mobile app's theme editor already calls.
  */
 export function parseThemeJson(
   json: string,
@@ -232,19 +240,20 @@ export function parseThemeJson(
   try {
     raw = JSON.parse(json);
   } catch {
-    return { ok: false, error: 'Not valid JSON.' };
+    return { ok: false, error: t('themeEditor.importErrors.invalidJson') };
   }
-  if (!raw || typeof raw !== 'object') return { ok: false, error: 'Expected a JSON object.' };
+  if (!raw || typeof raw !== 'object') return { ok: false, error: t('themeEditor.importErrors.notObject') };
   const d = raw as Record<string, unknown>;
-  const name = typeof d.name === 'string' && d.name.trim() ? d.name.trim().slice(0, 60) : 'Imported theme';
+  const name =
+    typeof d.name === 'string' && d.name.trim() ? d.name.trim().slice(0, 60) : t('themeEditor.importedName');
   const appearance = d.appearance === 'light' ? 'light' : 'dark';
   const colorsIn = (d.colors && typeof d.colors === 'object' ? d.colors : {}) as Record<string, unknown>;
   const colors: ThemeColors = { ...base };
-  for (const t of THEME_TOKENS) {
-    const v = colorsIn[t.key];
+  for (const tok of THEME_TOKENS) {
+    const v = colorsIn[tok.key];
     if (v === undefined) continue;
-    if (!isHexColor(v)) return { ok: false, error: `"${t.key}" must be a hex color like #1a2b3c.` };
-    colors[t.key] = normalizeHex(v);
+    if (!isHexColor(v)) return { ok: false, error: t('themeEditor.importErrors.badColor', { key: tok.key }) };
+    colors[tok.key] = normalizeHex(v);
   }
   return { ok: true, theme: { name, appearance, colors } };
 }

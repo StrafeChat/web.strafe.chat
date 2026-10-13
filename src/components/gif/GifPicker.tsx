@@ -62,11 +62,19 @@ export const GifPicker: Component<GifPickerProps> = (props) => {
   async function load(reset: boolean) {
     const id = provider();
     if (!gifProviderConfigured(id)) {
+      // Supersede anything still loading from the provider we just switched away from, or its
+      // results would land over the "not configured" note.
+      ++reqId;
+      controller?.abort();
+      setLoading(false);
       setState('config');
       setItems([]);
       return;
     }
-    if (loading()) return;
+    // Only a next page waits for the request in flight. A reset (new query, other provider)
+    // replaces it - the abort and reqId below make sure the stale one is dropped - where
+    // returning here discarded the search and let trending fill the grid under it.
+    if (!reset && loading()) return;
     if (!reset && done()) return;
     const myReq = ++reqId;
     controller?.abort();

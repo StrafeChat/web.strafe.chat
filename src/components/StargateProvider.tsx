@@ -22,7 +22,7 @@ import { initRoomNotifySettingsHandler } from '../lib/roomNotify';
 import { resyncDevice } from '../lib/e2ee/service';
 import { applyVoiceSettingsToSession, initPushToTalk, initVoiceHandlers, voice } from '../stores/voice';
 import { voiceSettings } from '../stores/voiceSettings';
-import { initInstanceHandlers, loadInstanceCapabilities, loadInstanceInfo } from '../stores/instance';
+import { initInstanceHandlers, instance, loadInstanceCapabilities, loadInstanceInfo } from '../stores/instance';
 import { on } from 'solid-js';
 
 // How long to wait for the WS READY payload before falling back to REST. Only matters
@@ -52,10 +52,19 @@ export const StargateProvider: Component<{ children?: import('solid-js').JSX.Ele
     // Whether this instance has voice (and a captcha, federation...) - decides which
     // call controls exist at all.
     void loadInstanceInfo();
+    // That first ask can fail (the desktop app started before the network was up, the API
+    // was restarting), and a failure leaves the info unloaded rather than guessed, so ask
+    // again when the network comes back. A no-op once it has loaded.
+    const retryInstanceInfo = () => void loadInstanceInfo();
+    window.addEventListener('online', retryInstanceInfo);
+    onCleanup(() => window.removeEventListener('online', retryInstanceInfo));
   });
 
   onMount(() => {
     const unsub = onStargateReady((payload) => {
+      // A READY means the server is reachable: if the instance info could not be loaded
+      // earlier, this is the moment to get it (a no-op when it already is).
+      void loadInstanceInfo();
       hydrateFromReady(payload);
       // Custom emoji aren't part of READY; one REST fetch per connection keeps the picker
       // and <:name:id> rendering warm across reconnects (membership may have changed).
@@ -151,7 +160,11 @@ export const StargateProvider: Component<{ children?: import('solid-js').JSX.Ele
 
   createEffect(() => {
     const uid = auth.user?.id;
-    if (uid) {
+    // Not before the instance info is in: the device identity is named after the instance's
+    // federation domain, so the engine refuses to open without it, and the bootstrap runs once
+    // per session - started too early it would fail and never run again. It is asked for again
+    // on READY, when the network returns and by every E2EE operation, so this waits, not stalls.
+    if (uid && instance.loaded) {
       bootstrapE2EEDevice(uid).catch((err) => console.error('E2EE device bootstrap failed:', err));
     }
   });
@@ -162,18 +175,36 @@ export const StargateProvider: Component<{ children?: import('solid-js').JSX.Ele
     }
   });
 
-  createEffect(() => {
-    if (!stargate.ready) return;
-    const list = spaces.spaces;
-    for (const s of list) {
-      if (s.id) subscribe(s.id, undefined);
-    }
-    onCleanup(() => {
-      for (const s of list) {
-        if (s.id) unsubscribe(s.id, undefined);
+  /**
+   * Keep the gateway subscribed to exactly the ids `wanted()` returns while the socket is up,
+   * sending frames only for ids that joined or left the set. The lists behind these sets are
+   * replaced on every MESSAGE_CREATE (a room's last_message_id moves), and the old "release
+   * everything, then subscribe everything" effect turned each message into an Unsubscribe and
+   * a fresh Subscribe for every room - the gateway dropped each one and re-authorized it, and
+   * any event published to a room inside that window never reached this client. On a drop
+   * everything is released: the next connection starts with no subscriptions and the client's
+   * ref counts are reset with it.
+   */
+  function holdSubscriptions(wanted: () => Iterable<string>): void {
+    let held = new Set<string>();
+    const release = () => {
+      for (const id of held) unsubscribe(id, undefined);
+      held = new Set();
+    };
+    createEffect(() => {
+      if (!stargate.ready) {
+        release();
+        return;
       }
+      const next = new Set(wanted());
+      for (const id of next) if (!held.has(id)) subscribe(id, undefined);
+      for (const id of held) if (!next.has(id)) unsubscribe(id, undefined);
+      held = next;
     });
-  });
+    onCleanup(release);
+  }
+
+  holdSubscriptions(() => spaces.spaces.map((s) => s.id).filter(Boolean));
 
   // Subscribe to every channel in every space the user belongs to, not just the space
   // container (which only carries space-wide events like renames/role changes) and not
@@ -182,32 +213,17 @@ export const StargateProvider: Component<{ children?: import('solid-js').JSX.Ele
   // reaches this client, so sidebar/space-icon unread badges for it go stale until a
   // full reload - the "doesn't update in real time" and "doesn't clear after reading"
   // complaints are the same root cause: no live signal for backgrounded channels.
-  createEffect(() => {
-    if (!stargate.ready) return;
+  holdSubscriptions(() => {
     const roomIds = new Set<string>();
     for (const list of Object.values(spaces.spaceRoomsBySpaceId)) {
       for (const r of list) {
         if (r.id) roomIds.add(r.id);
       }
     }
-    for (const id of roomIds) subscribe(id, undefined);
-    onCleanup(() => {
-      for (const id of roomIds) unsubscribe(id, undefined);
-    });
+    return roomIds;
   });
 
-  createEffect(() => {
-    if (!stargate.ready) return;
-    const list = rooms.rooms;
-    for (const r of list) {
-      if (r.id) subscribe(r.id, undefined);
-    }
-    onCleanup(() => {
-      for (const r of list) {
-        if (r.id) unsubscribe(r.id, undefined);
-      }
-    });
-  });
+  holdSubscriptions(() => rooms.rooms.map((r) => r.id).filter(Boolean));
 
   // A space joined mid-session (Discover, an invite) has its channels subscribed by the effects
   // above, but the gateway can briefly reject those subscribes right after the join - the new

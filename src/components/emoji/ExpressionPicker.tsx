@@ -1,5 +1,5 @@
 import type { Component } from 'solid-js';
-import { Show, createSignal, onCleanup } from 'solid-js';
+import { Show, createEffect, createSignal, on, onCleanup } from 'solid-js';
 import { appMenuPanel } from '../../theme/appChrome';
 import { EmojiPicker, type EmojiPick } from './EmojiPicker';
 import { GifPicker } from '../gif/GifPicker';
@@ -14,7 +14,11 @@ export interface ExpressionPickerProps {
   onClose: () => void;
   /** Fill the parent (the mobile sheet that replaces the keyboard) instead of the fixed desktop card. */
   fill?: boolean;
+  /** The tab to show. Read again whenever it changes, so the composer's Emoji and GIF buttons
+   * switch tabs on a picker that is already open. */
   initialTab?: ExpressionTab;
+  /** The user switched tabs inside the picker, so the composer's buttons can follow. */
+  onTabChange?: (tab: ExpressionTab) => void;
   /** Passed to the EmojiPicker: restrict custom emoji to this space (no Use External Emojis). */
   customEmojiSpaceId?: string;
 }
@@ -34,6 +38,22 @@ export const ExpressionPicker: Component<ExpressionPickerProps> = (props) => {
   const selectTab = (id: ExpressionTab) => {
     if (id === 'gif') setGifActivated(true);
     setTab(id);
+  };
+  // The composer keeps this picker mounted while it stays open, so pressing the GIF button with
+  // the Emoji tab showing (or the reverse) only changes this prop. Reading it once at mount
+  // left the old tab on screen under a button that claimed the other one.
+  createEffect(
+    on(
+      () => props.initialTab,
+      (next) => {
+        if (next) selectTab(next);
+      },
+      { defer: true }
+    )
+  );
+  const pickTab = (id: ExpressionTab) => {
+    selectTab(id);
+    props.onTabChange?.(id);
   };
   let rootEl: HTMLDivElement | undefined;
 
@@ -76,11 +96,11 @@ export const ExpressionPicker: Component<ExpressionPickerProps> = (props) => {
       aria-label={t('composer.expressionPicker')}
     >
       <div class="flex shrink-0 items-center gap-1 border-b border-border/70 p-1.5" role="tablist" aria-label={t('composer.expressionPicker')}>
-        <button type="button" role="tab" aria-selected={tab() === 'emoji'} class={tabBtn('emoji')} onClick={() => selectTab('emoji')}>
+        <button type="button" role="tab" aria-selected={tab() === 'emoji'} class={tabBtn('emoji')} onClick={() => pickTab('emoji')}>
           <i class="fa-solid fa-face-smile" aria-hidden="true" />
           {t('composer.emoji')}
         </button>
-        <button type="button" role="tab" aria-selected={tab() === 'gif'} class={tabBtn('gif')} onClick={() => selectTab('gif')}>
+        <button type="button" role="tab" aria-selected={tab() === 'gif'} class={tabBtn('gif')} onClick={() => pickTab('gif')}>
           <i class="fa-solid fa-film" aria-hidden="true" />
           {t('gif.tab')}
         </button>

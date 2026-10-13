@@ -1,4 +1,4 @@
-import { createStore } from 'solid-js/store';
+import { createStore, produce } from 'solid-js/store';
 import { listSpaceMembers, type SpaceMember } from '../api/spaces';
 import { onStargateEvent } from '../services/stargate/client';
 import { registerUserIdentity } from './federationIds';
@@ -67,9 +67,17 @@ export function loadSpaceMembers(spaceId: string): Promise<void> {
 }
 
 /** After a gateway (re)connect nothing that happened while offline was seen; keep the
- * lists for instant rendering but make the next visit re-fetch them. */
+ * lists for instant rendering but make the next visit re-fetch them.
+ *
+ * `produce`, not `setSpaceMembers('loadedAt', {})`: a store setter handed a plain object
+ * merges it, so an empty one changed nothing and every list stayed "fresh" - a member who
+ * joined during a short disconnect was then left out of an E2EE room's key share. */
 export function markSpaceMembersStale(): void {
-  setSpaceMembers('loadedAt', {});
+  setSpaceMembers(
+    produce((s) => {
+      s.loadedAt = {};
+    })
+  );
 }
 
 export function upsertSpaceMember(spaceId: string, member: SpaceMember): void {
@@ -130,6 +138,16 @@ export function initSpaceMembersHandlers(): () => void {
             : undefined,
         joined_at: typeof d.joined_at === 'string' ? d.joined_at : new Date().toISOString(),
         ...(roles ? { roles } : {}),
+        // Shaped like a listed member: a newcomer from another instance needs home_domain and
+        // origin_id for the E2EE engine to address their devices (upsertSpaceMember registers
+        // them) - without them this room's keys went to an identity with no devices - and the
+        // rest is what their handle, BOT tag, badges and pronouns render from.
+        ...(typeof d.pronouns === 'string' && d.pronouns ? { pronouns: d.pronouns } : {}),
+        ...(typeof d.public_flags === 'number' ? { public_flags: d.public_flags } : {}),
+        ...(d.bot === true ? { bot: true } : {}),
+        ...(d.system === true ? { system: true } : {}),
+        ...(typeof d.home_domain === 'string' && d.home_domain ? { home_domain: d.home_domain } : {}),
+        ...(d.origin_id != null && d.origin_id !== '' ? { origin_id: String(d.origin_id) } : {}),
       };
       upsertSpaceMember(spaceId, member);
       if (member.presence?.status) setUserPresence(member.id, member.presence);

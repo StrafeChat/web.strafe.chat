@@ -198,6 +198,10 @@ export const VoiceStage: Component<VoiceStageProps> = (props) => {
 
   const s = () => voice.session;
   const micOff = () => s().selfMute || s().selfDeaf || s().serverMute || s().suppress;
+  // These controls replace Join the moment a join starts, but camera and screen wait for
+  // the call's frame encryption: until it is on, anything published would go out
+  // unencrypted (the store refuses it too).
+  const videoReady = () => s().status !== 'connecting' && s().encrypted;
   /** Connected participants we don't hold a media key for yet - their audio and video
    * can't be decrypted until their key arrives, which is normally a moment. */
   const unkeyed = createMemo(() => {
@@ -400,7 +404,7 @@ export const VoiceStage: Component<VoiceStageProps> = (props) => {
               class={`${controlBase} ${s().camera ? controlOn : controlIdle}`}
               aria-pressed={s().camera}
               aria-label={s().camera ? t('voice.cameraOff') : t('voice.cameraOn')}
-              disabled={!perms().video}
+              disabled={!perms().video || !videoReady()}
               onClick={toggleCamera}
             >
               <i class={`fa-solid ${s().camera ? 'fa-video' : 'fa-video-slash'}`} aria-hidden="true" />
@@ -412,7 +416,7 @@ export const VoiceStage: Component<VoiceStageProps> = (props) => {
               class={`${controlBase} ${s().screen ? controlOn : controlIdle}`}
               aria-pressed={s().screen}
               aria-label={s().screen ? t('voice.stopSharing') : t('voice.shareScreen')}
-              disabled={!perms().video || typeof navigator.mediaDevices?.getDisplayMedia !== 'function'}
+              disabled={!perms().video || !videoReady() || typeof navigator.mediaDevices?.getDisplayMedia !== 'function'}
               onClick={() => (s().screen ? void setScreenShareEnabled(false) : openScreenShareDialog())}
             >
               <i class="fa-solid fa-display" aria-hidden="true" />

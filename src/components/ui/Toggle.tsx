@@ -21,9 +21,14 @@ export const Toggle: Component<{
         if (!props.disabled) props.onChange(!props.checked);
       }}
     >
+      {/* Anchored to the inline start and moved toward the end, so in a right-to-left
+          language the switch mirrors instead of the thumb sliding out of the track:
+          translate-x is physical, so it has to be negated under rtl. */}
       <span
-        class={`pointer-events-none absolute top-0.5 block size-5 rounded-sm bg-white shadow transition-transform ${
-          props.checked ? 'translate-x-[1.375rem]' : 'translate-x-0.5'
+        class={`pointer-events-none absolute start-0 top-0.5 block size-5 rounded-sm bg-white shadow transition-transform ${
+          props.checked
+            ? 'translate-x-[1.375rem] rtl:-translate-x-[1.375rem]'
+            : 'translate-x-0.5 rtl:-translate-x-0.5'
         }`}
       />
     </button>

@@ -1,14 +1,14 @@
 import type { Component } from 'solid-js';
 import { createSignal, For, Show } from 'solid-js';
-import { useNavigate } from '@solidjs/router';
 import { MessageAvatar } from '../messageList/MessageAvatar';
 import { IconButton } from '../ui/IconButton';
-import { logout } from '../../stores/auth';
+import { signOut as endSession } from '../../stores/auth';
 import { confirmDialog } from '../../stores/confirmDialog';
 import {
   activeDesktopAccountId,
   beginAddDesktopAccount,
-  removeDesktopAccount,
+  desktopAccountsSaved,
+  forgetDesktopAccount,
   sortedDesktopAccounts,
   switchDesktopAccount,
   type DesktopAccount,
@@ -23,13 +23,18 @@ const rowClass =
  * device (on this instance or another), one to add, and a sign-out for the current one.
  */
 export const DesktopAccountSection: Component<{ onClose: () => void }> = (props) => {
-  const navigate = useNavigate();
   const [open, setOpen] = createSignal(false);
+  const [signingOut, setSigningOut] = createSignal(false);
 
-  function signOut() {
+  async function signOut() {
+    if (signingOut()) return;
+    setSigningOut(true);
+    await endSession();
+    // The account leaves the file through the sign-out; let that write land, then a fresh
+    // page, so nothing the previous account had in memory is there for the next one.
+    await desktopAccountsSaved();
     props.onClose();
-    logout();
-    navigate('/login');
+    window.location.assign('/login');
   }
 
   async function remove(acc: DesktopAccount) {
@@ -39,7 +44,8 @@ export const DesktopAccountSection: Component<{ onClose: () => void }> = (props)
       confirmLabel: t('desktop.accounts.remove'),
       tone: 'danger',
     });
-    if (ok) await removeDesktopAccount(acc.id);
+    // Ends the session on its instance too, not just here.
+    if (ok) await forgetDesktopAccount(acc.id);
   }
 
   return (
@@ -103,8 +109,17 @@ export const DesktopAccountSection: Component<{ onClose: () => void }> = (props)
         </div>
       </Show>
 
-      <button type="button" class={`${rowClass} text-destructive hover:bg-destructive/10`} onClick={signOut}>
-        <i class="fa-solid fa-right-from-bracket w-4 text-center" aria-hidden="true" />
+      <button
+        type="button"
+        class={`${rowClass} text-destructive hover:bg-destructive/10 disabled:cursor-wait disabled:opacity-70`}
+        disabled={signingOut()}
+        aria-busy={signingOut()}
+        onClick={() => void signOut()}
+      >
+        <i
+          class={`fa-solid ${signingOut() ? 'fa-circle-notch animate-spin' : 'fa-right-from-bracket'} w-4 text-center`}
+          aria-hidden="true"
+        />
         {t('desktop.accounts.signOut')}
       </button>
     </div>

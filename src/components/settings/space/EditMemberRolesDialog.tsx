@@ -74,6 +74,7 @@ export const EditMemberRolesDialog: Component<Props> = (props) => {
                       </Show>
                     </span>
                     <Toggle
+                      label={role.name}
                       checked={picked().has(role.id)}
                       disabled={busy() || locked()}
                       onChange={(on) =>

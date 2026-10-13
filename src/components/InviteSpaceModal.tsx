@@ -6,6 +6,7 @@ import { ResponsiveDialog } from './ui/ResponsiveDialog';
 import { FieldError, fieldLabelClass } from './ui/Input';
 import { appDialogActions } from '../theme/appChrome';
 import { t } from '../i18n';
+import { publicWebOrigin } from '../lib/runtimeConfig';
 
 interface InviteSpaceModalProps {
   open: boolean;
@@ -64,7 +65,8 @@ export const InviteSpaceModal: Component<InviteSpaceModalProps> = (props) => {
     const c = code();
     if (!c) return '';
     if (typeof window === 'undefined') return c;
-    return `${window.location.origin}/invite/${c}`;
+    // The instance's own address: in the desktop app the page's origin is tauri://localhost.
+    return `${publicWebOrigin()}/invite/${c}`;
   }
 
   async function handleCopy() {

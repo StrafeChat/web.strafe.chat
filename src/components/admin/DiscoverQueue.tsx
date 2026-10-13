@@ -12,7 +12,7 @@ import { ResponsiveDialog } from '../ui/ResponsiveDialog';
 import { Textarea } from '../ui/Textarea';
 import { MessageAvatar } from '../messageList/MessageAvatar';
 import { AdminFilterTabs } from './AdminTabs';
-import { AdminListSkeleton } from './AdminLoading';
+import { AdminListSkeleton, AdminLoadFailed, loadFailed, settledValue } from './AdminLoading';
 import { confirmDialog } from '../../stores/confirmDialog';
 import { settingsRowShell } from '../settings/settingsChrome';
 import { appDialogActions, zLayer } from '../../theme/appChrome';
@@ -29,7 +29,8 @@ const avatarOf = (e: DiscoverEntry) => e.space?.icon ?? e.bot?.bot?.avatar ?? e.
  */
 export const DiscoverQueue: Component<{ onOpenUser: (id: string) => void; onOpenSpace: (id: string) => void }> = (props) => {
   const [status, setStatus] = createSignal<DiscoverStatus>('pending');
-  const [rows, { refetch }] = createResource(status, (s) => listDiscoverQueue(s));
+  const [rowsRes, { refetch }] = createResource(status, (s) => listDiscoverQueue(s));
+  const rows = () => settledValue(rowsRes);
   const [declining, setDeclining] = createSignal<DiscoverEntry | null>(null);
   const [note, setNote] = createSignal('');
   const [busy, setBusy] = createSignal(false);
@@ -82,7 +83,10 @@ export const DiscoverQueue: Component<{ onOpenUser: (id: string) => void; onOpen
       <Show when={error()}>
         <p class="text-sm text-destructive" role="alert">{error()}</p>
       </Show>
-      <Show when={rows()} fallback={<AdminListSkeleton rows={5} />}>
+      <Show
+        when={rows()}
+        fallback={loadFailed(rowsRes) ? <AdminLoadFailed onRetry={() => void refetch()} /> : <AdminListSkeleton rows={5} />}
+      >
         {(list) => (
           <Show when={list().length > 0} fallback={<EmptyState icon="fa-compass" title={t('admin.discover.empty')} size="inline" />}>
             <div class="space-y-1.5">

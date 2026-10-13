@@ -27,14 +27,14 @@ import { t } from '../../i18n';
 const iconSize = 24;
 
 const HomeIcon = () => (
-  <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+  <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
     <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" />
     <polyline points="9 22 9 12 15 12 15 22" />
   </svg>
 );
 
 const PlusIcon = () => (
-  <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+  <svg width={iconSize} height={iconSize} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true">
     <line x1="12" y1="5" x2="12" y2="19" />
     <line x1="5" y1="12" x2="19" y2="12" />
   </svg>
@@ -73,6 +73,10 @@ const SpaceIcon: Component<SpaceIconProps> = (props) => {
   const active = () => (props.active ? 'rounded-[16px]' : '');
   const hasUnread = () => (props.unreadCount ?? 0) > 0;
   const hasMention = () => (props.mentionCount ?? 0) > 0;
+  // The icon is a picture with alt="" (or two letters) and the name lives only in the wrapping
+  // tooltip, which assistive tech does not read - so name the control itself, count included.
+  const ariaLabel = () =>
+    hasMention() ? t('nav.railItemMentions', { name: props.name, count: props.mentionCount ?? 0 }) : props.name;
   const content = (
     <>
       {/* Clip layer: rounds the icon image to the squircle, following the button's animated
@@ -107,7 +111,11 @@ const SpaceIcon: Component<SpaceIconProps> = (props) => {
       <Show
         when={props.href}
         fallback={
-          <button type="button" class={`relative ${base} ${active()} bg-primary/30 hover:bg-primary/40`}>
+          <button
+            type="button"
+            aria-label={ariaLabel()}
+            class={`relative ${base} ${active()} bg-primary/30 hover:bg-primary/40`}
+          >
             {content}
           </button>
         }
@@ -115,6 +123,7 @@ const SpaceIcon: Component<SpaceIconProps> = (props) => {
         {(href) => (
           <A
             href={href()}
+            aria-label={ariaLabel()}
             class={`relative ${base} ${active()} bg-primary/30 hover:bg-primary/40`}
             onContextMenu={(e) => props.onContextMenu?.(e)}
           >
@@ -140,6 +149,8 @@ const DmRailIcon: Component<DmRailIconProps> = (props) => {
   const other = () => props.room.participants?.find((p) => p.id !== uid());
   const name = () => roomDisplayName(props.room, uid());
   const hasUnread = () => props.unread > 0;
+  // Same as SpaceIcon: the avatar has alt="" and the tooltip is not read out.
+  const ariaLabel = () => (hasUnread() ? t('nav.railItemUnread', { name: name(), count: props.unread }) : name());
   const base = 'relative flex items-center justify-center size-12 rounded-full transition-all duration-200';
   const dotClass = () =>
     hasUnread() && !props.active
@@ -152,6 +163,7 @@ const DmRailIcon: Component<DmRailIconProps> = (props) => {
       </Show>
       <A
         href={`/rooms/${props.room.id}`}
+        aria-label={ariaLabel()}
         class={`${base} ${props.active ? 'ring-2 ring-primary/50' : 'hover:ring-2 hover:ring-primary/30'}`}
       >
         <Show
@@ -357,6 +369,7 @@ export const SpaceBar: Component = () => {
           </Show>
           <A
             href={lastVisited.path()}
+            aria-label={t('nav.privateMessages')}
             class={`relative flex items-center justify-center size-12 transition-all duration-200 ${
               isHomeAppActive()
                 ? 'text-foreground bg-primary/30 rounded-[16px]'
@@ -409,6 +422,7 @@ export const SpaceBar: Component = () => {
           <div class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full bg-foreground opacity-0 transition-opacity duration-200 group-hover:opacity-100 pointer-events-none" />
           <button
             type="button"
+            aria-label={t('space.addSpace')}
             class="relative flex items-center justify-center size-12 rounded-[24px] text-muted-foreground hover:text-foreground hover:bg-primary/20 hover:rounded-[16px] transition-all duration-200"
             onClick={() => setShowCreateSpace(true)}
           >

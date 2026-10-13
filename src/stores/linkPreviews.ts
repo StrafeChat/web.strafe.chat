@@ -14,7 +14,7 @@
  *    client does the waiting.)
  */
 
-import { createStore } from 'solid-js/store';
+import { createStore, reconcile } from 'solid-js/store';
 import { fetchUnfurl, type LinkMetadata } from '../api/unfurl';
 
 export type LinkPreviewStatus = 'loading' | 'ok' | 'empty' | 'error';
@@ -88,6 +88,9 @@ function hasContent(m: LinkMetadata): boolean {
 }
 
 const inFlight = new Map<string, Promise<void>>();
+/** Bumped by clearLinkPreviews, so a fetch that answers after a sign-out is dropped rather
+ * than written back into the cache it was cleared from. */
+let generation = 0;
 
 /**
  * Fetch (once) the preview for a URL; components read linkPreviews.byUrl[url] reactively.
@@ -99,21 +102,47 @@ export function ensureLinkPreview(url: string): Promise<void> {
   const pending = inFlight.get(url);
   if (pending) return pending;
   setLinkPreviews('byUrl', url, { status: 'loading' });
+  const gen = generation;
   const p = fetchUnfurl(url)
     .then((data) => {
+      if (gen !== generation) return;
       const status = hasContent(data) ? 'ok' : 'empty';
       setLinkPreviews('byUrl', url, { status, data });
       persisted[url] = { status, data: status === 'ok' ? data : undefined, ts: Date.now() };
       schedulePersist();
     })
     .catch(() => {
+      if (gen !== generation) return;
       setLinkPreviews('byUrl', url, { status: 'error' });
       persisted[url] = { status: 'error', ts: Date.now() };
       schedulePersist();
     })
-    .finally(() => inFlight.delete(url));
+    .finally(() => {
+      // Only our own entry: after a clear, a newer fetch for the same URL may hold the slot.
+      if (inFlight.get(url) === p) inFlight.delete(url);
+    });
   inFlight.set(url, p);
   return p;
+}
+
+/**
+ * Forget every preview, in memory and in localStorage: on sign-out, since the cache lists the
+ * links (and page titles) from the account's conversations, encrypted rooms included.
+ */
+export function clearLinkPreviews(): void {
+  generation++;
+  inFlight.clear();
+  if (persistTimer) {
+    clearTimeout(persistTimer);
+    persistTimer = null;
+  }
+  for (const url of Object.keys(persisted)) delete persisted[url];
+  setLinkPreviews('byUrl', reconcile({}));
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // Storage unavailable: nothing was persisted either.
+  }
 }
 
 /**

@@ -77,7 +77,8 @@ export function createAttachmentDraft(opts: { maxFiles?: number; maxBytes?: numb
   }
 
   /** Hand the queued files off (to sendMessage) and reset. Preview URLs are NOT revoked
-   * here - the optimistic message keeps showing them until the upload lands. */
+   * here - they go with the files: the sent message keeps showing them and the messages
+   * store revokes them once no loaded message does, or a failed send restores them here. */
   function take(): PendingAttachment[] {
     const list = items();
     setItems([]);

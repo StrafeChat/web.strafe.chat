@@ -95,6 +95,11 @@ export const ScreenShareDialog: Component = () => {
   // A memo, so moving between connecting, connected and reconnecting while the dialog is open
   // is not an open/close: the source list and the choice stay put.
   const shown = createMemo(() => open() && voice.session.status !== 'idle');
+  // A dialog left open when the call ended is closed with it. Merely hidden, it came back on
+  // its own during the next call's connecting phase.
+  createEffect(() => {
+    if (open() && voice.session.status === 'idle') setOpen(false);
+  });
 
   // The app's own picker, for when the Electron shell leaves the choice to us (X11). On
   // Wayland the desktop portal asks instead, and a browser or the Tauri app shows the

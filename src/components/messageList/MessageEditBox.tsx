@@ -57,6 +57,10 @@ export const MessageEditBox: Component<MessageEditBoxProps> = (props) => {
           grow();
         }}
         onKeyDown={(e) => {
+          // While an input method is composing, Enter commits its candidate and Escape cancels
+          // it - neither is meant to save or throw away the edit. Safari reports that Enter as
+          // keyCode 229 rather than isComposing.
+          if (e.isComposing || e.keyCode === 229) return;
           if (e.key === 'Escape') {
             e.preventDefault();
             props.onCancel();

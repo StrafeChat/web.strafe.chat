@@ -1,5 +1,5 @@
 import { createSignal, onCleanup, onMount, Show } from 'solid-js';
-import { useNavigate, A } from '@solidjs/router';
+import { useNavigate, useSearchParams, A } from '@solidjs/router';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '../components/ui/Card';
 import { Button } from '../components/ui/Button';
 import { Input } from '../components/ui/Input';
@@ -18,6 +18,7 @@ import {
 import { AuthBrandMark } from '../components/auth/AuthBrandMark';
 import { FormApiErrors } from '../components/auth/FormApiErrors';
 import { CaptchaWidget } from '../components/auth/CaptchaWidget';
+import { redirectQuery, safeRedirectPath } from '../components/auth/authRedirect';
 import { instance, loadInstanceInfo } from '../stores/instance';
 import { isDesktop } from '../desktop/env';
 import { getDesktopInstance } from '../desktop/instanceOverride';
@@ -48,6 +49,13 @@ function isAtLeastAge(dob: Date, years: number) {
 export default function Register() {
   const [t] = useReactiveTranslate();
   const navigate = useNavigate();
+  // ?redirect=<path> from the sign-in page, handed back to it so the person still lands where
+  // they were going (an invite, the OAuth consent page) once the new account signs in.
+  const [params] = useSearchParams<{ redirect?: string }>();
+  const loginHref = (extra?: string) => {
+    const q = [extra, redirectQuery(safeRedirectPath(params.redirect))].filter(Boolean).join('&');
+    return q ? `/login?${q}` : '/login';
+  };
   // 3 is "check your inbox": shown instead of the login redirect when the instance wants
   // the address verified before the first sign-in.
   const [step, setStep] = createSignal<1 | 2 | 3>(1);
@@ -214,7 +222,7 @@ export default function Register() {
         setStep(3);
         return;
       }
-      navigate('/login?registered=1', { replace: true });
+      navigate(loginHref('registered=1'), { replace: true });
     } catch (err) {
       setErrorLines(translateCaughtApiError(err, t));
       // A token is single-use: whatever went wrong, the old one can't be replayed, so
@@ -271,7 +279,7 @@ export default function Register() {
                   {t('auth.register.next')}
                 </Button>
                 <A
-                  href="/login"
+                  href={loginHref()}
                   class="text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 text-start rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0"
                 >
                   {t('auth.register.signInLink')}
@@ -362,7 +370,7 @@ export default function Register() {
                   {t('auth.register.back')}
                 </Button>
                 <A
-                  href="/login"
+                  href={loginHref()}
                   class="text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 text-start rounded-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-0"
                 >
                   {t('auth.register.signInLink')}
@@ -381,7 +389,7 @@ export default function Register() {
               </div>
             </CardContent>
             <CardFooter class={authCardFooterClass}>
-              <A href="/login" class={authPrimaryLinkClass}>
+              <A href={loginHref()} class={authPrimaryLinkClass}>
                 {t('auth.register.verify.goToLogin')}
               </A>
             </CardFooter>

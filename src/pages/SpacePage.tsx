@@ -36,7 +36,7 @@ import {
   type DecryptedMessage,
 } from '../stores/messages';
 import { rooms, addOrUpdateRoom } from '../stores/rooms';
-import type { Room } from '../api/rooms';
+import { spaceRoomToRoom } from '../stores/spaceRoomMirror';
 import { subscribe, unsubscribe } from '../services/stargate/client';
 import { sendTyping } from '../api/rooms';
 import { getTypingUserIds, removeTyping } from '../stores/typing';
@@ -81,6 +81,7 @@ import {
 } from '../stores/mobileShellLayout';
 import { buildMentionCatalog, serializeDraft } from '../lib/utils/mentions';
 import type { ReplyTarget, TypingPerson } from '../components/room';
+import { createRoomDrafts } from '../components/room/roomDrafts';
 import {
   canAttachFilesInChannel,
   canSendMessagesInChannel,
@@ -127,35 +128,6 @@ function retryAfterSeconds(err: unknown): number {
  * the server's 5s per-user rate limit (announcements inside it are dropped) and below
  * the client's 10s TTL, so a continuous typist never flickers out. */
 const TYPING_PING_MS = 6000;
-
-/** Convert SpaceRoom to Room so it can be added to rooms store (e.g. for sendMessage).
- * Must carry last_read_message_id/mention_count through: addOrUpdateRoom unconditionally
- * re-syncs readState from whatever Room it's given (setReadStateFromRoom does no merging),
- * and this conversion runs on every view of a text channel, not just once - dropping these
- * fields silently reset the real read cursor to null on every single visit, which is what
- * made the NEW divider "always come back" in space channels no matter how much was read. */
-function spaceRoomToRoom(r: SpaceRoom, spaceId: string): Room {
-  return {
-    id: r.id,
-    type: r.type,
-    name: r.name,
-    topic: r.topic,
-    position: r.position,
-    space_id: spaceId,
-    parent_id: r.parent_id,
-    last_message_id: r.last_message_id,
-    last_read_message_id: r.last_read_message_id,
-    mention_count: r.mention_count,
-    // sendMessage/editMessage read this off the rooms-store copy to decide between the
-    // plaintext and Megolm paths - dropping it would silently send every space message
-    // as plaintext and get it rejected by the server for an E2EE room.
-    e2ee_enabled: r.e2ee_enabled,
-    created_at: r.created_at,
-    updated_at: r.updated_at,
-    recipients: [],
-    participants: [],
-  };
-}
 
 const SpacePage: Component = () => {
   const params = useParams<{ spaceId: string; roomId?: string }>();
@@ -208,7 +180,9 @@ const SpacePage: Component = () => {
   // rooms-store copy), not the room object: updateSpaceRoomLastMessage replaces the
   // SpaceRoom object on every incoming message, and re-running this per message pushed the
   // page-load read snapshot back into the store each time (addOrUpdateRoom syncs read
-  // state), fighting the live viewport ack.
+  // state), fighting the live viewport ack. For the same reason the copy must carry the read
+  // cursor and mention count (spaceRoomToRoom does): addOrUpdateRoom re-syncs read state from
+  // whatever it is given, and a copy without them reset the cursor on every visit.
   //
   // The effect tracks currentRoom() so a room or E2EE-flag change still re-runs it, then
   // compares a joined key before doing anything - `on` cannot do that comparison for us, it
@@ -240,6 +214,17 @@ const SpacePage: Component = () => {
 
   const [inputRef, setInputRef] = createSignal<HTMLTextAreaElement | undefined>();
   const [replyToMessageId, setReplyToMessageId] = createSignal<string | null>(null);
+  // This page stays mounted from one room to the next, and from one space to another, so each
+  // room's unsent text, files and reply are swapped out on the way out and back in on return.
+  const roomDrafts = createRoomDrafts({
+    roomId,
+    draft,
+    setDraft,
+    setCursorPos,
+    attachments: attachmentDraft,
+    replyTo: replyToMessageId,
+    setReplyTo: setReplyToMessageId,
+  });
   const [maxMessageIdWhenEntered, setMaxMessageIdWhenEntered] = createSignal<string | null>(null);
   /** Read cursor as it stood the moment we entered - frozen for the whole visit so the NEW
    * divider doesn't computationally vanish as the live cursor advances from viewport-ack
@@ -407,10 +392,9 @@ const SpacePage: Component = () => {
         // which also covers a message sent from another device.
         startSlowmode(id, retryAfterSeconds(err));
         // Give the user their message back to retry rather than silently losing it - and say
-        // why in their language (slowmode, rate limit, automod, verification level).
-        setDraft(raw);
-        attachmentDraft.restore(files);
-        attachmentDraft.setError(translateCaughtApiError(err, t).join(' ') || t('room.sendFailed'));
+        // why in their language (slowmode, rate limit, automod, verification level). It goes
+        // back to the room it was written in, even if that is no longer the one on screen.
+        roomDrafts.restoreFailedSend(id, raw, files, translateCaughtApiError(err, t).join(' ') || t('room.sendFailed'));
       });
   }
 
@@ -1159,6 +1143,7 @@ const SpacePage: Component = () => {
         starter={createThreadFor()?.starter ?? null}
         allowPrivate={canCreatePrivateThreads()}
         privateDefault={createThreadFor()?.privateDefault}
+        encrypted={currentRoom()?.e2ee_enabled === true}
         onClose={() => setCreateThreadFor(null)}
         onCreated={openThread}
       />
@@ -1240,6 +1225,9 @@ const SpacePage: Component = () => {
                 />
               </Show>
               <RoomComposerDock onHeightChange={setComposerHeight}>
+              {/* Keyed on the room so the composer's own state (a voice recording in progress, an
+                  open picker, the completion list) ends with the room instead of following you. */}
+              <Show when={roomId()} keyed>
               <RoomMessageInput
                 draft={draft()}
                 onInput={onInput}
@@ -1261,7 +1249,7 @@ const SpacePage: Component = () => {
                 mentionCatalog={mentionCatalog()}
                 replyTo={canSendMessages() ? replyTarget() : null}
                 attachments={attachmentDraft.items()}
-                onAddFiles={canAttachFiles() ? (files) => void attachmentDraft.addFiles(files) : undefined}
+                onAddFiles={canAttachFiles() ? (files) => void roomDrafts.addFiles(files) : undefined}
                 onRemoveAttachment={attachmentDraft.remove}
                 attachmentError={attachmentDraft.error()}
                 customEmojis={allCustomEmojis()}
@@ -1269,6 +1257,7 @@ const SpacePage: Component = () => {
                 noSendMessage={canSendMessages() ? verificationNotice() : isThread() && currentRoom()?.thread?.locked ? t('threads.lockedNotice') : t('space.noSendPermission')}
                 onSendGif={handleSendGif}
               />
+              </Show>
               </RoomComposerDock>
             </div>
             {/* Tapping the chat closes the swiped-in member drawer, the way any drawer

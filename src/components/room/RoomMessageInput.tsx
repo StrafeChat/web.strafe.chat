@@ -247,6 +247,12 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
   const [voiceError, setVoiceError] = createSignal('');
   let recorder: VoiceRecorderHandle | null = null;
   let recordTimer: number | null = null;
+  /** Between the mic click and the recorder actually starting (the permission prompt). The
+   * page stays clickable meanwhile, so without this a second click started a second recorder
+   * that nothing ever stopped - a live microphone with no UI until the page was reloaded. */
+  const [startingRecording, setStartingRecording] = createSignal(false);
+  /** Set once the composer is gone: a recorder that finishes starting after that is let go. */
+  let disposed = false;
 
   function clearRecordTimer() {
     if (recordTimer !== null) {
@@ -271,19 +277,30 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
   }
 
   async function beginRecording() {
-    if (recording() || props.disabled) return;
+    if (recording() || startingRecording() || props.disabled) return;
     setVoiceError('');
+    setStartingRecording(true);
     let handle: VoiceRecorderHandle;
     try {
       handle = await startVoiceRecording();
     } catch (err) {
-      setVoiceError(voiceErrorKey(err));
+      if (!disposed) setVoiceError(voiceErrorKey(err));
+      return;
+    } finally {
+      setStartingRecording(false);
+    }
+    // The composer went away (the room was left) while the permission prompt was up: there is
+    // no UI left to stop this recorder from, so release the microphone now. Likewise if one is
+    // somehow already running - this handle would replace it and leave it unstoppable.
+    if (disposed || recorder) {
+      handle.cancel();
       return;
     }
     recorder = handle;
     setRecording(true);
     setVoiceLevels([]);
     setVoiceElapsedMs(0);
+    clearRecordTimer();
     // Poll rather than push: the recorder is deliberately Solid-free, and a 100ms tick is
     // smooth enough for a waveform that grows 72 slots over minutes.
     recordTimer = window.setInterval(() => {
@@ -305,6 +322,9 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
     setVoiceLevels([]);
     setVoiceElapsedMs(0);
     const clip = await handle.stop();
+    // Left the room while the clip was being finalised: it belongs to that room's composer,
+    // which is gone, not to whichever room is on screen now.
+    if (disposed) return;
     // A clip shorter than the floor is a mis-click, not a message.
     if (!clip) {
       setVoiceError(t('attachments.voice.tooShort'));
@@ -324,6 +344,7 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
 
   // Never leave the microphone running if the composer goes away mid-recording.
   onCleanup(() => {
+    disposed = true;
     if (recorder) cancelRecording();
   });
 
@@ -380,7 +401,7 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
           kind: 'user',
           key: `user:${p.id}`,
           label: name,
-          sublabel: isSelf ? t('presence.you') : `@${username}`,
+          sublabel: isSelf ? t('common.you') : `@${username}`,
           insertText: `@${username} `,
           participant: p,
         });
@@ -445,6 +466,10 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
   };
 
   function handleKeyDown(e: KeyboardEvent) {
+    // Keys pressed while an input method (Japanese, Chinese, Korean...) is composing belong to
+    // it: the Enter that commits a candidate must not also send the half-written message or
+    // pick a completion. Safari reports that Enter as keyCode 229 rather than isComposing.
+    if (e.isComposing || e.keyCode === 229) return;
     const state = completion();
     if (state) {
       if (e.key === 'ArrowDown') {
@@ -506,6 +531,44 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
     e.preventDefault();
     props.onAddFiles(files);
   }
+
+  // Files dropped anywhere else in the window come here too, the way Discord takes a drop over
+  // the whole conversation. Only the composer strip used to accept them; a file let go over
+  // the message list fell through to the browser, which opened it in place of the app and
+  // unloaded the page, draft and queued attachments with it.
+  onMount(() => {
+    const carriesFiles = (e: DragEvent) => !!e.dataTransfer?.types.includes('Files');
+    // A modal over the room (settings, a confirm, the image viewer) is not this conversation,
+    // so a drop on it is refused rather than quietly queued behind it.
+    // Nor does a composer that is not shown (no permission to send, a locked thread) take one:
+    // the files would sit in a queue nobody can see or send.
+    const accepting = () =>
+      !!props.onAddFiles &&
+      !props.disabled &&
+      !props.noSendMessage &&
+      !document.querySelector('[data-modal], [aria-modal="true"]');
+    const onWindowDragOver = (e: DragEvent) => {
+      // Something nearer the pointer (the composer strip itself) has already taken it.
+      if (!carriesFiles(e) || e.defaultPrevented) return;
+      // Cancelling dragover is what stops the browser from opening the file; 'none' then
+      // refuses the drop outright when this composer cannot take it.
+      e.preventDefault();
+      if (e.dataTransfer) e.dataTransfer.dropEffect = accepting() ? 'copy' : 'none';
+    };
+    const onWindowDrop = (e: DragEvent) => {
+      if (!carriesFiles(e) || e.defaultPrevented) return;
+      e.preventDefault();
+      if (!accepting()) return;
+      const files = [...(e.dataTransfer?.files ?? [])];
+      if (files.length) props.onAddFiles?.(files);
+    };
+    window.addEventListener('dragover', onWindowDragOver);
+    window.addEventListener('drop', onWindowDrop);
+    onCleanup(() => {
+      window.removeEventListener('dragover', onWindowDragOver);
+      window.removeEventListener('drop', onWindowDrop);
+    });
+  });
 
   const tokenClass = (kind: string): string => {
     switch (kind) {
@@ -813,7 +876,7 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
                       icon="fa-solid fa-microphone"
                       label={t('composer.recordVoice')}
                       title={isVoiceRecordingSupported() ? t('composer.recordVoice') : t('composer.voiceUnavailable')}
-                      disabled={props.disabled}
+                      disabled={props.disabled || startingRecording()}
                       data-expr-toggle=""
                       onClick={() => void beginRecording()}
                     />
@@ -850,6 +913,7 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
                   >
                     <ExpressionPicker
                       initialTab={pickerTab()}
+                      onTabChange={setPickerTab}
                       onClose={() => setPickerOpen(false)}
                       onPickEmoji={handlePickEmoji}
                       onPickGif={handlePickGif}
@@ -951,6 +1015,7 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
               <ExpressionPicker
                 fill
                 initialTab={pickerTab()}
+                onTabChange={setPickerTab}
                 onClose={() => setPickerOpen(false)}
                 onPickEmoji={handlePickEmoji}
                 onPickGif={handlePickGif}

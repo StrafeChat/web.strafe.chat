@@ -102,6 +102,43 @@ export function cdnUrl(): string {
   return 'http://localhost:4010';
 }
 
+/**
+ * Where an instance's web client lives, given its API. In the standard deployment one host
+ * serves both (`<domain>/api` beside the client at `<domain>/`, see deploy/Caddyfile), so an
+ * API ending in /api names the client's origin; any other layout gets `fallback`.
+ */
+export function webOriginForApi(api: string, fallback: string): string {
+  api = trimSlash(api);
+  if (api.endsWith('/api')) {
+    try {
+      return new URL(api).origin;
+    } catch {
+      /* not a URL: the fallback */
+    }
+  }
+  return trimSlash(fallback);
+}
+
+/**
+ * The origin for links meant to leave the app - invites, room links, bot install links, the
+ * developer docs - so they open for whoever receives them. In a browser that is the page's
+ * own origin, the instance that served it. The desktop app's page is tauri://localhost (or
+ * http://tauri.localhost), which opens nothing anywhere else, so there it is the web client
+ * of the instance in use. Navigation inside the app keeps `window.location.origin`.
+ */
+export function publicWebOrigin(): string {
+  if (typeof window === 'undefined') return '';
+  if (isDesktop()) {
+    const inst = getDesktopInstance();
+    if (inst) {
+      if (typeof inst.webOrigin === 'string' && /^https?:\/\//i.test(inst.webOrigin)) return trimSlash(inst.webOrigin);
+      // Saved before the instance's web origin was recorded.
+      return webOriginForApi(inst.apiUrl, `https://${inst.domain}`);
+    }
+  }
+  return window.location.origin;
+}
+
 /** API key for a GIF provider, from runtime config or a VITE_ env fallback (dev). */
 export function giphyApiKey(): string | undefined {
   return runtime().giphyApiKey || (import.meta.env.VITE_GIPHY_API_KEY as string | undefined) || undefined;

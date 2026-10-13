@@ -28,6 +28,12 @@ export interface DecryptedToDeviceEventInfo {
   type: string;
   /** Local user id of the sending device's owner. */
   senderUserId: string;
+  /**
+   * The same sender as the engine names them (@origin_id:home_domain). The local id above
+   * goes through the registry, which falls back to the bare origin id for someone this
+   * client has never seen - so a check that has to tell people apart compares this one.
+   */
+  senderFid: string;
   senderDeviceId?: string;
   /** Whether that device is verified out of band (safety numbers). */
   senderVerified: boolean;
@@ -56,9 +62,11 @@ function dispatchDecrypted(processed: unknown[]): void {
     }
     if (typeof raw.type !== 'string') continue;
     const info = event.encryptionInfo;
+    const senderFid = info.sender.toString();
     const decoded: DecryptedToDeviceEventInfo = {
       type: raw.type,
-      senderUserId: fromMatrixUserId(info.sender.toString()),
+      senderUserId: fromMatrixUserId(senderFid),
+      senderFid,
       senderDeviceId: info.senderDevice?.toString(),
       senderVerified: info.isSenderVerified(),
       content: raw.content ?? {},

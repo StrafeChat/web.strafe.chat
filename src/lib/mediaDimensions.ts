@@ -110,3 +110,28 @@ export function hasRecentMediaFailure(url: string | undefined): boolean {
   }
   return true;
 }
+
+/**
+ * Forget every remembered URL, in memory and on disk. Called on sign-out: the keys are the
+ * image, video and attachment URLs from this account's conversations, encrypted rooms
+ * included, and they are not for whoever signs in next. The pending writes go too, or one
+ * could land after the clear and put the list back.
+ */
+export function clearMediaDimensions(): void {
+  cache.clear();
+  failed.clear();
+  if (persistTimer) {
+    clearTimeout(persistTimer);
+    persistTimer = null;
+  }
+  if (failedTimer) {
+    clearTimeout(failedTimer);
+    failedTimer = null;
+  }
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+    localStorage.removeItem(FAILED_KEY);
+  } catch {
+    // Storage unavailable: the in-memory copies above are gone, which is all we can reach.
+  }
+}

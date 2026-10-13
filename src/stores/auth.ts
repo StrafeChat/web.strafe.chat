@@ -5,7 +5,13 @@
 
 import { createStore } from 'solid-js/store';
 import { getMe, toAuthUser } from '../api/users';
+import { api } from '../api/client';
 import { ApiError } from '../api/ApiError';
+import { clearLinkPreviews } from './linkPreviews';
+import { clearMediaDimensions } from '../lib/mediaDimensions';
+import { clearRecentEmoji } from '../lib/emoji/recent';
+import { lastVisited } from './lastVisited';
+import { lastSpaceRoom } from './lastSpaceRoom';
 import { setUserPresence } from './presence';
 import { loadRooms, clearRooms, hydrateRoomsFromReady } from './rooms';
 import { loadRelationships, clearRelationships, hydrateRelationshipsFromReady } from './relationships';
@@ -73,6 +79,40 @@ export function logout() {
   cancelRecoveryPrompt();
   // Hang up: the LiveKit connection belongs to the session that just ended.
   clearVoice();
+  // Kept in localStorage for a day, and it lists the links (and their page titles) from this
+  // account's conversations, encrypted rooms included: not for whoever signs in next.
+  clearLinkPreviews();
+  // Likewise the media-size and failed-media caches, keyed by the URLs of the images, videos
+  // and attachments in those conversations.
+  clearMediaDimensions();
+  // And where it was last (a PM room, a room in each of its spaces) and its recent custom emoji.
+  lastVisited.clear();
+  lastSpaceRoom.clear();
+  clearRecentEmoji();
+}
+
+/** How long signing out waits for the instance to confirm before going ahead anyway. */
+const SIGN_OUT_TIMEOUT_MS = 5_000;
+
+/**
+ * The person signing out: end the session on the instance too (POST /auth/logout), then
+ * locally. Without the first step the token stays valid until it expires and anyone holding
+ * a copy of it keeps the account. Offline or slow, the local sign-out still happens; the
+ * server's session then lapses at its expiry. Not for a session the server already ended
+ * (SESSION_REVOKED, a 401) - plain logout() is.
+ *
+ * The caller should leave with a hard navigation afterwards, as SESSION_REVOKED does
+ * (stores/instance.ts): logout() clears the stores that name the account, but the page
+ * still holds the previous account's messages, members and presence in memory.
+ */
+export async function signOut(): Promise<void> {
+  if (auth.token) {
+    // api() reads the token as it is called, so the request keeps it even when the timeout
+    // lets logout() clear it first.
+    const revoke = api('/auth/logout', { method: 'POST' }).catch(() => undefined);
+    await Promise.race([revoke, new Promise<void>((resolve) => setTimeout(resolve, SIGN_OUT_TIMEOUT_MS))]);
+  }
+  logout();
 }
 
 /** Hydrate auth + rooms + relationships + spaces + space_rooms from READY payload. Skips REST. */

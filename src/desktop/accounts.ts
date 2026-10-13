@@ -261,11 +261,50 @@ export async function beginAddDesktopAccount(): Promise<void> {
 }
 
 /** Forget an account on this device. Signing out of the active one goes through the
- * normal sign-out, which lands here through the effect above. */
+ * normal sign-out, which lands here through the effect above. Local only: a saved
+ * account the person removes goes through forgetDesktopAccount, which ends its session. */
 export async function removeDesktopAccount(id: string): Promise<void> {
   setAccounts((list) => list.filter((a) => a.id !== id));
   if (activeId() === id) setActiveId(null);
   await persist();
+}
+
+/** How long removing a saved account waits for its instance to end the session. */
+const REVOKE_TIMEOUT_MS = 5_000;
+
+/**
+ * Remove a saved account that is not the one in use: end its session on its own instance
+ * first (best effort), then forget it here. Dropping the token alone would leave it valid on
+ * that server until it expires. Its own fetch rather than api(), which carries the active
+ * account's token to the active account's instance. The active account is signed out with
+ * stores/auth signOut() instead, and only forgotten here.
+ */
+export async function forgetDesktopAccount(id: string): Promise<void> {
+  const acc = accounts().find((a) => a.id === id);
+  if (!acc) return;
+  if (id !== activeId()) {
+    const ctrl = new AbortController();
+    const timer = setTimeout(() => ctrl.abort(), REVOKE_TIMEOUT_MS);
+    try {
+      await fetch(`${acc.instance.apiUrl.replace(/\/+$/, '')}/auth/logout`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${acc.token}` },
+        signal: ctrl.signal,
+      });
+    } catch {
+      /* offline, or the session is already gone: forget it here all the same */
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+  await removeDesktopAccount(id);
+}
+
+/** Resolves once every change to the accounts file so far has been written: a sign-out waits
+ * for it before reloading, or the account it just removed could come back with the next
+ * start. Already resolved in a browser, where nothing is written. */
+export function desktopAccountsSaved(): Promise<void> {
+  return saving;
 }
 
 /** The instance most recently signed in to, to prefill the instance field. */

@@ -70,7 +70,15 @@ export async function createMicPipeline(opts: MicPipelineOptions): Promise<MicPi
   }
   if (ctx.state === 'suspended') void ctx.resume().catch(() => undefined);
 
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: constraints });
+  let stream: MediaStream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: constraints });
+  } catch (err) {
+    // A denied or failed request must not strand the context made for this pipeline: each
+    // refused microphone test left one more open AudioContext behind.
+    if (ownsContext) void ctx.close().catch(() => undefined);
+    throw err;
+  }
   const source = stream.getAudioTracks()[0];
   if (!source) {
     stream.getTracks().forEach((t) => t.stop());

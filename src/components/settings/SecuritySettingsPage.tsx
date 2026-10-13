@@ -22,6 +22,7 @@ import { ResponsiveDialog } from '../ui/ResponsiveDialog';
 import { settingsRowShell, settingsRowIcon, settingsSectionTitle } from './settingsChrome';
 import { formatDate, t } from '../../i18n';
 import { translateCaughtApiError } from '../../lib/formatApiError';
+import { isDesktop } from '../../desktop/env';
 
 /**
  * Account → Security: TOTP authenticator app, passkeys/security keys, and the recovery
@@ -411,13 +412,19 @@ export const SecuritySettingsPage: Component = () => {
             <section class="space-y-2">
               <div class="flex items-center justify-between px-0.5">
                 <h3 class={settingsSectionTitle}>{t('settings.security.passkeys.sectionTitle')}</h3>
-                <Show when={webauthnSupported()}>
+                {/* Not in the desktop app: a passkey is bound to the instance's domain, and the
+                    app's page is not served from it, so creating one always fails there (sign-in
+                    hides passkeys on desktop for the same reason). Listing and removing still work. */}
+                <Show when={webauthnSupported() && !isDesktop()}>
                   <Button size="sm" variant="outline" loading={passkeyBusy()} onClick={() => void handleAddPasskey()}>
                     <i class="fa-solid fa-plus mr-1.5 text-xs" aria-hidden="true" />
                     {t('settings.security.passkeys.add')}
                   </Button>
                 </Show>
               </div>
+              <Show when={isDesktop()}>
+                <p class="px-0.5 text-xs text-muted-foreground">{t('settings.security.passkeys.desktopUnavailable')}</p>
+              </Show>
               <Show when={passkeyError()}>
                 <p class="px-0.5 text-xs text-destructive">{passkeyError()}</p>
               </Show>
@@ -462,7 +469,8 @@ export const SecuritySettingsPage: Component = () => {
                   <div class="min-w-0 flex-1">
                     <p class="text-sm font-medium text-foreground">{t('settings.security.recoveryCodes.rowTitle')}</p>
                     <p class="text-xs text-muted-foreground">
-                      {t('settings.security.recoveryCodes.remaining', { count: String(s().recovery_codes_remaining) })}
+                      {/* A number, not a string: i18next only picks a plural form for a numeric count. */}
+                      {t('settings.security.recoveryCodes.remaining', { count: s().recovery_codes_remaining })}
                     </p>
                   </div>
                   <Button size="sm" variant="outline" onClick={() => setDialog({ kind: 'regenerateCodes' })}>

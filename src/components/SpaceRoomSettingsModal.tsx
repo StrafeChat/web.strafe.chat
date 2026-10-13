@@ -219,6 +219,13 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
 
   async function saveGeneral() {
     if (!props.room || !props.canManageRooms) return;
+    // Refused here rather than filled in: saving a placeholder renamed the room, for everyone,
+    // to an English word nobody chose.
+    const roomName = name().trim();
+    if (!roomName) {
+      setErr(t('common.nameRequired'));
+      return;
+    }
     const slow = Number.parseInt(slowmode(), 10);
     if (Number.isNaN(slow) || slow < 0) {
       setErr(t('roomSettings.slowmodeInvalid'));
@@ -228,7 +235,7 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
     setErr('');
     try {
       await patchSpaceRoom(props.spaceId, props.room.id, {
-        name: name().trim() || 'unnamed',
+        name: roomName,
         // Voice rooms have no topic or slowmode; sending them unchanged is harmless
         // but pointless.
         ...(isVoiceRoom() ? {} : { topic: topic().trim(), slowmode_seconds: slow }),
@@ -475,6 +482,7 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
                 <Toggle
                   checked={isPrivateCategory()}
                   disabled={!props.canManageRoles || busy()}
+                  label={t('roomSettings.privateSection')}
                   onChange={(v) => void togglePrivateCategory(v)}
                 />
               </div>
@@ -485,7 +493,12 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
                   <p class="text-sm font-medium text-foreground">{t('roomSettings.syncSection')}</p>
                   <p class="text-xs text-muted-foreground">{t('roomSettings.syncSectionHelp')}</p>
                 </div>
-                <Toggle checked={synced()} disabled={!props.canManageRooms || busy()} onChange={(v) => void toggleSync(v)} />
+                <Toggle
+                  checked={synced()}
+                  disabled={!props.canManageRooms || busy()}
+                  label={t('roomSettings.syncSection')}
+                  onChange={(v) => void toggleSync(v)}
+                />
               </div>
               <Show when={syncLocked()}>
                 <p class="rounded-lg border border-primary/30 bg-primary/10 px-3 py-2 text-xs text-foreground/90">

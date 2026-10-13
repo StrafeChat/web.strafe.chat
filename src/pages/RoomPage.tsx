@@ -41,6 +41,7 @@ import { dismissNewHeader, clearNewHeaderDismissed, newHeaderDismissed } from '.
 import { getMessageBodyText, getSenderDisplay, messagePreviewText } from '../components/messageList';
 import { buildMentionCatalog, serializeDraft } from '../lib/utils/mentions';
 import type { ReplyTarget, TypingPerson } from '../components/room';
+import { createRoomDrafts } from '../components/room/roomDrafts';
 import { createComposerAutoFocus } from '../lib/composerFocus';
 import { scrollToMessage } from '../lib/utils/messages';
 import { ensureRoomPins, pinnedMessages } from '../stores/pinnedMessages';
@@ -101,6 +102,17 @@ const RoomPage: Component = () => {
   const [composerHeight, setComposerHeight] = createSignal(0);
   const [renameModalOpen, setRenameModalOpen] = createSignal(false);
   const [replyToMessageId, setReplyToMessageId] = createSignal<string | null>(null);
+  // This page stays mounted from one PM to the next, so each room's unsent text, files and
+  // reply are swapped out on the way out and back in on return.
+  const roomDrafts = createRoomDrafts({
+    roomId: () => params.roomId,
+    draft,
+    setDraft,
+    setCursorPos,
+    attachments: attachmentDraft,
+    replyTo: replyToMessageId,
+    setReplyTo: setReplyToMessageId,
+  });
   const viewportAck = createViewportAck(() => params.roomId);
   let lastTypingSent = 0;
   const room = () => rooms.rooms.find((r) => r.id === params.roomId);
@@ -327,11 +339,13 @@ const RoomPage: Component = () => {
 
   async function handleSubmit(e: Event) {
     e.preventDefault();
+    // Captured: by the time the send settles you may be in another room.
+    const roomId = params.roomId;
     const raw = draft().trim();
     if ((!raw && attachmentDraft.items().length === 0) || isSending()) return;
     // @username / :emoji: in the draft become <@id> / <:name:id> (or the Unicode emoji).
     const text = raw ? serializeDraft(raw, mentionCatalog()) : '';
-    if (auth.user?.id) removeTyping(params.roomId, auth.user.id);
+    if (auth.user?.id) removeTyping(roomId, auth.user.id);
     // Sending ends this typing run; the next keystroke should announce immediately.
     lastTypingSent = 0;
     const files = attachmentDraft.take();
@@ -344,16 +358,15 @@ const RoomPage: Component = () => {
     // the keyboard. Kept for the Enter-key path; the send button also preventDefaults pointerdown.
     inputRef()?.focus();
     try {
-      await sendMessage(params.roomId, text, replyTo, files);
-      dismissNewHeader(params.roomId);
+      await sendMessage(roomId, text, replyTo, files);
+      dismissNewHeader(roomId);
     } catch (err) {
       console.error('Send failed:', err);
       // Give the user their message back to retry rather than silently losing it - and say why
       // (the server's reason: rate limited / slowmode / forbidden), the way SpacePage already does.
-      // Without this a throttled DM just bounced back into the box with no explanation.
-      setDraft(raw);
-      attachmentDraft.restore(files);
-      attachmentDraft.setError(translateCaughtApiError(err, t).join(' ') || t('room.sendFailed'));
+      // Without this a throttled DM just bounced back into the box with no explanation. It goes
+      // back to the room it was written in, even if that is no longer the one on screen.
+      roomDrafts.restoreFailedSend(roomId, raw, files, translateCaughtApiError(err, t).join(' ') || t('room.sendFailed'));
     }
   }
 
@@ -361,9 +374,10 @@ const RoomPage: Component = () => {
    * which the renderer shows inline (see MessageBody / isGifUrl). */
   async function handleSendGif(url: string) {
     if (isSending()) return;
+    const roomId = params.roomId;
     try {
-      await sendMessage(params.roomId, url);
-      dismissNewHeader(params.roomId);
+      await sendMessage(roomId, url);
+      dismissNewHeader(roomId);
     } catch (err) {
       console.error('Send GIF failed:', err);
     }
@@ -546,6 +560,9 @@ const RoomPage: Component = () => {
               <MessageSkeleton />
             </Show>
             <RoomComposerDock onHeightChange={setComposerHeight}>
+            {/* Keyed on the room so the composer's own state (a voice recording in progress, an
+                open picker, the completion list) ends with the room instead of following you. */}
+            <Show when={params.roomId} keyed>
             <RoomMessageInput
               draft={draft()}
               onInput={onInput}
@@ -564,12 +581,13 @@ const RoomPage: Component = () => {
               mentionCatalog={mentionCatalog()}
               replyTo={replyTarget()}
               attachments={attachmentDraft.items()}
-              onAddFiles={(files) => void attachmentDraft.addFiles(files)}
+              onAddFiles={(files) => void roomDrafts.addFiles(files)}
               onRemoveAttachment={attachmentDraft.remove}
               attachmentError={attachmentDraft.error()}
               customEmojis={allCustomEmojis()}
               onSendGif={handleSendGif}
             />
+            </Show>
             </RoomComposerDock>
           </Show>
         </div>

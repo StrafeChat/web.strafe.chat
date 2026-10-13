@@ -117,6 +117,7 @@ export const SpaceSystemPage: Component<Props> = (props) => {
               description={t('spaceSettings.system.joinHint')}
               control={
                 <Toggle
+                  label={t('spaceSettings.system.joinTitle')}
                   checked={(flags() & SYSTEM_FLAG_SUPPRESS_JOIN) === 0}
                   disabled={disabled() || !props.space?.system_room_id}
                   onChange={(on) => setFlag(SYSTEM_FLAG_SUPPRESS_JOIN, !on)}
@@ -129,6 +130,7 @@ export const SpaceSystemPage: Component<Props> = (props) => {
               description={t('spaceSettings.system.leaveHint')}
               control={
                 <Toggle
+                  label={t('spaceSettings.system.leaveTitle')}
                   checked={(flags() & SYSTEM_FLAG_SUPPRESS_LEAVE) === 0}
                   disabled={disabled() || !props.space?.system_room_id}
                   onChange={(on) => setFlag(SYSTEM_FLAG_SUPPRESS_LEAVE, !on)}
@@ -212,6 +214,7 @@ export const SpaceSystemPage: Component<Props> = (props) => {
             description={t('spaceSettings.system.widgetEnableHint')}
             control={
               <Toggle
+                label={t('spaceSettings.system.widgetEnable')}
                 checked={props.space?.widget_enabled === true}
                 disabled={disabled()}
                 onChange={(on) => void patch({ widget_enabled: on })}

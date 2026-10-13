@@ -16,6 +16,7 @@ import {
 import { appMenuPanel } from '../../theme/appChrome';
 import { SearchInput } from '../ui/SearchInput';
 import { Emoji } from './Emoji';
+import { loadRecentEmoji, pushRecentEmoji } from '../../lib/emoji/recent';
 import { t } from '../../i18n';
 
 export type EmojiPick = { unicode: string; custom?: undefined } | { unicode?: undefined; custom: CustomEmoji };
@@ -36,28 +37,6 @@ export interface EmojiPickerProps {
 
 type CategoryId = 'recent' | `space:${string}` | `group:${number}`;
 
-const RECENT_KEY = 'strafe_emoji_recent';
-const RECENT_MAX = 32;
-
-function loadRecent(): string[] {
-  try {
-    const raw = localStorage.getItem(RECENT_KEY);
-    const list = raw ? (JSON.parse(raw) as unknown) : [];
-    return Array.isArray(list) ? list.filter((x): x is string => typeof x === 'string').slice(0, RECENT_MAX) : [];
-  } catch {
-    return [];
-  }
-}
-
-function pushRecent(key: string) {
-  try {
-    const next = [key, ...loadRecent().filter((k) => k !== key)].slice(0, RECENT_MAX);
-    localStorage.setItem(RECENT_KEY, JSON.stringify(next));
-  } catch {
-    // ignore
-  }
-}
-
 type GridItem = { key: string; unicode?: string; entry?: EmojiEntry; custom?: CustomEmoji; label: string };
 
 /**
@@ -70,7 +49,7 @@ export const EmojiPicker: Component<EmojiPickerProps> = (props) => {
   const [query, setQuery] = createSignal('');
   const [category, setCategory] = createSignal<CategoryId>('recent');
   const [hovered, setHovered] = createSignal<GridItem | null>(null);
-  const [recent, setRecent] = createSignal<string[]>(loadRecent());
+  const [recent, setRecent] = createSignal<string[]>(loadRecentEmoji());
   const [toneOpen, setToneOpen] = createSignal(false);
   let rootEl: HTMLDivElement | undefined;
 
@@ -148,13 +127,13 @@ export const EmojiPicker: Component<EmojiPickerProps> = (props) => {
 
   function pick(item: GridItem) {
     if (item.custom) {
-      pushRecent(`c:${item.custom.id}`);
+      pushRecentEmoji(`c:${item.custom.id}`);
       props.onPick({ custom: item.custom });
     } else if (item.entry) {
-      pushRecent(`u:${item.entry.unicode}`);
+      pushRecentEmoji(`u:${item.entry.unicode}`);
       props.onPick({ unicode: item.unicode ?? item.entry.unicode });
     }
-    setRecent(loadRecent());
+    setRecent(loadRecentEmoji());
   }
 
   // Outside click / Escape close the picker - but only when standalone (the reaction picker).

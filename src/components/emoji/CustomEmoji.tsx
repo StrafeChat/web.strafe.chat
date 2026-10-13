@@ -1,6 +1,7 @@
 import type { Component } from 'solid-js';
 import { Show } from 'solid-js';
 import { resolveCustomEmoji } from '../../stores/customEmojis';
+import { t } from '../../i18n';
 
 export interface CustomEmojiProps {
   id: string;
@@ -21,7 +22,7 @@ export const CustomEmoji: Component<CustomEmojiProps> = (props) => {
     <Show
       when={emoji()}
       fallback={
-        <span class={`text-muted-foreground ${props.class ?? ''}`} title="This emoji is no longer available">
+        <span class={`text-muted-foreground ${props.class ?? ''}`} title={t('emoji.unavailable')}>
           :{props.name}:
         </span>
       }

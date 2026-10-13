@@ -1,7 +1,38 @@
-import type { Component } from 'solid-js';
+import type { Component, Resource } from 'solid-js';
 import { For, Show } from 'solid-js';
+import { Button } from '../ui/Button';
+import { EmptyState } from '../ui/EmptyState';
 import { settingsRowShell, settingsSectionTitle } from '../settings/settingsChrome';
 import { t } from '../../i18n';
+
+/**
+ * A resource's value, or undefined once its fetch has failed. Reading a failed resource
+ * rethrows the error, and nothing above the dashboard catches it: the update it happened in
+ * was dropped and the panel sat on its skeleton for good (a 429, a blip, a report id from the
+ * audit log that is gone). Panels read through this and show AdminLoadFailed instead.
+ */
+export function settledValue<T>(r: Resource<T>): T | undefined {
+  return r.state === 'errored' ? undefined : r();
+}
+
+/** Whether a resource failed and is not being fetched again: show AdminLoadFailed. */
+export function loadFailed(r: Resource<unknown>): boolean {
+  return r.state === 'errored';
+}
+
+/** A panel whose data did not load, with a way to try again, in place of its skeleton. */
+export const AdminLoadFailed: Component<{ onRetry: () => void }> = (props) => (
+  <EmptyState
+    icon="fa-solid fa-triangle-exclamation"
+    title={t('admin.loadFailed')}
+    size="inline"
+    action={
+      <Button size="sm" variant="outline" onClick={() => props.onRetry()}>
+        {t('common.retry')}
+      </Button>
+    }
+  />
+);
 
 /**
  * The admin desk's full-page loading state. The gate asks the server for capabilities before

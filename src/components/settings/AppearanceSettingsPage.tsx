@@ -62,6 +62,18 @@ const SettingRow: Component<{ icon: string; title: string; description: string; 
   </div>
 );
 
+/**
+ * The line under a theme's name. A built-in theme's blurb comes from the locale files by its
+ * id, since themes.ts only carries the English; a built-in added without a key falls back to
+ * that English rather than showing the key path. Custom themes have no blurb of their own.
+ */
+function themeKind(th: ThemeDefinition): string {
+  if (!th.builtin) return t('settings.appearance.theme.custom');
+  return t(`settings.appearance.theme.descriptions.${th.id}`, {
+    defaultValue: th.description ?? t('settings.appearance.theme.builtIn'),
+  });
+}
+
 /** Miniature of a theme: canvas, a rail, two text lines and a brand button. */
 const ThemePreview: Component<{ theme: ThemeDefinition }> = (props) => (
   <div
@@ -136,7 +148,7 @@ export const AppearanceSettingsPage: Component = () => {
                       <span class="min-w-0 flex-1">
                         <span class="block truncate text-sm font-semibold text-foreground">{th.name}</span>
                         <span class="block truncate text-[11px] text-muted-foreground">
-                          {th.builtin ? (th.description ?? t('settings.appearance.theme.builtIn')) : t('settings.appearance.theme.custom')} ·{' '}
+                          {themeKind(th)} ·{' '}
                           {th.appearance === 'light' ? t('settings.appearance.theme.light') : t('settings.appearance.theme.dark')}
                         </span>
                       </span>

@@ -77,7 +77,13 @@ export function resetInstanceInfo(): void {
   });
 }
 
-/** Fetch GET / once (idempotent; safe to call from several places). */
+/**
+ * Fetch GET / once (idempotent; safe to call from several places). A failure leaves the info
+ * unloaded rather than marking the defaults as the answer, so the next call asks again - the
+ * E2EE identity is named after this instance's federation domain, and settling for "no
+ * domain" after one failed request (the desktop app starting before the network is up, the
+ * API restarting) provisioned a device under the wrong name for the rest of the session.
+ */
 export function loadInstanceInfo(): Promise<void> {
   if (instance.loaded) return Promise.resolve();
   if (!inflight) {
@@ -116,7 +122,6 @@ export function loadInstanceInfo(): Promise<void> {
       })
       .catch((e) => {
         console.warn('[instance] could not load instance info', e);
-        setInstance('loaded', true);
       })
       .finally(() => {
         inflight = null;

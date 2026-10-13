@@ -237,11 +237,13 @@ export const desktopAutostart = {
 // ---- storage ------------------------------------------------------------------------------------
 
 /**
- * Wipe the webview's IndexedDB for the app origin and relaunch. Under Tauri the shell does it
- * at the next start, before the webview exists, because WebKit's database server crashes on a
- * store it cannot read and takes every in-page deletion down with it (see
- * E2eeEnvironmentModal); the Electron shell clears the origin's storage from its main process
- * and relaunches. Never resolves on success: the process restarts.
+ * Wipe the webview's IndexedDB for the app origin and relaunch. The Electron shell clears the
+ * origin's storage from its main process and relaunches. Under Tauri only the Linux app can:
+ * its shell does it at the next start, before the webview exists, because WebKit's database
+ * server crashes on a store it cannot read and takes every in-page deletion down with it (see
+ * E2eeEnvironmentModal). On Windows and macOS nothing at start-up would honour the request,
+ * so the shell rejects it rather than restart onto the same store; the page deletes its own
+ * store there, as in a browser. Never resolves on success: the process restarts.
  */
 export function wipeWebviewStorageAndRestart(): Promise<void> {
   if (electron) return electron.wipeStorageAndRestart();

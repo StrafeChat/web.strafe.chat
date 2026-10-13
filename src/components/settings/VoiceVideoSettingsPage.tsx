@@ -55,10 +55,19 @@ export const VoiceVideoSettingsPage: Component = () => {
   const [micLevel, setMicLevel] = createSignal(0);
   const [micTesting, setMicTesting] = createSignal(false);
   const [cameraOn, setCameraOn] = createSignal(false);
+  const [cameraStarting, setCameraStarting] = createSignal(false);
   /** The same pipeline a call uses, so the meter shows what others would hear. */
   let mic: MicPipeline | null = null;
   let camStream: MediaStream | null = null;
   let videoEl: HTMLVideoElement | undefined;
+  // Opening a microphone or camera takes a while (a permission prompt, the noise
+  // suppressor loading), and the page can be left or the request superseded meanwhile.
+  // Each start and stop bumps its counter, so a capture that resolves for a start nobody
+  // wants any more is shut straight away - kept, it stayed live (the browser's recording
+  // indicator on) with nothing left that could stop it short of a reload.
+  let disposed = false;
+  let micGen = 0;
+  let camGen = 0;
 
   async function enumerate() {
     if (!supported) return;
@@ -86,6 +95,7 @@ export const VoiceVideoSettingsPage: Component = () => {
   });
 
   onCleanup(() => {
+    disposed = true;
     navigator.mediaDevices?.removeEventListener?.('devicechange', enumerate);
     stopMic();
     stopCamera();
@@ -104,6 +114,7 @@ export const VoiceVideoSettingsPage: Component = () => {
   }
 
   function stopMic() {
+    micGen++;
     mic?.close();
     mic = null;
     setMicTesting(false);
@@ -111,6 +122,7 @@ export const VoiceVideoSettingsPage: Component = () => {
   }
 
   async function startMic() {
+    const gen = ++micGen;
     setPermError('');
     try {
       const pipeline = await createMicPipeline({
@@ -120,8 +132,8 @@ export const VoiceVideoSettingsPage: Component = () => {
         // Map -60..0 dBFS onto 0..100.
         onLevel: (db) => setMicLevel(Math.max(0, Math.min(100, ((db + 60) / 60) * 100))),
       });
-      if (mic) {
-        // Two clicks raced; keep the first.
+      // Left the page, stopped, or a later start (a second click, a settings change) took over.
+      if (disposed || gen !== micGen) {
         pipeline.close();
         return;
       }
@@ -129,6 +141,8 @@ export const VoiceVideoSettingsPage: Component = () => {
       setMicTesting(true);
       await enumerate();
     } catch (e) {
+      // A superseded start's failure is not this test's: the newer one is still running.
+      if (disposed || gen !== micGen) return;
       stopMic();
       setPermError(e instanceof Error && e.name === 'NotAllowedError' ? t('settings.voice.permDenied') : t('settings.voice.micFailed'));
     }
@@ -151,25 +165,41 @@ export const VoiceVideoSettingsPage: Component = () => {
   });
 
   function stopCamera() {
+    camGen++;
     camStream?.getTracks().forEach((tr) => tr.stop());
     camStream = null;
     if (videoEl) videoEl.srcObject = null;
     setCameraOn(false);
+    setCameraStarting(false);
   }
 
   async function startCamera() {
+    const gen = ++camGen;
     setPermError('');
+    setCameraStarting(true);
     try {
-      camStream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints() });
+      const stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints() });
+      if (disposed || gen !== camGen) {
+        stream.getTracks().forEach((tr) => tr.stop());
+        return;
+      }
+      // Never overwrite a running stream: its camera would stay on with no way to stop it.
+      camStream?.getTracks().forEach((tr) => tr.stop());
+      camStream = stream;
       if (videoEl) {
-        videoEl.srcObject = camStream;
+        videoEl.srcObject = stream;
         await videoEl.play().catch(() => undefined);
       }
+      // Stopped while the preview was starting up: stopCamera already released the stream.
+      if (disposed || gen !== camGen) return;
       setCameraOn(true);
       await enumerate();
     } catch (e) {
+      if (disposed || gen !== camGen) return;
       stopCamera();
       setPermError(e instanceof Error && e.name === 'NotAllowedError' ? t('settings.voice.permDenied') : t('settings.voice.cameraFailed'));
+    } finally {
+      if (gen === camGen) setCameraStarting(false);
     }
   }
 
@@ -338,7 +368,13 @@ export const VoiceVideoSettingsPage: Component = () => {
             icon="fa-wand-magic-sparkles"
             title={t('settings.voice.autoSensitivity')}
             description={t('settings.voice.autoSensitivityHint')}
-            control={<Toggle checked={voiceSettings.autoSensitivity} onChange={(on) => setVoiceSettings({ autoSensitivity: on })} />}
+            control={
+              <Toggle
+                label={t('settings.voice.autoSensitivity')}
+                checked={voiceSettings.autoSensitivity}
+                onChange={(on) => setVoiceSettings({ autoSensitivity: on })}
+              />
+            }
           />
           <div class={settingsGroupFrame}>
             <RangeField
@@ -361,7 +397,13 @@ export const VoiceVideoSettingsPage: Component = () => {
             icon="fa-arrows-rotate"
             title={t('settings.voice.echo')}
             description={t('settings.voice.echoHint')}
-            control={<Toggle checked={voiceSettings.echoCancellation} onChange={(on) => setVoiceSettings({ echoCancellation: on })} />}
+            control={
+              <Toggle
+                label={t('settings.voice.echo')}
+                checked={voiceSettings.echoCancellation}
+                onChange={(on) => setVoiceSettings({ echoCancellation: on })}
+              />
+            }
           />
           <Row
             icon="fa-wind"
@@ -385,7 +427,13 @@ export const VoiceVideoSettingsPage: Component = () => {
             icon="fa-gauge-high"
             title={t('settings.voice.gain')}
             description={t('settings.voice.gainHint')}
-            control={<Toggle checked={voiceSettings.autoGainControl} onChange={(on) => setVoiceSettings({ autoGainControl: on })} />}
+            control={
+              <Toggle
+                label={t('settings.voice.gain')}
+                checked={voiceSettings.autoGainControl}
+                onChange={(on) => setVoiceSettings({ autoGainControl: on })}
+              />
+            }
           />
         </div>
       </section>
@@ -423,7 +471,13 @@ export const VoiceVideoSettingsPage: Component = () => {
           icon="fa-left-right"
           title={t('settings.voice.mirror')}
           description={t('settings.voice.mirrorHint')}
-          control={<Toggle checked={voiceSettings.mirrorCamera} onChange={(on) => setVoiceSettings({ mirrorCamera: on })} />}
+          control={
+            <Toggle
+              label={t('settings.voice.mirror')}
+              checked={voiceSettings.mirrorCamera}
+              onChange={(on) => setVoiceSettings({ mirrorCamera: on })}
+            />
+          }
         />
         <div class={`space-y-4 ${settingsGroupFrame}`}>
           <div class="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
@@ -433,7 +487,8 @@ export const VoiceVideoSettingsPage: Component = () => {
               disabled={!supported}
               onValueChange={(v) => {
                 setVoiceSettings({ cameraDeviceId: v });
-                if (cameraOn()) {
+                // A preview still starting is restarted too, or it opens the old camera.
+                if (cameraOn() || cameraStarting()) {
                   stopCamera();
                   void startCamera();
                 }
@@ -442,7 +497,13 @@ export const VoiceVideoSettingsPage: Component = () => {
               <option value="">{t('settings.voice.defaultDevice')}</option>
               <For each={devices().cameras}>{(d) => <option value={d.deviceId}>{deviceLabel(d, t('settings.voice.cameraFallback'))}</option>}</For>
             </Select>
-            <Button size="sm" variant={cameraOn() ? 'destructive' : 'outline'} class="h-10" disabled={!supported} onClick={() => (cameraOn() ? stopCamera() : void startCamera())}>
+            <Button
+              size="sm"
+              variant={cameraOn() ? 'destructive' : 'outline'}
+              class="h-10"
+              disabled={!supported || cameraStarting()}
+              onClick={() => (cameraOn() ? stopCamera() : void startCamera())}
+            >
               <i class={`fa-solid ${cameraOn() ? 'fa-video-slash' : 'fa-video'} text-xs`} aria-hidden="true" />
               {cameraOn() ? t('settings.voice.stopPreview') : t('settings.voice.testVideo')}
             </Button>

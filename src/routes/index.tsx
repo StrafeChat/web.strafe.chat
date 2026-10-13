@@ -32,13 +32,14 @@ import { AppBackground } from '../components/auth/AppBackground';
 import { isDesktop } from '../desktop/env';
 import { DesktopTitleBar } from '../components/desktop/TitleBar';
 import { DesktopUpdateBanner } from '../components/desktop/DesktopUpdateBanner';
+import { t } from '../i18n';
 
 function LoadingScreen() {
   return (
     <div class="min-h-dvh bg-background text-foreground flex items-center justify-center">
       <div class="flex flex-col items-center gap-4">
         <span class="size-8 animate-spin rounded-full border-2 border-primary border-t-transparent" />
-        <p class="text-sm text-muted-foreground">Loading...</p>
+        <p class="text-sm text-muted-foreground">{t('common.loading')}</p>
       </div>
     </div>
   );
@@ -51,13 +52,13 @@ function NotFound() {
     <div class="relative z-10 flex min-h-dvh items-center justify-center p-4 text-foreground">
       <div class={`w-full max-w-sm p-8 text-center ${authGlassSurface}`}>
         <p class="font-brand text-5xl font-extrabold tracking-tight text-primary">404</p>
-        <h1 class="mt-2 text-lg font-semibold text-foreground">Page not found</h1>
-        <p class="mt-1 text-sm text-muted-foreground">That link doesn't go anywhere.</p>
+        <h1 class="mt-2 text-lg font-semibold text-foreground">{t('notFound.title')}</h1>
+        <p class="mt-1 text-sm text-muted-foreground">{t('notFound.body')}</p>
         <A
           href="/"
           class="mt-6 inline-flex h-10 items-center justify-center rounded-lg bg-primary px-4 text-sm font-medium text-primary-foreground shadow-sm transition-colors hover:bg-primary-hover"
         >
-          Go home
+          {t('invite.goHome')}
         </A>
       </div>
     </div>

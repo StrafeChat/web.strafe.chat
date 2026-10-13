@@ -3,7 +3,7 @@ import { createSignal, Show } from 'solid-js';
 import { recoveryPrompt, setRecoveryPrompt } from '../stores/recoveryPrompt';
 import { auth } from '../stores/auth';
 import { forgetLocalDeviceIdentities, resetLocalE2eeStore } from '../lib/e2ee/machine';
-import { isDesktop } from '../desktop/env';
+import { desktopPlatform, desktopShell } from '../desktop/env';
 import { wipeWebviewStorageAndRestart } from '../desktop/native';
 import { ResponsiveDialog } from './ui/ResponsiveDialog';
 import { Button } from './ui/Button';
@@ -16,7 +16,8 @@ import { t } from '../i18n';
  * gives the device a fresh identity - history comes back from the recovery backup).
  */
 export const E2eeEnvironmentModal: Component = () => {
-  const message = () => recoveryPrompt.e2eeEnvironmentError;
+  // Set (to a marker) when Web Crypto is missing; the text shown is always the translated one.
+  const insecure = () => recoveryPrompt.e2eeEnvironmentError;
   const storeError = () => recoveryPrompt.e2eeStoreError;
   const [resetting, setResetting] = createSignal(false);
   const [resetError, setResetError] = createSignal('');
@@ -37,9 +38,14 @@ export const E2eeEnvironmentModal: Component = () => {
     setResetError('');
     setResetting(true);
     try {
-      if (isDesktop()) {
-        // In the app the shell deletes the files at restart: WebKit's database server has
-        // usually crashed on the unreadable store by now, and in-page deletion dies with it.
+      // The shell deletes the files at restart where it can: the Electron shell, and the
+      // Tauri app on Linux, whose WebKit database server has usually crashed on the
+      // unreadable store by now so in-page deletion dies with it. The Tauri app on Windows
+      // and macOS has no such wipe - sent down that path it restarted with the same store,
+      // showed this again and revoked a fresh device on every try - so there, as in a
+      // browser, the page deletes the store itself.
+      const shell = desktopShell();
+      if (shell === 'electron' || (shell === 'tauri' && desktopPlatform() === 'linux')) {
         await forgetLocalDeviceIdentities(userId);
         await wipeWebviewStorageAndRestart();
         return;
@@ -56,13 +62,13 @@ export const E2eeEnvironmentModal: Component = () => {
 
   return (
     <>
-      <Show when={message()}>
+      <Show when={insecure()}>
         <ResponsiveDialog
           size="md"
           zClass={zLayer.critical}
           onClose={dismiss}
           title={t('e2ee.environmentTitle')}
-          description={<span class="whitespace-pre-line">{message()}</span>}
+          description={t('e2ee.environmentBody')}
           icon="fa-solid fa-lock-open"
           tone="warning"
         >

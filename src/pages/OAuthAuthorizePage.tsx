@@ -191,8 +191,10 @@ const OAuthAuthorizePage: Component = () => {
                   <Button
                     class="w-full font-semibold"
                     onClick={() => {
+                      // The same parameter the invite pages use; the sign-in page sends the
+                      // person back here once they are in.
                       const back = encodeURIComponent(window.location.pathname + window.location.search);
-                      window.location.href = `/login?return=${back}`;
+                      window.location.href = `/login?redirect=${back}`;
                     }}
                   >
                     {t('oauth.signIn')}

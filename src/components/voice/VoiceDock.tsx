@@ -61,6 +61,9 @@ export const VoiceDock: Component<VoiceDockProps> = (props) => {
   const spaceName = () => (s().spaceId ? spaces.spaces.find((x) => x.id === s().spaceId)?.name ?? '' : t('nav.privateMessages'));
   const href = () => (s().spaceId ? `/spaces/${s().spaceId}/rooms/${s().roomId}` : `/rooms/${s().roomId}`);
   const perms = createMemo(() => voicePermsFor(auth.user?.id, s().spaceId ?? undefined, s().roomId ?? undefined));
+  // Camera and screen wait for the call's frame encryption: until it is on, anything
+  // published would go out unencrypted (the store refuses it too).
+  const videoReady = () => s().status !== 'connecting' && s().encrypted;
 
   // Everyone *else* in the call. Your own avatar is left out: you are already the user
   // area directly below this, and in a one-to-one call showing yourself back is noise.
@@ -199,7 +202,7 @@ export const VoiceDock: Component<VoiceDockProps> = (props) => {
             type="button"
             class={`${actionPill} ${s().camera ? actionOn : actionIdle}`}
             aria-pressed={s().camera}
-            disabled={!perms().video}
+            disabled={!perms().video || !videoReady()}
             title={s().camera ? t('voice.cameraOff') : t('voice.cameraOn')}
             onClick={toggleCamera}
           >
@@ -210,7 +213,7 @@ export const VoiceDock: Component<VoiceDockProps> = (props) => {
             type="button"
             class={`${actionPill} ${s().screen ? actionOn : actionIdle}`}
             aria-pressed={s().screen}
-            disabled={!perms().video || typeof navigator.mediaDevices?.getDisplayMedia !== 'function'}
+            disabled={!perms().video || !videoReady() || typeof navigator.mediaDevices?.getDisplayMedia !== 'function'}
             title={s().screen ? t('voice.stopSharing') : t('voice.shareScreen')}
             onClick={() => (s().screen ? void setScreenShareEnabled(false) : openScreenShareDialog())}
           >

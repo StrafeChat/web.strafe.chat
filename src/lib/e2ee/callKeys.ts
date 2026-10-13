@@ -31,7 +31,7 @@ import { claimKeys, sendToDevice } from '../../api/devices';
 import { getMachine, getCurrentDeviceId } from './machine';
 import { processOutgoingRequests, onDecryptedToDevice } from './transport';
 import { b64Encode, b64Decode } from './util';
-import { localUserIdFor, localRoomIdFor } from '../../stores/federationIds';
+import { localUserIdFor, localRoomIdFor, sameFederatedUser } from '../../stores/federationIds';
 
 /** 32 bytes of key material; LiveKit runs HKDF over it to derive the frame key. */
 export const MEDIA_KEY_BYTES = 32;
@@ -83,6 +83,22 @@ export function userIdOfIdentity(identity: string): string {
   }
   const dot = identity.indexOf('.');
   return dot > 0 ? identity.slice(0, dot) : identity;
+}
+
+/**
+ * The federated user (@origin:domain) a LiveKit identity belongs to, without guessing. A
+ * federated identity spells it out; a plain "<local id>.<session>" one names someone this
+ * instance has a row for, mapped forward the way keys are encrypted to them. Never the
+ * reverse lookup userIdOfIdentity uses: for an id the registry has not seen it falls back
+ * to the bare origin id, which any instance can make collide with a local user's.
+ */
+function federatedOwnerOfIdentity(identity: string): string | null {
+  if (identity.startsWith('@')) {
+    const dot = identity.lastIndexOf('.');
+    return dot > 0 ? identity.slice(0, dot) : null;
+  }
+  const dot = identity.indexOf('.');
+  return dot > 0 ? toMatrixUserId(identity.slice(0, dot)) : null;
 }
 
 function txnId(): string {
@@ -189,7 +205,11 @@ export function onIncomingMediaKey(handler: (key: IncomingMediaKey) => void): ()
     const keyIndex = typeof c.key_index === 'number' ? c.key_index : -1;
     const rawKey = typeof c.key === 'string' ? c.key : '';
     if (!roomId || !identity || !rawKey || keyIndex < 0 || keyIndex >= MEDIA_KEY_RING_SIZE) return;
-    if (userIdOfIdentity(identity) !== event.senderUserId) {
+    // Compared as federated ids. Comparing local ids let a user on another instance whose
+    // origin id equals one of ours - unknown to the registry, so mapped to that bare id -
+    // install their key for our user's identity and garble that person's media.
+    const owner = federatedOwnerOfIdentity(identity);
+    if (!owner || !sameFederatedUser(owner, event.senderFid)) {
       console.warn('[voice-e2ee] dropping media key claiming an identity its sender does not own', identity);
       return;
     }

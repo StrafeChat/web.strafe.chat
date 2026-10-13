@@ -23,9 +23,14 @@ export const [presence, setPresence] = createStore<PresenceState>({
   byUser: {},
 });
 
-/** Update a user's presence. Called from PRESENCE_UPDATE handler. */
+/** Update a user's presence. Called from PRESENCE_UPDATE handler.
+ *
+ * Always writes both fields: a store setter handed an object merges it into the stored one,
+ * and the server leaves `custom_status` out when it is empty (READY, room participants,
+ * friends, member lists), so a status cleared while this client was offline survived a
+ * reconnect. A key present as undefined is deleted by the merge. */
 export function setUserPresence(userId: string, p: UserPresence): void {
-  setPresence('byUser', userId, p);
+  setPresence('byUser', userId, { status: p.status, custom_status: p.custom_status });
 }
 
 /** True if status indicates user is "visible" (online or idle). */

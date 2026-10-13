@@ -13,9 +13,11 @@ import {
   uploadBotAvatar,
   uploadBotBanner,
   authorizeUrl,
+  shareableAuthorizeUrl,
   scopeKey,
   OAUTH_SCOPES,
   type Application,
+  type AuthorizeUrlOptions,
   type BotProfile,
   type OAuthScope,
 } from '../../api/developers';
@@ -33,6 +35,9 @@ import { MessageAvatar } from '../messageList/MessageAvatar';
 import { settingsGroupFrame, settingsRowIcon, settingsRowShell, settingsSectionTitle } from './settingsChrome';
 import { BotDiscoverSection } from './BotDiscoverSection';
 import { formatDate, t } from '../../i18n';
+import { publicWebOrigin } from '../../lib/runtimeConfig';
+import { isDesktop } from '../../desktop/env';
+import { openAppWindow } from '../../lib/openWindow';
 
 /** A client secret or bot token the server returned once; kept in memory only until dismissed. */
 interface Secret {
@@ -40,8 +45,12 @@ interface Secret {
   value: string;
 }
 
-/** Where the developer documentation lives on this instance (built into the web image). */
-export const DOCS_URL = '/docs/';
+/** Where the developer documentation lives on this instance (built into the web image). An
+ * absolute address on the instance: it opens in a new tab or the system browser, and the
+ * desktop app's own origin (tauri://localhost) does not serve it. */
+export function docsUrl(): string {
+  return `${publicWebOrigin()}/docs/`;
+}
 
 /**
  * The Developers section: an account's OAuth2 applications and their bots. The list opens
@@ -373,22 +382,39 @@ export const DevelopersSettingsPage: Component = () => {
   /** Every scope but a bare `bot` needs somewhere to deliver the code. */
   const genNeedsRedirect = () => [...genScopes()].some((s) => s !== 'bot');
   const genRedirectMissing = () => genNeedsRedirect() && !genRedirect();
-  const generatedUrl = createMemo(() => {
+  const generatedOptions = createMemo((): AuthorizeUrlOptions | null => {
     const app = selected();
-    if (!app || genScopes().size === 0 || genRedirectMissing()) return '';
-    return authorizeUrl({
+    if (!app || genScopes().size === 0 || genRedirectMissing()) return null;
+    return {
       clientId: app.client_id,
       scopes: OAUTH_SCOPES.filter((s) => genScopes().has(s)),
       redirectUri: genNeedsRedirect() ? genRedirect() : undefined,
       permissions: genHasBot() ? genPerms() : undefined,
-    });
+    };
   });
-  /** The quick "add my bot" link: bot scope with the generator's permissions, no redirect. */
-  const installUrl = () => {
-    const app = selected();
-    if (!app?.has_bot) return '';
-    return authorizeUrl({ clientId: app.client_id, scopes: ['bot'], permissions: genPerms() });
+  const generatedUrl = () => {
+    const opts = generatedOptions();
+    return opts ? shareableAuthorizeUrl(opts) : '';
   };
+  /** The quick "add my bot" link: bot scope with the generator's permissions, no redirect. */
+  const installOptions = (): AuthorizeUrlOptions | null => {
+    const app = selected();
+    if (!app?.has_bot) return null;
+    return { clientId: app.client_id, scopes: ['bot'], permissions: genPerms() };
+  };
+  const installUrl = () => {
+    const opts = installOptions();
+    return opts ? shareableAuthorizeUrl(opts) : '';
+  };
+  /** Following one of these links yourself. The links carry the instance's public address so
+   * they work when shared, but in the desktop app that address opens in the system browser,
+   * signed out - so there the consent page opens in the app's own window instead, as the
+   * profile's "Add to Space" does. A browser just follows the link. */
+  function openHereOnDesktop(e: MouseEvent, opts: AuthorizeUrlOptions | null) {
+    if (!opts || !isDesktop()) return;
+    e.preventDefault();
+    openAppWindow(authorizeUrl(opts));
+  }
 
   return (
     <Show
@@ -401,7 +427,7 @@ export const DevelopersSettingsPage: Component = () => {
               <i class="fa-solid fa-plus text-xs" aria-hidden="true" /> {t('settings.developers.newApp')}
             </Button>
             <a
-              href={DOCS_URL}
+              href={docsUrl()}
               target="_blank"
               rel="noopener"
               class="inline-flex h-10 items-center justify-center gap-2 rounded-lg border border-border px-4 text-sm font-medium text-foreground transition-colors hover:bg-muted/40"
@@ -493,7 +519,7 @@ export const DevelopersSettingsPage: Component = () => {
               <i class="fa-solid fa-chevron-left text-xs" aria-hidden="true" /> {t('settings.developers.backToApps')}
             </button>
             <a
-              href={DOCS_URL}
+              href={docsUrl()}
               target="_blank"
               rel="noopener"
               class="inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
@@ -625,6 +651,7 @@ export const DevelopersSettingsPage: Component = () => {
                   href={installUrl()}
                   target="_blank"
                   rel="noopener"
+                  onClick={(e) => openHereOnDesktop(e, installOptions())}
                   class="inline-flex h-8 shrink-0 items-center justify-center gap-1.5 rounded-lg bg-primary px-3 text-xs font-medium text-primary-foreground transition-colors hover:bg-primary-hover"
                 >
                   <i class="fa-solid fa-plus text-[10px]" aria-hidden="true" /> {t('settings.developers.addToSpace')}
@@ -871,6 +898,7 @@ export const DevelopersSettingsPage: Component = () => {
                     href={generatedUrl()}
                     target="_blank"
                     rel="noopener"
+                    onClick={(e) => openHereOnDesktop(e, generatedOptions())}
                     class="inline-flex h-8 shrink-0 items-center rounded-lg border border-border px-3 text-xs font-medium text-foreground hover:bg-muted/40"
                   >
                     {t('settings.developers.openUrl')}

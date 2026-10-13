@@ -4,6 +4,9 @@ import { setUserPresence } from './presence';
 import { setReadStateFromRoom, setReadState } from './readState';
 import { onStargateEvent } from '../services/stargate/client';
 import { registerRoomIdentity, registerUserIdentity } from './federationIds';
+// Read only when pruning kept space rooms, never at load: the spaces store imports this one.
+import { spaces } from './spaces';
+import { t } from '../i18n';
 
 /** Feed the E2EE identity registry from a room and its participants. */
 function registerIdentities(room: Room): void {
@@ -23,6 +26,50 @@ export const [rooms, setRooms] = createStore<RoomsState>({
   hydrated: false,
 });
 
+/** Space rooms the last READY / GET /rooms did not list but keepMirroredSpaceRooms kept. */
+let keptSpaceRoomIds = new Set<string>();
+
+/**
+ * The server lists a space room here only once this account has a per-user row for it (it
+ * has read or written there), so the channel SpacePage mirrors into this store for the send
+ * path - a new room, a new space's default rooms before anyone posts - can be absent from
+ * READY or GET /rooms. Keep those mirrored entries instead of letting a reconnect drop them.
+ * PMs are not kept: the server's list is the truth for those, and a group you were removed
+ * from must go.
+ *
+ * Whether a kept room still exists is decided once the caller is done (pruneKeptSpaceRooms):
+ * READY hydrates this store before the spaces store, so right now the spaces store still
+ * describes the previous connection. Done from here rather than left to each READY handler,
+ * so the mobile app, which runs its own, prunes too.
+ */
+function keepMirroredSpaceRooms(incoming: Room[]): Room[] {
+  const ids = new Set(incoming.map((r) => r.id));
+  const kept = rooms.rooms.filter((r) => r.space_id && !ids.has(r.id));
+  keptSpaceRoomIds = new Set(kept.map((r) => r.id));
+  if (kept.length) queueMicrotask(pruneKeptSpaceRooms);
+  return kept.length ? [...incoming, ...kept] : incoming;
+}
+
+/**
+ * Drop the space rooms keepMirroredSpaceRooms held on to that the spaces store no longer has
+ * (deleted, out of reach, or their space left while the socket was down): left behind, they
+ * kept a space's unread badge lit and were re-subscribed - and refused - on every reconnect.
+ * A space whose room list isn't loaded is left alone, as is everything while the spaces store
+ * itself isn't (the REST fallback loads both at once).
+ */
+function pruneKeptSpaceRooms(): void {
+  const stillExists = (r: Room): boolean => {
+    if (!spaces.hydrated) return true;
+    const spaceId = r.space_id;
+    if (!spaceId || !spaces.spaces.some((s) => s.id === spaceId)) return false;
+    const list = spaces.spaceRoomsBySpaceId[spaceId];
+    return !list || list.some((x) => x.id === r.id);
+  };
+  const gone = new Set(rooms.rooms.filter((r) => keptSpaceRoomIds.has(r.id) && !stillExists(r)).map((r) => r.id));
+  keptSpaceRoomIds = new Set();
+  if (gone.size) setRooms('rooms', (list) => list.filter((r) => !gone.has(r.id)));
+}
+
 export async function loadRooms(): Promise<void> {
   setRooms({ loading: true });
   try {
@@ -36,30 +83,33 @@ export async function loadRooms(): Promise<void> {
       }
       setReadStateFromRoom(room.id, room, { authoritative: true });
     }
-    setRooms({ rooms: list, loading: false, hydrated: true });
+    setRooms({ rooms: keepMirroredSpaceRooms(list), loading: false, hydrated: true });
   } catch {
     setRooms({ loading: false, hydrated: true });
   }
 }
 
 export function clearRooms() {
+  keptSpaceRoomIds = new Set();
   setRooms({ rooms: [], loading: false, hydrated: false });
   setReadState({ byRoom: {} });
 }
 
 /** Update room's last_message_id (for real-time unread when MESSAGE_CREATE arrives). */
 export function updateRoomLastMessage(roomId: string, messageId: string) {
-  setRooms(
-    'rooms',
-    (list) => list.map((r) => (r.id === roomId ? { ...r, last_message_id: messageId } : r))
-  );
+  setRoomLastMessageId(roomId, messageId);
 }
 
 /** Set a room's last_message_id to an exact value or clear it (null) - used when a deletion
- * moves or removes the room's newest message, so the sidebar stops showing a phantom unread. */
+ * moves or removes the room's newest message, so the sidebar stops showing a phantom unread.
+ * Leaves the list alone when nothing changes: most messages arrive in space channels that
+ * aren't in this list, and a fresh array per message re-runs everything that reads it. */
 export function setRoomLastMessageId(roomId: string, messageId: string | null) {
+  const next = messageId ?? undefined;
   setRooms('rooms', (list) =>
-    list.map((r) => (r.id === roomId ? { ...r, last_message_id: messageId ?? undefined } : r))
+    list.some((r) => r.id === roomId && r.last_message_id !== next)
+      ? list.map((r) => (r.id === roomId ? { ...r, last_message_id: next } : r))
+      : list
   );
 }
 
@@ -118,7 +168,7 @@ export function hydrateRoomsFromReady(roomsData: unknown[]): void {
     }
     setReadStateFromRoom(room.id, room, { authoritative: true });
   }
-  setRooms({ rooms: list, loading: false, hydrated: true });
+  setRooms({ rooms: keepMirroredSpaceRooms(list), loading: false, hydrated: true });
 }
 
 /** Sort rooms by last message (most recent first). Uses last_message_id (snowflake) for order; rooms with none go last. */
@@ -183,11 +233,19 @@ function roomFromPayload(payload: unknown): Room | null {
   };
 }
 
-/** Register Stargate handlers for ROOM_CREATE and ROOM_UPDATE. Call once on app init. */
+/** Register Stargate handlers for ROOM_CREATE, ROOM_UPDATE and ROOM_LEAVE. Call once on app init. */
 export function initRoomHandlers(): () => void {
   return onStargateEvent((event) => {
-    if (event.t !== 'ROOM_CREATE' && event.t !== 'ROOM_UPDATE') return;
     const payload = (event.d as { d?: unknown })?.d ?? event.d;
+    if (event.t === 'ROOM_LEAVE') {
+      // Removed from a group PM, or left it from another device. Handled here and not only
+      // by the open room's page, or a group you were looking away from stayed in the list
+      // for the rest of the session - its subscription refused, its history and sends 403.
+      const d = payload as { room_id?: unknown } | undefined;
+      if (d?.room_id != null) removeRoom(String(d.room_id));
+      return;
+    }
+    if (event.t !== 'ROOM_CREATE' && event.t !== 'ROOM_UPDATE') return;
     const room = roomFromPayload(payload);
     if (room) addOrUpdateRoom(room);
   });
@@ -207,14 +265,14 @@ export function roomDisplayName(room: Room, currentUserId: string): string {
   if (room.participants?.length) {
     const others = room.participants.filter((p) => p.id !== currentUserId);
     if (others.length > 1) {
-      return others.map((p) => p.display_name || p.username || 'Unknown').join(', ');
+      return others.map((p) => p.display_name || p.username || t('common.unknown')).join(', ');
     }
     if (others.length === 1) {
-      return others[0]!.display_name || others[0]!.username || 'Unknown';
+      return others[0]!.display_name || others[0]!.username || t('common.unknown');
     }
     if (room.participants.length === 1 && room.participants[0]!.id === currentUserId) {
-      return 'Notes';
+      return t('nav.notes');
     }
   }
-  return 'Unknown';
+  return t('common.unknown');
 }

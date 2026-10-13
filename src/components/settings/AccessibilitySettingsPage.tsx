@@ -30,7 +30,7 @@ export const AccessibilitySettingsPage: Component = () => (
           icon="fa-person-running"
           title={t('settings.accessibility.reduceMotion')}
           description={t('settings.accessibility.reduceMotionHint')}
-          control={<Toggle checked={appearance.reduceMotion} disabled={accessibility.followSystemMotion} onChange={setReduceMotion} />}
+          control={<Toggle label={t('settings.accessibility.reduceMotion')} checked={appearance.reduceMotion} disabled={accessibility.followSystemMotion} onChange={setReduceMotion} />}
         />
         <Row
           icon="fa-desktop"
@@ -38,7 +38,7 @@ export const AccessibilitySettingsPage: Component = () => (
           description={
             systemPrefersReducedMotion() ? t('settings.accessibility.followSystemOnHint') : t('settings.accessibility.followSystemOffHint')
           }
-          control={<Toggle checked={accessibility.followSystemMotion} onChange={(on) => setAccessibility({ followSystemMotion: on })} />}
+          control={<Toggle label={t('settings.accessibility.followSystem')} checked={accessibility.followSystemMotion} onChange={(on) => setAccessibility({ followSystemMotion: on })} />}
         />
       </div>
     </section>
@@ -65,7 +65,7 @@ export const AccessibilitySettingsPage: Component = () => (
           icon="fa-link"
           title={t('settings.accessibility.underlineLinks')}
           description={t('settings.accessibility.underlineLinksHint')}
-          control={<Toggle checked={accessibility.underlineLinks} onChange={(on) => setAccessibility({ underlineLinks: on })} />}
+          control={<Toggle label={t('settings.accessibility.underlineLinks')} checked={accessibility.underlineLinks} onChange={(on) => setAccessibility({ underlineLinks: on })} />}
         />
       </div>
       <Show when={accessibility.followSystemMotion}>

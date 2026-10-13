@@ -44,7 +44,7 @@ function userTag(rel: Relationship): string {
 }
 
 /** The same grammar equinox accepts: a username, optionally @domain[:port]. */
-const HANDLE_RE = /^([A-Za-z0-9_.\-]{2,32})(?:@([A-Za-z0-9.\-]+(?::\d+)?))?$/;
+const HANDLE_RE = /^([A-Za-z0-9_.-]{2,32})(?:@([A-Za-z0-9.-]+(?::\d+)?))?$/;
 
 const TAB_IDS: TabId[] = ['online', 'all', 'pending', 'blocked'];
 

@@ -12,6 +12,7 @@ import { messages } from '../../stores/messages';
 import { PresenceDot } from '../PresenceDot';
 import { MessageAvatar } from '../messageList/MessageAvatar';
 import { showContextMenu } from '../../stores/contextMenu';
+import { confirmDialog } from '../../stores/confirmDialog';
 import { removeRoomParticipant } from '../../api/rooms';
 import { removeRoom } from '../../stores/rooms';
 import { useNavigate } from '@solidjs/router';
@@ -187,9 +188,19 @@ export const RoomsBar: Component = () => {
       )
     );
 
-  async function handleLeaveGroup(roomId: string) {
+  async function handleLeaveGroup(roomId: string, name: string) {
     const uid = currentUserId();
     if (!uid) return;
+    // Asked first, the way leaving a space is: it sits in the same menu as mute and copy, and
+    // once you are out only someone still in the group can add you back.
+    const ok = await confirmDialog({
+      title: t('contextMenu.leaveGroup'),
+      body: t('contextMenu.leaveGroupConfirm', { name }),
+      confirmLabel: t('contextMenu.leaveGroup'),
+      tone: 'danger',
+      icon: 'fa-solid fa-right-from-bracket',
+    });
+    if (!ok) return;
     try {
       await removeRoomParticipant(roomId, uid);
       removeRoom(roomId);
@@ -296,7 +307,7 @@ export const RoomsBar: Component = () => {
                                 label: t('contextMenu.leaveGroup'),
                                 icon: 'fa-right-from-bracket',
                                 danger: true,
-                                onClick: () => handleLeaveGroup(room.id),
+                                onClick: () => handleLeaveGroup(room.id, roomDisplayName(room, currentUserId())),
                               },
                             ]
                           : []),

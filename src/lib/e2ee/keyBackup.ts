@@ -424,6 +424,16 @@ async function importFromBackup(
   }
 
   const machine = await getMachine(userId);
+  // This device's own keys may carry "backed up" marks for an older version - the backup
+  // was replaced from another device. Those marks have to go *before* the import, which
+  // then marks only what it brings in for this version. Left in place (enableFrom below
+  // switches versions without clearing, and correctly so for the imported keys), any key
+  // only this device holds would never reach the new backup, and with the version now
+  // recorded as current nothing later would notice.
+  if (lastEnabledVersion(userId) !== version) {
+    await machine.disableBackup();
+    enabledVersion = null;
+  }
   const result = await machine.importBackedUpRoomKeys(decrypted as Map<RoomId, Map<string, any>>, () => {}, version);
 
   // Keep contributing to the same backup from now on, so keys this device acquires later are

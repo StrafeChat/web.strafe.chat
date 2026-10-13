@@ -69,6 +69,11 @@ function hasAccessibleName(el: HTMLElement): boolean {
   return false;
 }
 
+/** Marks an element whose data-tooltip came from its own `title`, so a later title can replace it. */
+const ADOPTED_ATTR = 'data-tooltip-adopted';
+/** Marks an aria-label that adoption filled in, so it follows the title too. */
+const ARIA_BACKFILLED_ATTR = 'data-tooltip-aria-backfilled';
+
 /** Strip a native `title` so the browser bubble never shows and an explicit data-tooltip can
  * win. A non-empty title is adopted as `data-tooltip` (with an aria-label backfill when the
  * element had no other accessible name); an empty `title=""` - the codebase's "defer to a
@@ -81,8 +86,18 @@ function adoptNativeTitle(el: HTMLElement): void {
   const title = el.getAttribute('title');
   if (title == null) return;
   if (title && el.getAttribute('data-tooltip') == null) {
-    if (!hasAccessibleName(el)) el.setAttribute('aria-label', title);
+    if (!hasAccessibleName(el)) {
+      el.setAttribute('aria-label', title);
+      el.setAttribute(ARIA_BACKFILLED_ATTR, '');
+    }
     el.setAttribute('data-tooltip', title);
+    el.setAttribute(ADOPTED_ATTR, '');
+  } else if (title && el.hasAttribute(ADOPTED_ATTR)) {
+    // A reactive title written again after we adopted the first one (Mute -> Unmute, a presence
+    // dot going idle, a language switch). The new text replaces ours, or the bubble would keep
+    // showing the first label for good. A data-tooltip the app set itself is never touched.
+    el.setAttribute('data-tooltip', title);
+    if (el.hasAttribute(ARIA_BACKFILLED_ATTR)) el.setAttribute('aria-label', title);
   }
   el.removeAttribute('title');
 }
@@ -233,6 +248,19 @@ export const TooltipHost: Component = () => {
       if (e.key === 'Escape') hide();
     };
 
+    // Solid writes a reactive `title` straight back onto the element when its value changes.
+    // Re-adopt it at once on elements we already adopted: the open bubble updates (the label
+    // observer sees the new data-tooltip) and no native bubble shows in the meantime.
+    const titleObserver = new MutationObserver((records) => {
+      for (const r of records) {
+        const el = r.target;
+        if (el instanceof HTMLElement && el.hasAttribute(ADOPTED_ATTR) && el.hasAttribute('title')) {
+          adoptNativeTitle(el);
+        }
+      }
+    });
+    titleObserver.observe(document.documentElement, { attributes: true, attributeFilter: ['title'], subtree: true });
+
     document.addEventListener('pointerover', onOver);
     document.addEventListener('pointerout', onOut);
     document.addEventListener('focusin', onFocusIn);
@@ -242,6 +270,7 @@ export const TooltipHost: Component = () => {
     window.addEventListener('scroll', onScroll, true);
     window.addEventListener('resize', onScroll);
     onCleanup(() => {
+      titleObserver.disconnect();
       document.removeEventListener('pointerover', onOver);
       document.removeEventListener('pointerout', onOut);
       document.removeEventListener('focusin', onFocusIn);

@@ -1,5 +1,5 @@
 import type { Component } from 'solid-js';
-import { createSignal, Show } from 'solid-js';
+import { createEffect, createSignal, on, Show } from 'solid-js';
 import {
   externalLink,
   getDomainFromUrl,
@@ -17,8 +17,14 @@ export const ExternalLinkModal: Component = () => {
   const url = () => externalLink.pendingUrl;
   const domain = () => (url() ? getDomainFromUrl(url()!) : '');
 
+  // The modal is mounted once for the whole app, so the box would otherwise stay ticked into
+  // the next prompt and quietly trust a different domain. Every new link starts unticked.
+  createEffect(on(url, () => setTrustDomain(false)));
+
   function handleVisit() {
-    confirmExternalLink(trustDomain());
+    const trust = trustDomain();
+    setTrustDomain(false);
+    confirmExternalLink(trust);
   }
 
   function handleClose() {
