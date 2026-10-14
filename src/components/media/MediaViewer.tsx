@@ -127,10 +127,12 @@ const MediaViewerFrame: Component = () => {
 
   return (
     <Portal mount={document.body}>
+      {/* Below the desktop app's title bar (0 on the web): that bar sits above every layer, so
+          a viewer reaching the top of the window had its close and download buttons under it. */}
       <div
         ref={overlay}
         data-modal
-        class={`fixed inset-0 flex flex-col ${zLayer.lightbox} bg-black/92 backdrop-blur-sm dialog-overlay-in`}
+        class={`fixed inset-x-0 bottom-0 top-[var(--desktop-titlebar-height)] flex flex-col ${zLayer.lightbox} bg-black/92 backdrop-blur-sm dialog-overlay-in`}
         onClick={(e) => {
           if (e.target === e.currentTarget) closeMediaViewer();
         }}

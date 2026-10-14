@@ -144,10 +144,19 @@ const RoomPage: Component = () => {
   };
   const roomMessages = () => messages.byRoom[params.roomId] ?? [];
   const isGroupRoom = () => room()?.type === 2;
-  /** Calls exist in PMs and group PMs (never in the notes room) when the instance has voice. */
+  /** Calls exist in PMs and group PMs when the instance has voice - never in the notes room,
+   * nor with the official account, which is one-way and has nobody to answer (the server
+   * refuses that call too). */
   const canCall = () => {
     const r = room();
-    return instance.voiceEnabled && !!r && (r.type === 1 || r.type === 2) && !!auth.user?.id && !isNotesRoom(r, auth.user.id);
+    return (
+      instance.voiceEnabled &&
+      !!r &&
+      (r.type === 1 || r.type === 2) &&
+      !!auth.user?.id &&
+      !isNotesRoom(r, auth.user.id) &&
+      !isOfficialDM()
+    );
   };
   const callActive = () => !!voice.calls[params.roomId] || voiceStatesForRoom(params.roomId).length > 0;
   /** The call view shows while a call runs here or we are connected to it. */
