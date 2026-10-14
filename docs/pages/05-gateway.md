@@ -179,6 +179,7 @@ Sent space-wide when everyone can view the parent channel, otherwise only to the
 | `ROOM_UPDATE` | room | A PM's name or settings changed |
 | `ROOM_LEAVE` | account | You were removed from a group PM |
 | `MESSAGE_ACK` | account | `{"room_id", "message_id", "last_read_message_id"}` - your own read position moved (another session read the room) |
+| `MESSAGE_MENTION_UPDATE` | account | `{"room_id", "mention_count", "message_id"?}` - your mention badge for a room, as an absolute count: after a message mentioned a role you hold (`message_id` is that message; ignore the count if you have already read past it), or after a message that mentioned you was deleted |
 | `ROOM_NOTIFY_SETTINGS_UPDATE` | account | Your notification setting for a room changed |
 
 ### Spaces and members
