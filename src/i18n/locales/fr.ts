@@ -790,6 +790,8 @@ export default {
     noRolesToAdd: 'Aucun rôle à ajouter.',
     noRolesYetEditable: 'Pas encore de rôle — utilisez + pour en ajouter.',
     noRolesAssigned: 'Aucun rôle attribué.',
+    searchRoles: 'Rechercher des rôles',
+    noRolesMatch: 'Aucun rôle ne correspond.',
   },
   permissions: {
     allow: 'Autoriser',
