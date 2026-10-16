@@ -1,7 +1,7 @@
 import type { SpaceRoom } from '../../api/spaces';
 import type { Component } from 'solid-js';
 import { incomingFriendRequests } from '../../lib/mobileNotifications';
-import { createSignal, For, Show } from 'solid-js';
+import { createMemo, createSignal, For, Show } from 'solid-js';
 import { A, useLocation, useNavigate } from '@solidjs/router';
 import { lastVisited } from '../../stores/lastVisited';
 import { spaces, removeSpace } from '../../stores/spaces';
@@ -10,6 +10,8 @@ import { memberCanCreateInvite, memberCanManageSpace, memberCanManageRoles } fro
 import { confirmDialog } from '../../stores/confirmDialog';
 import { requestSpaceAction, type SpaceQuickAction } from '../../stores/spaceQuickActions';
 import { lastSpaceRoom } from '../../stores/lastSpaceRoom';
+import { orderSpacesByPreference, spaceOrder } from '../../stores/spaceOrder';
+import { createSpaceReorder } from './spaceRail/createSpaceReorder';
 import { Tooltip } from '../ui/Tooltip';
 import { CreateSpaceModal } from '../CreateSpaceModal';
 import { rooms, roomDisplayName, isNotesRoom, sortRoomsByLastMessage } from '../../stores/rooms';
@@ -83,7 +85,7 @@ const SpaceIcon: Component<SpaceIconProps> = (props) => {
           radius. Kept separate from the badge so overflow-hidden never touches the badge. */}
       <span class="absolute inset-0 flex items-center justify-center overflow-hidden rounded-[inherit]">
         {props.icon ? (
-          <img src={props.icon} alt="" class="size-full object-cover" />
+          <img src={props.icon} alt="" class="size-full object-cover" draggable={false} />
         ) : (
           <span>{props.initial}</span>
         )}
@@ -124,6 +126,7 @@ const SpaceIcon: Component<SpaceIconProps> = (props) => {
           <A
             href={href()}
             aria-label={ariaLabel()}
+            draggable={false}
             class={`relative ${base} ${active()} bg-primary/30 hover:bg-primary/40`}
             onContextMenu={(e) => props.onContextMenu?.(e)}
           >
@@ -196,6 +199,14 @@ export const SpaceBar: Component = () => {
   const pathname = () => location.pathname;
   const currentUserId = () => auth.user?.id ?? '';
   const activeRoomId = () => pathname().match(/^\/spaces\/[^/]+\/rooms\/([^/]+)/)?.[1] ?? null;
+
+  const [railEl, setRailEl] = createSignal<HTMLElement>();
+  const orderedSpaces = createMemo(() => orderSpacesByPreference(spaces.spaces));
+  const reorder = createSpaceReorder({
+    container: () => railEl(),
+    ids: () => orderedSpaces().map((s) => s.id),
+    onCommit: (ids) => spaceOrder.set(ids),
+  });
 
   const friendRequestCount = () => incomingFriendRequests().length;
   const activePmRoomId = () => pathname().match(/^\/rooms\/([^/]+)/)?.[1] ?? null;
@@ -354,6 +365,7 @@ export const SpaceBar: Component = () => {
   // has to stay mounted even while the conversation is on screen.
   return (
     <aside
+      ref={setRailEl}
       class={`flex w-[72px] shrink-0 flex-col items-center gap-2 overflow-y-auto py-3 pb-[calc(4.5rem+env(safe-area-inset-bottom))] md:pb-3 ${appSpaceRail}`}
     >
       <CreateSpaceModal open={showCreateSpace()} onClose={() => setShowCreateSpace(false)} />
@@ -397,23 +409,30 @@ export const SpaceBar: Component = () => {
         </For>
       </Show>
       <Divider />
-      <For each={spaces.spaces}>
+      <For each={orderedSpaces()}>
         {(s) => (
-          <Tooltip label={s.name || t('space.unnamed')}>
-            <SpaceIcon
-              name={s.name || t('space.unnamed')}
-              initial={spaceInitial(s)}
-              icon={s.icon || undefined}
-              href={(() => {
-                const lastRoom = lastSpaceRoom.get(s.id);
-                return lastRoom ? `/spaces/${s.id}/rooms/${lastRoom}` : `/spaces/${s.id}`;
-              })()}
-              active={activeSpaceId() === s.id}
-              unreadCount={spaceUnreadCount(s.id)}
-              mentionCount={spaceMentionCount(s.id)}
-              onContextMenu={(e) => openSpaceMenu(e, s.id)}
-            />
-          </Tooltip>
+          <div
+            data-space-id={s.id}
+            class="w-full"
+            style={reorder.styleFor(s.id)}
+            onPointerDown={(e) => reorder.start(e, s.id, e.currentTarget)}
+          >
+            <Tooltip label={s.name || t('space.unnamed')}>
+              <SpaceIcon
+                name={s.name || t('space.unnamed')}
+                initial={spaceInitial(s)}
+                icon={s.icon || undefined}
+                href={(() => {
+                  const lastRoom = lastSpaceRoom.get(s.id);
+                  return lastRoom ? `/spaces/${s.id}/rooms/${lastRoom}` : `/spaces/${s.id}`;
+                })()}
+                active={activeSpaceId() === s.id}
+                unreadCount={spaceUnreadCount(s.id)}
+                mentionCount={spaceMentionCount(s.id)}
+                onContextMenu={(e) => openSpaceMenu(e, s.id)}
+              />
+            </Tooltip>
+          </div>
         )}
       </For>
       <Divider />
