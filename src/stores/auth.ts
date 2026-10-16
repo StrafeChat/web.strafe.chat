@@ -12,6 +12,7 @@ import { clearMediaDimensions } from '../lib/mediaDimensions';
 import { clearRecentEmoji } from '../lib/emoji/recent';
 import { lastVisited } from './lastVisited';
 import { lastSpaceRoom } from './lastSpaceRoom';
+import { spaceOrder } from './spaceOrder';
 import { setUserPresence } from './presence';
 import { loadRooms, clearRooms, hydrateRoomsFromReady } from './rooms';
 import { loadRelationships, clearRelationships, hydrateRelationshipsFromReady } from './relationships';
@@ -88,6 +89,7 @@ export function logout() {
   // And where it was last (a PM room, a room in each of its spaces) and its recent custom emoji.
   lastVisited.clear();
   lastSpaceRoom.clear();
+  spaceOrder.clear();
   clearRecentEmoji();
 }
 

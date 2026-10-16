@@ -59,6 +59,7 @@ import { MobileRailsOpenButton } from '../components/layout/MobileRailsOpenButto
 import { getMessageBodyText, getSenderDisplay, messagePreviewText } from '../components/messageList';
 import { spaceMembers, loadSpaceMembers, ensureSpaceMembers } from '../stores/spaceMembers';
 import { lastSpaceRoom } from '../stores/lastSpaceRoom';
+import { pickLandingRoomId } from '../lib/spaceRoomsNav';
 import { createPM } from '../api/rooms';
 import { dismissNewHeader, clearNewHeaderDismissed, newHeaderDismissed } from '../stores/newHeaderDismissed';
 import { ensureRoomPins, pinnedMessages } from '../stores/pinnedMessages';
@@ -174,6 +175,13 @@ const SpacePage: Component = () => {
     const id = roomId();
     if (!id) return null;
     return spaceRooms().find((r) => r.id === id) ?? null;
+  });
+
+  createEffect(() => {
+    const sid = spaceId();
+    if (!sid || roomId()) return;
+    const target = pickLandingRoomId(sid);
+    if (target) navigate(`/spaces/${sid}/rooms/${target}`, { replace: true });
   });
 
   // Keyed on the room *id* (plus the E2EE flag, which the send path reads from the

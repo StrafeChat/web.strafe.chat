@@ -834,6 +834,8 @@ export default {
     noRolesToAdd: 'لا توجد أدوار لإضافتها.',
     noRolesYetEditable: 'لا توجد أدوار بعد — استخدم + للإضافة.',
     noRolesAssigned: 'لم تُسند أي أدوار.',
+    searchRoles: 'البحث عن الأدوار',
+    noRolesMatch: 'لا توجد أدوار مطابقة.',
   },
   permissions: {
     allow: 'سماح',

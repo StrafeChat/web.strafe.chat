@@ -777,6 +777,8 @@ export default {
     noRolesToAdd: 'No roles to add.',
     noRolesYetEditable: 'No roles yet — use + to add.',
     noRolesAssigned: 'No roles assigned.',
+    searchRoles: 'Search roles',
+    noRolesMatch: 'No roles match.',
   },
   permissions: {
     allow: 'Allow',

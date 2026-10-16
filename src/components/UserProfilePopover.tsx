@@ -5,6 +5,7 @@ import { MessageAvatar } from './messageList/MessageAvatar';
 import { ProfileIdentity } from './ProfileIdentity';
 import { ProfileBirthday } from './ProfileBirthday';
 import { RolePill } from './RolePill';
+import { SearchInput } from './ui/SearchInput';
 import { MessageBody } from './messageList/MessageBody';
 import { PresenceDot } from './PresenceDot';
 import { createPM } from '../api/rooms';
@@ -59,6 +60,14 @@ export const UserProfilePopover: Component = () => {
   const [roleSaveBusy, setRoleSaveBusy] = createSignal(false);
   const [roleSaveErr, setRoleSaveErr] = createSignal('');
   const [addRolesMenuOpen, setAddRolesMenuOpen] = createSignal(false);
+  const [roleSearch, setRoleSearch] = createSignal('');
+  const [roleMenuAnchor, setRoleMenuAnchor] = createSignal<{
+    top: number;
+    left: number;
+    maxHeight: number;
+  } | null>(null);
+  let roleAddBtnEl: HTMLButtonElement | undefined;
+  let roleMenuEl: HTMLDivElement | undefined;
   const [quickDraft, setQuickDraft] = createSignal('');
   const [quickSending, setQuickSending] = createSignal(false);
   const [quickError, setQuickError] = createSignal('');
@@ -103,6 +112,7 @@ export const UserProfilePopover: Component = () => {
       setPickedCustomRoleIds(new Set<string>());
       setRoleSaveErr('');
       setAddRolesMenuOpen(false);
+      setRoleSearch('');
       setQuickDraft('');
       setQuickError('');
       return;
@@ -158,12 +168,57 @@ export const UserProfilePopover: Component = () => {
     onCleanup(() => document.removeEventListener('mousedown', onDoc, true));
   });
 
+  // The role menu is portaled so it can overlap the card (which clips its own overflow) and
+  // the page. It opens below the + when that fits, else above; `maxHeight` is what the chosen
+  // side can hold, so a long list scrolls inside the viewport instead of running off it.
+  function placeRoleMenu() {
+    const btn = roleAddBtnEl;
+    const menu = roleMenuEl;
+    if (!btn || !menu) return;
+    const r = btn.getBoundingClientRect();
+    const h = menu.offsetHeight;
+    const w = menu.offsetWidth;
+    const gap = 6;
+    const edge = 8;
+    const belowSpace = window.innerHeight - r.bottom - gap - edge;
+    const aboveSpace = r.top - gap - edge;
+    const fitsBelow = h <= belowSpace;
+    const fitsAbove = h <= aboveSpace;
+    const openBelow = fitsBelow || (!fitsAbove && belowSpace >= aboveSpace);
+    const maxHeight = Math.max(80, openBelow ? belowSpace : aboveSpace);
+    const top = openBelow ? r.bottom + gap : r.top - gap - Math.min(h, maxHeight);
+    const left = Math.max(edge, Math.min(r.left, window.innerWidth - w - edge));
+    setRoleMenuAnchor({ top, left, maxHeight });
+  }
+
+  createEffect(() => {
+    if (!addRolesMenuOpen()) {
+      setRoleSearch('');
+      setRoleMenuAnchor(null);
+      return;
+    }
+    setRoleMenuAnchor(null);
+    const raf = requestAnimationFrame(() => {
+      placeRoleMenu();
+      roleMenuEl?.querySelector('input')?.focus({ preventScroll: true });
+    });
+    const onReflow = () => placeRoleMenu();
+    window.addEventListener('resize', onReflow);
+    window.addEventListener('scroll', onReflow, true);
+    onCleanup(() => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener('resize', onReflow);
+      window.removeEventListener('scroll', onReflow, true);
+    });
+  });
+
   onMount(() => {
     const onDoc = (e: MouseEvent) => {
       if (!userProfilePopover.open) return;
       const el = document.getElementById('user-profile-popover-root');
+      const menu = document.getElementById('profile-role-add-menu');
       const t = e.target as Node;
-      if (el?.contains(t)) return;
+      if (el?.contains(t) || menu?.contains(t)) return;
       closeUserProfilePopover();
     };
     document.addEventListener('mousedown', onDoc, true);
@@ -216,6 +271,12 @@ export const UserProfilePopover: Component = () => {
     return ctx.spaceRoles
       .filter((r) => r.name !== EVERYONE_ROLE_NAME && !r.bot_id && !pickedCustomRoleIds().has(r.id) && !roleLocked(r))
       .sort((a, b) => b.position - a.position);
+  });
+
+  const filteredRolesToAdd = createMemo(() => {
+    const q = roleSearch().trim().toLowerCase();
+    const list = rolesAvailableToAdd();
+    return q ? list.filter((r) => r.name.toLowerCase().includes(q)) : list;
   });
 
   async function persistCustomRoles(next: Set<string>) {
@@ -508,53 +569,78 @@ export const UserProfilePopover: Component = () => {
                         </span>
                       </Show>
                       <Show when={canEditMemberRoles()}>
-                        <div class="relative inline-flex">
-                          <button
-                            id="profile-role-add-btn"
-                            type="button"
-                            disabled={roleSaveBusy()}
-                            class="flex size-7 shrink-0 items-center justify-center rounded-full border border-dashed border-border/90 text-muted-foreground transition hover:border-primary/60 hover:bg-muted/40 hover:text-foreground disabled:opacity-40"
-                            title={t('profile.addRole')}
-                            aria-label={t('profile.addRole')}
-                            aria-expanded={addRolesMenuOpen()}
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setAddRolesMenuOpen((o) => !o);
-                            }}
-                          >
-                            <i class="fa-solid fa-plus text-xs" />
-                          </button>
-                          <Show when={addRolesMenuOpen()}>
+                        <button
+                          id="profile-role-add-btn"
+                          ref={(el) => (roleAddBtnEl = el)}
+                          type="button"
+                          disabled={roleSaveBusy()}
+                          class="flex size-7 shrink-0 items-center justify-center rounded-full border border-dashed border-border/90 text-muted-foreground transition hover:border-primary/60 hover:bg-muted/40 hover:text-foreground disabled:opacity-40"
+                          title={t('profile.addRole')}
+                          aria-label={t('profile.addRole')}
+                          aria-expanded={addRolesMenuOpen()}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setAddRolesMenuOpen((o) => !o);
+                          }}
+                        >
+                          <i class="fa-solid fa-plus text-xs" />
+                        </button>
+                        <Show when={addRolesMenuOpen()}>
+                          <Portal mount={document.body}>
                             <div
                               id="profile-role-add-menu"
-                              class={`absolute start-0 top-[calc(100%+6px)] z-10 max-h-48 min-w-[11rem] overflow-y-auto ${appMenuPanel}`}
+                              ref={(el) => (roleMenuEl = el)}
+                              class={`fixed flex flex-col w-56 ${zLayer.popover} ${appMenuPanel}`}
+                              style={{
+                                top: `${roleMenuAnchor()?.top ?? -9999}px`,
+                                left: `${roleMenuAnchor()?.left ?? -9999}px`,
+                                'max-height': roleMenuAnchor() ? `${roleMenuAnchor()!.maxHeight}px` : undefined,
+                                visibility: roleMenuAnchor() ? 'visible' : 'hidden',
+                              }}
                               onClick={(e) => e.stopPropagation()}
                             >
-                              <Show
-                                when={rolesAvailableToAdd().length > 0}
-                                fallback={
-                                  <p class="px-3 py-2 text-xs text-muted-foreground">{t('profile.noRolesToAdd')}</p>
-                                }
-                              >
-                                <For each={rolesAvailableToAdd()}>
-                                  {(role) => (
-                                    <button
-                                      type="button"
-                                      class={appMenuItemDefault}
-                                      onClick={() => void addMemberRole(role.id)}
-                                    >
-                                      <span
-                                        class="size-2 shrink-0 rounded-full ring-1 ring-border/40"
-                                        style={{ 'background-color': spaceRoleColorHex(role.color) }}
-                                      />
-                                      <span class="truncate">{role.name}</span>
-                                    </button>
-                                  )}
-                                </For>
-                              </Show>
+                              <div class="shrink-0 px-1.5 pb-2 pt-1.5">
+                                <SearchInput
+                                  value={roleSearch()}
+                                  onValueChange={setRoleSearch}
+                                  size="sm"
+                                  wrapperClass="w-full"
+                                  placeholder={t('profile.searchRoles')}
+                                  class="focus:border-input! focus-visible:ring-0!"
+                                  autofocus
+                                />
+                              </div>
+                              <div class="min-h-0 flex-1 overflow-y-auto pt-1" style={{ 'max-height': '180px' }}>
+                                <Show
+                                  when={filteredRolesToAdd().length > 0}
+                                  fallback={
+                                    <p class="px-3 py-2 text-xs text-muted-foreground">
+                                      {rolesAvailableToAdd().length === 0
+                                        ? t('profile.noRolesToAdd')
+                                        : t('profile.noRolesMatch')}
+                                    </p>
+                                  }
+                                >
+                                  <For each={filteredRolesToAdd()}>
+                                    {(role) => (
+                                      <button
+                                        type="button"
+                                        class={appMenuItemDefault}
+                                        onClick={() => void addMemberRole(role.id)}
+                                      >
+                                        <span
+                                          class="size-2 shrink-0 rounded-full ring-1 ring-border/40"
+                                          style={{ 'background-color': spaceRoleColorHex(role.color) }}
+                                        />
+                                        <span class="truncate">{role.name}</span>
+                                      </button>
+                                    )}
+                                  </For>
+                                </Show>
+                              </div>
                             </div>
-                          </Show>
-                        </div>
+                          </Portal>
+                        </Show>
                       </Show>
                     </div>
                     <Show when={!displayedSortedRoles().length}>

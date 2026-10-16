@@ -18,12 +18,10 @@ import { lastVisited } from '../../stores/lastVisited';
 import { settings, setMembersPanelOpen, setMessageCompact } from '../../stores/settings';
 import { openUserSettings } from '../../stores/userSettingsModal';
 import { initKeybinds } from '../../stores/keybinds';
-import { spaces, spaceRoles } from '../../stores/spaces';
 import { rooms, sortRoomsByLastMessage, isNotesRoom } from '../../stores/rooms';
-import { spaceMembers } from '../../stores/spaceMembers';
 import { auth } from '../../stores/auth';
-import { canViewSpaceChannel } from '../../lib/spacePermissions';
-import { ackAllSpaceRooms, type SpaceRoom } from '../../api/spaces';
+import { ackAllSpaceRooms } from '../../api/spaces';
+import { orderedViewableTextRooms } from '../../lib/spaceRoomsNav';
 import { onNavigateRequest } from '../../lib/notifications';
 import { attachSwipeNavigation } from '../../lib/mobileSwipe';
 import {
@@ -46,41 +44,6 @@ interface AppShellProps {
   children?: import('solid-js').JSX.Element;
 }
 
-const ROOM_TYPE_TEXT = 3;
-const ROOM_TYPE_SECTION = 5;
-
-/** A space's text rooms in the order its sidebar lists them: top-level rooms, then each
- * section's rooms under it. Positions only order rooms within one scope (the top level or one
- * section), so a single sort by position interleaved the sections. Rooms and sections the
- * viewer cannot see are skipped, as the sidebar skips them. */
-function sidebarTextRooms(spaceId: string): SpaceRoom[] {
-  const all = spaces.spaceRoomsBySpaceId[spaceId] ?? [];
-  const space = spaces.spaces.find((s) => s.id === spaceId);
-  const uid = auth.user?.id;
-  const me = uid ? spaceMembers.bySpaceId[spaceId]?.find((m) => m.id === uid) : undefined;
-  const roles = spaceRoles(spaceId);
-  const canView = (room: SpaceRoom) =>
-    canViewSpaceChannel({
-      room,
-      allRooms: all,
-      memberUserId: uid,
-      ownerId: space?.owner_id,
-      everyoneRoleId: space?.everyone_role_id,
-      memberRoleIds: me?.roles,
-      roles,
-    });
-  const byPosition = (a: SpaceRoom, b: SpaceRoom) => a.position - b.position;
-  const sections = all.filter((r) => r.type === ROOM_TYPE_SECTION).sort(byPosition);
-  const sectionIds = new Set(sections.map((s) => s.id));
-  const isText = (r: SpaceRoom) => r.type === ROOM_TYPE_TEXT && canView(r);
-  const list = all.filter((r) => isText(r) && (!r.parent_id || !sectionIds.has(r.parent_id))).sort(byPosition);
-  for (const section of sections) {
-    if (!canView(section)) continue;
-    list.push(...all.filter((r) => r.parent_id === section.id && isText(r)).sort(byPosition));
-  }
-  return list;
-}
-
 /** Only the first shell mount of a page load may restore the last visited route. */
 let restoreChecked = false;
 
@@ -98,7 +61,7 @@ export const AppShell: Component<AppShellProps> = (props) => {
     const p = location.pathname;
     const inSpace = p.match(/^\/spaces\/(\d+)(?:\/rooms\/(\d+))?/);
     if (inSpace) {
-      const list = sidebarTextRooms(inSpace[1]!);
+      const list = orderedViewableTextRooms(inSpace[1]!);
       if (!list.length) return;
       const idx = list.findIndex((r) => r.id === inSpace[2]);
       const next = list[idx < 0 ? 0 : (idx + dir + list.length) % list.length]!;

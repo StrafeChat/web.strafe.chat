@@ -790,6 +790,8 @@ export default {
     noRolesToAdd: 'Nenhum cargo para adicionar.',
     noRolesYetEditable: 'Nenhum cargo ainda — use + para adicionar.',
     noRolesAssigned: 'Nenhum cargo atribuído.',
+    searchRoles: 'Buscar cargos',
+    noRolesMatch: 'Nenhum cargo corresponde.',
   },
   permissions: {
     allow: 'Permitir',
