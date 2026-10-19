@@ -8,6 +8,7 @@ import {
   DecryptionSettings,
   TrustRequirement,
   RequestType,
+  ShieldStateCode,
 } from '@matrix-org/matrix-sdk-crypto-wasm';
 import { toMatrixRoomId, toMatrixUserId, CHAT_EVENT_TYPE, MEGOLM_CIPHERTEXT_PREFIX } from './constants';
 import { claimKeys, sendToDevice } from '../../api/devices';
@@ -101,6 +102,19 @@ export async function invalidateRoomSession(machine: OlmMachine, roomId: string)
   await machine.invalidateGroupSession(matrixRoomId);
 }
 
+/**
+ * The ciphertext decrypted, but with a Megolm session whose owner the engine knows is not
+ * the sender the server attributed the message to. A server (or a relaying peer) that
+ * stores one member's ciphertext under another member's name would otherwise have it
+ * rendered as that member's words.
+ */
+export class SenderMismatchError extends Error {
+  constructor(public readonly claimedSender: string) {
+    super('decrypted event does not belong to its claimed sender');
+    this.name = 'SenderMismatchError';
+  }
+}
+
 export interface DecryptResult {
   plaintext: string;
   senderVerified: boolean;
@@ -136,6 +150,13 @@ export async function decryptForRoom(machine: OlmMachine, roomId: string, cipher
     content: JSON.parse(ciphertext),
   });
   const result = await machine.decryptRoomEvent(event, matrixRoomId, settings);
+  // Authenticity is not a side note of decryption: the session that opened this was shared
+  // by some device, and the row says who sent the message. When the engine knows the
+  // session's owner and it is not that person, this is not their message.
+  const shield = result.shieldState(true);
+  const mismatched = shield.code === ShieldStateCode.MismatchedSender;
+  shield.free();
+  if (mismatched) throw new SenderMismatchError(meta.senderId);
   const clearEvent = JSON.parse(result.event) as { content?: Record<string, unknown>; body?: string };
   const content = clearEvent.content ?? {};
   const body = typeof content.body === 'string' ? content.body : clearEvent.body ?? '';

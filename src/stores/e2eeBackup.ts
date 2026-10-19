@@ -14,6 +14,9 @@
  *    where the alternative is silently unreadable history.
  *  - Nothing blocks the app. The prompts are dialogs over a working client; a message that
  *    can't be decrypted yet shows a placeholder and resolves itself once keys arrive.
+ *  - The one thing asked for beyond the code is the account password, and only to create or
+ *    delete a backup: that is where a stolen session could swap in a backup it can read, so
+ *    the server wants more than the session for it (withPassword below).
  */
 
 import {
@@ -34,7 +37,9 @@ import {
 } from '../lib/e2ee';
 import { getMachine } from '../lib/e2ee/machine';
 import { getBackupVersion } from '../api/devices';
+import { ApiError } from '../api/ApiError';
 import { confirmDialog } from './confirmDialog';
+import { PasswordPromptCancelled, promptPassword, setPasswordPromptError } from './passwordPrompt';
 import { retryPendingDecrypts } from './messages';
 import { E2eeUnavailableError } from '../lib/e2ee/subtle';
 import { E2eeStoreUnusableError } from '../lib/e2ee/machine';
@@ -51,6 +56,60 @@ import { t } from '../i18n';
 
 /** Wrong-answer retries before giving up for this session. */
 const ATTEMPTS = 3;
+
+/**
+ * Creating or deleting a backup version needs the account password again. Devices take the
+ * version the server reports on trust, so a session token alone must not be enough to swap
+ * the backup for one whose key someone else holds, or to destroy it. The server answers a
+ * wrong password with 403.
+ */
+function isWrongPassword(e: unknown): boolean {
+  return e instanceof ApiError && (e.status === 403 || e.code === 'invalid_password');
+}
+
+/** Ask for the account password; null when the user closes the prompt. */
+async function askPassword(retainSubmitError: boolean): Promise<string | null> {
+  try {
+    return await promptPassword({
+      title: t('settings.devices.backupPasswordTitle'),
+      description: t('settings.devices.backupPasswordDescription'),
+      confirmLabel: t('settings.devices.backupPasswordConfirm'),
+      retainSubmitError,
+    });
+  } catch (e) {
+    if (e instanceof PasswordPromptCancelled) return null;
+    throw e;
+  }
+}
+
+/**
+ * Run a change the server guards with the account password, asking again with the error
+ * shown after each wrong answer. Returns the change's result and the password that worked, so
+ * a flow with two guarded steps asks once - or null when the user closed the prompt, which
+ * every caller treats as "leave things as they are", quietly. `known` is a password an
+ * earlier step already proved; it is tried before asking.
+ */
+async function withPassword<T>(
+  run: (password: string) => Promise<T>,
+  known?: string
+): Promise<{ result: T; password: string } | null> {
+  let password = known;
+  for (let attempt = 0; attempt < ATTEMPTS; attempt++) {
+    if (password === undefined) {
+      const entered = await askPassword(attempt > 0);
+      if (entered === null) return null;
+      password = entered;
+    }
+    try {
+      return { result: await run(password), password };
+    } catch (e) {
+      if (!isWrongPassword(e)) throw e;
+      setPasswordPromptError(t('settings.devices.backupPasswordWrong'));
+      password = undefined;
+    }
+  }
+  return null;
+}
 
 /**
  * A room still loading its history at the instant a restore imports its keys can land those
@@ -221,8 +280,9 @@ async function startOverWithNewBackup(userId: string): Promise<void> {
     icon: 'fa-solid fa-key',
   });
   if (!ok) return;
-  await resetKeyBackup();
-  await createBackupWithPrompt(userId);
+  const reset = await withPassword((password) => resetKeyBackup(password));
+  if (!reset) return;
+  await createBackupWithPrompt(userId, reset.password);
 }
 
 /**
@@ -233,8 +293,18 @@ async function startOverWithNewBackup(userId: string): Promise<void> {
  * account holding a backup nobody could open - reported in settings as "On", and having
  * already replaced whatever backup existed before. Preparing locally and committing on
  * confirmation makes backing out a true no-op.
+ *
+ * The password is asked for before the code is shown, so that closing the prompt leaves
+ * nothing behind - not even a code someone might keep, believing it opens something. Only the
+ * commit can check it, which is why a wrong one is asked for again afterwards. `password` is
+ * one an earlier step of the same flow already proved.
  */
-export async function createBackupWithPrompt(userId: string): Promise<boolean> {
+export async function createBackupWithPrompt(userId: string, password?: string): Promise<boolean> {
+  if (password === undefined) {
+    const entered = await askPassword(false);
+    if (entered === null) return false;
+    password = entered;
+  }
   const prepared = await prepareKeyBackup();
   try {
     await promptShowRecoveryCode(prepared.code);
@@ -245,8 +315,8 @@ export async function createBackupWithPrompt(userId: string): Promise<boolean> {
     }
     throw e;
   }
-  await commitKeyBackup(userId, prepared);
-  return true;
+  const committed = await withPassword((pw) => commitKeyBackup(userId, prepared, pw), password);
+  return committed !== null;
 }
 
 /** First time an account sets a backup up. Declining is fine - E2EE keeps working, history

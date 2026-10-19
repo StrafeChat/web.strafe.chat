@@ -19,6 +19,7 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { EmptyState } from '../ui/EmptyState';
 import { ResponsiveDialog } from '../ui/ResponsiveDialog';
+import { PasswordPromptDialog } from './PasswordPromptDialog';
 import { settingsRowShell, settingsRowIcon, settingsSectionTitle } from './settingsChrome';
 import { formatDate, t } from '../../i18n';
 import { translateCaughtApiError } from '../../lib/formatApiError';
@@ -115,65 +116,6 @@ const TotpSetupDialog: Component<{ onClose: () => void; onEnabled: (codes: strin
           </form>
         </div>
       </Show>
-    </ResponsiveDialog>
-  );
-};
-
-const PasswordPromptDialog: Component<{
-  title: string;
-  description?: string;
-  confirmLabel: string;
-  tone?: 'default' | 'danger';
-  onConfirm: (password: string) => Promise<void>;
-  onClose: () => void;
-}> = (props) => {
-  const [password, setPassword] = createSignal('');
-  const [busy, setBusy] = createSignal(false);
-  const [error, setError] = createSignal('');
-
-  async function handleSubmit(e: Event) {
-    e.preventDefault();
-    setError('');
-    if (!password()) return;
-    setBusy(true);
-    try {
-      await props.onConfirm(password());
-    } catch (err) {
-      setError(apiErrorText(err));
-      setBusy(false);
-    }
-  }
-
-  return (
-    <ResponsiveDialog
-      size="sm"
-      onClose={props.onClose}
-      closeButton
-      dismissible={!busy()}
-      title={props.title}
-      description={props.description}
-      icon="fa-solid fa-lock"
-      tone={props.tone ?? 'default'}
-    >
-      <form onSubmit={handleSubmit} class="space-y-3">
-        <Input
-          type="password"
-          label={t('settings.security.passwordPromptLabel')}
-          value={password()}
-          onInput={(e) => {
-            setError('');
-            setPassword(e.currentTarget.value);
-          }}
-          autocomplete="current-password"
-          autofocus
-        />
-        <Show when={error()}>
-          <p class="text-xs text-destructive">{error()}</p>
-        </Show>
-        <Button type="submit" class="w-full" variant={props.tone === 'danger' ? 'destructive' : 'primary'} loading={busy()}>
-          {props.confirmLabel}
-        </Button>
-      </form>
     </ResponsiveDialog>
   );
 };

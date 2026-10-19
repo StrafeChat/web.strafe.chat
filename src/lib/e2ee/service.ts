@@ -1,7 +1,7 @@
 import type { OlmMachine } from '@matrix-org/matrix-sdk-crypto-wasm';
 import { getMachine, getCurrentDeviceId } from './machine';
 import { processOutgoingRequests, receiveToDeviceMessages, drainPendingToDevice, noteOneTimeKeyCounts } from './transport';
-import { ensureRoomKeyShared, encryptForRoom, decryptForRoom, invalidateRoomSession, type RoomEventMeta } from './rooms';
+import { ensureRoomKeyShared, encryptForRoom, decryptForRoom, invalidateRoomSession, type RoomEventMeta, SenderMismatchError } from './rooms';
 import { listOwnDevices, uploadKeys, type DeviceInfo } from '../../api/devices';
 import {
   PLAINTEXT_PREFIX,
@@ -178,6 +178,9 @@ export async function decryptMessage(userId: string, roomId: string, ciphertext:
       const result = await decryptForRoom(machine, roomId, inner, meta);
       return { plaintext: result.plaintext, legacy: false, pending: false, content: result.content };
     } catch (e) {
+      // Not a missing key: the message is readable but not the claimed sender's. "Waiting
+      // for keys" would be wrong; the caller shows it as unreadable instead.
+      if (e instanceof SenderMismatchError) throw e;
       console.warn('[e2ee] decrypt pending/failed for event', meta.eventId, e);
       return { plaintext: '', legacy: false, pending: true };
     }

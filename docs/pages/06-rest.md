@@ -59,11 +59,11 @@ The space's rooms with overrides and, for the caller, read state. Same shape as 
 
 ### `POST` /spaces/:id/rooms — *Manage Rooms*
 
-`{"name", "type": 3 | 4 | 5, "parent_id"?, "e2ee_enabled"?, "user_limit"?, "bitrate"?}`. Type `3` text, `4` voice, `5` section. Returns the room (`201`).
+`{"name", "type": 3 | 4 | 5, "parent_id"?, "e2ee_enabled"?, "user_limit"?, "bitrate"?}`. Type `3` text, `4` voice, `5` section. Returns the room (`201`). A space holds at most 500 rooms and 250 roles (`400` beyond that).
 
 ### `PATCH` /spaces/:id/rooms/:roomId — *Manage Rooms*
 
-`name`, `topic`, `slowmode_seconds`, `e2ee_enabled` (text rooms; turning encryption **on** is one-way for existing history), `user_limit`, `bitrate`, `position`.
+`name`, `topic`, `slowmode_seconds`, `e2ee_enabled` (text rooms; turning encryption **on** is one-way for existing history), `user_limit`, `bitrate`, `position`, `permissions_synced`. You must be able to view the room; `permissions_synced` rewrites the room's overrides, so it needs *Manage Roles* as well, and only for overrides you could have written yourself.
 
 ### `DELETE` /spaces/:id/rooms/:roomId — *Manage Rooms*
 
@@ -95,7 +95,7 @@ Add a user who authorized your application with `spaces.join`: `{"access_token":
 
 ### Bans — *Ban Members*
 
-`POST /spaces/:id/bans/:userId` `{"reason"?}` bans (and removes) the user; `DELETE /spaces/:id/bans/:userId` lifts it; `GET /spaces/:id/bans` lists the bans (`user_id`, `reason`, `banned_by`, `created_at`) together with the profiles of the users involved. The owner cannot be kicked or banned, and you cannot act on someone whose highest role is at or above yours.
+`POST /spaces/:id/bans/:userId` `{"reason"?}` bans (and removes) the user - someone who has already left or been kicked can be banned too, so a live invite does not let them back in; `DELETE /spaces/:id/bans/:userId` lifts it; `GET /spaces/:id/bans` lists the bans (`user_id`, `reason`, `banned_by`, `created_at`) together with the profiles of the users involved. The owner cannot be kicked or banned, and you cannot act on someone whose highest role is at or above yours.
 
 ## Roles
 
@@ -126,7 +126,7 @@ Not `@everyone`, not a managed role.
 - `GET /spaces/:id/rooms/:roomId/overrides` → `[{role_id, allow, deny}]`; `PUT …/overrides/:roleId` `{"allow", "deny"}`; `DELETE …/overrides/:roleId`.
 - `GET /spaces/:id/rooms/:roomId/overrides/users` → `[{user_id, allow, deny}]`; `PUT …/overrides/users/:userId`; `DELETE …/overrides/users/:userId`.
 
-Only room-scoped bits are accepted (see [Permissions › Room overrides](/docs/permissions/#room-overrides)).
+Only room-scoped bits are accepted (see [Permissions › Room overrides](/docs/permissions/#room-overrides)). Listing needs View on the room. Deleting an override is bound by the same rule as writing one - removing a deny grants what the matching allow would - so you can only delete overrides whose bits you hold in that room (`403` otherwise).
 
 ## Invites
 
@@ -154,7 +154,7 @@ The account's private messages and group PMs.
 
 ### `GET` /rooms/:id
 
-Any room the account can see, space rooms included. Space rooms carry `space_id`; every room carries `e2ee_enabled`.
+Any room the account can see, space rooms included - a space room is listed only when the account may view it. Space rooms carry `space_id`; every room carries `e2ee_enabled`.
 
 ### `POST` /rooms
 
@@ -271,6 +271,19 @@ Managed from the client's *Settings → Developers*; listed for completeness. On
 | `GET` /oauth2/@me/grants, `DELETE` /oauth2/@me/grants/:app_id | The applications you authorized, and revoking one |
 
 OAuth2 endpoints (`/oauth2/token`, `/oauth2/token/revoke`, `/oauth2/@me`) are on the [OAuth2](/docs/oauth2/) page.
+
+## Key backup (session only)
+
+The end-to-end encryption key backup (`m.megolm_backup.v1.curve25519-aes-sha2`, the same shape as Matrix's `/room_keys`). The server stores room keys encrypted to the backup's public key and the private key wrapped under the user's recovery code; it can read neither. Only a person's session may call these.
+
+| Method and path | |
+| --- | --- |
+| `POST` /devices/backup/version `{"algorithm", "auth_data", "wrapped_private_key", "salt", "password"}` | Start a new version; returns `{"version"}`. `password` is the account password, checked again: `400 password is required` without it, `403 invalid password` when wrong. The version this one replaces is kept, keys included, for **7 days** so a replacement the user did not make can be undone; anything older is removed. Fires `KEY_BACKUP_UPDATE` |
+| `GET` /devices/backup/version | The current version's public parameters: `{"exists", "version", "algorithm", "auth_data", "etag", "count", "created_at"}`, plus `"previous": {"version", "created_at"}` while a superseded version is still retained (absent otherwise) |
+| `GET` /devices/backup/recovery`[?version=N]` | The wrapped private key and salt for a restore. Without `version`, the current one; with it, the current or the retained previous version only - anything else is `404` |
+| `DELETE` /devices/backup/version?version=N `{"password"}` | Discard a version and every key in it, immediately; takes the password the same way as `POST`. Deleting the current version makes the retained previous one current again. Fires `KEY_BACKUP_UPDATE` |
+| `PUT` /devices/backup/keys?version=N | Upload room keys to the **current** version; a superseded one answers `404`, which is how a device that missed `KEY_BACKUP_UPDATE` learns the version moved |
+| `GET` /devices/backup/keys?version=N`[&after=<cursor>]` | One page of a version's keys - the current or the retained previous one |
 
 ## Errors
 

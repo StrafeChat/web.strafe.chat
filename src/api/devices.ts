@@ -102,6 +102,12 @@ export interface BackupVersionResponse {
   /** How many room keys the backup currently holds. */
   count?: number;
   created_at?: string;
+  /**
+   * The version this one replaced, while the server still retains it (seven days). A restore
+   * can fall back to it when the recovery code does not open the current version - which is
+   * what happens when someone else replaced the backup.
+   */
+  previous?: { version: string; created_at: string };
 }
 
 /** Public parameters. Safe and cheap to read; carries no recovery material. */
@@ -119,22 +125,36 @@ export interface BackupRecoveryResponse {
   salt?: string;
 }
 
-/** The wrapped private key. Only a restore needs it, and it is rate limited accordingly. */
-export function getBackupRecovery() {
-  return api<BackupRecoveryResponse>('/devices/backup/recovery');
+/**
+ * The wrapped private key. Only a restore needs it, and it is rate limited accordingly.
+ * `version` may name the retained previous version (see BackupVersionResponse.previous);
+ * the server serves no other.
+ */
+export function getBackupRecovery(version?: string) {
+  return api<BackupRecoveryResponse>(
+    `/devices/backup/recovery${version ? `?version=${encodeURIComponent(version)}` : ''}`
+  );
 }
+
+// Creating or deleting a version is where the backup can be taken over - the version holds
+// the public key every device encrypts its history to - so both ask for the account password
+// again, as disabling 2FA does. A session token alone is not enough for either.
 
 export function createBackupVersion(input: {
   algorithm: string;
   auth_data: Record<string, unknown>;
   wrapped_private_key: string;
   salt: string;
+  password: string;
 }) {
   return api<{ version: string }>('/devices/backup/version', { method: 'POST', json: input });
 }
 
-export function deleteBackupVersion(version: string) {
-  return api<void>(`/devices/backup/version?version=${encodeURIComponent(version)}`, { method: 'DELETE' });
+export function deleteBackupVersion(version: string, password: string) {
+  return api<void>(`/devices/backup/version?version=${encodeURIComponent(version)}`, {
+    method: 'DELETE',
+    json: { password },
+  });
 }
 
 /**
@@ -164,7 +184,7 @@ export interface BackupKeysPage {
 }
 
 /** One page of a backup. Paged because a busy account's whole backup is far too large to
- * assemble into a single response. */
+ * assemble into a single response. Serves the retained previous version too. */
 export function getBackupKeys(version: string, after?: string) {
   const query = `version=${encodeURIComponent(version)}${after ? `&after=${encodeURIComponent(after)}` : ''}`;
   return api<BackupKeysPage>(`/devices/backup/keys?${query}`);

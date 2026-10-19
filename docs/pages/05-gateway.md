@@ -36,7 +36,7 @@ Every frame is a JSON object with an `op` and, usually, a `d`.
 | `op` | Name | `d` | |
 | --- | --- | --- | --- |
 | `0` | Heartbeat | - | Optional; resets the read timeout. Answered by nothing |
-| `1` | Subscribe | `{"space_id": "<space or room id>"}` | Start receiving a space's or a room's events. Bots are subscribed to everything on connect; see [Subscriptions](#subscriptions) |
+| `1` | Subscribe | `{"space_id": "<space or room id>"}` | Start receiving a space's or a room's events. Bots are subscribed to everything on connect; see [Subscriptions](#subscriptions). Subscriptions that need authorizing are rate limited per connection (a burst of 60, refilling ten a second; `4029` when exceeded); re-subscribing to a channel you already hold is free. A subscription ends when the membership that allowed it does: being kicked or banned, leaving, or losing View on a room drops it server-side. One account may hold 25 connections per gateway |
 | `2` | Send | `{"space_id": "<room id>", "type": "typing", "content": {…}}` | Publish a lightweight event to a room's subscribers (typing). Messages are **not** sent this way - use REST |
 | `5` | Unsubscribe | `{"space_id": "…"}` | Stop receiving a space's or a room's events |
 | `6` | Ping | - | Answered with `op 7` |
@@ -206,6 +206,7 @@ Sent space-wide when everyone can view the parent channel, otherwise only to the
 | `SESSION_REVOKED` | `{"reason"}` - this credential is dead: the account was banned from the instance, signed out everywhere, or (for a bot) the token was reset. The socket is closed right after |
 | `VOICE_STATE_UPDATE`, `CALL_RING`, `CALL_DECLINE`, `CALL_END` | Voice and video (see the client) |
 | `TO_DEVICE`, `DEVICE_REVOKED`, `SESSION_ROTATE` | End-to-end encryption key traffic between devices. A bot can ignore these |
+| `KEY_BACKUP_UPDATE` | `{"action": "created" \| "deleted", "version"}` - the account's [key backup](/docs/rest/#key-backup-session-only) version was created or deleted (for `deleted`, the version that went). A device pinned to a version that is no longer current stops uploading to it and asks the user to confirm the new one with the recovery code, without waiting for its next upload to fail |
 
 ## Errors
 
