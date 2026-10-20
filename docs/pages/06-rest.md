@@ -1,6 +1,6 @@
 ---
 title: REST API
-description: Reference for the endpoints bots and applications use - users, spaces, members, roles, invites, rooms, messages, reactions, attachments - plus error and rate-limit behaviour.
+description: Reference for the endpoints bots and applications use - the instance, users, spaces, members, roles, invites, rooms, messages, reactions, attachments, GIFs - plus error and rate-limit behaviour.
 ---
 
 # REST API
@@ -8,6 +8,18 @@ description: Reference for the endpoints bots and applications use - users, spac
 All paths are relative to this instance's API base: <code data-instance="api">https://your-instance.example/api</code>. Authenticate with `Authorization: Bot <token>` (bots) or `Authorization: Bearer <access token>` (OAuth2, scoped endpoints only). Send and expect JSON; ids are strings.
 
 **Who can call what.** Every endpoint below accepts a bot token unless marked *session only*. OAuth2 tokens reach only the endpoints marked with a scope. A bot is checked against its permissions in the space or room like any member.
+
+## Instance
+
+### `GET` / — *no auth*
+
+What this instance is and what it has switched on. Clients read it before anyone signs in.
+
+```json
+{ "strafe": { "version": "…" }, "federation": { "enabled": true, "domain": "your-instance.example" }, "features": { "captcha": { "enabled": true, "provider": "altcha" }, "email": { "enabled": true, "verification_required": false }, "invite_only": { "enabled": false }, "voice": { "enabled": true }, "gifs": { "enabled": true, "providers": ["giphy"] } }, "services": { "cdn": { "enabled": true, "url": "…" }, "voice": { "enabled": true, "url": "…" } } }
+```
+
+`features.gifs.providers` lists the GIF providers (`giphy`, `heypster`) this instance has an API key for, and `enabled` is true when there is at least one; see [GIFs](#gifs). The keys themselves never leave the server.
 
 ## Users
 
@@ -254,6 +266,35 @@ See [Bots › Sending messages](/docs/bots/#sending-messages). `201` with the me
 
 `multipart/form-data` with `file` and optional `width`/`height`. Returns the attachment record; reference its `id` in a message within the same room. Size limit per the instance's configuration (25 MB on a default deployment).
 
+## GIFs
+
+The instance proxies GIF search, so the provider's API key stays on the server and the search request comes from the instance, never from the person searching: not their address, cookies or account. The GIFs themselves (`url`, `preview_url`, `still_url`) are served by the provider's CDN, so whatever loads them is seen by the provider. Trending pages are cached for two minutes; searches are passed straight through and not cached.
+
+### `GET` /gifs/search, `GET` /gifs/trending
+
+| Parameter | |
+| --- | --- |
+| `provider` | `giphy` (the default) or `heypster` - one of `features.gifs.providers` on `GET /` |
+| `q` | Search only, and required there. Trimmed, and cut to 50 characters |
+| `limit` | 1-50, default 24 |
+| `offset` | 0-4999, default 0 |
+
+Results are rated up to PG-13.
+
+```json
+{ "results": [{ "id": "…", "title": "…", "url": "https://…/giphy.gif", "width": 480, "height": 270, "preview_url": "https://…/200w.gif", "preview_width": 200, "preview_height": 113, "still_url": "https://…/200w_s.gif" }], "next_offset": 24, "total_count": 1000 }
+```
+
+`url` is the rendition to send or embed, `preview_url` a smaller animated one for a picker grid, and `still_url` (absent when the provider has none) a single frame to show while it loads. Every URL is `https://`; an item without a usable preview and full rendition is left out, so a page can hold fewer than `limit`. Pass `next_offset` as `offset` for the next page, and stop once it reaches `total_count`.
+
+| Status | Body | When |
+| --- | --- | --- |
+| `400` | `{"error": "unknown gif provider", "code": "gif_provider_unknown"}` | `provider` is neither `giphy` nor `heypster` |
+| `400` | `{"error": "query is required"}` | `q` is empty on `/gifs/search` |
+| `404` | `{"error": "gif provider not configured", "code": "gif_not_configured"}` | The instance has no key for that provider |
+| `502` | `{"error": "gif provider unavailable", "code": "gif_upstream"}` | The provider failed or answered with an error |
+| `503` | `{"error": "gif provider unavailable", "code": "gif_upstream"}` | The provider is rate limiting the instance; try again later |
+
 ## Applications (session only)
 
 Managed from the client's *Settings → Developers*; listed for completeness. Only a person's session may call them, never a bot or an OAuth2 token.
@@ -300,6 +341,7 @@ The end-to-end encryption key backup (`m.megolm_backup.v1.curve25519-aes-sha2`, 
 | `409` | A conflict (an application that already has a bot, the application limit) |
 | `429` | Rate limited or slowmode; see below |
 | `500` | Something broke server-side. Retry with backoff |
+| `502`, `503` | A service the instance relays to (a GIF provider) failed or is limiting the instance. Retry later |
 
 ## Rate limits
 
@@ -308,6 +350,7 @@ The end-to-end encryption key backup (`m.megolm_backup.v1.curve25519-aes-sha2`, 
 | `POST /oauth2/token`, `POST /oauth2/token/revoke` | 20 per minute per IP |
 | Creating applications, secrets and bot tokens | 20 per minute |
 | Typing indicators | One broadcast per 5 s per room (extra calls succeed silently) |
+| `GET /gifs/search`, `GET /gifs/trending` | 60 per minute per account, each |
 | Gateway `op 2` frames | Burst of 20 per connection, refilling one every 250 ms |
 | Messages in a room with slowmode | One per `slowmode_seconds` per member; `429` with `retry_after` (seconds) and a `Retry-After` header. Members with Manage Messages are exempt |
 | Sign-in, registration, key backup | Separate tight limits (not relevant to bots) |

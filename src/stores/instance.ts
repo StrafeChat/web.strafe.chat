@@ -3,6 +3,7 @@ import { api } from '../api/client';
 import { getInstanceCapabilities } from '../api/instance';
 import { disconnectStargate, onStargateEvent } from '../services/stargate/client';
 import { logout } from './auth';
+import type { GifProviderId } from '../lib/gif/providers';
 
 /**
  * What this client knows about the instance it's connected to. Federation info decides
@@ -30,6 +31,9 @@ export interface InstanceState {
   /** The signed-in account administers this instance. Asked of the server after every
    * connection; false until it answers, which is the safe way to be wrong. */
   instanceAdmin: boolean;
+  /** GIF providers the instance has an API key for and proxies (GET /gifs/*). The keys
+   * themselves never reach the client. Empty means the GIF tab shows "not configured". */
+  gifProviders: GifProviderId[];
 }
 
 export const [instance, setInstance] = createStore<InstanceState>({
@@ -42,6 +46,7 @@ export const [instance, setInstance] = createStore<InstanceState>({
   inviteOnly: false,
   email: { enabled: false, verificationRequired: false },
   instanceAdmin: false,
+  gifProviders: [],
 });
 
 interface IndexResponse {
@@ -52,7 +57,25 @@ interface IndexResponse {
     voice?: { enabled?: boolean };
     invite_only?: { enabled?: boolean };
     email?: { enabled?: boolean; verification_required?: boolean };
+    gifs?: { enabled?: boolean; providers?: unknown };
   };
+}
+
+// Keyed by the type so that adding a provider to GifProviderId fails to compile until it is
+// listed here too. Only a type is imported from lib/gif/providers: that module reads this
+// store, and a runtime import back would make the two modules require each other.
+const KNOWN_GIF_PROVIDERS: Record<GifProviderId, true> = { giphy: true, heypster: true };
+
+/** The providers GET / lists, keeping only ids this client can show (a newer server may
+ * offer more) and each once. */
+function parseGifProviders(v: unknown): GifProviderId[] {
+  if (!Array.isArray(v)) return [];
+  const out: GifProviderId[] = [];
+  for (const p of v) {
+    if (typeof p !== 'string' || !Object.prototype.hasOwnProperty.call(KNOWN_GIF_PROVIDERS, p)) continue;
+    if (!out.includes(p as GifProviderId)) out.push(p as GifProviderId);
+  }
+  return out;
 }
 
 let inflight: Promise<void> | null = null;
@@ -74,6 +97,7 @@ export function resetInstanceInfo(): void {
     inviteOnly: false,
     email: { enabled: false, verificationRequired: false },
     instanceAdmin: false,
+    gifProviders: [],
   });
 }
 
@@ -118,6 +142,7 @@ export function loadInstanceInfo(): Promise<void> {
             enabled: res.features?.email?.enabled === true,
             verificationRequired: res.features?.email?.enabled === true && res.features?.email?.verification_required === true,
           },
+          gifProviders: parseGifProviders(res.features?.gifs?.providers),
         });
       })
       .catch((e) => {
