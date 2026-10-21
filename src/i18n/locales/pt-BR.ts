@@ -2171,7 +2171,6 @@ export default {
       hostedOn: 'Este espaço é hospedado em {{domain}}, então seu perfil do espaço fica salvo lá.',
       nickname: 'Apelido',
       nicknameHint: 'Aparece no lugar do seu nome de exibição neste espaço. Até 32 caracteres.',
-      nicknameLocked: 'Este espaço não permite que você altere seu apelido.',
       avatar: 'Avatar do espaço',
       banner: 'Banner do espaço',
       removeAvatar: 'Remover avatar do espaço',

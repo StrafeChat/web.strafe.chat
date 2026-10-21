@@ -2170,7 +2170,6 @@ export default {
       hostedOn: 'Este espacio está alojado en {{domain}}, así que tu perfil del espacio se guarda allí.',
       nickname: 'Apodo',
       nicknameHint: 'Se muestra en lugar de tu nombre visible en este espacio. Hasta 32 caracteres.',
-      nicknameLocked: 'Este espacio no te permite cambiar tu apodo.',
       avatar: 'Avatar del espacio',
       banner: 'Banner del espacio',
       removeAvatar: 'Quitar avatar del espacio',

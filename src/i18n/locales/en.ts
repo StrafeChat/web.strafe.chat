@@ -2144,7 +2144,6 @@ export default {
       hostedOn: 'This space is hosted on {{domain}}, so your space profile is saved there.',
       nickname: 'Nickname',
       nicknameHint: 'Shown instead of your display name in this space. Up to 32 characters.',
-      nicknameLocked: "This space doesn't let you change your nickname.",
       avatar: 'Space avatar',
       banner: 'Space banner',
       removeAvatar: 'Remove space avatar',

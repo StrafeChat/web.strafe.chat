@@ -138,8 +138,9 @@ export const SpaceProfilesSettingsPage: Component<SpaceProfilesSettingsPageProps
   });
 
   const canChangeNick = createMemo(() => memberCanChangeNickname(space(), roles(), member(), myId()));
-  // Locked only once the space's roles are known to say so: claiming a lock from roles that
-  // have not arrived would be wrong as often as not, and the server decides either way.
+  // Without Change Nickname the field is hidden, as Discord hides it - but only once the
+  // space's roles are known to say so: hiding it on roles that have not arrived would be wrong
+  // as often as not, and the server decides either way.
   const nickLocked = () => roles() !== undefined && !canChangeNick();
 
   /** Pick the space to start on: the one asked for, else the one on screen, else the first. */
@@ -209,7 +210,11 @@ export const SpaceProfilesSettingsPage: Component<SpaceProfilesSettingsPageProps
     setDrafts((d) => ({ ...d, [key]: value }));
   }
 
-  const changedKeys = createMemo(() => TEXT_KEYS.filter((k) => drafts()[k].trim() !== baseline()[k].trim()));
+  // A hidden nickname never counts as an edit: it cannot be seen or saved (sending it would get
+  // the whole save refused), so it must not hold the page dirty or block Save.
+  const changedKeys = createMemo(() =>
+    TEXT_KEYS.filter((k) => !(k === 'nick' && nickLocked()) && drafts()[k].trim() !== baseline()[k].trim())
+  );
   const dirty = createMemo(() => loadState() === 'ready' && changedKeys().length > 0);
   /** Why the server would refuse an edited field, translated; only edits are judged. */
   const fieldError = (k: keyof TextFields): string | undefined => {
@@ -245,9 +250,6 @@ export const SpaceProfilesSettingsPage: Component<SpaceProfilesSettingsPageProps
     const patch: SpaceProfilePatch = {};
     const d = drafts();
     for (const k of changedKeys()) {
-      // The field is disabled then, so it cannot have changed; sending it would only get the
-      // whole save refused.
-      if (k === 'nick' && nickLocked()) continue;
       // Empty clears it, so the main profile shows through again.
       patch[WIRE_KEY[k]] = d[k].trim() || null;
     }
@@ -520,30 +522,30 @@ export const SpaceProfilesSettingsPage: Component<SpaceProfilesSettingsPageProps
                 <section class="space-y-3">
                   <h3 class={settingsSectionTitle}>{t('settings.profile.detailsTitle')}</h3>
                   <div class="space-y-2">
-                    <div class={fieldCard}>
-                      <div class={settingsRowIcon}>
-                        <i class="fa-solid fa-signature text-sm" />
+                    <Show when={!nickLocked()}>
+                      <div class={fieldCard}>
+                        <div class={settingsRowIcon}>
+                          <i class="fa-solid fa-signature text-sm" />
+                        </div>
+                        <div class="min-w-0 flex-1 space-y-2">
+                          <label for="space-profile-nick" class="text-[15px] font-semibold text-foreground">
+                            {t('settings.spaceProfiles.nickname')}
+                          </label>
+                          <Input
+                            id="space-profile-nick"
+                            value={drafts().nick}
+                            maxLength={inputMaxLength('nick')}
+                            error={fieldError('nick')}
+                            placeholder={globalName()}
+                            autocomplete="off"
+                            disabled={saving() || resetting()}
+                            onInput={(e) => setDraft('nick', e.currentTarget.value)}
+                            class="rounded-lg border-border bg-background/60"
+                          />
+                          <p class="text-xs text-muted-foreground">{t('settings.spaceProfiles.nicknameHint')}</p>
+                        </div>
                       </div>
-                      <div class="min-w-0 flex-1 space-y-2">
-                        <label for="space-profile-nick" class="text-[15px] font-semibold text-foreground">
-                          {t('settings.spaceProfiles.nickname')}
-                        </label>
-                        <Input
-                          id="space-profile-nick"
-                          value={drafts().nick}
-                          maxLength={inputMaxLength('nick')}
-                          error={fieldError('nick')}
-                          placeholder={globalName()}
-                          autocomplete="off"
-                          disabled={saving() || resetting() || nickLocked()}
-                          onInput={(e) => setDraft('nick', e.currentTarget.value)}
-                          class="rounded-lg border-border bg-background/60"
-                        />
-                        <p class="text-xs text-muted-foreground">
-                          {nickLocked() ? t('settings.spaceProfiles.nicknameLocked') : t('settings.spaceProfiles.nicknameHint')}
-                        </p>
-                      </div>
-                    </div>
+                    </Show>
                     <div class={fieldCard}>
                       <div class={settingsRowIcon}>
                         <i class="fa-solid fa-venus-mars text-sm" />
