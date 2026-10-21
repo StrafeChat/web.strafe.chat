@@ -1,5 +1,6 @@
 import type { Component } from 'solid-js';
 import { userOptionLabel } from '../stores/instance';
+import { resolveProfile } from '../lib/spaceProfile';
 import { createEffect, createMemo, createSignal, For, Show } from 'solid-js';
 import {
   deleteRoomPermissionOverride,
@@ -528,7 +529,8 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
                   <For each={props.members}>
                     {(m) => (
                       <option value={m.id}>
-                        {userOptionLabel(m)}
+                        {/* Their name in this space, with the handle beside it. */}
+                        {userOptionLabel({ username: m.username, display_name: resolveProfile(m, m, m.username).name })}
                       </option>
                     )}
                   </For>

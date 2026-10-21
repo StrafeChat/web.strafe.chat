@@ -2,6 +2,7 @@ import type { Component } from 'solid-js';
 import { createEffect, createSignal, For, Show } from 'solid-js';
 import { setMemberSpaceRoles, type SpaceMember, type SpaceRole } from '../../../api/spaces';
 import { spaceRoleColorHex } from '../../../lib/spacePermissions';
+import { resolveProfile } from '../../../lib/spaceProfile';
 import { Button } from '../../ui/Button';
 import { Toggle } from '../../ui/Toggle';
 import { ResponsiveDialog } from '../../ui/ResponsiveDialog';
@@ -57,7 +58,7 @@ export const EditMemberRolesDialog: Component<Props> = (props) => {
           zClass={zLayer.modalStacked}
           onClose={() => !busy() && props.onClose()}
           dismissible={!busy()}
-          title={t('spaceSettings.members.editRolesTitle', { name: m().display_name || m().username })}
+          title={t('spaceSettings.members.editRolesTitle', { name: resolveProfile(m(), m(), m().username).name })}
           description={t('spaceSettings.membersExplain')}
         >
           <div class="max-h-72 space-y-1 overflow-y-auto rounded-xl border border-border/60 bg-card/10 p-2">

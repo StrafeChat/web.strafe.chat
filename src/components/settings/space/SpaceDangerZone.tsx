@@ -3,6 +3,7 @@ import { userOptionLabel } from '../../../stores/instance';
 import { createMemo, createSignal, For, Show } from 'solid-js';
 import { deleteSpace, transferSpaceOwnership, type Space, type SpaceMember } from '../../../api/spaces';
 import { addOrUpdateSpace, removeSpace } from '../../../stores/spaces';
+import { resolveProfile } from '../../../lib/spaceProfile';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
 import { Select } from '../../ui/Select';
@@ -39,7 +40,10 @@ export const SpaceDangerZone: Component<Props> = (props) => {
   const isOwner = () => !!props.viewerId && props.space?.owner_id === props.viewerId;
   const spaceName = () => props.space?.name ?? '';
   const candidates = createMemo(() => props.members.filter((m) => m.id !== props.space?.owner_id));
-  const memberName = (m: SpaceMember) => m.display_name || m.username;
+  /** Their name in this space (a nickname when set) beside the handle: handing the space to
+   * the wrong person is not undoable, so the picker must never show a nickname alone. */
+  const memberLabel = (m: SpaceMember) =>
+    userOptionLabel({ username: m.username, display_name: resolveProfile(m, m, m.username).name });
 
   function openTransfer() {
     setNewOwnerId('');
@@ -138,7 +142,7 @@ export const SpaceDangerZone: Component<Props> = (props) => {
               <For each={candidates()}>
                 {(m) => (
                   <option value={m.id}>
-                    {userOptionLabel(m)}
+                    {memberLabel(m)}
                   </option>
                 )}
               </For>

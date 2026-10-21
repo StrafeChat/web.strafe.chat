@@ -64,6 +64,32 @@ const SERVER_MESSAGE_TO_KEY: Record<string, string> = {
   'this space is hosted on another instance and can only be managed from there': 'errors.api.spaceHostedElsewhere',
   'the instance hosting this space could not be reached': 'errors.api.spaceOriginUnreachable',
   'this instance does not federate with other instances': 'errors.api.federationOff',
+  // An origin older than the op a mirror forwarded. The only member-facing op new enough to
+  // meet one in practice is member.profile (space profiles), hence the wording.
+  'unknown action': 'errors.api.spaceProfileUnsupported',
+  // Space profiles (spaces/member_profile.go) and the space moderation errors they share.
+  // The about_me / bio / pronouns lines are also the global profile's own (users/schema.go).
+  'nickname must be at most 32 characters, on one line': 'errors.api.nicknameInvalid',
+  'missing permission to change your nickname in this space': 'errors.api.nicknameForbidden',
+  "only the space owner can change the owner's nickname": 'errors.api.ownerNicknameForbidden',
+  "only the space owner can change the owner's space profile": 'errors.api.ownerSpaceProfileForbidden',
+  'only the member can change their own space avatar, banner, pronouns, about me or bio': 'errors.api.spaceProfileNotOwn',
+  'avatar and banner must be uploaded, or cleared with null': 'errors.api.spaceProfileImage',
+  'about_me must be at most 190 characters': 'errors.api.aboutMeTooLong',
+  'bio must be at most 190 characters': 'errors.api.bioTooLong',
+  'pronouns must be at most 40 characters': 'errors.api.pronounsTooLong',
+  'member not found': 'errors.api.memberNotFound',
+  'cannot manage a role or member at or above your own highest role': 'errors.api.roleHierarchy',
+  'missing permission': 'errors.api.missingPermission',
+  // A 409: two writes (normally two uploads at once) raced and this one lost twice.
+  'the space profile changed while saving; try again': 'errors.api.spaceProfileChanged',
+  // Image uploads judge the type by extension, so an image/* the picker let through (HEIC,
+  // BMP) can still be refused here.
+  'unsupported image type (use jpg, png, gif, or webp)': 'settings.profile.imageTypeError',
+  // The rest of every image upload's refusals (profile, space profile, space icon and banner).
+  'invalid file size': 'settings.profile.imageSizeError',
+  'could not read file': 'settings.profile.uploadFailed',
+  'could not store image': 'settings.profile.uploadFailed',
   // Zog login
   'email must be valid': 'errors.validation.emailInvalid',
   'email is required': 'errors.validation.emailRequired',
@@ -119,6 +145,11 @@ export function translateApiErrorMessage(raw: string, t: ErrorTranslateFn): stri
     return [t('errors.api.httpStatus', { status: code })];
   }
 
+  // The whole message first: a server sentence may itself contain "; " (the space-profile
+  // 409, the federation-off hint), and split into halves it would match nothing.
+  const whole = SERVER_MESSAGE_TO_KEY[n.toLowerCase()] ?? SERVER_MESSAGE_TO_KEY[n];
+  if (whole) return [t(whole)];
+
   return splitErrorMessage(n).map((seg) => translateSegment(seg, t));
 }
 
@@ -154,6 +185,11 @@ export function translateCaughtApiError(err: unknown, t: ErrorTranslateFn): stri
   }
   if (isApiError(err) && err.code === 'ip_banned') {
     return [t('errors.api.ipBanned')];
+  }
+  // A moderator sent a value (not a clear) for someone else's space avatar, banner, pronouns,
+  // About Me or bio: only the member sets those.
+  if (isApiError(err) && err.code === 'cannot_edit_member_profile') {
+    return [t('errors.api.spaceProfileNotOwn')];
   }
   // Likewise a 429 that means "one was just sent", not "slow down".
   if (isApiError(err) && err.code === 'email_cooldown') {

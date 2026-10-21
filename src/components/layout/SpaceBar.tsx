@@ -6,9 +6,10 @@ import { A, useLocation, useNavigate } from '@solidjs/router';
 import { lastVisited } from '../../stores/lastVisited';
 import { spaces, removeSpace } from '../../stores/spaces';
 import { spaceMembers } from '../../stores/spaceMembers';
-import { memberCanCreateInvite, memberCanManageSpace, memberCanManageRoles } from '../../lib/spacePermissions';
+import { memberCanCreateInvite, memberCanManageSpace, memberCanManageRoles, memberCanManageNicknames } from '../../lib/spacePermissions';
 import { confirmDialog } from '../../stores/confirmDialog';
 import { requestSpaceAction, type SpaceQuickAction } from '../../stores/spaceQuickActions';
+import { openUserSettings } from '../../stores/userSettingsModal';
 import { lastSpaceRoom } from '../../stores/lastSpaceRoom';
 import { orderSpacesByPreference, spaceOrder } from '../../stores/spaceOrder';
 import { createSpaceReorder } from './spaceRail/createSpaceReorder';
@@ -295,8 +296,11 @@ export const SpaceBar: Component = () => {
     const me = spaceMembers.bySpaceId[spaceId]?.find((m) => m.id === uid);
     const roles = sp?.roles;
     const canInvite = memberCanCreateInvite(sp, roles, me, uid);
+    // Same gate as the space header's Settings entry (SpaceRoomsBar's showSpaceSettings).
     const canSettings =
-      memberCanManageSpace(sp, roles, me, uid) || memberCanManageRoles(sp, roles, me, uid);
+      memberCanManageSpace(sp, roles, me, uid) ||
+      memberCanManageRoles(sp, roles, me, uid) ||
+      memberCanManageNicknames(sp, roles, me, uid);
     const isOwner = !!sp && sp.owner_id === uid;
 
     // Invite/Settings modals live in that space's SpaceRoomsBar: flag the action and, if it's not
@@ -313,6 +317,13 @@ export const SpaceBar: Component = () => {
       ...(canSettings
         ? [{ label: t('space.settings'), icon: 'fa-sliders', onClick: () => openAction('settings') }]
         : []),
+      // User Settings is one app-wide modal, so unlike Invite/Settings this needs no
+      // navigation to the space first.
+      {
+        label: t('spaceProfile.edit'),
+        icon: 'fa-id-badge',
+        onClick: () => openUserSettings('spaceProfiles', { spaceId }),
+      },
       {
         label: t('contextMenu.markSpaceAsRead'),
         icon: 'fa-check-double',

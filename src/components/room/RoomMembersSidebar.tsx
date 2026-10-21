@@ -9,10 +9,15 @@ import { showContextMenu, type ContextMenuItem } from '../../stores/contextMenu'
 import { buildUserMenuItems, buildSpaceModerationItems } from '../../lib/userContextMenu';
 import { appActivityRail, appSectionLabel } from '../../theme/appChrome';
 import {
+  canEditNicknameOf,
   highestHoistedRole,
+  memberHighestRolePosition,
   memberNameColorHex,
 } from '../../lib/spacePermissions';
+import { resolveProfile } from '../../lib/spaceProfile';
 import { openUserProfileFromParticipant } from '../../stores/userProfilePopover';
+import { openNicknameDialog } from '../../stores/nicknameDialog';
+import { openUserSettings } from '../../stores/userSettingsModal';
 import { IconButton } from '../ui/IconButton';
 import { t } from '../../i18n';
 import { BotTag } from '../BotTag';
@@ -47,6 +52,11 @@ export interface RoomMembersSidebarProps {
   viewerHighestRolePosition?: number;
   onKickMember?: (userId: string) => void;
   onBanMember?: (userId: string) => void;
+  /** Space profiles: memberCanChangeNickname / memberCanManageNicknames for the viewer. With
+   * spaceId set, a row's menu and profile card offer Change Nickname (and, on your own row,
+   * Edit Space Profile); Manage Nicknames also brings Reset Space Profile. */
+  canChangeOwnNickname?: boolean;
+  canManageNicknames?: boolean;
   /** Below md the member list is an overlay drawer swiped in from the right edge; this is
    * whether it is currently out. Ignored from md up, where it is a static column. */
   mobileOpen?: boolean;
@@ -64,16 +74,24 @@ function isMemberOnline(p: RoomParticipant): boolean {
   return st === 'online' || st === 'idle' || st === 'dnd';
 }
 
-function sortByDisplayName(a: RoomParticipant, b: RoomParticipant): number {
-  return (a.display_name || a.username).localeCompare(b.display_name || b.username, undefined, {
-    sensitivity: 'base',
-  });
+type MemberCompare = (a: RoomParticipant, b: RoomParticipant) => number;
+
+/** By the name each row shows: in a space, the member's nickname when they have one. The
+ * names are resolved once per pass, not per comparison - the list re-sorts on every presence
+ * change in the space. */
+function byDisplayName(list: RoomParticipant[]): MemberCompare {
+  const names = new Map(list.map((p) => [p.id, resolveProfile(p, p).name]));
+  return (a, b) =>
+    (names.get(a.id) ?? '').localeCompare(names.get(b.id) ?? '', undefined, {
+      sensitivity: 'base',
+    });
 }
 
 /** Discord-style: one section per hoisted role (by position), then "Online" for members with no hoisted role. */
 function buildSpaceOnlineSections(
   online: RoomParticipant[],
-  roles: SpaceRole[]
+  roles: SpaceRole[],
+  sortByDisplayName: MemberCompare
 ): { label: string; members: RoomParticipant[] }[] {
   const groupMap = new Map<string, RoomParticipant[]>();
   for (const p of online) {
@@ -133,6 +151,7 @@ export const RoomMembersSidebar: Component<RoomMembersSidebarProps> = (props) =>
       if (isMemberOnline(p)) online.push(p);
       else offline.push(p);
     }
+    const sortByDisplayName = byDisplayName(list);
     offline.sort(sortByDisplayName);
 
     if (roles === undefined) {
@@ -142,7 +161,7 @@ export const RoomMembersSidebar: Component<RoomMembersSidebarProps> = (props) =>
 
     return {
       kind: 'space',
-      onlineSections: buildSpaceOnlineSections(online, roles),
+      onlineSections: buildSpaceOnlineSections(online, roles, sortByDisplayName),
       offline,
     };
   });
@@ -180,6 +199,8 @@ export const RoomMembersSidebar: Component<RoomMembersSidebarProps> = (props) =>
     viewerHighestRolePosition: props.viewerHighestRolePosition,
     onKickMember: props.onKickMember,
     onBanMember: props.onBanMember,
+    canChangeOwnNickname: props.canChangeOwnNickname,
+    canManageNicknames: props.canManageNicknames,
   });
 
   return (
@@ -245,9 +266,27 @@ const MemberRow: Component<{
   viewerHighestRolePosition?: number;
   onKickMember?: (userId: string) => void;
   onBanMember?: (userId: string) => void;
+  canChangeOwnNickname?: boolean;
+  canManageNicknames?: boolean;
 }> = (props) => {
-  const displayName = () => props.p.display_name || props.p.username || t('common.unknown');
+  // In a space the row is the member's, so it carries their space profile; in a group PM
+  // there is none and this is the global name and avatar.
+  const profile = createMemo(() => resolveProfile(props.p, props.p));
+  const displayName = () => profile().name;
   const isSelf = () => props.p.id === props.currentUserId;
+
+  /** The menu's and the card's shared answer: may the viewer change this member's nickname. */
+  const canEditNickname = () =>
+    props.spaceId != null &&
+    canEditNicknameOf({
+      viewerId: props.currentUserId,
+      targetId: props.p.id,
+      spaceOwnerId: props.spaceOwnerId,
+      canChangeOwnNickname: props.canChangeOwnNickname,
+      canManageNicknames: props.canManageNicknames,
+      viewerHighestRolePosition: props.viewerHighestRolePosition,
+      targetHighestRolePosition: memberHighestRolePosition(undefined, props.spaceRoles, { roles: getMemberRoleIds(props.p) }),
+    });
 
   const nameColorHex = createMemo(() =>
     memberNameColorHex(getMemberRoleIds(props.p), props.spaceRoles)
@@ -277,6 +316,7 @@ const MemberRow: Component<{
             canManageMemberRoles: props.canManageMemberRoles === true,
             viewerHighestPosition: props.viewerHighestRolePosition,
             onMemberRolesUpdated: props.onSpaceMemberRolesUpdated,
+            canEditNickname: canEditNickname(),
           }
         : null;
     openUserProfileFromParticipant({
@@ -286,6 +326,7 @@ const MemberRow: Component<{
       onMessageUser: props.onMessageUser,
       spaceRoles: props.spaceRoles,
       spaceRoleContext,
+      spaceId: sid,
     });
   }
 
@@ -295,6 +336,7 @@ const MemberRow: Component<{
         props.dim ? 'opacity-60 hover:opacity-100' : ''
       }`}
       onContextMenu={(e) => {
+        const sid = props.spaceId;
         const extraItems = buildSpaceModerationItems({
           spaceId: props.spaceId,
           targetUserId: props.p.id,
@@ -309,6 +351,14 @@ const MemberRow: Component<{
           onBan: props.onBanMember,
           canRemoveFromGroup: props.isCreator && !isSelf(),
           onRemoveFromGroup: props.onRemoveMember,
+          canChangeOwnNickname: props.canChangeOwnNickname,
+          canManageNicknames: props.canManageNicknames,
+          ...(sid
+            ? {
+                onEditNickname: (uid: string) => openNicknameDialog({ spaceId: sid, userId: uid }),
+                onEditSpaceProfile: () => openUserSettings('spaceProfiles', { spaceId: sid }),
+              }
+            : {}),
         });
         const items = buildUserMenuItems({
           userId: props.p.id,
@@ -331,7 +381,7 @@ const MemberRow: Component<{
         onClick={openProfile}
       >
         <div class="relative shrink-0">
-          <MessageAvatar name={displayName()} avatar={props.p.avatar} class="size-8 text-[13px]" />
+          <MessageAvatar name={displayName()} avatar={profile().avatar} class="size-8 text-[13px]" />
           <span class="absolute -bottom-px -end-px">
             <PresenceDot userId={props.p.id} class="size-3.5" />
           </span>

@@ -4,12 +4,15 @@ import { listReactors, type MessageReaction, type Reactor } from '../../api/mess
 import { resolveCustomEmoji } from '../../stores/customEmojis';
 import { Emoji } from '../emoji/Emoji';
 import { Tooltip } from '../ui/Tooltip';
+import { resolveSpaceUser } from '../../lib/spaceProfile';
 import { t } from '../../i18n';
 
 const CUSTOM_PREFIX = 'custom:';
 
-function reactorLabel(users: Reactor[]): string {
-  const names = users.map((u) => u.display_name || u.username);
+/** The server sends reactors with their global profile; in a space room each name is
+ * overlaid with that member's nickname from the member list, as the author rows are. */
+function reactorLabel(users: Reactor[], spaceId?: string): string {
+  const names = users.map((u) => resolveSpaceUser(spaceId, u.id, u, u.username).name);
   if (names.length <= 3) return names.join(', ');
   return t('messages.reactions.andOthers', { names: names.slice(0, 3).join(', '), count: names.length - 3 });
 }
@@ -17,6 +20,8 @@ function reactorLabel(users: Reactor[]): string {
 const ReactionPill: Component<{
   roomId: string;
   messageId: string;
+  /** The space the message is in, so reactor names show nicknames; unset in PMs. */
+  spaceId?: string;
   reaction: MessageReaction;
   /** False when the viewer may not join this reaction (no Read Message History in the room -
    * Discord's requirement for reacting at all) - they can still remove their own (mine). */
@@ -43,7 +48,7 @@ const ReactionPill: Component<{
     const list = reactors();
     if (loading() && !list) return t('common.loading');
     if (!list || list.length === 0) return `:${emojiName()}:`;
-    return t('messages.reactions.tooltip', { names: reactorLabel(list), emoji: `:${emojiName()}:` });
+    return t('messages.reactions.tooltip', { names: reactorLabel(list, props.spaceId), emoji: `:${emojiName()}:` });
   };
 
   const canClick = () => props.canReact || props.reaction.me;
@@ -80,6 +85,8 @@ const ReactionPill: Component<{
 export const MessageReactions: Component<{
   roomId: string;
   messageId: string;
+  /** The space the message is in, so reactor names show nicknames; unset in PMs. */
+  spaceId?: string;
   reactions: MessageReaction[];
   /** False when the viewer may not join existing reactions in this room. Default true. */
   canReact?: boolean;
@@ -91,6 +98,7 @@ export const MessageReactions: Component<{
         <ReactionPill
           roomId={props.roomId}
           messageId={props.messageId}
+          spaceId={props.spaceId}
           reaction={r}
           canReact={props.canReact !== false}
           onToggle={props.onToggle}

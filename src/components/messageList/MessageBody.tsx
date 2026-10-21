@@ -20,6 +20,7 @@ import { spaces } from '../../stores/spaces';
 import type { RoomParticipant } from '../../api/rooms';
 import type { SpaceRole } from '../../api/spaces';
 import { spaceRoleColorHex } from '../../lib/spacePermissions';
+import { resolveProfile } from '../../lib/spaceProfile';
 import { t } from '../../i18n';
 
 export interface MessageBodyProps {
@@ -424,9 +425,11 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
           // Accessor, not a one-shot lookup: participants often finish loading after the
           // message has rendered (a fresh MESSAGE_CREATE beats the member list), and a
           // plain const here rendered "@Unknown" permanently for that message.
+          // In a space room the participants are its member rows, so the pill shows the
+          // member's nickname there, as every other name in the room does.
           const display = () => {
             const p = props.participants?.find((x) => x.id === seg.userId);
-            return p?.display_name || p?.username || t('common.unknown');
+            return resolveProfile(p, p).name;
           };
           return (
             <Show when={props.onMentionClick} fallback={<span class={brandPill}>@{display()}</span>}>

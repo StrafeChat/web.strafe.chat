@@ -27,11 +27,13 @@ import { showContextMenu } from '../../stores/contextMenu';
 import { isRoomMuted, muteRoom, unmuteRoom } from '../../lib/roomNotify';
 import { spaceMembers, loadSpaceMembers } from '../../stores/spaceMembers';
 import { consumeSpaceAction } from '../../stores/spaceQuickActions';
+import { openUserSettings } from '../../stores/userSettingsModal';
 import {
   memberCanCreateInvite,
   memberCanManageRooms,
   memberCanManageRoles,
   memberCanManageSpace,
+  memberCanManageNicknames,
   canViewSpaceChannel,
 } from '../../lib/spacePermissions';
 import { SpaceRoomSettingsModal } from '../SpaceRoomSettingsModal';
@@ -191,7 +193,12 @@ export const SpaceRoomsBar: Component = () => {
   const canManageRoles = createMemo(() =>
     memberCanManageRoles(space(), rolesRes(), currentMember(), auth.user?.id)
   );
-  const showSpaceSettings = createMemo(() => canManageSpace() || canManageRoles());
+  // Manage Nicknames opens Space Settings too: its Members page is where that moderator
+  // changes nicknames and resets space profiles, and the modal shows only the pages allowed.
+  const canManageNicknames = createMemo(() =>
+    memberCanManageNicknames(space(), rolesRes(), currentMember(), auth.user?.id)
+  );
+  const showSpaceSettings = createMemo(() => canManageSpace() || canManageRoles() || canManageNicknames());
   const sections = () =>
     spaceRooms()
       .filter((r) => r.type === ROOM_TYPE_SECTION)
@@ -671,6 +678,21 @@ export const SpaceRoomsBar: Component = () => {
                       <i class="fa-solid fa-user-plus text-[13px] text-muted-foreground" aria-hidden />
                     </button>
                   </Show>
+                  {/* Every member has a space profile; only the nickname inside it is
+                      permission-gated, and the page itself says so. */}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    class={`${appMenuItemDefault} justify-between`}
+                    onClick={() => {
+                      setSpaceMenuOpen(false);
+                      const sid = spaceId();
+                      if (sid) openUserSettings('spaceProfiles', { spaceId: sid });
+                    }}
+                  >
+                    <span>{t('spaceProfile.edit')}</span>
+                    <i class="fa-solid fa-id-badge text-[13px] text-muted-foreground" aria-hidden />
+                  </button>
                   <Show when={showSpaceSettings()}>
                     <button
                       type="button"

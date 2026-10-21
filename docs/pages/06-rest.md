@@ -89,9 +89,44 @@ Leave the space (the owner cannot; they transfer or delete it).
 
 ## Members
 
+### The member object
+
+```json
+{
+  "id": "2102223172425220096", "username": "turtle", "display_name": "Turtle", "avatar": "", "banner": "", "bio": "", "about_me": "", "pronouns": "",
+  "bot": false, "public_flags": 0, "presence": { "status": "online" },
+  "joined_at": "2026-10-13T12:00:00Z", "roles": ["2102226824779005952"],
+  "nick": "Shell", "space_avatar": "https://cdn.your-instance.example/v1/spaces/members/…/avatar-….png",
+  "space_banner": null, "space_about_me": null, "space_bio": null, "space_pronouns": null
+}
+```
+
+The user fields (`display_name`, `avatar`, `bio`, `about_me`, `pronouns`, …) are always the member's **global** profile. The six space-profile keys are their profile in this space only, and every member object carries all six, each a string or `null`: `nick` (max 32 characters), `space_avatar` and `space_banner` (image URLs, set only through the upload endpoints below), `space_about_me` and `space_bio` (max 190 each), `space_pronouns` (max 40). Where one is set it replaces the global value inside this space - show `nick` instead of the display name, `space_avatar` instead of `avatar`, and so on. A space profile is visible to the space's members only, and it is deleted with the membership: leaving, a kick, a ban or the space's deletion removes it.
+
 ### `GET` /spaces/:id/members
 
-Every member with their profile, `roles` (role ids), `joined_at`, `presence`, `public_flags` and `bot`.
+Every member as a member object.
+
+### `GET` /spaces/:id/members/:userId
+
+One member as a member object; `@me` for yourself. You must be a member yourself (`403`), and `404` `member not found` means they are not one.
+
+### `PATCH` /spaces/:id/members/:userId — *Change Nickname for your own, Manage Nicknames for others'*
+
+Set part of a space profile: `nick`, `about_me`, `bio`, `pronouns`, `avatar`, `banner`. A key that is absent is left alone; `null` or `""` clears it; values are trimmed. Returns the updated member object and sends `SPACE_MEMBER_UPDATE`. A request that changes nothing returns `200` with no event.
+
+- **Yourself** (`@me`): `nick` needs **Change Nickname** (on for `@everyone` by default) or **Manage Nicknames**; the other fields need only membership. `avatar` and `banner` accept only a clear (`null` or `""`) - set an image with the upload endpoints below.
+- **Another member**, with **Manage Nicknames** and a highest role above theirs: `nick` (set or clear), and `null` (or `""`) for any of `avatar`, `banner`, `about_me`, `bio` and `pronouns`, which resets it to their global profile. A non-empty value for those five is `403` `only the member can change their own space avatar, banner, pronouns, about me or bio` (`code: "cannot_edit_member_profile"`). Only the owner can change the owner's nickname or profile, Administrators included: anyone else gets `403` `only the space owner can change the owner's nickname` when the request touches `nick`, and `403` `only the space owner can change the owner's space profile` when it only resets the other fields.
+
+A moderator's nickname change is logged as `member_nick_update` (`changes.nick` with the old and new value) and a reset as `member_profile_reset` (`changes.fields`, the fields that were cleared). Changes to your own profile are never logged. In a space hosted on another instance the change is made there, where the space profile lives.
+
+Errors: `400` `no fields to update`, `400` for a value over its limit or a nickname that is not on one line, `400` `avatar and banner must be uploaded, or cleared with null`, `403` `missing permission to change your nickname in this space`, `403` `only the space owner can change the owner's nickname`, `403` `only the space owner can change the owner's space profile`, `403` `only the member can change their own space avatar, banner, pronouns, about me or bio` (`code: "cannot_edit_member_profile"`), `403` `cannot manage a role or member at or above your own highest role`, `404` `member not found`, `409` `the space profile changed while saving; try again` (another write to the same image won the race; send it again).
+
+### `POST` /spaces/:id/members/@me/avatar, `POST` /spaces/:id/members/@me/banner
+
+Upload your own space avatar or banner: multipart `file`, png, jpg, gif or webp, within the same size limits as the global ones. Only membership is needed. Returns the member object with `space_avatar` / `space_banner` set; the image it replaces is deleted. To remove one, `PATCH` it to `null`.
+
+Errors: `400` `missing file field`, `400` `invalid file size`, `400` `unsupported image type (use jpg, png, gif, or webp)`, `403` when you are not a member, `502` `could not store image`, `503` `file uploads are not configured` (the instance has no object storage set up).
 
 ### `DELETE` /spaces/:id/members/:userId — *Kick Members*
 
@@ -353,6 +388,7 @@ The end-to-end encryption key backup (`m.megolm_backup.v1.curve25519-aes-sha2`, 
 | `GET /gifs/search`, `GET /gifs/trending` | 60 per minute per account, each |
 | Gateway `op 2` frames | Burst of 20 per connection, refilling one every 250 ms |
 | Messages in a room with slowmode | One per `slowmode_seconds` per member; `429` with `retry_after` (seconds) and a `Retry-After` header. Members with Manage Messages are exempt |
+| Space member profiles | Per account: 60 per minute reading one member, 20 per minute `PATCH`, 10 per minute image uploads |
 | Sign-in, registration, key backup | Separate tight limits (not relevant to bots) |
 
 Other endpoints are not individually limited today; be a good citizen anyway - batch what you can, cache what does not change, and back off on `429` and `5xx`.

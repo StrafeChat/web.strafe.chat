@@ -11,10 +11,18 @@ import type { RoomParticipant } from '../../api/rooms';
 import type { SpaceRole, SpaceRoom } from '../../api/spaces';
 import type { CustomEmoji } from '../../api/emojis';
 import { spaceRoleColorHex } from '../spacePermissions';
+import { resolveProfile } from '../spaceProfile';
 import { emojiCatalogIfLoaded } from '../emoji/data';
 
 export interface MentionCatalog {
-  users: { id: string; username: string; displayName: string }[];
+  /**
+   * `displayName` is the name they show with here (a space nickname in a space). `aliases`
+   * (nickname, global display name) is ONLY for filtering autocomplete suggestions: the draft
+   * tokenizer below matches the exact `username` and nothing else, because handles are unique
+   * and nicknames are not - a member could otherwise set their nickname to someone else's
+   * username and take over mentions meant for that person.
+   */
+  users: { id: string; username: string; displayName: string; aliases?: string[] }[];
   roles: { id: string; name: string; colorHex: string }[];
   channels: { id: string; name: string }[];
   /** Custom emoji the composer may reference as :name: (serialized to <:name:id>). */
@@ -35,7 +43,11 @@ export function buildMentionCatalog(opts: {
   return {
     users: (opts.participants ?? [])
       .filter((p) => p.username)
-      .map((p) => ({ id: p.id, username: p.username, displayName: p.display_name || p.username })),
+      .map((p) => {
+        const r = resolveProfile(p, p, p.username);
+        const aliases = [...new Set([r.nick, p.display_name].filter((s): s is string => !!s?.trim()))];
+        return { id: p.id, username: p.username, displayName: r.name, aliases };
+      }),
     roles: (opts.roles ?? [])
       .filter((r) => r.name && r.name !== EVERYONE_ROLE_NAME)
       .map((r) => ({ id: r.id, name: r.name, colorHex: spaceRoleColorHex(r.color) })),
@@ -113,6 +125,7 @@ function matchNamed<T extends { name: string }>(text: string, from: number, list
 export function tokenizeDraft(text: string, catalog: MentionCatalog = EMPTY_CATALOG): DraftToken[] {
   const out: DraftToken[] = [];
   const len = text.length;
+  // The exact username only - never displayName or aliases (see MentionCatalog.users).
   const users = [...catalog.users]
     .map((u) => ({ ...u, name: u.username }))
     .sort((a, b) => b.name.length - a.name.length);

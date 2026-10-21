@@ -22,6 +22,8 @@ export interface RoomPinnedPanelProps {
   messages: DecryptedMessage[];
   participants?: RoomParticipant[];
   spaceRoles?: SpaceRole[];
+  /** The space the room is in, so a profile card opened here carries its space profile. */
+  spaceId?: string;
   onSelectMessage: (messageId: string) => void;
   /** Whether the viewer may unpin here (Manage Messages in a space channel). Default true. */
   canManage?: boolean;
@@ -60,7 +62,11 @@ export const RoomPinnedPanel: Component<RoomPinnedPanelProps> = (props) => {
                   const s = getSenderDisplay(userId, props.participants, currentUserId());
                   openUserProfilePopover({
                     anchor,
-                    subject: popoverSubjectFromSender(s, { participant: props.participants?.find((x) => x.id === userId), spaceRoles: props.spaceRoles }),
+                    subject: popoverSubjectFromSender(s, {
+                      participant: props.participants?.find((x) => x.id === userId),
+                      spaceRoles: props.spaceRoles,
+                      spaceId: props.spaceId,
+                    }),
                     currentUserId: currentUserId(),
                   });
                 }

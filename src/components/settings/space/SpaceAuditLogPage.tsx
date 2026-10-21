@@ -37,6 +37,8 @@ const ACTION_ICON: Record<string, string> = {
   member_ban_add: 'fa-ban',
   member_ban_remove: 'fa-user-check',
   member_roles_update: 'fa-user-tag',
+  member_nick_update: 'fa-signature',
+  member_profile_reset: 'fa-eraser',
   bot_add: 'fa-robot',
   invite_create: 'fa-link',
   invite_delete: 'fa-link-slash',
@@ -51,7 +53,13 @@ const ACTION_ICON: Record<string, string> = {
   member_voice_disconnect: 'fa-phone-slash',
 };
 
-const DESTRUCTIVE = new Set(['room_delete', 'role_delete', 'member_kick', 'member_ban_add', 'invite_delete', 'emoji_delete', 'override_delete', 'member_voice_disconnect']);
+const DESTRUCTIVE = new Set(['room_delete', 'role_delete', 'member_kick', 'member_ban_add', 'member_profile_reset', 'invite_delete', 'emoji_delete', 'override_delete', 'member_voice_disconnect']);
+
+/** Most changes are an {old, new} pair; a space-profile reset's is just the list of fields it
+ * cleared (`{"fields": ["avatar", "bio"]}`). */
+function isChangePair(c: unknown): c is { old?: unknown; new?: unknown } {
+  return !!c && typeof c === 'object' && !Array.isArray(c);
+}
 
 function fmtValue(v: unknown): string {
   if (v == null || v === '') return '—';
@@ -109,6 +117,8 @@ export const SpaceAuditLogPage: Component<Props> = (props) => {
       case 'member_ban_add':
       case 'member_ban_remove':
       case 'member_roles_update':
+      case 'member_nick_update':
+      case 'member_profile_reset':
       case 'bot_add':
       case 'member_voice_mute':
       case 'member_voice_deafen':
@@ -145,7 +155,14 @@ export const SpaceAuditLogPage: Component<Props> = (props) => {
   }
 
   function sentence(e: AuditLogEntry): string {
-    return t(`spaceSettings.audit.actions.${e.action_type}`, { actor: userName(e.user_id), target: targetLabel(e), defaultValue: e.action_type });
+    const names = { actor: userName(e.user_id), target: targetLabel(e) };
+    // The reset's sentence also exists as spaceSettings.audit.memberProfileReset (the key
+    // mobile reads too); either one beats showing the raw action id.
+    const fallback =
+      e.action_type === 'member_profile_reset'
+        ? t('spaceSettings.audit.memberProfileReset', { ...names, defaultValue: e.action_type })
+        : e.action_type;
+    return t(`spaceSettings.audit.actions.${e.action_type}`, { ...names, defaultValue: fallback });
   }
 
   function changeLabel(key: string): string {
@@ -154,6 +171,8 @@ export const SpaceAuditLogPage: Component<Props> = (props) => {
 
   function prettyChange(key: string, v: unknown): string {
     if (key === 'roles' && Array.isArray(v)) return v.map((rid) => rolesById().get(String(rid))?.name ?? String(rid)).join(', ') || '—';
+    // A profile reset names the fields it cleared (avatar, about_me...): show them as fields.
+    if (key === 'fields' && Array.isArray(v)) return v.map((f) => changeLabel(String(f))).join(', ') || '—';
     if ((key === 'system_room_id' || key === 'afk_room_id' || key === 'widget_room_id') && typeof v === 'string' && v) {
       return `#${roomsById().get(v)?.name ?? v}`;
     }
@@ -230,11 +249,17 @@ export const SpaceAuditLogPage: Component<Props> = (props) => {
                               <div class="flex flex-wrap items-baseline gap-x-2">
                                 <dt class="font-medium text-muted-foreground">{changeLabel(key)}</dt>
                                 <dd class="text-foreground">
-                                  <Show when={c.old !== undefined}>
-                                    <span class="line-through opacity-60">{prettyChange(key, c.old)}</span>
-                                    <span class="mx-1.5 text-muted-foreground">→</span>
+                                  <Show when={isChangePair(c) ? c : undefined} fallback={prettyChange(key, c)}>
+                                    {(pair) => (
+                                      <>
+                                        <Show when={pair().old !== undefined}>
+                                          <span class="line-through opacity-60">{prettyChange(key, pair().old)}</span>
+                                          <span class="mx-1.5 text-muted-foreground">→</span>
+                                        </Show>
+                                        {prettyChange(key, pair().new)}
+                                      </>
+                                    )}
                                   </Show>
-                                  {prettyChange(key, c.new)}
                                 </dd>
                               </div>
                             )}

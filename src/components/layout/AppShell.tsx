@@ -9,6 +9,7 @@ import { MobileNotificationsPanel } from './MobileNotificationsPanel';
 import { MobileYouPanel } from './MobileYouPanel';
 import { ContextMenu } from '../ContextMenu';
 import { UserProfilePopover } from '../UserProfilePopover';
+import { NicknameDialog } from '../NicknameDialog';
 import { ReportDialog } from '../ReportDialog';
 import { UserProfileFullModal } from '../UserProfileFullModal';
 import { MediaViewer } from '../media/MediaViewer';
@@ -268,6 +269,7 @@ export const AppShell: Component<AppShellProps> = (props) => {
       <VoiceStatsPopover />
       <ScreenShareDialog />
       <UserProfilePopover />
+      <NicknameDialog />
       <UserProfileFullModal />
       <IncomingCallModal />
       <ReportDialog />

@@ -190,9 +190,9 @@ Sent space-wide when everyone can view the parent channel, otherwise only to the
 | `SPACE_UPDATE` | space | The space's settings changed. May carry `roles` (the full list) after a change that reordered them, such as a bot install |
 | `SPACE_DELETE` | space | `{"space_id"}` - the space is gone |
 | `SPACE_LEAVE` | account | `{"space_id"}` - you were kicked, banned, or left from another session |
-| `SPACE_MEMBER_ADD` | space | The member's profile plus `space_id`, `role_ids`, `bot`, `presence` |
+| `SPACE_MEMBER_ADD` | space | The member's profile plus `space_id`, `role_ids`, `joined_at`, `bot`, `presence`, and their space profile: `nick`, `space_avatar`, `space_banner`, `space_about_me`, `space_bio`, `space_pronouns` (each a string, or `null` for none) |
 | `SPACE_MEMBER_REMOVE` | space | `{"space_id", "user_id"}` |
-| `SPACE_MEMBER_UPDATE` | space | `{"user_id", "role_ids"}` - roles changed |
+| `SPACE_MEMBER_UPDATE` | space | `{"user_id", "role_ids", "nick", "space_avatar", "space_banner", "space_about_me", "space_bio", "space_pronouns"}` - roles or the space profile changed; always the full state, so replace all seven fields |
 | `SPACE_ROLE_CREATE` / `SPACE_ROLE_UPDATE` | space | The [role](/docs/rest/#the-role-object) |
 | `SPACE_ROLE_DELETE` | space | `{"role_id"}` |
 

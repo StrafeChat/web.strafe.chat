@@ -90,7 +90,9 @@ import {
   channelOverridesSource,
   hasPerm,
   memberCanBanMembers,
+  memberCanChangeNickname,
   memberCanKickMembers,
+  memberCanManageNicknames,
   memberCanManageRoles,
   memberHighestRolePosition,
   PermAddReactions,
@@ -106,6 +108,7 @@ import {
   PermManageThreads,
 } from '../lib/spacePermissions';
 import { instance } from '../stores/instance';
+import { resolveProfile } from '../lib/spaceProfile';
 import { VoiceStage } from '../components/voice/VoiceStage';
 import { voiceStatesForRoom } from '../stores/voice';
 import { t } from '../i18n';
@@ -541,6 +544,15 @@ const SpacePage: Component = () => {
     });
   });
 
+  // Every member of the space, whether or not they can see this room: the pool names are
+  // resolved from. A mentioned member, or the author of an old message, who cannot view the
+  // room is still called by their nickname here, not by the global profile the server embeds
+  // on the message. visibleMembers stays for who is listed, mentionable and typing.
+  const allSpaceMembers = createMemo(() => {
+    const sid = spaceId();
+    return sid ? spaceMembers.bySpaceId[sid] ?? [] : [];
+  });
+
   // Declared after visibleMembers on purpose: createMemo runs its function immediately, and
   // reading a `const` memo declared further down threw "Cannot access 'visibleMembers'
   // before initialization" whenever someone happened to be typing as the channel mounted.
@@ -565,10 +577,10 @@ const SpacePage: Component = () => {
     const id = replyToMessageId();
     if (!id) return null;
     const target = roomMessages().find((m) => m.id === id);
-    const sender = target ? getSenderDisplay(target.sender_id, visibleMembers(), auth.user?.id) : null;
+    const sender = target ? getSenderDisplay(target.sender_id, allSpaceMembers(), auth.user?.id) : null;
     return {
       name: sender?.name ?? t('room.replyFallback'),
-      preview: target ? messagePreviewText(getMessageBodyText(target), visibleMembers(), auth.user?.id, 120) : '',
+      preview: target ? messagePreviewText(getMessageBodyText(target), allSpaceMembers(), auth.user?.id, 120) : '',
       onJump: target ? () => scrollToMessage(id) : undefined,
       onCancel: () => setReplyToMessageId(null),
     };
@@ -641,7 +653,7 @@ const SpacePage: Component = () => {
   function handleCreateThread(msg: DecryptedMessage) {
     // The suggested name is the message as people read it - mentions and emoji resolved,
     // markdown stripped - never the wire form (`<#id>` would sit in the name verbatim).
-    const preview = messagePreviewText(getMessageBodyText(msg), visibleMembers(), auth.user?.id, MAX_THREAD_NAME_LENGTH);
+    const preview = messagePreviewText(getMessageBodyText(msg), allSpaceMembers(), auth.user?.id, MAX_THREAD_NAME_LENGTH);
     setCreateThreadFor({ starter: { id: msg.id, preview } });
   }
   function openThread(threadId: string) {
@@ -661,7 +673,7 @@ const SpacePage: Component = () => {
       try {
         const raw = (await getMessage(key.pid, key.mid)) as unknown as ApiMessage;
         const [m] = await decryptServerMessages([raw]);
-        return m ? messagePreviewText(getMessageBodyText(m), visibleMembers(), auth.user?.id, 300) : null;
+        return m ? messagePreviewText(getMessageBodyText(m), allSpaceMembers(), auth.user?.id, 300) : null;
       } catch {
         return null;
       }
@@ -673,7 +685,8 @@ const SpacePage: Component = () => {
     const owner = spaceMembers.bySpaceId[spaceId()]?.find((m) => m.id === r.thread?.owner_id);
     return {
       name: r.name,
-      ownerName: owner?.display_name || owner?.username || t('common.someone'),
+      // Their nickname in this space, as the thread's messages show them.
+      ownerName: resolveProfile(owner, owner, t('common.someone')).name,
       private: r.thread?.private,
       starter: threadStarter() ?? null,
     };
@@ -700,7 +713,7 @@ const SpacePage: Component = () => {
         onClick: () => {
           const typed = window.prompt(t('threads.renamePrompt'), r.name)?.trim();
           // Same plain-text rule as the create dialog: mention syntax becomes its readable form.
-          const next = typed ? messagePreviewText(typed, visibleMembers(), auth.user?.id, 1000).slice(0, MAX_THREAD_NAME_LENGTH).trim() : '';
+          const next = typed ? messagePreviewText(typed, allSpaceMembers(), auth.user?.id, 1000).slice(0, MAX_THREAD_NAME_LENGTH).trim() : '';
           if (next && next !== r.name) void updateThread(r.id, { name: next }).catch((err) => console.error('Rename thread failed:', err));
         },
       });
@@ -848,6 +861,15 @@ const SpacePage: Component = () => {
   );
   const canBanMembers = createMemo(() =>
     memberCanBanMembers(space(), spaceRolesRes(), currentSpaceMember(), auth.user?.id)
+  );
+  // Space profiles: who may change their own nickname here, and who may change (and reset the
+  // space profiles of) lower-ranked members. The author menu, the member list and the profile
+  // card all decide from these two, so they always agree.
+  const canChangeOwnNickname = createMemo(() =>
+    memberCanChangeNickname(space(), spaceRolesRes(), currentSpaceMember(), auth.user?.id)
+  );
+  const canManageNicknames = createMemo(() =>
+    memberCanManageNicknames(space(), spaceRolesRes(), currentSpaceMember(), auth.user?.id)
   );
   /** Number.MAX_SAFE_INTEGER for the owner - no ceiling, can moderate anyone. */
   const viewerHighestRolePosition = createMemo(() => {
@@ -1161,8 +1183,9 @@ const SpacePage: Component = () => {
           <RoomPinnedPanel
             roomId={roomId()!}
             messages={pinnedMessagesForRoom()}
-            participants={visibleMembers()}
+            participants={allSpaceMembers()}
             spaceRoles={spaceRolesRes()}
+            spaceId={spaceId()}
             onSelectMessage={handleSelectPinnedMessage}
             canManage={canManageMessagesInRoom()}
           />
@@ -1196,7 +1219,7 @@ const SpacePage: Component = () => {
                   onCreateThread={!isThread() && canCreatePublicThreads() ? handleCreateThread : undefined}
                   roomName={currentRoom()!.name}
                   e2eeEnabled={currentRoom()!.e2ee_enabled === true}
-                  participants={visibleMembers()}
+                  participants={allSpaceMembers()}
                   spaceRoles={spaceRolesRes()}
                   spaceId={spaceId()!}
                   spaceOwnerId={space()?.owner_id ?? ''}
@@ -1225,6 +1248,8 @@ const SpacePage: Component = () => {
                   viewerHighestRolePosition={viewerHighestRolePosition()}
                   onKickMember={handleKickMember}
                   onBanMember={handleBanMember}
+                  canChangeOwnNickname={canChangeOwnNickname()}
+                  canManageNicknames={canManageNicknames()}
                   canReact={canReact()}
                   canJoinReactions={canJoinReactions()}
                   customEmojiSpaceId={customEmojiSpaceId()}
@@ -1311,6 +1336,8 @@ const SpacePage: Component = () => {
                     viewerHighestRolePosition={viewerHighestRolePosition()}
                     onKickMember={handleKickMember}
                     onBanMember={handleBanMember}
+                    canChangeOwnNickname={canChangeOwnNickname()}
+                    canManageNicknames={canManageNicknames()}
                     showMembersHeader={false}
                     listAriaLabel={t('space.membersAria')}
                   />
@@ -1320,7 +1347,7 @@ const SpacePage: Component = () => {
                   spaceId={spaceId()}
                   roomId={roomId()!}
                   query={searchQuery()}
-                  participants={visibleMembers()}
+                  participants={allSpaceMembers()}
                   channels={searchChannels()}
                   spaceRoles={spaceRolesRes()}
                   roomE2EE={currentRoom()?.e2ee_enabled === true}

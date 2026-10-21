@@ -132,6 +132,7 @@ export const UserProfileFullModal: Component = () => {
                 headingLevel="h2"
                 id="user-profile-full-title"
                 displayName={subject()!.displayName}
+                secondaryName={subject()!.globalName}
                 username={subject()!.username}
                 homeDomain={subject()!.homeDomain}
                 alwaysShowDomain

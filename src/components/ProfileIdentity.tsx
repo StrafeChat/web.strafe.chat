@@ -13,6 +13,9 @@ export const PROFILE_BADGE_CAP = 5;
 
 export interface ProfileIdentityProps {
   displayName: string;
+  /** Their global name, shown small under `displayName` when a space nickname replaces it -
+   * so a nickname never hides who someone is (Discord shows it the same way). */
+  secondaryName?: string;
   username: string;
   homeDomain?: string;
   bot?: boolean;
@@ -46,8 +49,9 @@ export interface ProfileIdentityProps {
 }
 
 /**
- * The identity block every profile surface shows: display name, BOT tag, the `@name`
- * tag, pronouns, the 🎂 birthday marker, and the badge row.
+ * The identity block every profile surface shows: display name (and, under a space
+ * nickname, the global name), BOT tag, the `@name` tag, pronouns, the 🎂 birthday marker,
+ * and the badge row.
  *
  * One component because these used to be written out three times and drift: the badge row
  * moved between being a sibling of the heading and part of a wrapping flex row, so the same
@@ -102,6 +106,10 @@ export const ProfileIdentity: Component<ProfileIdentityProps> = (props) => {
           </span>
         </Show>
       </Dynamic>
+
+      <Show when={props.secondaryName?.trim()}>
+        {(name) => <p class="-mt-1 min-w-0 break-words text-sm text-muted-foreground">{name()}</p>}
+      </Show>
 
       <div class="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
         <Switch

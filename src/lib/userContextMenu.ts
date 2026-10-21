@@ -6,9 +6,12 @@ import { authorizeUrl } from '../api/developers';
 import { openReportDialog } from '../components/ReportDialog';
 import { confirmDialog } from '../stores/confirmDialog';
 import { t } from '../i18n';
-import { memberHighestRolePosition } from './spacePermissions';
-import type { SpaceRole } from '../api/spaces';
+import { canEditNicknameOf, memberHighestRolePosition } from './spacePermissions';
+import { patchSpaceMember, type SpaceRole } from '../api/spaces';
 import { openAppWindow } from './openWindow';
+import { hasResettableSpaceProfile, resolveProfile, spaceMemberOf, spaceProfileResetPatch } from './spaceProfile';
+import { upsertSpaceMember } from '../stores/spaceMembers';
+import { translateCaughtApiError } from './formatApiError';
 
 export interface UserMenuContext {
   userId: string;
@@ -123,12 +126,25 @@ export interface SpaceModerationContext {
   /** Group-DM creator removing a member (no space involved). */
   canRemoveFromGroup?: boolean;
   onRemoveFromGroup?: (userId: string) => void;
+  /** memberCanChangeNickname(viewer): may set their own nickname here. */
+  canChangeOwnNickname?: boolean;
+  /** memberCanManageNicknames(viewer): may change lower-ranked members' nicknames and reset
+   * their space profiles. */
+  canManageNicknames?: boolean;
+  /** Opens the Change Nickname dialog: `(uid) => openNicknameDialog({ spaceId, userId: uid })`. */
+  onEditNickname?: (userId: string) => void;
+  /** Self only: `() => openUserSettings('spaceProfiles', { spaceId })`. */
+  onEditSpaceProfile?: () => void;
 }
 
 /**
- * Kick / ban / remove-from-group items, shared by member rows and message authors so both
- * menus offer the same moderation actions. The hierarchy rules mirror the server: never
- * yourself or the space owner, and only a member whose highest role sits below yours.
+ * Space moderation items for a member, shared by member rows and message authors so both menus
+ * offer the same actions. The hierarchy rules mirror the server: never the space owner, and
+ * only a member whose highest role sits below yours.
+ *
+ * Your own entry gets the space-profile actions only (Edit Space Profile, and Change Nickname
+ * when the space lets you). For others: Change Nickname and Reset Space Profile (Manage
+ * Nicknames), then kick and ban.
  */
 export function buildSpaceModerationItems(ctx: SpaceModerationContext): ContextMenuItem[] {
   const items: ContextMenuItem[] = [];
@@ -143,11 +159,45 @@ export function buildSpaceModerationItems(ctx: SpaceModerationContext): ContextM
     });
   }
 
-  if (ctx.spaceId == null || isSelf) return items;
-  if (ctx.spaceOwnerId != null && ctx.targetUserId === ctx.spaceOwnerId) return items;
+  if (ctx.spaceId == null) return items;
+  const spaceId = ctx.spaceId;
   const targetHighest = memberHighestRolePosition(undefined, ctx.spaceRoles, { roles: ctx.targetRoleIds });
+
+  if (isSelf) {
+    if (ctx.onEditSpaceProfile) {
+      items.push({ label: t('spaceProfile.edit'), icon: 'fa-id-badge', onClick: () => ctx.onEditSpaceProfile!() });
+    }
+    const canEditOwn = canEditNicknameOf({
+      viewerId: ctx.currentUserId,
+      targetId: ctx.targetUserId,
+      spaceOwnerId: ctx.spaceOwnerId,
+      canChangeOwnNickname: ctx.canChangeOwnNickname,
+      canManageNicknames: ctx.canManageNicknames,
+      viewerHighestRolePosition: ctx.viewerHighestRolePosition,
+      targetHighestRolePosition: targetHighest,
+    });
+    if (canEditOwn && ctx.onEditNickname) {
+      items.push({ label: t('spaceProfile.changeNickname'), icon: 'fa-pen', onClick: () => ctx.onEditNickname!(ctx.targetUserId) });
+    }
+    return items;
+  }
+
+  if (ctx.spaceOwnerId != null && ctx.targetUserId === ctx.spaceOwnerId) return items;
   if (targetHighest >= (ctx.viewerHighestRolePosition ?? -1)) return items;
 
+  if (ctx.canManageNicknames && ctx.onEditNickname) {
+    items.push({ label: t('spaceProfile.changeNickname'), icon: 'fa-pen', onClick: () => ctx.onEditNickname!(ctx.targetUserId) });
+  }
+  // Offered only when there is something to clear; read from the member list, which every
+  // surface with a member menu has loaded. Needs no caller wiring beyond canManageNicknames.
+  if (ctx.canManageNicknames && hasResettableSpaceProfile(spaceMemberOf(spaceId, ctx.targetUserId), { ignoreNick: true })) {
+    items.push({
+      label: t('contextMenu.resetSpaceProfile'),
+      icon: 'fa-eraser',
+      danger: true,
+      onClick: () => void confirmResetSpaceProfile(spaceId, ctx.targetUserId),
+    });
+  }
   if (ctx.canKickMembers && ctx.onKick) {
     items.push({ label: t('room.members.kick'), icon: 'fa-user-minus', danger: true, onClick: () => ctx.onKick!(ctx.targetUserId) });
   }
@@ -155,4 +205,54 @@ export function buildSpaceModerationItems(ctx: SpaceModerationContext): ContextM
     items.push({ label: t('room.members.ban'), icon: 'fa-gavel', danger: true, onClick: () => ctx.onBan!(ctx.targetUserId) });
   }
   return items;
+}
+
+/**
+ * A moderator's "Reset Space Profile" on someone else: confirm, then clear their space avatar,
+ * banner, pronouns, About Me and bio, so each falls back to their main profile. The nickname
+ * stays - it has its own action, and the server accepts only clears of these five on another
+ * member. Exported so surfaces with their own member menu (Space Settings > Members) run the
+ * same flow. Resolves true when the reset went through.
+ *
+ * A failure (an origin too old for space profiles, a 403 because their roles changed, a 429)
+ * is always reported: to `onError` when the caller has an error area of its own, otherwise in
+ * a one-button notice - never only to the console, which would leave the moderator thinking
+ * it worked.
+ */
+export async function confirmResetSpaceProfile(
+  spaceId: string,
+  userId: string,
+  onError?: (message: string) => void,
+): Promise<boolean> {
+  const member = spaceMemberOf(spaceId, userId);
+  const ok = await confirmDialog({
+    title: t('contextMenu.resetSpaceProfile'),
+    body: t('contextMenu.resetSpaceProfileConfirm', { name: resolveProfile(member, member).name }),
+    confirmLabel: t('contextMenu.resetSpaceProfile'),
+    tone: 'danger',
+    icon: 'fa-solid fa-eraser',
+  });
+  if (!ok) return false;
+  try {
+    const updated = await patchSpaceMember(spaceId, userId, spaceProfileResetPatch({ includeNick: false }));
+    // The API helpers never touch stores; the SPACE_MEMBER_UPDATE that follows would catch
+    // up anyway, but this makes the cleared profile show at once.
+    upsertSpaceMember(spaceId, updated);
+    return true;
+  } catch (err) {
+    console.error('Failed to reset space profile:', err);
+    const message = translateCaughtApiError(err, t).join(' ') || t('errors.unknown');
+    if (onError) {
+      onError(message);
+    } else {
+      void confirmDialog({
+        title: t('contextMenu.resetSpaceProfile'),
+        body: message,
+        confirmLabel: t('common.close'),
+        icon: 'fa-solid fa-circle-exclamation',
+        acknowledgeOnly: true,
+      });
+    }
+    return false;
+  }
 }

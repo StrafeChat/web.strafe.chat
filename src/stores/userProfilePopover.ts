@@ -15,6 +15,9 @@ export type SpaceMemberRoleEditContext = {
    * at or above it are shown locked, matching what the server enforces. */
   viewerHighestPosition?: number;
   onMemberRolesUpdated?: () => void;
+  /** The viewer may change this member's nickname (memberCanEditNickname): the popover shows
+   * a pencil beside the name. */
+  canEditNickname?: boolean;
 };
 
 /**
@@ -30,7 +33,13 @@ export type ProfileRole = {
 
 export type UserProfilePopoverSubject = {
   userId: string;
+  /** The name to show: their space nickname when opened inside a space, else their display name. */
   displayName: string;
+  /** Their global display name, set only when it differs from `displayName` (a nickname
+   * applies): shown small under the name, as Discord does under a server nickname. */
+  globalName?: string;
+  /** The space the card was opened in, when it shows that space's profile. */
+  spaceId?: string;
   username: string;
   /** Federation: the user's home instance (shown after the tag when it isn't this one). */
   homeDomain?: string;
@@ -196,8 +205,12 @@ export function openUserProfileFromParticipant(opts: {
   onMessageUser?: (userId: string) => void;
   spaceRoles?: SpaceRole[];
   spaceRoleContext?: SpaceMemberRoleEditContext | null;
+  /** The space the participant is shown in, so the card carries their space profile. */
+  spaceId?: string;
 }): void {
-  const subject = popoverSubjectFromParticipant(opts.participant, opts.spaceRoles);
+  const subject = popoverSubjectFromParticipant(opts.participant, opts.spaceRoles, {
+    spaceId: opts.spaceId ?? opts.spaceRoleContext?.spaceId,
+  });
   openUserProfilePopover({
     anchor: opts.anchor,
     subject,

@@ -24,6 +24,7 @@ import {
 } from '../../stores/voice';
 import { spaceMembers } from '../../stores/spaceMembers';
 import { voicePermsFor, voiceParticipantName } from '../../lib/voice/perms';
+import { resolveSpaceUser } from '../../lib/spaceProfile';
 import { VoiceTile } from './VoiceTile';
 import { openVoiceUserMenu } from './VoiceUserMenu';
 import { toggleVoiceStats } from './VoiceStatsPopover';
@@ -117,8 +118,10 @@ export const VoiceStage: Component<VoiceStageProps> = (props) => {
       if (p?.avatar) return p.avatar;
     }
     if (props.spaceId) {
+      // A space room: their space avatar here when they set one, else their global one.
       const m = spaceMembers.bySpaceId[props.spaceId]?.find((x) => x.id === st.user_id);
-      if (m?.avatar) return m.avatar;
+      const a = resolveSpaceUser(props.spaceId, st.user_id, m ?? st.user).avatar;
+      if (a) return a;
     }
     return st.user?.avatar;
   }

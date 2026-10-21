@@ -3,6 +3,7 @@ import type { SpaceMember, SpaceRole } from '../api/spaces';
 import type { SenderDisplay } from '../components/messageList/utils';
 import type { ProfileRole, UserProfilePopoverSubject } from '../stores/userProfilePopover';
 import { memberNameColorHex as sharedMemberNameColorHex } from './spacePermissions';
+import { resolveProfile } from './spaceProfile';
 import { birthdayIsToday } from './utils/birthday';
 import { formatLongDate } from './utils/datetime';
 import { t } from '../i18n';
@@ -74,17 +75,23 @@ function participantRoleIds(p: RoomParticipant): string[] | undefined {
 export function popoverSubjectFromParticipant(
   p: RoomParticipant,
   spaceRoles?: SpaceRole[],
+  opts?: { spaceId?: string },
 ): UserProfilePopoverSubject {
+  // A space member row carries its space profile; resolving it here is what makes the member
+  // list and voice tiles open the same card the chat does.
+  const r = resolveProfile(p, p);
   return {
     userId: p.id,
-    displayName: p.display_name || p.username || t('common.unknown'),
+    displayName: r.name,
+    ...(r.globalName !== r.name ? { globalName: r.globalName } : {}),
+    ...(opts?.spaceId ? { spaceId: opts.spaceId } : {}),
     username: p.username,
     homeDomain: p.home_domain,
-    avatar: p.avatar,
-    banner: p.banner,
-    aboutMe: p.about_me,
-    bio: p.bio,
-    pronouns: p.pronouns,
+    avatar: r.avatar,
+    banner: r.banner,
+    aboutMe: r.aboutMe,
+    bio: r.bio,
+    pronouns: r.pronouns,
     birthday: p.birthday,
     birthdayToday: p.birthday ? birthdayIsToday(p.birthday, p.is_birthday) : false,
     spaceRoles: rolesForMemberProfile(participantRoleIds(p), spaceRoles),
@@ -104,12 +111,16 @@ export function popoverSubjectFromParticipant(
  */
 export function popoverSubjectFromSender(
   s: SenderDisplay,
-  opts?: { participant?: RoomParticipant; spaceRoles?: SpaceRole[] },
+  opts?: { participant?: RoomParticipant; spaceRoles?: SpaceRole[]; spaceId?: string },
 ): UserProfilePopoverSubject {
   const p = opts?.participant;
+  // getSenderDisplay already resolved the space profile (name, avatar, banner, about me, bio,
+  // pronouns), so the card shows exactly what the message row did.
   return {
     userId: s.userId,
     displayName: s.name,
+    ...(s.globalName && s.globalName !== s.name ? { globalName: s.globalName } : {}),
+    ...(opts?.spaceId ? { spaceId: opts.spaceId } : {}),
     username: s.username || t('common.unknown').toLowerCase(),
     homeDomain: s.homeDomain ?? p?.home_domain,
     avatar: s.avatar,

@@ -53,7 +53,10 @@ import { IconButton } from './ui/IconButton';
 import { pinMessage, unpinMessage } from '../stores/pinnedMessages';
 import { openUserProfilePopover } from '../stores/userProfilePopover';
 import { popoverSubjectFromSender } from '../lib/userProfilePopoverHelpers';
-import { memberNameColorHex, viewerRoleCeiling } from '../lib/spacePermissions';
+import { canEditNicknameOf, memberHighestRolePosition, memberNameColorHex, viewerRoleCeiling } from '../lib/spacePermissions';
+import { spaceMemberOf } from '../lib/spaceProfile';
+import { openNicknameDialog } from '../stores/nicknameDialog';
+import { openUserSettings } from '../stores/userSettingsModal';
 import { flashMessageRow } from '../lib/utils/messages';
 import { captureScrollAnchor } from '../lib/scrollAnchor';
 import { recallScrollPosition, rememberScrollPosition, type SavedScrollPosition } from '../lib/scrollPositions';
@@ -147,6 +150,11 @@ export interface MessageListProps {
   viewerHighestRolePosition?: number;
   onKickMember?: (userId: string) => void;
   onBanMember?: (userId: string) => void;
+  /** Space profiles, mirrored from the member list too: memberCanChangeNickname /
+   * memberCanManageNicknames for the viewer. With spaceId set, the author menu and the
+   * profile card offer Change Nickname (and Edit Space Profile on yourself). */
+  canChangeOwnNickname?: boolean;
+  canManageNicknames?: boolean;
   /** Open DM with user (profile popover). */
   onMessageUser?: (userId: string) => void;
 }
@@ -340,9 +348,24 @@ export const MessageList: Component<MessageListProps> = (props) => {
         canBanMembers: props.canBanMembers,
         onKick: props.onKickMember,
         onBan: props.onBanMember,
+        canChangeOwnNickname: props.canChangeOwnNickname,
+        canManageNicknames: props.canManageNicknames,
+        ...spaceProfileMenuActions(msg.sender_id),
       }),
     });
     if (items.length) showContextMenu(e, items);
+  }
+
+  /** The space-profile menu callbacks: only inside a space (PMs and groups have none), and
+   * only for someone still in it - a former member's messages keep rendering from the
+   * message's embedded author, but they have no member row left to give a nickname to. */
+  function spaceProfileMenuActions(targetUserId: string) {
+    const sid = props.spaceId;
+    if (!sid || !spaceMemberOf(sid, targetUserId)) return {};
+    return {
+      onEditNickname: (uid: string) => openNicknameDialog({ spaceId: sid, userId: uid }),
+      onEditSpaceProfile: () => openUserSettings('spaceProfiles', { spaceId: sid }),
+    };
   }
 
   // Messages from blocked users are hidden. Filtered only for rendering (and the grouping
@@ -355,6 +378,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
     const uid = currentUserId();
     const s = getSenderDisplay(userId, resolvedParticipants(), uid);
     const p = resolvedParticipants()?.find((x) => x.id === userId);
+    const subjectRoleIds = (p as { roles?: string[] } | undefined)?.roles;
     const spaceRoleContext =
       props.spaceId &&
       props.spaceRoles != null &&
@@ -362,17 +386,28 @@ export const MessageList: Component<MessageListProps> = (props) => {
         ? {
             spaceId: props.spaceId,
             spaceOwnerId: props.spaceOwnerId ?? '',
-            subjectRoleIds: [...((p as { roles?: string[] } | undefined)?.roles ?? [])],
+            subjectRoleIds: [...(subjectRoleIds ?? [])],
             spaceRoles: props.spaceRoles,
             canManageMemberRoles: props.canManageMemberRoles === true,
             viewerHighestPosition: viewerRoleCeiling(props.spaceOwnerId, uid, props.spaceRoles, resolvedParticipants()),
             onMemberRolesUpdated: props.onSpaceMemberRolesUpdated,
+            // The same rule the author menu applies, so the card's pencil and the menu's
+            // Change Nickname appear for exactly the same people.
+            canEditNickname: !!spaceMemberOf(props.spaceId, userId) && canEditNicknameOf({
+              viewerId: uid,
+              targetId: userId,
+              spaceOwnerId: props.spaceOwnerId,
+              canChangeOwnNickname: props.canChangeOwnNickname,
+              canManageNicknames: props.canManageNicknames,
+              viewerHighestRolePosition: props.viewerHighestRolePosition,
+              targetHighestRolePosition: memberHighestRolePosition(undefined, props.spaceRoles, { roles: subjectRoleIds }),
+            }),
           }
         : null;
 
     openUserProfilePopover({
       anchor,
-      subject: popoverSubjectFromSender(s, { participant: p, spaceRoles: props.spaceRoles }),
+      subject: popoverSubjectFromSender(s, { participant: p, spaceRoles: props.spaceRoles, spaceId: props.spaceId }),
       currentUserId: uid,
       onMessageUser: props.onMessageUser,
       spaceRoleContext,
@@ -1246,6 +1281,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                       <MessageReactions
                         roomId={props.roomId!}
                         messageId={msg.id}
+                        spaceId={props.spaceId}
                         reactions={msg.reactions!}
                         canReact={canJoinReactions()}
                         onToggle={(emoji, mine) => toggleReaction(props.roomId!, msg.id, emoji, mine).catch((err) => console.error('Toggle reaction failed:', err))}
@@ -1315,6 +1351,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                       <MessageReactions
                         roomId={props.roomId!}
                         messageId={msg.id}
+                        spaceId={props.spaceId}
                         reactions={msg.reactions!}
                         canReact={canJoinReactions()}
                         onToggle={(emoji, mine) => toggleReaction(props.roomId!, msg.id, emoji, mine).catch((err) => console.error('Toggle reaction failed:', err))}

@@ -1,5 +1,6 @@
 import type { Component } from 'solid-js';
 import { userOptionLabel } from '../stores/instance';
+import { resolveProfile } from '../lib/spaceProfile';
 import { createSignal, createEffect, createMemo, For, Show, untrack } from 'solid-js';
 import {
   createSpaceRole,
@@ -17,6 +18,7 @@ import {
   memberCanBanMembers,
   memberCanKickMembers,
   memberCanManageEmojis,
+  memberCanManageNicknames,
   memberCanManageRoles,
   memberCanManageSpace,
   memberHighestRolePosition,
@@ -63,6 +65,12 @@ import { confirmDialog } from '../stores/confirmDialog';
 import { t } from '../i18n';
 
 const EVERYONE = '@everyone';
+
+/** A member as this space shows them - nickname and space avatar when set - with the handle. */
+const MemberCell: Component<{ m: SpaceMember }> = (props) => {
+  const r = () => resolveProfile(props.m, props.m, props.m.username);
+  return <UserCell size="sm" name={r().name} bot={props.m.bot} username={props.m.username} avatar={r().avatar} />;
+};
 
 /** Discord's default role palette, offered as quick swatches next to the custom colour picker. */
 const ROLE_COLOR_SWATCHES = [
@@ -154,7 +162,12 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
   );
   const canKick = createMemo(() => memberCanKickMembers(props.space, roles(), viewerMember(), viewerId()));
   const canBan = createMemo(() => memberCanBanMembers(props.space, roles(), viewerMember(), viewerId()));
-  const canSeeMembers = createMemo(() => canManageSpace() || userCanManageRoles() || canKick() || canBan());
+  // Manage Nicknames is moderation too: the Members page is where its holder changes
+  // nicknames and resets space profiles.
+  const canManageNicknames = createMemo(() => memberCanManageNicknames(props.space, roles(), viewerMember(), viewerId()));
+  const canSeeMembers = createMemo(
+    () => canManageSpace() || userCanManageRoles() || canKick() || canBan() || canManageNicknames()
+  );
 
   const allowed = (id: SpaceSettingsSection): boolean => {
     switch (id) {
@@ -535,6 +548,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
       .filter(
         (m) =>
           !q ||
+          (m.nick || '').toLowerCase().includes(q) ||
           (m.display_name || '').toLowerCase().includes(q) ||
           (m.username || '').toLowerCase().includes(q)
       )
@@ -984,7 +998,8 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                                 <For each={props.members}>
                                   {(m) => (
                                     <option value={m.id}>
-                                      {userOptionLabel(m)}
+                                      {/* Their name in this space, with the handle beside it. */}
+                                      {userOptionLabel({ username: m.username, display_name: resolveProfile(m, m, m.username).name })}
                                     </option>
                                   )}
                                 </For>
@@ -1040,7 +1055,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                                 <For each={roleMembers()}>
                                   {(m) => (
                                     <div class="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 hover:bg-muted/20">
-                                      <UserCell size="sm" name={m.display_name || m.username} bot={m.bot} username={m.username} avatar={m.avatar} />
+                                      <MemberCell m={m} />
                                       <Show when={props.canManageRoles && canAssignTo(m.id) && !roleLockedForViewer(r()) && !r().bot_id}>
                                         <button
                                           type="button"
@@ -1086,7 +1101,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                                         disabled={busy()}
                                         onClick={() => toggleMemberInRole(m.id, true)}
                                       >
-                                        <UserCell size="sm" name={m.display_name || m.username} bot={m.bot} username={m.username} avatar={m.avatar} />
+                                        <MemberCell m={m} />
                                         <i class="fa-solid fa-plus shrink-0 text-xs text-muted-foreground" aria-hidden="true" />
                                       </button>
                                     )}

@@ -17,6 +17,12 @@ export interface ConfirmDialogOptions {
   tone?: 'default' | 'danger';
   /** Font Awesome class for the chip; defaults per tone. */
   icon?: string;
+  /**
+   * A notice rather than a question: only the confirm button is shown (label it with
+   * `confirmLabel`, e.g. "Close"), for reporting a failure from a surface with no inline
+   * error area of its own. Resolves the same way.
+   */
+  acknowledgeOnly?: boolean;
 }
 
 interface ConfirmDialogState {

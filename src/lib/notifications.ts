@@ -13,6 +13,7 @@ import { notificationPrefs, playNotificationSound, showDesktopNotification } fro
 import { notificationsSuppressedByStatus } from '../stores/presence';
 import { getMessageBodyText, isSystemMessage, messagePreviewText } from '../components/messageList/utils';
 import { isRoomMuted, NotifyModeAll, NotifyModeMentions, NotifyModeNone } from './roomNotify';
+import { resolveProfile, resolveSpaceUser, type ProfileBase } from './spaceProfile';
 import { t } from '../i18n';
 
 const NAVIGATE_EVENT = 'strafe:navigate';
@@ -87,15 +88,31 @@ function roomContext(roomId: string, senderName: string): RoomContext | null {
   return null;
 }
 
-function senderName(roomId: string, senderId: string): string {
-  const pm = rooms.rooms.find((r) => r.id === roomId);
-  const p = pm?.participants?.find((x) => x.id === senderId);
-  if (p) return p.display_name || p.username;
-  for (const list of Object.values(spaceMembers.bySpaceId)) {
-    const m = list.find((x) => x.id === senderId);
-    if (m) return m.display_name || m.username;
+/** The space a room belongs to, or undefined for a PM. The rooms store copy says so directly
+ * when it has the room; the spaces store knows every channel of every space otherwise. */
+function roomSpaceId(roomId: string): string | undefined {
+  const stored = rooms.rooms.find((r) => r.id === roomId);
+  if (stored?.space_id) return stored.space_id;
+  for (const [spaceId, list] of Object.entries(spaces.spaceRoomsBySpaceId)) {
+    if (list.some((r) => r.id === roomId)) return spaceId;
   }
-  return t('common.someone');
+  return undefined;
+}
+
+function senderName(roomId: string, senderId: string, spaceId: string | undefined): string {
+  const pm = rooms.rooms.find((r) => r.id === roomId);
+  let base: ProfileBase | undefined = pm?.participants?.find((x) => x.id === senderId);
+  if (!base) {
+    for (const list of Object.values(spaceMembers.bySpaceId)) {
+      base = list.find((x) => x.id === senderId);
+      if (base) break;
+    }
+  }
+  // The global name may come from any list the sender is in, but a nickname only from the
+  // room's own space: the first list that happened to contain them could be another space,
+  // with another nickname.
+  if (spaceId) return resolveSpaceUser(spaceId, senderId, base, t('common.someone')).name;
+  return resolveProfile(base, undefined, t('common.someone')).name;
 }
 
 function mentionsMe(roomId: string, content: string): boolean {
@@ -127,7 +144,8 @@ export function maybeNotifyMessage(roomId: string, messageId: string): void {
   const focusedHere = document.visibilityState === 'visible' && viewedRoomId() === roomId;
   if (focusedHere && !prefs.whileFocused) return;
 
-  const sender = senderName(roomId, msg.sender_id);
+  const spaceId = roomSpaceId(roomId);
+  const sender = senderName(roomId, msg.sender_id, spaceId);
   const ctx = roomContext(roomId, sender);
   if (!ctx) return;
   if (ctx.muted) return;
@@ -153,7 +171,12 @@ export function maybeNotifyMessage(roomId: string, messageId: string): void {
 
   if (prefs.sounds) playNotificationSound(prefs.volume);
   if (prefs.desktop) {
-    const preview = prefs.preview ? messagePreviewText(body, undefined, me, 140) || t('notifications.newMessage') : t('notifications.newMessage');
+    // In a space, its member list names the people the body mentions (with their nicknames
+    // there) instead of "@Someone".
+    const participants = spaceId ? spaceMembers.bySpaceId[spaceId] : undefined;
+    const preview = prefs.preview
+      ? messagePreviewText(body, participants, me, 140) || t('notifications.newMessage')
+      : t('notifications.newMessage');
     showDesktopNotification({
       title: ctx.title,
       body: preview,

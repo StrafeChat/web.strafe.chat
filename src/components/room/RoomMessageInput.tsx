@@ -6,6 +6,7 @@ import type { SpaceRole, SpaceRoom } from '../../api/spaces';
 import type { CustomEmoji } from '../../api/emojis';
 import { spaceRoleColorHex } from '../../lib/spacePermissions';
 import { EMPTY_CATALOG, tokenizeDraft, type MentionCatalog } from '../../lib/utils/mentions';
+import { resolveProfile } from '../../lib/spaceProfile';
 import { emojiCatalogIfLoaded, loadEmojiCatalog, searchEmoji, withSkinTone, type EmojiCatalog } from '../../lib/emoji/data';
 import type { PendingAttachment } from '../../lib/attachments/draft';
 import { attachmentKind, fileIcon, formatFileSize, isVoiceMessage } from '../../lib/attachments/format';
@@ -95,12 +96,8 @@ export interface RoomMessageInputProps {
   slowmodeRemaining?: number;
 }
 
-function participantDisplayName(p: RoomParticipant): string {
-  return p.display_name || p.username || t('common.unknown');
-}
-
 type Candidate =
-  | { kind: 'user'; key: string; label: string; sublabel: string; insertText: string; participant: RoomParticipant }
+  | { kind: 'user'; key: string; label: string; sublabel: string; insertText: string; participant: RoomParticipant; avatar?: string }
   | { kind: 'role'; key: string; label: string; colorHex: string; insertText: string }
   | { kind: 'channel'; key: string; label: string; insertText: string }
   | { kind: 'special'; key: string; label: string; sublabel: string; insertText: string }
@@ -391,19 +388,28 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
       // list used to filter the current user out, so typing your own name after `@` produced
       // nothing at all. Self is flagged instead, so the row is identifiable rather than just
       // mysteriously present.
+      //
+      // In a space the row shows the member's space profile (nickname, space avatar), and
+      // typing their nickname, display name or username finds them. What gets inserted stays
+      // `@username`: handles are unique and nicknames are not, and the draft tokenizer only
+      // ever converts the exact username.
       for (const p of props.participants ?? []) {
-        const name = participantDisplayName(p);
+        const prof = resolveProfile(p, p);
         const username = p.username ?? '';
         if (!username) continue;
-        if (q !== '' && !name.toLowerCase().startsWith(q) && !username.toLowerCase().startsWith(q)) continue;
+        if (q !== '') {
+          const keys = [prof.nick, p.display_name, username];
+          if (!keys.some((k) => !!k && k.toLowerCase().startsWith(q))) continue;
+        }
         const isSelf = p.id === props.currentUserId;
         candidates.push({
           kind: 'user',
           key: `user:${p.id}`,
-          label: name,
+          label: prof.name,
           sublabel: isSelf ? t('common.you') : `@${username}`,
           insertText: `@${username} `,
           participant: p,
+          avatar: prof.avatar,
         });
       }
       for (const r of props.spaceRoles ?? []) {
@@ -948,7 +954,7 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
                         <Show when={c.kind === 'user'}>
                           <MessageAvatar
                             name={c.label}
-                            avatar={(c as { participant: RoomParticipant }).participant.avatar}
+                            avatar={(c as { avatar?: string }).avatar}
                             class="size-6 text-[11px]"
                           />
                           <span class="truncate">{c.label}</span>

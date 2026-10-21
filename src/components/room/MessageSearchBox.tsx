@@ -12,15 +12,21 @@ import {
   type SearchFilterKey,
   type SearchIdentity,
 } from '../../lib/messageSearch';
+import type { SpaceProfileFields } from '../../api/spaces';
+import { resolveProfile } from '../../lib/spaceProfile';
 import { t } from '../../i18n';
 import { BotTag } from '../BotTag';
+
+/** A person the box can suggest. In a space these are its member rows, which carry each
+ * member's space profile, so suggestions show (and match) their nickname there. */
+export type SearchPerson = SearchIdentity & SpaceProfileFields;
 
 export interface MessageSearchBoxProps {
   value: string;
   onValueChange: (value: string) => void;
   /** Enter, or picking "Search for …": run the query. */
   onSubmit: (raw: string) => void;
-  people?: SearchIdentity[];
+  people?: SearchPerson[];
   /** Space channels, for `in:`. Omitted in PMs, which have nothing to scope to. */
   channels?: SearchChannel[];
   placeholder?: string;
@@ -42,8 +48,8 @@ const FILTER_ICON: Record<SearchFilterKey, string> = {
   mentions: 'fa-solid fa-at',
 };
 
-function personLabel(p: SearchIdentity) {
-  return p.display_name || p.username;
+function personLabel(p: SearchPerson) {
+  return resolveProfile(p, p, p.username).name;
 }
 
 /**
@@ -91,12 +97,17 @@ export const MessageSearchBox: Component<MessageSearchBoxProps> = (props) => {
   document.addEventListener('mousedown', onDocMouseDown);
   onCleanup(() => document.removeEventListener('mousedown', onDocMouseDown));
 
-  function matchPeople(q: string): SearchIdentity[] {
+  function matchPeople(q: string): SearchPerson[] {
     const people = props.people ?? [];
     const needle = q.replace(/^@/, '').toLowerCase();
+    // The filter itself still goes in as `from:username` (resolveUser matches handles only);
+    // the nickname just helps find the person.
     const hits = needle
       ? people.filter(
-          (p) => p.username.toLowerCase().includes(needle) || (p.display_name ?? '').toLowerCase().includes(needle)
+          (p) =>
+            p.username.toLowerCase().includes(needle) ||
+            (p.display_name ?? '').toLowerCase().includes(needle) ||
+            (p.nick ?? '').toLowerCase().includes(needle)
         )
       : people;
     return hits.slice(0, SUGGESTION_LIMIT);

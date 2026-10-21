@@ -3,13 +3,12 @@ import { createSignal, onMount, createEffect, createMemo, Show } from 'solid-js'
 import { auth, setAuthUser, signOut } from '../../stores/auth';
 import { desktopAccountsSaved } from '../../desktop/accounts';
 import { getMe, patchMe, toAuthUser, uploadAvatar, uploadBanner } from '../../api/users';
-import { MessageAvatar } from '../messageList/MessageAvatar';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
 import { Toggle } from '../ui/Toggle';
-import { PresenceDot } from '../PresenceDot';
 import { settingsSectionTitle } from './settingsChrome';
+import { ProfileMediaEditor } from './ProfileMediaEditor';
 import { markdownAndHtmlToSanitizedBioHtml } from '../../lib/profileRichText';
 import { formatBirthday } from '../../lib/utils/birthday';
 import { t } from '../../i18n';
@@ -41,10 +40,8 @@ export const ProfileSettingsPage: Component<ProfileSettingsPageProps> = (props) 
   const [profileError, setProfileError] = createSignal('');
   const [avatarUploading, setAvatarUploading] = createSignal(false);
   const [avatarError, setAvatarError] = createSignal('');
-  let avatarFileInput: HTMLInputElement | undefined;
   const [bannerUploading, setBannerUploading] = createSignal(false);
   const [bannerError, setBannerError] = createSignal('');
-  let bannerFileInput: HTMLInputElement | undefined;
   // The birthday opt-in is its own switch that saves the moment it flips, so it is kept out
   // of the draft above (a discarded profile edit must not silently undo it, and vice versa).
   const [birthday, setBirthday] = createSignal<string | undefined>(undefined);
@@ -52,8 +49,6 @@ export const ProfileSettingsPage: Component<ProfileSettingsPageProps> = (props) 
   const [birthdayBusy, setBirthdayBusy] = createSignal(false);
   const [birthdayError, setBirthdayError] = createSignal('');
   const [signingOut, setSigningOut] = createSignal(false);
-
-  const profileImageMaxBytes = 8 * 1024 * 1024;
 
   function markDirty() {
     props.onDirtyChange?.(true);
@@ -156,19 +151,8 @@ export const ProfileSettingsPage: Component<ProfileSettingsPageProps> = (props) 
     if (user()?.id) navigator.clipboard.writeText(user()!.id);
   }
 
-  async function onAvatarSelected(e: Event) {
-    const input = e.target as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = '';
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      setAvatarError(t('settings.profile.imageTypeError'));
-      return;
-    }
-    if (file.size > profileImageMaxBytes) {
-      setAvatarError(t('settings.profile.imageSizeError'));
-      return;
-    }
+  // ProfileMediaEditor has already checked the type and size.
+  async function onAvatarFile(file: File) {
     setAvatarError('');
     setAvatarUploading(true);
     try {
@@ -182,19 +166,7 @@ export const ProfileSettingsPage: Component<ProfileSettingsPageProps> = (props) 
     }
   }
 
-  async function onBannerSelected(e: Event) {
-    const input = e.target as HTMLInputElement;
-    const file = input.files?.[0];
-    input.value = '';
-    if (!file) return;
-    if (!file.type.startsWith('image/')) {
-      setBannerError(t('settings.profile.imageTypeError'));
-      return;
-    }
-    if (file.size > profileImageMaxBytes) {
-      setBannerError(t('settings.profile.imageSizeError'));
-      return;
-    }
+  async function onBannerFile(file: File) {
     setBannerError('');
     setBannerUploading(true);
     try {
@@ -231,91 +203,18 @@ export const ProfileSettingsPage: Component<ProfileSettingsPageProps> = (props) 
             <h3 class={settingsSectionTitle}>
               {t('settings.profile.mediaTitle')}
             </h3>
-            <div class="overflow-hidden rounded-xl border border-border bg-muted/15 shadow-sm">
-              <input
-                ref={(el) => {
-                  avatarFileInput = el;
-                }}
-                type="file"
-                accept="image/jpeg,image/png,image/gif,image/webp"
-                class="hidden"
-                onChange={onAvatarSelected}
-              />
-              <input
-                ref={(el) => {
-                  bannerFileInput = el;
-                }}
-                type="file"
-                accept="image/jpeg,image/png,image/gif,image/webp"
-                class="hidden"
-                onChange={onBannerSelected}
-              />
-              <button
-                type="button"
-                disabled={bannerUploading()}
-                title={t('settings.profile.changeBanner')}
-                aria-label={t('settings.profile.changeBannerAria')}
-                class="group/banner relative flex h-28 w-full cursor-pointer border-0 bg-gradient-to-br from-primary/30 to-primary/10 bg-cover bg-center p-0 text-start outline-none ring-inset ring-ring transition focus-visible:ring-2 disabled:cursor-wait disabled:opacity-70"
-                style={
-                  auth.user?.banner
-                    ? { 'background-image': `url(${auth.user.banner})` }
-                    : undefined
-                }
-                onClick={() => {
-                  if (!bannerUploading()) bannerFileInput?.click();
-                }}
-              >
-                <span class="pointer-events-none absolute inset-0 bg-black/0 transition-colors group-hover/banner:bg-black/50 group-focus-visible/banner:bg-black/45" />
-                <span class="pointer-events-none absolute inset-0 flex items-center justify-center px-4 text-center text-sm font-medium text-white opacity-0 transition-opacity group-hover/banner:opacity-100 group-focus-visible/banner:opacity-100">
-                  {t('settings.profile.changeBanner')}
-                </span>
-                {bannerUploading() && (
-                  <span class="absolute inset-0 z-[1] flex items-center justify-center bg-background/60 text-sm font-medium text-foreground backdrop-blur-[2px]">
-                    {t('common.uploading')}
-                  </span>
-                )}
-              </button>
-              <div class="flex flex-col gap-3 px-4 pb-4 pt-2 sm:flex-row sm:items-end sm:justify-between">
-                <button
-                  type="button"
-                  disabled={avatarUploading()}
-                  title={t('settings.profile.changeAvatar')}
-                  aria-label={t('settings.profile.changeAvatarAria')}
-                  class="group/avatar relative -mt-12 shrink-0 cursor-pointer rounded-full border-0 bg-transparent p-0 outline-none ring-offset-2 ring-offset-card transition focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-wait disabled:opacity-70 sm:-mt-14"
-                  onClick={() => {
-                    if (!avatarUploading()) avatarFileInput?.click();
-                  }}
-                >
-                  <span class="relative block rounded-full">
-                    <MessageAvatar
-                      name={displayNameDraft() || displayName()}
-                      avatar={auth.user?.avatar}
-                      class="pointer-events-none size-20 border-[3px] border-card bg-primary text-xl text-primary-foreground shadow-md sm:size-[5.25rem] sm:text-2xl"
-                    />
-                    <span class="pointer-events-none absolute inset-0 rounded-full bg-black/0 transition-colors group-hover/avatar:bg-black/55 group-focus-visible/avatar:bg-black/50" />
-                    <span class="pointer-events-none absolute inset-0 flex items-center justify-center rounded-full px-2 text-center text-[10px] font-semibold leading-tight text-white opacity-0 transition-opacity group-hover/avatar:opacity-100 group-focus-visible/avatar:opacity-100 sm:text-xs">
-                      {t('settings.profile.changeAvatar')}
-                    </span>
-                  </span>
-                  <span class="pointer-events-none absolute bottom-1 right-1 z-[1]">
-                    <PresenceDot userId={user()?.id ?? ''} class="size-4" />
-                  </span>
-                  {avatarUploading() && (
-                    <span class="absolute inset-0 z-[2] flex items-center justify-center rounded-full bg-background/60 text-[11px] font-medium text-foreground backdrop-blur-[2px]">
-                      …
-                    </span>
-                  )}
-                </button>
-                <div class="flex min-w-0 flex-1 flex-col gap-1 sm:items-end sm:pb-1">
-                  <p class="text-[11px] text-muted-foreground sm:text-end">{t('settings.profile.mediaHint')}</p>
-                  {(avatarError() || bannerError()) && (
-                    <p class="text-xs text-destructive sm:text-end">
-                      {avatarError() || bannerError()}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
+            <ProfileMediaEditor
+              name={displayNameDraft() || displayName()}
+              userId={user()?.id ?? ''}
+              avatar={auth.user?.avatar}
+              banner={auth.user?.banner}
+              avatarUploading={avatarUploading()}
+              bannerUploading={bannerUploading()}
+              onAvatarFile={(file) => void onAvatarFile(file)}
+              onBannerFile={(file) => void onBannerFile(file)}
+              onInvalidFile={(kind, message) => (kind === 'avatar' ? setAvatarError(message) : setBannerError(message))}
+              error={avatarError() || bannerError() || undefined}
+            />
           </section>
 
           <section class="space-y-3">

@@ -41,6 +41,8 @@ Add the values of the bits you need to build a mask; test a bit with `(mask & bi
 | 25 | `33554432` | Create Private Threads | room | Start an invite-only thread |
 | 26 | `67108864` | Send Messages In Threads | room | Talk in threads (Send Messages alone does not grant it) |
 | 27 | `134217728` | Manage Threads | room | Rename, archive, lock and delete any thread; see private threads |
+| 28 | `268435456` | Change Nickname | space | Set or clear their own nickname in the space (on for `@everyone` by default) |
+| 29 | `536870912` | Manage Nicknames | space | Change or clear the nicknames of members ranked below them, and reset those members' space profiles (avatar, banner, pronouns, About Me, bio); their own nickname too |
 
 New permissions are only ever appended; existing values never change meaning.
 
@@ -49,9 +51,9 @@ New permissions are only ever appended; existing values never change meaning.
 | Mask | Value |
 | --- | --- |
 | Read and post (View Room + Send Messages + Read Message History) | `7` |
-| `@everyone` in a new space (read, post, attach files, react, external emoji, invite, join and talk in voice) | `10723359` |
-| Every room-scoped bit | `16744575` |
-| Every bit | `16777215` |
+| `@everyone` in a new space (read, post, attach files, react, external emoji, invite, start public threads and talk in threads, join and talk in voice, change their nickname) | `363044895` |
+| Every room-scoped bit | `268402815` |
+| Every bit | `1073741823` |
 
 ## How permissions resolve
 
@@ -64,7 +66,7 @@ For a member in a space:
 5. **Threads** have no overrides of their own: a thread resolves against its channel's effective overrides (and so a synced section's), with the thread bits above on top. A private thread yields no permissions at all to anyone who is neither a member nor a Manage Threads holder.
 6. **Two implicit rules**, the same as Discord's: without View Room the member has no permission at all in that room, whatever the bits say; and without Send Messages they cannot Attach Files or Mention @everyone either.
 
-Administrator also grants every space-scoped permission for management actions (adding bots, editing the space, invites, emoji, roles, kicks and bans), though role hierarchy still applies to Administrators - only the owner is above it.
+Administrator also grants every space-scoped permission for management actions (adding bots, editing the space, invites, emoji, roles, nicknames, kicks and bans), though role hierarchy still applies to Administrators - only the owner is above it.
 
 `GET /users/@me/spaces` and the `permissions` of a space in `READY` give you step 2; to know what a bot may do *in a room*, apply that room's `permission_overrides` and `user_overrides` from `READY.space_rooms` (or `GET /spaces/:id/rooms`) yourself, or simply try the call and handle `403`.
 
@@ -78,6 +80,7 @@ Roles are ordered by `position` (`@everyone` is 0). A member's rank is their hig
 
 - You can only create, edit, delete, assign or remove roles **below** your rank.
 - You can only kick or ban members whose rank is below yours.
+- You can only change the nickname of, or reset the space profile of, members whose rank is below yours; only the owner can change the owner's.
 - You can only grant permission bits you hold yourself (Administrators hold all).
 - You may always edit your own roles within those rules - including the owner, which is how they give themselves a colour.
 
