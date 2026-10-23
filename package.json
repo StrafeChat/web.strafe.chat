@@ -22,7 +22,7 @@
     "tailwindcss": "^4.1.13",
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.70.1",
-    "vite": "^7.1.4",
+    "vite": "^7.3.7",
     "vite-plugin-solid": "^2.11.8"
   },
   "dependencies": {
