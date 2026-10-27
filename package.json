@@ -42,7 +42,7 @@
     "@tauri-apps/plugin-window-state": "^2.5.0",
     "@types/dompurify": "^3.0.5",
     "altcha": "^3.2.3",
-    "dompurify": "^3.4.1",
+    "dompurify": "^3.4.17",
     "emojibase-data": "^17.0.0",
     "highlight.js": "^11.12.0",
     "i18next": "^25.8.13",
