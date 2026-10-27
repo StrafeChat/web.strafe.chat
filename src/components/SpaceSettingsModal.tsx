@@ -63,7 +63,7 @@ import {
 import { appSectionLabel } from '../theme/appChrome';
 import { confirmDialog } from '../stores/confirmDialog';
 import { t } from '../i18n';
-
+import { ColorPicker } from './ui/ColorPicker';
 const EVERYONE = '@everyone';
 
 /** A member as this space shows them - nickname and space avatar when set - with the handle. */
@@ -845,47 +845,12 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                           onInput={(e) => setRoleName(e.currentTarget.value)}
                         />
                         <div class="space-y-2">
-                          <label class="text-sm font-medium text-foreground" for="space-role-color-hex">
-                            {t('spaceSettings.roleColor')}
-                          </label>
-                          <div class="flex flex-wrap items-center gap-1.5">
-                            <For each={ROLE_COLOR_SWATCHES}>
-                              {(hex) => (
-                                <button
-                                  type="button"
-                                  disabled={!props.canManageRoles}
-                                  aria-label={hex}
-                                  onClick={() => setRoleColorHex(hex)}
-                                  class="size-7 rounded-md border border-border/40 transition-transform hover:scale-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
-                                  classList={{ 'ring-2 ring-ring ring-offset-2 ring-offset-background': roleColorHex().toLowerCase() === hex }}
-                                  style={{ 'background-color': hex }}
-                                />
-                              )}
-                            </For>
-                            <label
-                              class="relative flex size-7 cursor-pointer items-center justify-center rounded-md border border-dashed border-border/70 text-muted-foreground transition-colors hover:text-foreground"
-                              data-tooltip={t('spaceSettings.pickRoleColor')}
-                              aria-label={t('spaceSettings.pickRoleColor')}
-                            >
-                              <i class="fa-solid fa-eye-dropper text-[11px]" aria-hidden="true" />
-                              <input
-                                type="color"
-                                value={roleColorHex()}
-                                disabled={!props.canManageRoles}
-                                onInput={(e) => setRoleColorHex(e.currentTarget.value)}
-                                class="absolute inset-0 cursor-pointer opacity-0"
-                              />
-                            </label>
-                            <input
-                              id="space-role-color-hex"
-                              type="text"
-                              value={roleColorHex()}
-                              disabled={!props.canManageRoles}
-                              onInput={(e) => setRoleColorHex(e.currentTarget.value)}
-                              class={`${inputBaseClass} h-9 w-28 px-3 font-mono`}
-                              placeholder="#99aab5"
-                            />
-                          </div>
+                          <ColorPicker
+                            label={t('spaceSettings.roleColor')}
+                            value={roleColorHex()}
+                            onChange={setRoleColorHex}
+                            disabled={!props.canManageRoles}
+                          />
                         </div>
                         <div class="flex flex-col gap-4 rounded-xl border border-border/60 bg-card/20 p-4">
                           <div class="flex items-center justify-between gap-4">
