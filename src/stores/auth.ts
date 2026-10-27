@@ -13,6 +13,7 @@ import { clearRecentEmoji } from '../lib/emoji/recent';
 import { lastVisited } from './lastVisited';
 import { lastSpaceRoom } from './lastSpaceRoom';
 import { spaceOrder } from './spaceOrder';
+import { spaceRailOrder } from './spaceRailOrder';
 import { setUserPresence } from './presence';
 import { loadRooms, clearRooms, hydrateRoomsFromReady } from './rooms';
 import { loadRelationships, clearRelationships, hydrateRelationshipsFromReady } from './relationships';
@@ -90,6 +91,7 @@ export function logout() {
   lastVisited.clear();
   lastSpaceRoom.clear();
   spaceOrder.clear();
+  spaceRailOrder.clear();
   clearRecentEmoji();
 }
 

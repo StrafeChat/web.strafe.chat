@@ -2,8 +2,13 @@ import { createSignal, onCleanup, type JSX } from 'solid-js';
 
 export interface SpaceReorderOptions {
   container: () => HTMLElement | undefined;
-  ids: () => string[];
-  onCommit: (ids: string[]) => void;
+  ids: (draggedId: string | null) => string[];
+  onCommit: (ids: string[], draggedId: string) => void;
+  onDragMove?: (info: { id: string; x: number; y: number }) => void;
+  onDragEnd?: (info: { id: string; committed: boolean; cancelled: boolean }) => void;
+  shouldReorder?: () => boolean;
+  shouldCommit?: (id: string) => boolean;
+  unbounded?: (draggedId: string | null) => boolean;
 }
 
 export interface SpaceReorder {
@@ -35,7 +40,9 @@ export function createSpaceReorder(opts: SpaceReorderOptions): SpaceReorder {
   let startY = 0;
   let lastY = 0;
   let grabDelta = 0;
-  let pitch = 56;
+  let centreOffset = 24;
+  let handleEl: HTMLElement | null = null;
+  let itemGap = 8;
   let homeTops: Record<string, number> = {};
   let homeHeights: Record<string, number> = {};
   let orderAtStart: string[] = [];
@@ -45,16 +52,16 @@ export function createSpaceReorder(opts: SpaceReorderOptions): SpaceReorder {
   function slotFor(id: string): HTMLElement | null {
     const container = opts.container();
     if (!container) return null;
-    return container.querySelector<HTMLElement>(`[data-space-id="${CSS.escape(id)}"]`);
+    return container.querySelector<HTMLElement>(`[data-rail-id="${CSS.escape(id)}"]`);
   }
 
-  function measure() {
+  function measure(draggedId: string) {
     const container = opts.container();
-    orderAtStart = [...opts.ids()];
+    orderAtStart = [...opts.ids(draggedId)];
     homeTops = {};
     homeHeights = {};
     if (!container) {
-      pitch = 56;
+      itemGap = 8;
       return;
     }
     const box = container.getBoundingClientRect();
@@ -65,11 +72,14 @@ export function createSpaceReorder(opts: SpaceReorderOptions): SpaceReorder {
       homeTops[id] = r.top - box.top + container.scrollTop;
       homeHeights[id] = r.height;
     }
-    const tops = orderAtStart.map((id) => homeTops[id]).filter((t) => t !== undefined);
-    pitch =
-      tops.length > 1
-        ? (tops[tops.length - 1]! - tops[0]!) / (tops.length - 1)
-        : (homeHeights[orderAtStart[0] ?? ''] ?? 48) + 8;
+    itemGap = 8;
+    for (let i = 1; i < orderAtStart.length; i++) {
+      const prev = orderAtStart[i - 1]!;
+      const current = orderAtStart[i]!;
+      if (homeTops[prev] === undefined || homeTops[current] === undefined) continue;
+      itemGap = homeTops[current] - (homeTops[prev] + (homeHeights[prev] ?? 48));
+      break;
+    }
   }
 
   function beginDrag() {
@@ -77,8 +87,13 @@ export function createSpaceReorder(opts: SpaceReorderOptions): SpaceReorder {
     const id = pendingId;
     if (!id) return;
     const el = slotFor(id);
-    if (el) grabDelta = startY - el.getBoundingClientRect().top;
-    measure();
+    if (el) {
+      const rootRect = el.getBoundingClientRect();
+      grabDelta = startY - rootRect.top;
+      const handleRect = handleEl?.isConnected ? handleEl.getBoundingClientRect() : null;
+      centreOffset = handleRect ? handleRect.top - rootRect.top + handleRect.height / 2 : rootRect.height / 2;
+    }
+    measure(id);
     finalOrder = [...orderAtStart];
     setDraggingId(id);
     document.body.style.userSelect = 'none';
@@ -86,7 +101,7 @@ export function createSpaceReorder(opts: SpaceReorderOptions): SpaceReorder {
     update();
   }
 
-  function update() {
+  function update(preview = true) {
     const id = pendingId;
     const container = opts.container();
     if (!id || !container) return;
@@ -96,12 +111,13 @@ export function createSpaceReorder(opts: SpaceReorderOptions): SpaceReorder {
     const firstTop = homeTops[orderAtStart[0] ?? ''];
     const lastTop = homeTops[orderAtStart[orderAtStart.length - 1] ?? ''];
     let targetTop = rawTargetTop;
-    if (firstTop !== undefined && lastTop !== undefined) {
+    if (!(opts.unbounded?.(id) ?? false) && firstTop !== undefined && lastTop !== undefined) {
       targetTop = Math.max(firstTop, Math.min(lastTop, rawTargetTop));
     }
     setDragDy(targetTop - (homeTops[id] ?? targetTop));
+    if (!preview) return;
 
-    const centre = rawTargetTop + (homeHeights[id] ?? 48) / 2;
+    const centre = rawTargetTop + centreOffset;
     const without = orderAtStart.filter((x) => x !== id);
     let insertAt = 0;
     for (const other of without) {
@@ -113,11 +129,11 @@ export function createSpaceReorder(opts: SpaceReorderOptions): SpaceReorder {
     finalOrder = next;
 
     const shiftBy: Record<string, number> = {};
-    for (const other of orderAtStart) {
-      if (other === id) continue;
-      const from = orderAtStart.indexOf(other);
-      const to = next.indexOf(other);
-      if (from !== to) shiftBy[other] = (to - from) * pitch;
+    let cursor = firstTop ?? 0;
+    for (const other of next) {
+      const top = homeTops[other];
+      if (other !== id && top !== undefined) shiftBy[other] = cursor - top;
+      cursor += (homeHeights[other] ?? 48) + itemGap;
     }
     setShifts(shiftBy);
   }
@@ -135,6 +151,7 @@ export function createSpaceReorder(opts: SpaceReorderOptions): SpaceReorder {
     document.body.style.cursor = '';
 
     const didDrag = started;
+    const draggedId = pendingId;
     const order = finalOrder;
     pendingId = null;
     started = false;
@@ -152,8 +169,16 @@ export function createSpaceReorder(opts: SpaceReorderOptions): SpaceReorder {
       document.addEventListener('click', swallow, true);
       setTimeout(() => document.removeEventListener('click', swallow, true), 0);
     }
-    
-    if (didDrag && commit && order && !sameOrder(order, orderAtStart)) opts.onCommit(order);
+
+    const canCommit =
+      didDrag &&
+      commit &&
+      !!order &&
+      !!draggedId &&
+      !sameOrder(order, orderAtStart) &&
+      (opts.shouldCommit?.(draggedId) ?? true);
+    if (canCommit && order && draggedId) opts.onCommit(order, draggedId);
+    if (didDrag && draggedId) opts.onDragEnd?.({ id: draggedId, committed: canCommit, cancelled: !commit });
     if (didDrag) {
       requestAnimationFrame(() => requestAnimationFrame(() => setSettling(false)));
     }
@@ -175,7 +200,7 @@ export function createSpaceReorder(opts: SpaceReorderOptions): SpaceReorder {
       const next = Math.max(0, Math.min(max, container.scrollTop + dy));
       if (next !== container.scrollTop) {
         container.scrollTop = next;
-        update();
+        update(opts.shouldReorder?.() ?? true);
       }
       scrollRaf = requestAnimationFrame(autoScrollTick);
     }
@@ -188,7 +213,8 @@ export function createSpaceReorder(opts: SpaceReorderOptions): SpaceReorder {
       if (Math.hypot(e.clientX - startX, e.clientY - startY) < MOVE_THRESHOLD_PX) return;
       beginDrag();
     }
-    update();
+    if (pendingId) opts.onDragMove?.({ id: pendingId, x: e.clientX, y: e.clientY });
+    update(opts.shouldReorder?.() ?? true);
     if (!scrollRaf) scrollRaf = requestAnimationFrame(autoScrollTick);
   }
 
@@ -212,6 +238,7 @@ export function createSpaceReorder(opts: SpaceReorderOptions): SpaceReorder {
     startX = e.clientX;
     startY = e.clientY;
     lastY = e.clientY;
+    handleEl = el;
     grabDelta = e.clientY - el.getBoundingClientRect().top;
     window.addEventListener('pointermove', onPointerMove);
     window.addEventListener('pointerup', onPointerUp);
@@ -227,6 +254,7 @@ export function createSpaceReorder(opts: SpaceReorderOptions): SpaceReorder {
         'z-index': '20',
         position: 'relative',
         'will-change': 'transform',
+        'pointer-events': 'none',
       };
     }
     const shift = shifts()[id] ?? 0;

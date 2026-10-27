@@ -205,6 +205,27 @@ html[data-density='spacious'] {
 .admin-panel-in { animation: admin-fade-up 0.3s cubic-bezier(0.22, 1, 0.36, 1); }
 .admin-row-in { animation: admin-fade-up 0.26s cubic-bezier(0.22, 1, 0.36, 1) both; }
 
+@keyframes space-folder-panel-open {
+  from { opacity: 0.85; transform: scale(0.97); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes space-folder-panel-close {
+  from { opacity: 1; transform: scale(1); }
+  to { opacity: 0.85; transform: scale(0.97); }
+}
+@keyframes space-folder-members-open {
+  from { opacity: 0; transform: translateY(-4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+@keyframes space-folder-members-close {
+  from { opacity: 1; transform: translateY(0); }
+  to { opacity: 0; transform: translateY(-4px); }
+}
+.space-folder-panel-open { animation: space-folder-panel-open 0.18s ease-out; }
+.space-folder-panel-close { animation: space-folder-panel-close 0.12s ease-in forwards; }
+.space-folder-members-open { animation: space-folder-members-open 0.18s ease-out; }
+.space-folder-members-close { animation: space-folder-members-close 0.12s ease-in forwards; }
+
 /* Emoji drawn from an image provider (Twemoji etc.): inline, sized to the text, vertically
    centred on the x-height like a native glyph would be. Jumbo = an emoji-only message. */
 img.emoji {
@@ -249,6 +270,41 @@ img.emoji.emoji-jumbo,
   margin: 0;
   padding: 0;
   transform: translate(-50%, calc(-50% + 1px));
+}
+
+/* Color picker hue slider */
+.color-picker-hue {
+  --cp-thumb: #fff;
+}
+.color-picker-hue::-webkit-slider-thumb {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgb(255 255 255 / 0.92);
+  border-radius: 9999px;
+  background: var(--cp-thumb);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.55),
+    0 1px 4px rgb(0 0 0 / 0.45);
+  cursor: grab;
+}
+.color-picker-hue:active::-webkit-slider-thumb {
+  cursor: grabbing;
+}
+.color-picker-hue::-moz-range-thumb {
+  width: 18px;
+  height: 18px;
+  border: 2px solid rgb(255 255 255 / 0.92);
+  border-radius: 9999px;
+  background: var(--cp-thumb);
+  box-shadow:
+    0 0 0 1px rgb(0 0 0 / 0.55),
+    0 1px 4px rgb(0 0 0 / 0.45);
+  cursor: grab;
+}
+.color-picker-hue:focus-visible {
+  outline: 2px solid var(--color-ring);
+  outline-offset: 2px;
 }
 
 /* Accessibility: underline every link (settings → Accessibility) */

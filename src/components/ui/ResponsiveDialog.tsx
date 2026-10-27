@@ -20,7 +20,7 @@ export type DialogTone = keyof typeof appDialogIconTone;
 
 export interface ResponsiveDialogProps {
   /** `sm` ≈ max-w-sm on desktop, `md` ≈ max-w-md (default), `lg` ≈ max-w-lg. */
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md' | 'lg' | 'xl';
   /** Stacking tier, one of `zLayer`. Defaults to `zLayer.modal`. */
   zClass?: string;
   /** Requested by Escape, a backdrop click and the close button. */

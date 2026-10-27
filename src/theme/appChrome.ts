@@ -77,6 +77,7 @@ export const appResponsiveDialogWidth = {
   sm: 'md:max-w-sm',
   md: 'md:max-w-md',
   lg: 'md:max-w-lg',
+  xl: 'md:max-w-2xl',
 } as const;
 
 /** Inner padding of a padded dialog body. The bottom clears the home indicator on phones. */
