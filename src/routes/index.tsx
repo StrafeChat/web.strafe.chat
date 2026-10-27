@@ -27,6 +27,7 @@ import { ExternalLinkModal } from '../components/ExternalLinkModal';
 import { UserSettingsModal } from '../components/UserSettingsModal';
 import { SafetyNumberModal } from '../components/SafetyNumberModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
+import { PasswordPromptHost } from '../components/PasswordPromptHost';
 import { auth, hydrateAuth } from '../stores/auth';
 import { AppBackground } from '../components/auth/AppBackground';
 import { isDesktop } from '../desktop/env';
@@ -90,6 +91,7 @@ function RootLayout(props: { children?: import('solid-js').JSX.Element }) {
         <UserSettingsModal />
         <SafetyNumberModal />
         <ConfirmDialog />
+        <PasswordPromptHost />
       </Show>
       </StargateProvider>
     </>

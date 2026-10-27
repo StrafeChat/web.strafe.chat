@@ -34,9 +34,25 @@ was replaced.
 The OlmMachine owns its own IndexedDB store internally, encrypted at rest with a random
 per-device passphrase (see `machine.ts`) - not something this module manages by hand.
 That's the fix for the old design storing raw private key bytes as plaintext in
-IndexedDB. The recovery-PIN backup (`backup.ts`) protects that passphrase, not key
-material directly - restoring from backup reopens the same encrypted store rather than
-reconstructing keys from the backup payload.
+IndexedDB. Room keys are additionally backed up server-side under an asymmetric scheme
+(`keyBackup.ts`): devices hold only the backup's public key and can append, and the
+private key exists only wrapped under the user's recovery code (`recoveryCode.ts`). The
+earlier PIN-wrapped backup is read-only now (`legacyBackup.ts`), folded into the new one
+once and then deleted.
+
+## Key backup trust
+
+The server decides which backup version is "current", and whoever holds a version's
+private key reads every room key uploaded to it - so a device never takes the server's
+word for it. A version is trusted by a device only when that device created it or opened it
+with the recovery code (the pin in `keyBackup.ts`); any other version gets nothing uploaded
+to it, and settings reports it as needing confirmation. Creating or deleting a version
+requires the account password again, not just a session token. Replacing a version does not
+destroy the old one: the server retains the superseded version for seven days, and a
+restore whose code opens that one instead of the current one imports from it. When a
+version is created or deleted, `KEY_BACKUP_UPDATE` on the user's gateway channel tells the
+account's other devices at once, so they stop uploading before the next 404 would have
+told them.
 
 ## Wire format / legacy compatibility
 

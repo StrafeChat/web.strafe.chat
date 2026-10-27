@@ -1,7 +1,16 @@
 import type { Component } from 'solid-js';
 import { createMemo, createSignal, For, Show } from 'solid-js';
 import { kickSpaceMember, type Space, type SpaceMember, type SpaceRole } from '../../../api/spaces';
-import { memberHighestRolePosition, spaceRoleColorHex } from '../../../lib/spacePermissions';
+import {
+  memberCanEditNickname,
+  memberCanManageNicknames,
+  memberCanResetSpaceProfile,
+  memberHighestRolePosition,
+  spaceRoleColorHex,
+} from '../../../lib/spacePermissions';
+import { hasResettableSpaceProfile, resolveProfile } from '../../../lib/spaceProfile';
+import { confirmResetSpaceProfile } from '../../../lib/userContextMenu';
+import { openNicknameDialog } from '../../../stores/nicknameDialog';
 import { presence, isVisibleStatus } from '../../../stores/presence';
 import { confirmDialog } from '../../../stores/confirmDialog';
 import { showContextMenu, type ContextMenuItem } from '../../../stores/contextMenu';
@@ -52,7 +61,23 @@ export const SpaceMembersPage: Component<Props> = (props) => {
     return memberHighestRolePosition(everyoneId(), props.roles, mine);
   });
 
-  const memberName = (m: SpaceMember) => m.display_name || m.username;
+  // Names here are the members' names in this space: a nickname when one is set, with the
+  // handle (and, under a nickname, the global name) beside it so a moderator always knows who.
+  const memberName = (m: SpaceMember) => resolveProfile(m, m, m.username).name;
+  const viewerRow = createMemo(() => {
+    const me = props.viewerId;
+    return me ? (props.members.find((m) => m.id === me) ?? { id: me }) : undefined;
+  });
+  const canManageNicknames = createMemo(() =>
+    memberCanManageNicknames(props.space, props.roles, viewerRow(), props.viewerId)
+  );
+  /** Change Nickname is offered on your own row when the space lets you change yours, and on
+   * others' when you hold Manage Nicknames; memberCanEditNickname then decides whether it is
+   * enabled (the hierarchy and owner rules, as the server applies them). */
+  const offersNickname = (m: SpaceMember) =>
+    m.id === props.viewerId ? memberCanEditNickname(props.space, props.roles, viewerRow(), m) : canManageNicknames();
+  const canResetProfile = (m: SpaceMember) =>
+    memberCanResetSpaceProfile(props.space, props.roles, viewerRow(), m) && hasResettableSpaceProfile(m, { ignoreNick: true });
   const customRolesOf = (m: SpaceMember) =>
     (m.roles ?? [])
       .filter((rid) => rid !== everyoneId())
@@ -66,16 +91,25 @@ export const SpaceMembersPage: Component<Props> = (props) => {
     let list = props.members.filter((m) => {
       if (rf && !(m.roles ?? []).includes(rf)) return false;
       if (!q) return true;
-      return memberName(m).toLowerCase().includes(q) || m.username.toLowerCase().includes(q) || m.id === q;
+      return (
+        memberName(m).toLowerCase().includes(q) ||
+        (m.display_name ?? '').toLowerCase().includes(q) ||
+        m.username.toLowerCase().includes(q) ||
+        m.id === q
+      );
     });
     const joined = (m: SpaceMember) => (m.joined_at ? new Date(m.joined_at).getTime() : 0);
     switch (sort()) {
       case 'joined_asc':
         list = [...list].sort((a, b) => joined(a) - joined(b));
         break;
-      case 'name':
-        list = [...list].sort((a, b) => memberName(a).localeCompare(memberName(b)));
+      case 'name': {
+        const names = new Map(list.map((m) => [m.id, memberName(m)]));
+        list = [...list].sort((a, b) =>
+          (names.get(a.id) ?? '').localeCompare(names.get(b.id) ?? '', undefined, { sensitivity: 'base' })
+        );
         break;
+      }
       default:
         list = [...list].sort((a, b) => joined(b) - joined(a));
     }
@@ -137,16 +171,46 @@ export const SpaceMembersPage: Component<Props> = (props) => {
         onClick: () => setRolesTarget(m),
       });
     }
+    if (offersNickname(m)) {
+      items.push({
+        label: t('spaceProfile.changeNickname'),
+        icon: 'fa-solid fa-pen',
+        disabled: !memberCanEditNickname(props.space, props.roles, viewerRow(), m),
+        onClick: () => openNicknameDialog({ spaceId: props.spaceId, userId: m.id }),
+      });
+    }
+    // Only when there is something to clear and you may clear it (Manage Nicknames, ranked
+    // above them); the nickname is left alone, it has its own action.
+    if (canResetProfile(m)) {
+      items.push({
+        label: t('contextMenu.resetSpaceProfile'),
+        icon: 'fa-solid fa-eraser',
+        danger: true,
+        onClick: () => {
+          props.onError('');
+          void confirmResetSpaceProfile(props.spaceId, m.id, props.onError);
+        },
+      });
+    }
     if (props.canKick) items.push({ label: t('room.members.kick'), icon: 'fa-solid fa-user-minus', danger: true, disabled: !mod, onClick: () => void kick(m) });
     if (props.canBan) items.push({ label: t('room.members.ban'), icon: 'fa-solid fa-ban', danger: true, disabled: !mod, onClick: () => setBanTarget({ id: m.id, name: memberName(m) }) });
     if (items.length === 0) return;
     showContextMenu(e, items);
   }
 
-  const hasActions = () => props.canKick || props.canBan || props.canManageRoles;
+  const hasActions = () =>
+    props.canKick ||
+    props.canBan ||
+    props.canManageRoles ||
+    canManageNicknames() ||
+    memberCanEditNickname(props.space, props.roles, viewerRow(), viewerRow());
   /** Whether this row's menu would hold anything at all. */
   const hasMenu = (m: SpaceMember) =>
-    (props.canManageRoles && (canEditRoles(m) || !isOwner(m.id))) || props.canKick || props.canBan;
+    (props.canManageRoles && (canEditRoles(m) || !isOwner(m.id))) ||
+    props.canKick ||
+    props.canBan ||
+    offersNickname(m) ||
+    canResetProfile(m);
 
   return (
     <div class="space-y-4">
@@ -194,11 +258,24 @@ export const SpaceMembersPage: Component<Props> = (props) => {
                   const status = () => presence.byUser[m.id]?.status ?? m.presence?.status;
                   const online = () => isVisibleStatus(status());
                   const roles = () => customRolesOf(m);
+                  const profile = () => resolveProfile(m, m, m.username);
+                  /** Under a nickname, who they are everywhere else - unless that is just
+                   * their handle again, already on the line. */
+                  const globalHint = () => {
+                    const r = profile();
+                    return r.nick && r.globalName !== m.username ? r.globalName : undefined;
+                  };
                   return (
                     <tr class={appTableRow} onContextMenu={(e) => hasActions() && openMenu(e, m)}>
                       <td class={appTableCell}>
                         <div class="flex items-center gap-2">
-                          <UserCell name={memberName(m)} bot={m.bot} username={m.username} avatar={m.avatar} />
+                          <UserCell
+                            name={profile().name}
+                            bot={m.bot}
+                            username={m.username}
+                            avatar={profile().avatar}
+                            subline={globalHint()}
+                          />
                           <Show when={isOwner(m.id)}>
                             <i class="fa-solid fa-crown text-[11px] text-amber-400" title={t('room.members.owner')} aria-hidden="true" />
                           </Show>

@@ -3,7 +3,12 @@ import type { ProfileRole } from './userProfilePopover';
 
 export type UserProfileFullSubject = {
   userId: string;
+  /** Space nickname when opened inside a space, else the display name. */
   displayName: string;
+  /** Global display name, only when it differs from `displayName`; shown under it. */
+  globalName?: string;
+  /** The space whose profile this shows, if any. */
+  spaceId?: string;
   username: string;
   /** Federation: the user's home instance, shown after the tag when it isn't this one. */
   homeDomain?: string;

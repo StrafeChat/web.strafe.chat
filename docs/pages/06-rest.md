@@ -1,6 +1,6 @@
 ---
 title: REST API
-description: Reference for the endpoints bots and applications use - users, spaces, members, roles, invites, rooms, messages, reactions, attachments - plus error and rate-limit behaviour.
+description: Reference for the endpoints bots and applications use - the instance, users, spaces, members, roles, invites, rooms, messages, reactions, attachments, GIFs - plus error and rate-limit behaviour.
 ---
 
 # REST API
@@ -8,6 +8,18 @@ description: Reference for the endpoints bots and applications use - users, spac
 All paths are relative to this instance's API base: <code data-instance="api">https://your-instance.example/api</code>. Authenticate with `Authorization: Bot <token>` (bots) or `Authorization: Bearer <access token>` (OAuth2, scoped endpoints only). Send and expect JSON; ids are strings.
 
 **Who can call what.** Every endpoint below accepts a bot token unless marked *session only*. OAuth2 tokens reach only the endpoints marked with a scope. A bot is checked against its permissions in the space or room like any member.
+
+## Instance
+
+### `GET` / — *no auth*
+
+What this instance is and what it has switched on. Clients read it before anyone signs in.
+
+```json
+{ "strafe": { "version": "…" }, "federation": { "enabled": true, "domain": "your-instance.example" }, "features": { "captcha": { "enabled": true, "provider": "altcha" }, "email": { "enabled": true, "verification_required": false }, "invite_only": { "enabled": false }, "voice": { "enabled": true }, "gifs": { "enabled": true, "providers": ["giphy"] } }, "services": { "cdn": { "enabled": true, "url": "…" }, "voice": { "enabled": true, "url": "…" } } }
+```
+
+`features.gifs.providers` lists the GIF providers (`giphy`, `heypster`) this instance has an API key for, and `enabled` is true when there is at least one; see [GIFs](#gifs). The keys themselves never leave the server.
 
 ## Users
 
@@ -59,11 +71,11 @@ The space's rooms with overrides and, for the caller, read state. Same shape as 
 
 ### `POST` /spaces/:id/rooms — *Manage Rooms*
 
-`{"name", "type": 3 | 4 | 5, "parent_id"?, "e2ee_enabled"?, "user_limit"?, "bitrate"?}`. Type `3` text, `4` voice, `5` section. Returns the room (`201`).
+`{"name", "type": 3 | 4 | 5, "parent_id"?, "e2ee_enabled"?, "user_limit"?, "bitrate"?}`. Type `3` text, `4` voice, `5` section. Returns the room (`201`). A space holds at most 500 rooms and 250 roles (`400` beyond that).
 
 ### `PATCH` /spaces/:id/rooms/:roomId — *Manage Rooms*
 
-`name`, `topic`, `slowmode_seconds`, `e2ee_enabled` (text rooms; turning encryption **on** is one-way for existing history), `user_limit`, `bitrate`, `position`.
+`name`, `topic`, `slowmode_seconds`, `e2ee_enabled` (text rooms; turning encryption **on** is one-way for existing history), `user_limit`, `bitrate`, `position`, `permissions_synced`. You must be able to view the room; `permissions_synced` rewrites the room's overrides, so it needs *Manage Roles* as well, and only for overrides you could have written yourself.
 
 ### `DELETE` /spaces/:id/rooms/:roomId — *Manage Rooms*
 
@@ -77,9 +89,44 @@ Leave the space (the owner cannot; they transfer or delete it).
 
 ## Members
 
+### The member object
+
+```json
+{
+  "id": "2102223172425220096", "username": "turtle", "display_name": "Turtle", "avatar": "", "banner": "", "bio": "", "about_me": "", "pronouns": "",
+  "bot": false, "public_flags": 0, "presence": { "status": "online" },
+  "joined_at": "2026-10-13T12:00:00Z", "roles": ["2102226824779005952"],
+  "nick": "Shell", "space_avatar": "https://cdn.your-instance.example/v1/spaces/members/…/avatar-….png",
+  "space_banner": null, "space_about_me": null, "space_bio": null, "space_pronouns": null
+}
+```
+
+The user fields (`display_name`, `avatar`, `bio`, `about_me`, `pronouns`, …) are always the member's **global** profile. The six space-profile keys are their profile in this space only, and every member object carries all six, each a string or `null`: `nick` (max 32 characters), `space_avatar` and `space_banner` (image URLs, set only through the upload endpoints below), `space_about_me` and `space_bio` (max 190 each), `space_pronouns` (max 40). Where one is set it replaces the global value inside this space - show `nick` instead of the display name, `space_avatar` instead of `avatar`, and so on. A space profile is visible to the space's members only, and it is deleted with the membership: leaving, a kick, a ban or the space's deletion removes it.
+
 ### `GET` /spaces/:id/members
 
-Every member with their profile, `roles` (role ids), `joined_at`, `presence`, `public_flags` and `bot`.
+Every member as a member object.
+
+### `GET` /spaces/:id/members/:userId
+
+One member as a member object; `@me` for yourself. You must be a member yourself (`403`), and `404` `member not found` means they are not one.
+
+### `PATCH` /spaces/:id/members/:userId — *Change Nickname for your own, Manage Nicknames for others'*
+
+Set part of a space profile: `nick`, `about_me`, `bio`, `pronouns`, `avatar`, `banner`. A key that is absent is left alone; `null` or `""` clears it; values are trimmed. Returns the updated member object and sends `SPACE_MEMBER_UPDATE`. A request that changes nothing returns `200` with no event.
+
+- **Yourself** (`@me`): `nick` needs **Change Nickname** (on for `@everyone` by default) or **Manage Nicknames**; the other fields need only membership. `avatar` and `banner` accept only a clear (`null` or `""`) - set an image with the upload endpoints below.
+- **Another member**, with **Manage Nicknames** and a highest role above theirs: `nick` (set or clear), and `null` (or `""`) for any of `avatar`, `banner`, `about_me`, `bio` and `pronouns`, which resets it to their global profile. A non-empty value for those five is `403` `only the member can change their own space avatar, banner, pronouns, about me or bio` (`code: "cannot_edit_member_profile"`). Only the owner can change the owner's nickname or profile, Administrators included: anyone else gets `403` `only the space owner can change the owner's nickname` when the request touches `nick`, and `403` `only the space owner can change the owner's space profile` when it only resets the other fields.
+
+A moderator's nickname change is logged as `member_nick_update` (`changes.nick` with the old and new value) and a reset as `member_profile_reset` (`changes.fields`, the fields that were cleared). Changes to your own profile are never logged. In a space hosted on another instance the change is made there, where the space profile lives.
+
+Errors: `400` `no fields to update`, `400` for a value over its limit or a nickname that is not on one line, `400` `avatar and banner must be uploaded, or cleared with null`, `403` `missing permission to change your nickname in this space`, `403` `only the space owner can change the owner's nickname`, `403` `only the space owner can change the owner's space profile`, `403` `only the member can change their own space avatar, banner, pronouns, about me or bio` (`code: "cannot_edit_member_profile"`), `403` `cannot manage a role or member at or above your own highest role`, `404` `member not found`, `409` `the space profile changed while saving; try again` (another write to the same image won the race; send it again).
+
+### `POST` /spaces/:id/members/@me/avatar, `POST` /spaces/:id/members/@me/banner
+
+Upload your own space avatar or banner: multipart `file`, png, jpg, gif or webp, within the same size limits as the global ones. Only membership is needed. Returns the member object with `space_avatar` / `space_banner` set; the image it replaces is deleted. To remove one, `PATCH` it to `null`.
+
+Errors: `400` `missing file field`, `400` `invalid file size`, `400` `unsupported image type (use jpg, png, gif, or webp)`, `403` when you are not a member, `502` `could not store image`, `503` `file uploads are not configured` (the instance has no object storage set up).
 
 ### `DELETE` /spaces/:id/members/:userId — *Kick Members*
 
@@ -95,7 +142,7 @@ Add a user who authorized your application with `spaces.join`: `{"access_token":
 
 ### Bans — *Ban Members*
 
-`POST /spaces/:id/bans/:userId` `{"reason"?}` bans (and removes) the user; `DELETE /spaces/:id/bans/:userId` lifts it; `GET /spaces/:id/bans` lists the bans (`user_id`, `reason`, `banned_by`, `created_at`) together with the profiles of the users involved. The owner cannot be kicked or banned, and you cannot act on someone whose highest role is at or above yours.
+`POST /spaces/:id/bans/:userId` `{"reason"?}` bans (and removes) the user - someone who has already left or been kicked can be banned too, so a live invite does not let them back in; `DELETE /spaces/:id/bans/:userId` lifts it; `GET /spaces/:id/bans` lists the bans (`user_id`, `reason`, `banned_by`, `created_at`) together with the profiles of the users involved. The owner cannot be kicked or banned, and you cannot act on someone whose highest role is at or above yours.
 
 ## Roles
 
@@ -126,7 +173,7 @@ Not `@everyone`, not a managed role.
 - `GET /spaces/:id/rooms/:roomId/overrides` → `[{role_id, allow, deny}]`; `PUT …/overrides/:roleId` `{"allow", "deny"}`; `DELETE …/overrides/:roleId`.
 - `GET /spaces/:id/rooms/:roomId/overrides/users` → `[{user_id, allow, deny}]`; `PUT …/overrides/users/:userId`; `DELETE …/overrides/users/:userId`.
 
-Only room-scoped bits are accepted (see [Permissions › Room overrides](/docs/permissions/#room-overrides)).
+Only room-scoped bits are accepted (see [Permissions › Room overrides](/docs/permissions/#room-overrides)). Listing needs View on the room. Deleting an override is bound by the same rule as writing one - removing a deny grants what the matching allow would - so you can only delete overrides whose bits you hold in that room (`403` otherwise).
 
 ## Invites
 
@@ -154,7 +201,7 @@ The account's private messages and group PMs.
 
 ### `GET` /rooms/:id
 
-Any room the account can see, space rooms included. Space rooms carry `space_id`; every room carries `e2ee_enabled`.
+Any room the account can see, space rooms included - a space room is listed only when the account may view it. Space rooms carry `space_id`; every room carries `e2ee_enabled`.
 
 ### `POST` /rooms
 
@@ -254,6 +301,35 @@ See [Bots › Sending messages](/docs/bots/#sending-messages). `201` with the me
 
 `multipart/form-data` with `file` and optional `width`/`height`. Returns the attachment record; reference its `id` in a message within the same room. Size limit per the instance's configuration (25 MB on a default deployment).
 
+## GIFs
+
+The instance proxies GIF search, so the provider's API key stays on the server and the search request comes from the instance, never from the person searching: not their address, cookies or account. The GIFs themselves (`url`, `preview_url`, `still_url`) are served by the provider's CDN, so whatever loads them is seen by the provider. Trending pages are cached for two minutes; searches are passed straight through and not cached.
+
+### `GET` /gifs/search, `GET` /gifs/trending
+
+| Parameter | |
+| --- | --- |
+| `provider` | `giphy` (the default) or `heypster` - one of `features.gifs.providers` on `GET /` |
+| `q` | Search only, and required there. Trimmed, and cut to 50 characters |
+| `limit` | 1-50, default 24 |
+| `offset` | 0-4999, default 0 |
+
+Results are rated up to PG-13.
+
+```json
+{ "results": [{ "id": "…", "title": "…", "url": "https://…/giphy.gif", "width": 480, "height": 270, "preview_url": "https://…/200w.gif", "preview_width": 200, "preview_height": 113, "still_url": "https://…/200w_s.gif" }], "next_offset": 24, "total_count": 1000 }
+```
+
+`url` is the rendition to send or embed, `preview_url` a smaller animated one for a picker grid, and `still_url` (absent when the provider has none) a single frame to show while it loads. Every URL is `https://`; an item without a usable preview and full rendition is left out, so a page can hold fewer than `limit`. Pass `next_offset` as `offset` for the next page, and stop once it reaches `total_count`.
+
+| Status | Body | When |
+| --- | --- | --- |
+| `400` | `{"error": "unknown gif provider", "code": "gif_provider_unknown"}` | `provider` is neither `giphy` nor `heypster` |
+| `400` | `{"error": "query is required"}` | `q` is empty on `/gifs/search` |
+| `404` | `{"error": "gif provider not configured", "code": "gif_not_configured"}` | The instance has no key for that provider |
+| `502` | `{"error": "gif provider unavailable", "code": "gif_upstream"}` | The provider failed or answered with an error |
+| `503` | `{"error": "gif provider unavailable", "code": "gif_upstream"}` | The provider is rate limiting the instance; try again later |
+
 ## Applications (session only)
 
 Managed from the client's *Settings → Developers*; listed for completeness. Only a person's session may call them, never a bot or an OAuth2 token.
@@ -272,6 +348,19 @@ Managed from the client's *Settings → Developers*; listed for completeness. On
 
 OAuth2 endpoints (`/oauth2/token`, `/oauth2/token/revoke`, `/oauth2/@me`) are on the [OAuth2](/docs/oauth2/) page.
 
+## Key backup (session only)
+
+The end-to-end encryption key backup (`m.megolm_backup.v1.curve25519-aes-sha2`, the same shape as Matrix's `/room_keys`). The server stores room keys encrypted to the backup's public key and the private key wrapped under the user's recovery code; it can read neither. Only a person's session may call these.
+
+| Method and path | |
+| --- | --- |
+| `POST` /devices/backup/version `{"algorithm", "auth_data", "wrapped_private_key", "salt", "password"}` | Start a new version; returns `{"version"}`. `password` is the account password, checked again: `400 password is required` without it, `403 invalid password` when wrong. The version this one replaces is kept, keys included, for **7 days** so a replacement the user did not make can be undone; anything older is removed. Fires `KEY_BACKUP_UPDATE` |
+| `GET` /devices/backup/version | The current version's public parameters: `{"exists", "version", "algorithm", "auth_data", "etag", "count", "created_at"}`, plus `"previous": {"version", "created_at"}` while a superseded version is still retained (absent otherwise) |
+| `GET` /devices/backup/recovery`[?version=N]` | The wrapped private key and salt for a restore. Without `version`, the current one; with it, the current or the retained previous version only - anything else is `404` |
+| `DELETE` /devices/backup/version?version=N `{"password"}` | Discard a version and every key in it, immediately; takes the password the same way as `POST`. Deleting the current version makes the retained previous one current again. Fires `KEY_BACKUP_UPDATE` |
+| `PUT` /devices/backup/keys?version=N | Upload room keys to the **current** version; a superseded one answers `404`, which is how a device that missed `KEY_BACKUP_UPDATE` learns the version moved |
+| `GET` /devices/backup/keys?version=N`[&after=<cursor>]` | One page of a version's keys - the current or the retained previous one |
+
 ## Errors
 
 ```json
@@ -287,6 +376,7 @@ OAuth2 endpoints (`/oauth2/token`, `/oauth2/token/revoke`, `/oauth2/@me`) are on
 | `409` | A conflict (an application that already has a bot, the application limit) |
 | `429` | Rate limited or slowmode; see below |
 | `500` | Something broke server-side. Retry with backoff |
+| `502`, `503` | A service the instance relays to (a GIF provider) failed or is limiting the instance. Retry later |
 
 ## Rate limits
 
@@ -295,8 +385,10 @@ OAuth2 endpoints (`/oauth2/token`, `/oauth2/token/revoke`, `/oauth2/@me`) are on
 | `POST /oauth2/token`, `POST /oauth2/token/revoke` | 20 per minute per IP |
 | Creating applications, secrets and bot tokens | 20 per minute |
 | Typing indicators | One broadcast per 5 s per room (extra calls succeed silently) |
+| `GET /gifs/search`, `GET /gifs/trending` | 60 per minute per account, each |
 | Gateway `op 2` frames | Burst of 20 per connection, refilling one every 250 ms |
 | Messages in a room with slowmode | One per `slowmode_seconds` per member; `429` with `retry_after` (seconds) and a `Retry-After` header. Members with Manage Messages are exempt |
+| Space member profiles | Per account: 60 per minute reading one member, 20 per minute `PATCH`, 10 per minute image uploads |
 | Sign-in, registration, key backup | Separate tight limits (not relevant to bots) |
 
 Other endpoints are not individually limited today; be a good citizen anyway - batch what you can, cache what does not change, and back off on `429` and `5xx`.

@@ -2,6 +2,7 @@ import { effectiveChannelPermissionsForMember, channelOverridesSource, voicePerm
 import { spaces } from '../../stores/spaces';
 import { spaceMembers } from '../../stores/spaceMembers';
 import type { SpaceMember } from '../../api/spaces';
+import { resolveProfile } from '../spaceProfile';
 
 /**
  * A member's voice permissions in a room, from the locally held roles and overrides.
@@ -31,7 +32,8 @@ export function voicePermsFor(userId: string | undefined, spaceId: string | unde
   return voicePermsFromMask(mask);
 }
 
-/** Display name for a voice participant from whatever we know about them. */
+/** Display name for a voice participant from whatever we know about them: in a space room,
+ * their nickname there when they have one. */
 export function voiceParticipantName(
   userId: string,
   state: { user?: { display_name?: string; username?: string } } | undefined,
@@ -39,7 +41,7 @@ export function voiceParticipantName(
 ): string {
   if (spaceId) {
     const m = spaceMembers.bySpaceId[spaceId]?.find((x) => x.id === userId);
-    if (m) return m.display_name || m.username;
+    if (m) return resolveProfile(m, m).name;
   }
   return state?.user?.display_name || state?.user?.username || '…';
 }

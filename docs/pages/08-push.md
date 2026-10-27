@@ -118,12 +118,12 @@ Compact JSON, at most 2047 bytes, ids as strings. Ignore fields you do not know;
 | `rid`, `rt` | The room and its type: `1` PM, `2` group PM, `3` space text, `4` space voice, `6` thread |
 | `sid` | The space (space rooms and threads only) |
 | `mid` | `msg`: the message. `read`: read up to and including this message |
-| `a` | `msg`: the author; `call`: the caller - `id`, `n` (display name, else username), `av` (avatar URL, when there is one) |
+| `a` | `msg`: the author; `call`: the caller - `id`, `n` (display name, else username), `av` (avatar URL, when there is one). In a space room or thread, `n` is the author's nickname in that space and `av` their space avatar, whenever they have set one; PMs, group PMs and calls always carry the global profile |
 | `rn` | Room name: a channel's or thread's name, a group PM's name or its first few members; absent for a 1:1 PM |
 | `pn` | A thread's channel name |
 | `sn` | The space's name |
 | `e` | The room is end-to-end encrypted; there is never a `b` |
-| `b` | Plain-text preview (at most 300 characters; mentions written out as `@name`, custom emoji as `:name:`), only for a room that is not end-to-end encrypted and a subscription with `preview` on. Absent when the message is only attachments |
+| `b` | Plain-text preview (at most 300 characters; mentions written out as `@name`, using the member's nickname in a space room or thread when they have one and the global name in PMs; custom emoji as `:name:`), only for a room that is not end-to-end encrypted and a subscription with `preview` on. Absent when the message is only attachments |
 | `att` | Number of attachments |
 | `m` | The message mentions the recipient - directly, through a role, or with `@everyone`/`@here` |
 | `vid` | `call`: reserved for video calls |

@@ -8,6 +8,7 @@ import { spaceMembers } from '../../stores/spaceMembers';
 import { spaceRoles } from '../../stores/spaces';
 import { openUserProfileFromParticipant } from '../../stores/userProfilePopover';
 import { voiceParticipantName } from '../../lib/voice/perms';
+import { resolveSpaceUser } from '../../lib/spaceProfile';
 import { MessageAvatar } from '../messageList/MessageAvatar';
 import { openVoiceUserMenu } from './VoiceUserMenu';
 import { t } from '../../i18n';
@@ -23,7 +24,9 @@ export const VoiceChannelUsers: Component<VoiceChannelUsersProps> = (props) => {
     [...voiceStatesForRoom(props.roomId)].sort((a, b) => a.joined_at.localeCompare(b.joined_at))
   );
   const member = (st: VoiceState) => spaceMembers.bySpaceId[props.spaceId]?.find((m) => m.id === st.user_id);
-  const avatar = (st: VoiceState) => member(st)?.avatar ?? st.user?.avatar;
+  // Their space avatar here when they set one; the member row's global avatar beats the voice
+  // state's copy, which is only as fresh as the join.
+  const avatar = (st: VoiceState) => resolveSpaceUser(props.spaceId, st.user_id, member(st) ?? st.user).avatar;
   const name = (st: VoiceState) => voiceParticipantName(st.user_id, st, props.spaceId);
 
   function openProfile(e: MouseEvent, st: VoiceState) {
@@ -39,6 +42,7 @@ export const VoiceChannelUsers: Component<VoiceChannelUsersProps> = (props) => {
       anchor: e.currentTarget as HTMLElement,
       currentUserId: auth.user?.id,
       spaceRoles: spaceRoles(props.spaceId),
+      spaceId: props.spaceId,
     });
   }
 

@@ -2,14 +2,17 @@
  * GIF search providers for the composer's GIF picker.
  *
  * The user picks one of two providers in Appearance settings: GIPHY (giphy.com) or Heypster
- * (heypster.com). Heypster exposes a GIPHY-compatible REST API, so both speak the same
- * request/response shape and share one parser here - the only difference is the base URL and
- * which API key (from runtime config) is sent. No key is bundled: the instance operator sets
- * `giphyApiKey` / `heypsterApiKey` in config.js (or VITE_GIPHY_API_KEY / VITE_HEYPSTER_API_KEY
- * for local dev), and the GIF tab shows a "not configured" note until one is present.
+ * (heypster.com). Neither is called from the browser: the instance proxies both through
+ * GET /gifs/search and /gifs/trending (src/api/gifs.ts), so the provider's API key stays on
+ * the server and the provider never sees a user's address or what they searched for. The
+ * operator sets the keys on the API service (GIPHY_API_KEY / HEYPSTER_API_KEY); the instance
+ * lists the providers it has a key for on GET / (`features.gifs.providers`), and the GIF tab
+ * shows a "not configured" note until there is one.
  */
 
-import { giphyApiKey, heypsterApiKey } from '../runtimeConfig';
+import { ApiError } from '../../api/ApiError';
+import { searchGifs, trendingGifs, type WireGif, type WireGifPage } from '../../api/gifs';
+import { instance } from '../../stores/instance';
 
 export type GifProviderId = 'giphy' | 'heypster';
 
@@ -36,21 +39,12 @@ export function gifProviderInfo(id: GifProviderId): GifProviderInfo {
   return GIF_PROVIDERS.find((p) => p.id === id) ?? GIF_PROVIDERS[0]!;
 }
 
-const BASE_URL: Record<GifProviderId, string> = {
-  giphy: 'https://api.giphy.com/v1',
-  heypster: 'https://heypster-gif.com/giphy/v1',
-};
-
-function apiKeyFor(id: GifProviderId): string | undefined {
-  return id === 'giphy' ? giphyApiKey() : heypsterApiKey();
-}
-
-/** Whether the given provider has an API key configured and can be queried. */
+/** Whether this instance has a key for the given provider and can be queried. */
 export function gifProviderConfigured(id: GifProviderId): boolean {
-  return !!apiKeyFor(id);
+  return instance.gifProviders.includes(id);
 }
 
-/** A single GIF, normalized from the provider's rendition set. */
+/** A single GIF, normalized (by the instance) from the provider's rendition set. */
 export interface GifResult {
   id: string;
   title: string;
@@ -74,59 +68,12 @@ export interface GifPage {
   totalCount: number;
 }
 
-/** Thrown when a provider has no API key configured, so the UI can show a distinct message. */
+/** Thrown when the instance has no API key for a provider, so the UI can show a distinct message. */
 export class GifNotConfiguredError extends Error {
   constructor(public providerId: GifProviderId) {
     super(`GIF provider ${providerId} is not configured`);
     this.name = 'GifNotConfiguredError';
   }
-}
-
-interface RawRendition {
-  url?: string;
-  width?: string | number;
-  height?: string | number;
-}
-
-function num(v: string | number | undefined): number {
-  const n = typeof v === 'string' ? parseInt(v, 10) : v;
-  return Number.isFinite(n) ? (n as number) : 0;
-}
-
-/** First rendition (in preference order) that carries a usable url. */
-function pickRendition(images: Record<string, RawRendition> | undefined, keys: string[]): RawRendition | undefined {
-  if (!images) return undefined;
-  for (const k of keys) {
-    const r = images[k];
-    if (r && typeof r.url === 'string' && r.url) return r;
-  }
-  return undefined;
-}
-
-// Grid preview: ~200px animated, small file. Sent URL: a downsized .gif (falls back to
-// original). Still: a single frame for the placeholder.
-const PREVIEW_KEYS = ['fixed_width', 'fixed_width_downsampled', 'fixed_height', 'downsized', 'preview_gif', 'original'];
-const FULL_KEYS = ['downsized', 'downsized_medium', 'downsized_large', 'original', 'fixed_width'];
-const STILL_KEYS = ['fixed_width_still', 'fixed_height_still', '480w_still', 'original_still'];
-
-function toResult(item: unknown): GifResult | null {
-  if (!item || typeof item !== 'object') return null;
-  const d = item as { id?: unknown; title?: unknown; images?: Record<string, RawRendition> };
-  const preview = pickRendition(d.images, PREVIEW_KEYS);
-  const full = pickRendition(d.images, FULL_KEYS) ?? preview;
-  if (!preview?.url || !full?.url) return null;
-  const still = pickRendition(d.images, STILL_KEYS);
-  return {
-    id: String(d.id ?? full.url),
-    title: typeof d.title === 'string' ? d.title : '',
-    url: full.url,
-    width: num(full.width),
-    height: num(full.height),
-    previewUrl: preview.url,
-    previewWidth: num(preview.width),
-    previewHeight: num(preview.height),
-    stillUrl: still?.url,
-  };
 }
 
 export interface FetchGifsOptions {
@@ -137,27 +84,42 @@ export interface FetchGifsOptions {
   signal?: AbortSignal;
 }
 
-/** Fetch a page of GIFs (trending when no query) from the given provider. */
+function num(v: unknown): number {
+  return typeof v === 'number' && Number.isFinite(v) ? v : 0;
+}
+
+// The server already picked the renditions and dropped anything unusable; this only guards
+// against a malformed item reaching an <img src> or being sent as a message.
+function fromWire(g: WireGif): GifResult | null {
+  if (!g || typeof g.url !== 'string' || !g.url || typeof g.preview_url !== 'string' || !g.preview_url) return null;
+  return {
+    id: typeof g.id === 'string' && g.id ? g.id : g.url,
+    title: typeof g.title === 'string' ? g.title : '',
+    url: g.url,
+    width: num(g.width),
+    height: num(g.height),
+    previewUrl: g.preview_url,
+    previewWidth: num(g.preview_width),
+    previewHeight: num(g.preview_height),
+    stillUrl: typeof g.still_url === 'string' && g.still_url ? g.still_url : undefined,
+  };
+}
+
+/** Fetch a page of GIFs (trending when no query) from the given provider, through the instance. */
 export async function fetchGifs(id: GifProviderId, opts: FetchGifsOptions = {}): Promise<GifPage> {
-  const key = apiKeyFor(id);
-  if (!key) throw new GifNotConfiguredError(id);
   const { query, limit = 24, offset = 0, signal } = opts;
   const q = query?.trim();
-  const params = new URLSearchParams({
-    api_key: key,
-    limit: String(limit),
-    offset: String(offset),
-    rating: 'pg-13',
-  });
-  if (q) params.set('q', q);
-  const path = q ? '/gifs/search' : '/gifs/trending';
-  const res = await fetch(`${BASE_URL[id]}${path}?${params.toString()}`, { signal });
-  if (!res.ok) throw new Error(`GIF search failed (${res.status})`);
-  const json = (await res.json()) as { data?: unknown[]; pagination?: { offset?: number; count?: number; total_count?: number } };
-  const results = (json.data ?? []).map(toResult).filter((r): r is GifResult => r !== null);
-  const pag = json.pagination ?? {};
-  const nextOffset = (typeof pag.offset === 'number' ? pag.offset : offset) + (typeof pag.count === 'number' ? pag.count : results.length);
-  const totalCount = typeof pag.total_count === 'number' ? pag.total_count : nextOffset + results.length;
+  let page: WireGifPage | undefined;
+  try {
+    page = q ? await searchGifs(id, q, limit, offset, signal) : await trendingGifs(id, limit, offset, signal);
+  } catch (e) {
+    // The instance has no key for this provider (it may have been removed since GET / was read).
+    if (e instanceof ApiError && e.status === 404 && e.code === 'gif_not_configured') throw new GifNotConfiguredError(id);
+    throw e;
+  }
+  const results = (Array.isArray(page?.results) ? page.results : []).map(fromWire).filter((r): r is GifResult => r !== null);
+  const nextOffset = typeof page?.next_offset === 'number' ? page.next_offset : offset + results.length;
+  const totalCount = typeof page?.total_count === 'number' ? page.total_count : nextOffset;
   return { results, nextOffset, totalCount };
 }
 

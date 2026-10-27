@@ -26,9 +26,14 @@ import { spaceMembers } from '../stores/spaceMembers';
 export function roomE2EEOff(room: Room, isGroupRoom: boolean, isSpaceTextRoom: boolean): boolean {
   if (isGroupRoom) return room.e2ee_enabled === false;
   if (isSpaceTextRoom) return room.e2ee_enabled !== true;
-  // A 1:1 PM is E2EE unless explicitly flagged plain-text - the official account's DM is,
-  // since that account has no encryption keys (equinox roomE2EEOff mirrors this).
-  return room.e2ee_enabled === false;
+  // A 1:1 PM is encrypted for life. The one plaintext PM is the instance's official
+  // account's, which has no encryption keys and which the server marks e2ee_enabled=false -
+  // and so could a compromised server mark any PM, so the flag alone is not believed. Only
+  // when the other side is the instance account does a PM go out in the clear; any other PM
+  // flagged plain is still encrypted here, and a server that then refuses the ciphertext
+  // produces a failed send rather than a silent downgrade.
+  if (room.e2ee_enabled !== false) return false;
+  return (room.participants ?? []).some((p) => p.system === true);
 }
 
 /** Every user whose devices should receive this room's Megolm session key. Always

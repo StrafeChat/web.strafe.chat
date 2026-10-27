@@ -6,8 +6,8 @@ import { MobileRailsOpenButton } from '../layout/MobileRailsOpenButton';
 import { IconButton } from '../ui/IconButton';
 import { Tooltip } from '../ui/Tooltip';
 import { RoomNotifyMenu } from './RoomNotifyMenu';
-import { MessageSearchBox } from './MessageSearchBox';
-import type { SearchChannel, SearchIdentity } from '../../lib/messageSearch';
+import { MessageSearchBox, type SearchPerson } from './MessageSearchBox';
+import type { SearchChannel } from '../../lib/messageSearch';
 import { t } from '../../i18n';
 import { BotTag } from '../BotTag';
 import { OfficialTag } from '../OfficialTag';
@@ -37,7 +37,8 @@ export interface RoomHeaderProps {
   searchQuery: string;
   onSearchQueryChange: (value: string) => void;
   onSearchSubmit: (raw: string) => void;
-  searchPeople?: SearchIdentity[];
+  /** People for `from:`/`mentions:`; a space passes its member rows (space profiles). */
+  searchPeople?: SearchPerson[];
   /** Space channels, so the box can offer `in:`. Omitted for PMs. */
   searchChannels?: SearchChannel[];
   /** Show the members toggle. Defaults to isGroup (group PMs); space channels pass true. */

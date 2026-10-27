@@ -1,6 +1,7 @@
 import type { Component } from 'solid-js';
-import { For, Show, createEffect, createSignal, on, onCleanup } from 'solid-js';
+import { For, Show, createEffect, createMemo, createSignal, on, onCleanup } from 'solid-js';
 import { appearance, setGifProvider } from '../../stores/appearance';
+import { instance, loadInstanceInfo } from '../../stores/instance';
 import {
   fetchGifs,
   gifProviderConfigured,
@@ -28,8 +29,10 @@ type LoadState = 'ok' | 'config' | 'error';
 
 /**
  * GIF picker: trending by default, live search, infinite scroll, backed by the provider the
- * user chose (GIPHY or Heypster) - switchable right here in the header. Clicking a GIF calls
- * onPick with the result; the composer sends its .gif URL as a message. See lib/gif/providers.
+ * user chose (GIPHY or Heypster) among those the instance has a key for - switchable right
+ * here in the header. Requests go through the instance, never to the provider directly.
+ * Clicking a GIF calls onPick with the result; the composer sends its .gif URL as a message.
+ * See lib/gif/providers.
  */
 export const GifPicker: Component<GifPickerProps> = (props) => {
   const [query, setQuery] = createSignal('');
@@ -44,7 +47,19 @@ export const GifPicker: Component<GifPickerProps> = (props) => {
   let debounceTimer: number | undefined;
   let gridEl: HTMLDivElement | undefined;
 
-  const provider = () => appearance.gifProvider;
+  // The provider the picker queries: the one chosen in Appearance settings when this instance
+  // offers it, otherwise the first one it does, so a preference for Heypster does not leave
+  // the tab empty on an instance that only has a GIPHY key. The preference itself is left
+  // alone - the desktop app moves between instances that offer different ones. Memos, so a
+  // fresh copy of the same provider list from GET / does not reload the grid.
+  const provider = createMemo<GifProviderId>(() => {
+    const chosen = appearance.gifProvider;
+    const offered = instance.gifProviders;
+    return offered.length === 0 || offered.includes(chosen) ? chosen : offered[0]!;
+  });
+  const configured = createMemo(() => gifProviderConfigured(provider()));
+  /** The switch offers only what the instance can serve; with one provider there is no choice. */
+  const offeredProviders = createMemo(() => GIF_PROVIDERS.filter((p) => instance.gifProviders.includes(p.id)));
 
   onCleanup(() => {
     controller?.abort();
@@ -61,7 +76,22 @@ export const GifPicker: Component<GifPickerProps> = (props) => {
 
   async function load(reset: boolean) {
     const id = provider();
-    if (!gifProviderConfigured(id)) {
+    if (!instance.loaded) {
+      // GET / has not answered yet, or failed, so which providers exist is unknown and "not
+      // configured" would be a guess. Ask again; the effect below reloads once it lands.
+      const myReq = ++reqId;
+      controller?.abort();
+      setItems([]);
+      setState('ok');
+      setLoading(true);
+      await loadInstanceInfo();
+      if (myReq === reqId && !instance.loaded) {
+        setLoading(false);
+        setState('error');
+      }
+      return;
+    }
+    if (!configured()) {
       // Supersede anything still loading from the provider we just switched away from, or its
       // results would land over the "not configured" note.
       ++reqId;
@@ -103,9 +133,9 @@ export const GifPicker: Component<GifPickerProps> = (props) => {
     }
   }
 
-  // Reset and reload whenever the query or the chosen provider changes.
+  // Reset and reload whenever the query, the provider or what the instance offers changes.
   createEffect(
-    on([debounced, provider], () => {
+    on([debounced, provider, configured, () => instance.loaded], () => {
       offset = 0;
       setDone(false);
       void load(true);
@@ -132,23 +162,25 @@ export const GifPicker: Component<GifPickerProps> = (props) => {
           autofocus={props.autofocusSearch !== false}
           wrapperClass="flex-1"
         />
-        <div class="flex shrink-0 rounded-lg bg-muted/40 p-0.5" role="radiogroup" aria-label={t('gif.provider')}>
-          <For each={GIF_PROVIDERS}>
-            {(p) => (
-              <button
-                type="button"
-                role="radio"
-                aria-checked={provider() === p.id}
-                class={`rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${
-                  provider() === p.id ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground'
-                }`}
-                onClick={() => setGifProvider(p.id as GifProviderId)}
-              >
-                {p.name}
-              </button>
-            )}
-          </For>
-        </div>
+        <Show when={offeredProviders().length > 1}>
+          <div class="flex shrink-0 rounded-lg bg-muted/40 p-0.5" role="radiogroup" aria-label={t('gif.provider')}>
+            <For each={offeredProviders()}>
+              {(p) => (
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={provider() === p.id}
+                  class={`rounded-md px-2 py-1 text-[11px] font-semibold transition-colors ${
+                    provider() === p.id ? 'bg-primary/20 text-primary' : 'text-muted-foreground hover:text-foreground'
+                  }`}
+                  onClick={() => setGifProvider(p.id as GifProviderId)}
+                >
+                  {p.name}
+                </button>
+              )}
+            </For>
+          </div>
+        </Show>
       </div>
 
       <div ref={(el) => (gridEl = el)} class="min-h-0 flex-1 overflow-y-auto p-2" onScroll={maybeLoadMore}>

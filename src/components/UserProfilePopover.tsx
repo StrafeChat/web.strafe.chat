@@ -21,6 +21,9 @@ import {
 import { memberNameColorHex, rolesForMemberChips, rolesForMemberProfile } from '../lib/userProfilePopoverHelpers';
 import { openUserProfileFullModal } from '../stores/userProfileFullModal';
 import { openSafetyNumberModal } from '../stores/safetyNumberModal';
+import { openUserSettings } from '../stores/userSettingsModal';
+import { openNicknameDialog } from '../stores/nicknameDialog';
+import { IconButton } from './ui/IconButton';
 import { setMemberSpaceRoles } from '../api/spaces';
 import type { SpaceRole } from '../api/spaces';
 import { spaceRoleColorHex } from '../lib/spacePermissions';
@@ -338,8 +341,33 @@ export const UserProfilePopover: Component = () => {
     void navigator.clipboard.writeText(s.userId);
   }
 
+  // Your own card, opened inside a space, leads to that space's profile editor - the quickest
+  // way from "this is how I look here" to changing it.
+  const showEditSpaceProfile = () => isSelf() && !!subject()?.spaceId;
+
+  function editSpaceProfile() {
+    const spaceId = subject()?.spaceId;
+    if (!spaceId) return;
+    closeUserProfilePopover();
+    openUserSettings('spaceProfiles', { spaceId });
+  }
+
+  /** The space whose nickname the pencil edits: the role context's, which is what granted it. */
+  const nicknameSpaceId = () => (roleEditCtx()?.canEditNickname ? roleEditCtx()?.spaceId : undefined);
+
+  function editNickname() {
+    const spaceId = nicknameSpaceId();
+    const userId = subject()?.userId;
+    if (!spaceId || !userId) return;
+    // Closed first: the card is a snapshot taken when it opened, so it would keep showing the
+    // old name, and the dialog's own clicks would close it anyway (they land outside it).
+    closeUserProfilePopover();
+    openNicknameDialog({ spaceId, userId });
+  }
+
   /** Whether anything renders under the identity block, so the divider never trails empty. */
   const hasDetailSections = () =>
+    showEditSpaceProfile() ||
     !!(subject()?.bot && botApp()?.has_bot && botApp()?.bot_public) ||
     !!subject()?.aboutMe?.trim() ||
     !!subject()?.birthday ||
@@ -352,7 +380,10 @@ export const UserProfilePopover: Component = () => {
       {
         userId: s.userId,
         displayName: s.displayName,
+        globalName: s.globalName,
+        spaceId: s.spaceId,
         username: s.username,
+        homeDomain: s.homeDomain,
         avatar: s.avatar,
         banner: s.banner,
         bio: s.bio,
@@ -504,26 +535,52 @@ export const UserProfilePopover: Component = () => {
               </div>
             </div>
 
-            <div class="px-4 pb-1 pt-2.5">
-              <ProfileIdentity
-                headingLevel="h3"
-                compact
-                displayName={subject()!.displayName}
-                username={subject()!.username}
-                homeDomain={subject()!.homeDomain}
-                bot={subject()!.bot}
-                system={subject()!.system}
-                publicFlags={subject()!.publicFlags}
-                pronouns={subject()!.pronouns}
-                isBirthday={subject()!.birthdayToday}
-                nameColor={subject()!.nameColor}
-                onOpenProfile={viewFullProfile}
-                openProfileLabel={t('profile.viewFull')}
-              />
+            <div class="flex items-start gap-2 px-4 pb-1 pt-2.5">
+              <div class="min-w-0 flex-1">
+                <ProfileIdentity
+                  headingLevel="h3"
+                  compact
+                  displayName={subject()!.displayName}
+                  secondaryName={subject()!.globalName}
+                  username={subject()!.username}
+                  homeDomain={subject()!.homeDomain}
+                  bot={subject()!.bot}
+                  system={subject()!.system}
+                  publicFlags={subject()!.publicFlags}
+                  pronouns={subject()!.pronouns}
+                  isBirthday={subject()!.birthdayToday}
+                  nameColor={subject()!.nameColor}
+                  onOpenProfile={viewFullProfile}
+                  openProfileLabel={t('profile.viewFull')}
+                />
+              </div>
+              <Show when={nicknameSpaceId()}>
+                <IconButton
+                  icon="fa-solid fa-pen"
+                  label={t('spaceProfile.changeNickname')}
+                  size="sm"
+                  tone="subtle"
+                  class="shrink-0"
+                  onClick={editNickname}
+                />
+              </Show>
             </div>
 
             <Show when={hasDetailSections()}>
               <div class="mx-4 my-2.5 border-t border-border/60" />
+            </Show>
+
+            <Show when={showEditSpaceProfile()}>
+              <div class="px-4 pb-3">
+                <button
+                  type="button"
+                  onClick={editSpaceProfile}
+                  class="flex w-full items-center justify-center gap-2 rounded-lg border border-border/70 bg-muted/30 px-3 py-2 text-sm font-medium text-foreground transition-colors hover:bg-muted/50"
+                >
+                  <i class="fa-solid fa-id-badge text-xs" aria-hidden="true" />
+                  {t('spaceProfile.edit')}
+                </button>
+              </div>
             </Show>
 
             <Show when={subject()?.bot && botApp()?.has_bot && botApp()?.bot_public}>

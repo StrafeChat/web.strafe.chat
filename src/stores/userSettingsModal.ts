@@ -4,6 +4,7 @@ import { createSignal } from 'solid-js';
 export type UserSettingsSection =
   | 'instance'
   | 'account'
+  | 'spaceProfiles'
   | 'security'
   | 'devices'
   | 'authorizedApps'
@@ -17,9 +18,12 @@ export type UserSettingsSection =
 const [userSettingsOpen, setUserSettingsOpen] = createSignal(false);
 
 let pendingSection: UserSettingsSection | null = null;
+/** The space "Edit Space Profile" was opened from, so Space Profiles starts on it. */
+let pendingSpaceProfileSpaceId: string | null = null;
 
-export function openUserSettings(section?: UserSettingsSection) {
+export function openUserSettings(section?: UserSettingsSection, opts?: { spaceId?: string }) {
   pendingSection = section ?? null;
+  pendingSpaceProfileSpaceId = opts?.spaceId ?? null;
   setUserSettingsOpen(true);
 }
 
@@ -37,6 +41,14 @@ export function hasPendingSettingsSection(): boolean {
 export function takePendingSettingsSection(): UserSettingsSection | null {
   const s = pendingSection;
   pendingSection = null;
+  return s;
+}
+
+/** The space Space Profiles should open on, consumed on read; null = the page's own default
+ * (the active space, else the first). */
+export function takePendingSpaceProfileSpaceId(): string | null {
+  const s = pendingSpaceProfileSpaceId;
+  pendingSpaceProfileSpaceId = null;
   return s;
 }
 

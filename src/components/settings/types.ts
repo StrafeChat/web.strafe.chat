@@ -2,6 +2,7 @@ import { t } from '../../i18n';
 
 export type SectionId =
   | 'account'
+  | 'spaceProfiles'
   | 'security'
   | 'devices'
   | 'authorizedApps'
@@ -24,6 +25,8 @@ export interface SettingsNavItem {
 
 export const ACCOUNT_ITEMS: SettingsNavItem[] = [
   { id: 'account', labelKey: 'settings.sections.account.title', icon: 'fa-user' },
+  // Right after the main profile: it is the same profile, set per space.
+  { id: 'spaceProfiles', labelKey: 'settings.sections.spaceProfiles.title', icon: 'fa-id-badge' },
   { id: 'security', labelKey: 'settings.sections.security.title', icon: 'fa-lock' },
   { id: 'devices', labelKey: 'settings.sections.devices.title', icon: 'fa-shield-halved' },
   { id: 'authorizedApps', labelKey: 'settings.sections.authorizedApps.title', icon: 'fa-plug' },

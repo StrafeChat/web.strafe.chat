@@ -23,10 +23,16 @@ export const ConfirmDialog: Component = () => (
           tone={danger() ? 'danger' : 'default'}
         >
           <div class={appDialogActions}>
-            <Button variant="outline" onClick={() => settleConfirmDialog(false)} data-autofocus>
-              {opts().cancelLabel ?? t('common.cancel')}
-            </Button>
-            <Button variant={danger() ? 'destructive' : 'primary'} onClick={() => settleConfirmDialog(true)}>
+            <Show when={!opts().acknowledgeOnly}>
+              <Button variant="outline" onClick={() => settleConfirmDialog(false)} data-autofocus>
+                {opts().cancelLabel ?? t('common.cancel')}
+              </Button>
+            </Show>
+            <Button
+              variant={danger() ? 'destructive' : 'primary'}
+              onClick={() => settleConfirmDialog(true)}
+              data-autofocus={opts().acknowledgeOnly ? true : undefined}
+            >
               {opts().confirmLabel ?? t('common.confirm')}
             </Button>
           </div>

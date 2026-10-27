@@ -72,8 +72,8 @@ export class NoBackupError extends Error {
 
 /**
  * The backup version this session has told the engine to encrypt to. Tracked so a sync
- * doesn't re-issue enableBackupV1 on every call, and so a 404 (another device replaced the
- * version) can clear it and force a re-read.
+ * doesn't re-issue enableBackupV1 on every call, and so a 404 or a KEY_BACKUP_UPDATE
+ * (another device replaced the version) can clear it and force a re-read.
  */
 let enabledVersion: string | null = null;
 
@@ -88,6 +88,36 @@ let enabledVersion: string | null = null;
  * marks have to be cleared, and the engine does not expose it - so it is recorded here.
  */
 const ENABLED_VERSION_KEY = 'strafe_e2ee_backup_version';
+
+/**
+ * The backup version this device has proof for: it created it (commitKeyBackup) or opened
+ * it with the recovery code (restoreKeyBackup). Whoever holds a version's private key reads
+ * every room key uploaded to it, and the server decides which version is "current" - so a
+ * stolen session token, or the server itself, could replace the backup with a key of its own
+ * and wait for every device to upload its history. A version without proof gets nothing.
+ */
+const BACKUP_PIN_KEY = 'strafe_e2ee_backup_pin';
+interface BackupPin {
+  version: string;
+  publicKey: string;
+}
+function pinnedBackup(userId: string): BackupPin | null {
+  try {
+    const raw = localStorage.getItem(`${BACKUP_PIN_KEY}:${userId}`);
+    return raw ? (JSON.parse(raw) as BackupPin) : null;
+  } catch {
+    return null;
+  }
+}
+function pinBackup(userId: string, version: string, publicKey: string): void {
+  try {
+    localStorage.setItem(`${BACKUP_PIN_KEY}:${userId}`, JSON.stringify({ version, publicKey } satisfies BackupPin));
+  } catch {
+    // Storage unavailable: the backup still works for this page's life; the next load asks again.
+  }
+}
+/** The server's current version when it is not one this device trusts (see enableFrom). */
+let untrustedVersion: string | null = null;
 
 function lastEnabledVersion(userId: string): string | null {
   try {
@@ -158,6 +188,16 @@ async function enableFrom(
     return null;
   }
   if (enabledVersion === info.version && (await machine.isBackupEnabled())) return info.version;
+  const pin = pinnedBackup(userId);
+  if (!pin || pin.publicKey !== info.auth_data.public_key) {
+    if (untrustedVersion !== info.version) {
+      console.warn('[e2ee] key backup version', info.version, 'was not created or unlocked on this device; not uploading to it until the recovery code confirms it');
+    }
+    untrustedVersion = info.version;
+    enabledVersion = null;
+    return null;
+  }
+  untrustedVersion = null;
   if (resetBackedUpMarks) await machine.disableBackup();
   await machine.enableBackupV1(info.auth_data.public_key, info.version);
   enabledVersion = info.version;
@@ -174,6 +214,11 @@ export interface BackupStatus {
   total: number;
   /** Sessions this device still has to upload, per the engine's own bookkeeping. */
   pending: number;
+  /**
+   * The server's backup was set up on another device and this one has not opened it with
+   * the recovery code, so it uploads nothing to it (see enableFrom). Restoring confirms it.
+   */
+  untrusted: boolean;
   /**
    * The engine believes it has uploaded more than the server actually has.
    *
@@ -195,6 +240,7 @@ export async function getBackupStatus(userId: string): Promise<BackupStatus> {
     backedUp: info.count ?? 0,
     total: counts.total,
     pending,
+    untrusted: info.exists && !!info.version && pinnedBackup(userId)?.publicKey !== info.auth_data?.public_key,
     outOfSync: info.exists && pending === 0 && (info.count ?? 0) < counts.total,
   };
 }
@@ -238,17 +284,24 @@ export async function prepareKeyBackup(): Promise<PreparedKeyBackup> {
 /**
  * Create the prepared backup on the server and upload this device's room keys to it.
  *
- * Replaces any existing backup, server-side included - see the service's
- * CreateBackupVersion for why a superseded version's keys are deleted rather than kept.
+ * Replaces the account's current backup. The server keeps the replaced version for seven
+ * days rather than deleting it outright: a replacement nobody asked for - a hijacked
+ * session, a mistaken "start over" - would otherwise destroy the only copy of the history,
+ * and restoreKeyBackup can still open the retained one with its code. `password` is the
+ * account password, asked for again because a session token alone must not be enough to
+ * point every device's uploads at a new key.
  */
-export async function commitKeyBackup(userId: string, prepared: PreparedKeyBackup): Promise<string> {
+export async function commitKeyBackup(userId: string, prepared: PreparedKeyBackup, password: string): Promise<string> {
   const machine = await getMachine(userId);
   const { version } = await createBackupVersion({
     algorithm: BACKUP_ALGORITHM,
     auth_data: { public_key: prepared.publicKey },
     wrapped_private_key: prepared.wrapped,
     salt: prepared.salt,
+    password,
   });
+  // This device made it: the one proof that needs no code.
+  pinBackup(userId, version, prepared.publicKey);
 
   // resetBackedUpMarks, always: every key this device holds is marked as backed up to the
   // version this one just replaced, and without clearing those marks the new backup stays
@@ -332,6 +385,18 @@ function countSessions(body: string): number {
   }
 }
 
+/** A recovery response that actually carries a version to unwrap. */
+type RecoverableVersion = BackupRecoveryResponse & {
+  version: string;
+  wrapped_private_key: string;
+  salt: string;
+  auth_data: { public_key: string };
+};
+
+function isRecoverable(info: BackupRecoveryResponse): info is RecoverableVersion {
+  return !!(info.exists && info.version && info.wrapped_private_key && info.salt && info.auth_data?.public_key);
+}
+
 /**
  * Read the backup with a recovery code and import its room keys into this device.
  *
@@ -339,44 +404,96 @@ function countSessions(body: string): number {
  * wrong code is reported immediately and precisely instead of surfacing later as messages
  * that quietly fail to decrypt.
  *
+ * If the code does not open the current version but the server still retains the one it
+ * replaced, that one is tried too. A code that opens the *previous* version is what a
+ * backup replaced by someone else looks like from the account holder's side - the retention
+ * exists so their history is still there to read. Its keys are imported and that version
+ * pinned (the code is proof enough), but nothing is enabled for upload: the current version
+ * remains unconfirmed, so settings keeps saying it needs confirming until this code opens
+ * it or the user creates a new backup. Only when neither version opens is the code wrong.
+ *
  * Returns how many sessions were new to this device.
  */
 export async function restoreKeyBackup(userId: string, code: string): Promise<number> {
   const info = await getBackupRecovery();
-  if (!info.exists || !info.version || !info.wrapped_private_key || !info.salt || !info.auth_data?.public_key) {
-    throw new NoBackupError();
+  if (!isRecoverable(info)) throw new NoBackupError();
+
+  const decryptionKey = await unwrapWithCode(info, code);
+  if (decryptionKey) {
+    try {
+      return await importFromBackup(userId, info, decryptionKey, true);
+    } finally {
+      // The backup's private key lives in wasm linear memory, which is not garbage collected -
+      // without this it would stay readable for the rest of the page's life, on a device that
+      // deliberately never persists it.
+      decryptionKey.free();
+    }
   }
 
-  let decryptionKey: BackupDecryptionKey;
+  const previous = await retainedPreviousRecovery(info.version);
+  const previousKey = previous && (await unwrapWithCode(previous, code));
+  if (!previous || !previousKey) throw new RecoveryCodeMismatchError();
+  console.info('[e2ee] the recovery code opens the retained previous backup version, not the current one; restoring from it');
   try {
-    decryptionKey = BackupDecryptionKey.fromBase64(await unwrapBackupKey(info.wrapped_private_key, info.salt, code));
+    return await importFromBackup(userId, previous, previousKey, false);
+  } finally {
+    previousKey.free();
+  }
+}
+
+/** The version's private key if `code` opens its wrapped copy, else null. */
+async function unwrapWithCode(info: RecoverableVersion, code: string): Promise<BackupDecryptionKey | null> {
+  try {
+    return BackupDecryptionKey.fromBase64(await unwrapBackupKey(info.wrapped_private_key, info.salt, code));
   } catch (e) {
     // Web Crypto missing (an insecure context) is not a wrong code, and must not be reported
     // as one - that tells someone their code is bad when the problem is how they reached the
     // app. Everything else here is a failed AES-GCM tag (wrong code) or a corrupt row.
     if (e instanceof E2eeUnavailableError) throw e;
-    throw new RecoveryCodeMismatchError();
-  }
-  try {
-    return await importFromBackup(userId, info.version, info.auth_data.public_key, decryptionKey, info);
-  } finally {
-    // The backup's private key lives in wasm linear memory, which is not garbage collected -
-    // without this it would stay readable for the rest of the page's life, on a device that
-    // deliberately never persists it.
-    decryptionKey.free();
+    return null;
   }
 }
 
+/**
+ * Recovery material of the version the current one replaced, while the server retains it
+ * (seven days). Null when there is none, or it expired between the two requests.
+ */
+async function retainedPreviousRecovery(currentVersion: string): Promise<RecoverableVersion | null> {
+  const { previous } = await getBackupVersion();
+  if (!previous?.version || previous.version === currentVersion) return null;
+  let info: BackupRecoveryResponse;
+  try {
+    info = await getBackupRecovery(previous.version);
+  } catch (e) {
+    if (isVersionGone(e)) return null;
+    throw e;
+  }
+  return isRecoverable(info) && info.version === previous.version ? info : null;
+}
+
+/**
+ * `enableUploads` points the engine at this version afterwards so keys this device acquires
+ * later reach the same backup. Off for a retained previous version: it is on its way out,
+ * and uploading to it would hide the unconfirmed current version behind a backup that stops
+ * existing in a week.
+ */
 async function importFromBackup(
   userId: string,
-  version: string,
-  publicKey: string,
+  info: RecoverableVersion,
   decryptionKey: BackupDecryptionKey,
-  info: BackupRecoveryResponse
+  enableUploads: boolean
 ): Promise<number> {
+  const { version } = info;
+  const publicKey = info.auth_data.public_key;
+  // The published public key has to be the one the unwrapped private key belongs to. A row
+  // whose two halves disagree is corrupt - or a server pairing the user's own wrapped key
+  // with a public key of someone else's, hoping the match below gets it trusted.
   if (decryptionKey.megolmV1PublicKey.publicKeyBase64 !== publicKey) {
     throw new RecoveryCodeMismatchError();
   }
+  // The code opened it, so the key behind this version is the account holder's: trust it
+  // from here on (see pinnedBackup).
+  pinBackup(userId, version, publicKey);
 
   // The backup is read a page at a time: a busy account can hold tens of thousands of
   // sessions, and asking for all of them at once would be a response of tens of megabytes on
@@ -439,16 +556,38 @@ async function importFromBackup(
   // Keep contributing to the same backup from now on, so keys this device acquires later are
   // recoverable too. No reset: the import above already marked these keys as backed up to
   // this very version, and clearing that would immediately re-upload everything just read.
-  await enableFrom(machine, userId, info, false);
+  if (enableUploads) {
+    await enableFrom(machine, userId, info, false);
+  } else {
+    // This device may still have been pointed at the version just read, from before it
+    // learnt of the replacement. Forgetting that makes the next sync re-read the server's
+    // current version and judge it on its own pin.
+    enabledVersion = null;
+  }
 
   return Number(result.importedCount ?? 0);
 }
 
-/** Discard the account's backup and everything in it - "I lost my recovery code". */
-export async function resetKeyBackup(): Promise<void> {
+/**
+ * Discard the account's current backup and everything in it - "I lost my recovery code".
+ * Immediate, unlike a replacement: there is no code left that could ever open it. Needs the
+ * account password again (see createBackupVersion).
+ */
+export async function resetKeyBackup(password: string): Promise<void> {
   const info = await getBackupVersion();
   if (!info.exists || !info.version) return;
-  await deleteBackupVersion(info.version);
+  await deleteBackupVersion(info.version, password);
+  enabledVersion = null;
+}
+
+/**
+ * The gateway says the account's backup version was created or deleted elsewhere
+ * (KEY_BACKUP_UPDATE). Forget which version the engine was pointed at, so the next sync
+ * re-reads the server's and - unless this device created or unlocked it - refuses to upload
+ * to it at once, rather than at the 404 the next upload would have met. The engine itself is
+ * left alone: a pinned version that comes back unchanged is simply re-enabled.
+ */
+export function noteBackupVersionChanged(): void {
   enabledVersion = null;
 }
 

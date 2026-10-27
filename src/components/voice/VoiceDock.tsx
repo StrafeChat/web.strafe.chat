@@ -18,6 +18,7 @@ import { rooms, roomDisplayName } from '../../stores/rooms';
 import { spaces } from '../../stores/spaces';
 import { spaceMembers } from '../../stores/spaceMembers';
 import { voicePermsFor, voiceParticipantName } from '../../lib/voice/perms';
+import { resolveSpaceUser } from '../../lib/spaceProfile';
 import { appUserDock } from '../../theme/appChrome';
 import { IconButton } from '../ui/IconButton';
 import { MessageAvatar } from '../messageList/MessageAvatar';
@@ -80,8 +81,10 @@ export const VoiceDock: Component<VoiceDockProps> = (props) => {
   const avatarOf = (st: { user_id: string; user?: { avatar?: string } }) => {
     const sid = s().spaceId;
     if (sid) {
+      // In a space call: their space avatar there when they set one, else their global one.
       const m = spaceMembers.bySpaceId[sid]?.find((x) => x.id === st.user_id);
-      if (m?.avatar) return m.avatar;
+      const a = resolveSpaceUser(sid, st.user_id, m ?? st.user).avatar;
+      if (a) return a;
     }
     return st.user?.avatar;
   };

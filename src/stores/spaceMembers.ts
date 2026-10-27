@@ -1,5 +1,5 @@
 import { createStore, produce } from 'solid-js/store';
-import { listSpaceMembers, type SpaceMember } from '../api/spaces';
+import { listSpaceMembers, SPACE_PROFILE_KEYS, type SpaceMember, type SpaceProfileFields } from '../api/spaces';
 import { onStargateEvent } from '../services/stargate/client';
 import { registerUserIdentity } from './federationIds';
 import { setUserPresence } from './presence';
@@ -98,6 +98,18 @@ function roleIdsFromPayload(d: Record<string, unknown>): string[] | undefined {
   return ids.length ? ids : undefined;
 }
 
+/** A space-profile key off the wire: the string when it says something, else null (cleared). */
+function profileValue(v: unknown): string | null {
+  return typeof v === 'string' && v.trim() !== '' ? v : null;
+}
+
+/** All six space-profile keys, for a payload that is the member's full state (SPACE_MEMBER_ADD). */
+function profileFromPayload(d: Record<string, unknown>): SpaceProfileFields {
+  const out: SpaceProfileFields = {};
+  for (const k of SPACE_PROFILE_KEYS) out[k] = profileValue(d[k]);
+  return out;
+}
+
 /** Listen for space member WebSocket events and keep member lists in sync. */
 export function initSpaceMembersHandlers(): () => void {
   return onStargateEvent((event) => {
@@ -148,6 +160,9 @@ export function initSpaceMembersHandlers(): () => void {
         ...(d.system === true ? { system: true } : {}),
         ...(typeof d.home_domain === 'string' && d.home_domain ? { home_domain: d.home_domain } : {}),
         ...(d.origin_id != null && d.origin_id !== '' ? { origin_id: String(d.origin_id) } : {}),
+        // The space profile, always all six (null = none): an add is full state, so a member
+        // re-added over a stale row must not keep the old nickname or images.
+        ...profileFromPayload(d),
       };
       upsertSpaceMember(spaceId, member);
       if (member.presence?.status) setUserPresence(member.id, member.presence);
@@ -173,12 +188,20 @@ export function initSpaceMembersHandlers(): () => void {
       if (!spaceId) return;
       const uid = d.user_id != null ? String(d.user_id) : null;
       if (!uid) return;
-      const roles = roleIdsFromPayload(d) ?? [];
+      // A patch of only what the event names. The server sends the full state (role_ids and
+      // all six profile keys) every time, but replacing roles with `role_ids ?? []` - what
+      // this did before space profiles - would wipe a member's roles on any event that left
+      // them out, and their colour, hoisting and permissions with them.
+      const patch: Partial<SpaceMember> = {};
+      if ('role_ids' in d) patch.roles = Array.isArray(d.role_ids) ? d.role_ids.map((x) => String(x)).filter(Boolean) : [];
+      for (const k of SPACE_PROFILE_KEYS) {
+        if (k in d) patch[k] = profileValue(d[k]);
+      }
       setSpaceMembers('bySpaceId', spaceId, (prev) => {
         const list = prev ?? [];
         const idx = list.findIndex((m) => m.id === uid);
         if (idx < 0) return list;
-        return list.map((m, i) => (i === idx ? { ...m, roles } : m));
+        return list.map((m, i) => (i === idx ? { ...m, ...patch } : m));
       });
     }
   });

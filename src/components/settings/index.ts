@@ -7,6 +7,8 @@ export { SettingsPanel } from './SettingsPanel';
 export type { SettingsPanelProps } from './SettingsPanel';
 export { ProfileSettingsPage } from './ProfileSettingsPage';
 export type { ProfileSettingsPageProps } from './ProfileSettingsPage';
+export { SpaceProfilesSettingsPage } from './SpaceProfilesSettingsPage';
+export type { SpaceProfilesSettingsPageProps } from './SpaceProfilesSettingsPage';
 export { AppearanceSettingsPage } from './AppearanceSettingsPage';
 export { LanguageSettingsPage } from './LanguageSettingsPage';
 export { DevicesSettingsPage } from './DevicesSettingsPage';

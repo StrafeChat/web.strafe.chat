@@ -1,6 +1,7 @@
 import { createStore } from 'solid-js/store';
 import { handleIncomingToDevice, rotateRoomSession, scheduleBackupSync } from '../lib/e2ee';
 import { getCurrentDeviceId } from '../lib/e2ee/machine';
+import { noteBackupVersionChanged } from '../lib/e2ee/keyBackup';
 import { auth } from './auth';
 import { rooms } from './rooms';
 import { spaces } from './spaces';
@@ -23,7 +24,7 @@ export const [e2eeSync, setE2eeSync] = createStore<E2EESyncState>({
   thisDeviceRevoked: false,
 });
 
-/** Register handlers for the three gateway events the E2EE engine needs live, on top of
+/** Register handlers for the four gateway events the E2EE engine needs live, on top of
  * the initial poll-on-load ensureDevice already does. Call once on app init. */
 export function initE2EESyncHandlers() {
   return onStargateEvent((evt) => {
@@ -97,6 +98,16 @@ export function initE2EESyncHandlers() {
       // A *different* device being revoked needs no local action: the server no longer
       // returns its keys from queryKeys, so the next ensureRoomKeyShared naturally stops
       // sharing with it - nothing cached here should keep including it.
+    } else if (evt.t === 'KEY_BACKUP_UPDATE') {
+      const payload = (evt.d as Record<string, unknown>)?.d ?? evt.d;
+      const data = payload as { action?: 'created' | 'deleted'; version?: string | number };
+      // Whoever changed the version holds its private key, and it may not have been this
+      // user: a version this device neither created nor unlocked gets nothing uploaded to
+      // it. Told now rather than at the next upload's 404, the uploads stop before any key
+      // reaches it. The settings page re-reads the backup status when it is opened, so the
+      // "needs confirming" state shows there without a store field to update.
+      console.warn('[e2ee] key backup version', data.action ?? 'changed', data.version == null ? '(unknown)' : String(data.version));
+      noteBackupVersionChanged();
     }
   });
 }

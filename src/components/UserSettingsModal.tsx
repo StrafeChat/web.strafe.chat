@@ -9,6 +9,7 @@ import {
   SettingsNav,
   SettingsPanel,
   ProfileSettingsPage,
+  SpaceProfilesSettingsPage,
   AppearanceSettingsPage,
   LanguageSettingsPage,
   DevicesSettingsPage,
@@ -40,7 +41,15 @@ export const UserSettingsModal: Component = () => {
   // Failing closed simply hides the section, which is the right way to be wrong.
   const [isInstanceAdmin, setIsInstanceAdmin] = createSignal(false);
   const [searchQuery, setSearchQuery] = createSignal('');
-  const [hasUnsavedChanges, setHasUnsavedChanges] = createSignal(false);
+  // One flag per page with drafts, not a shared one: either page reporting "clean" (its load
+  // finishing, a save) must not wipe the other's unsaved edits from the close guard.
+  const [accountDirty, setAccountDirty] = createSignal(false);
+  const [spaceProfilesDirty, setSpaceProfilesDirty] = createSignal(false);
+  const hasUnsavedChanges = () => accountDirty() || spaceProfilesDirty();
+  // Space Profiles loads your member row from the server, so it mounts on its first visit
+  // rather than with every settings open - and then stays mounted (hidden) until the modal
+  // closes, so switching sections keeps its drafts.
+  const [spaceProfilesMounted, setSpaceProfilesMounted] = createSignal(false);
   const [confirming, setConfirming] = createSignal(false);
   const [isSavingProfile, setIsSavingProfile] = createSignal(false);
   const saveProfileRef: { current: (() => void) | null } = { current: null };
@@ -54,7 +63,13 @@ export const UserSettingsModal: Component = () => {
         .catch(() => setIsInstanceAdmin(false));
     } else {
       setSection('account');
+      setSpaceProfilesMounted(false);
+      setSpaceProfilesDirty(false);
     }
+  });
+
+  createEffect(() => {
+    if (userSettingsOpen() && section() === 'spaceProfiles') setSpaceProfilesMounted(true);
   });
 
   const navGroups = createMemo((): SettingsNavGroup<SectionId>[] => {
@@ -137,7 +152,7 @@ export const UserSettingsModal: Component = () => {
           titleId="user-settings-title"
           onClose={() => void requestClose()}
           headerActions={
-            <Show when={section() === 'account' && hasUnsavedChanges()}>
+            <Show when={section() === 'account' && accountDirty()}>
               <Button size="sm" loading={isSavingProfile()} onClick={handleSaveProfile}>
                 <Show when={!isSavingProfile()}>
                   <i class="fa-solid fa-check text-xs" aria-hidden="true" />
@@ -149,13 +164,21 @@ export const UserSettingsModal: Component = () => {
         >
           <div class={section() === 'account' ? 'contents' : 'hidden'} aria-hidden={section() !== 'account'}>
             <ProfileSettingsPage
-              onDirtyChange={setHasUnsavedChanges}
+              onDirtyChange={setAccountDirty}
               registerSaveHandler={(fn) => {
                 saveProfileRef.current = fn;
               }}
               onSavingChange={setIsSavingProfile}
             />
           </div>
+          <Show when={spaceProfilesMounted()}>
+            <div class={section() === 'spaceProfiles' ? 'contents' : 'hidden'} aria-hidden={section() !== 'spaceProfiles'}>
+              <SpaceProfilesSettingsPage
+                onDirtyChange={setSpaceProfilesDirty}
+                onEditMainProfile={() => setSection('account')}
+              />
+            </div>
+          </Show>
           <div class={section() === 'appearance' ? 'contents' : 'hidden'} aria-hidden={section() !== 'appearance'}>
             <AppearanceSettingsPage />
           </div>

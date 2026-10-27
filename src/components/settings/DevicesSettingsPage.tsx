@@ -1,6 +1,6 @@
 import type { Component } from 'solid-js';
 import { createSignal, onMount, For, Show } from 'solid-js';
-import { listOwnDevices, revokeDevice, type DeviceInfo } from '../../api/devices';
+import { getBackupVersion, listOwnDevices, revokeDevice, type DeviceInfo } from '../../api/devices';
 import { E2eeStoreUnusableError, getMachine, getCurrentDeviceId } from '../../lib/e2ee/machine';
 import { setRecoveryPrompt } from '../../stores/recoveryPrompt';
 import { getOwnFingerprint, getBackupStatus, hasLegacyPinBackup, type BackupStatus } from '../../lib/e2ee';
@@ -38,6 +38,12 @@ export const DevicesSettingsPage: Component = () => {
   // The engine could not open this device's store: the safety-number row says so and offers
   // the reset dialog, instead of a dash and a backup that is forever "checking".
   const [storeError, setStoreError] = createSignal<E2eeStoreUnusableError | null>(null);
+  // A Restore whose code did not open the current backup may have opened the retained
+  // previous one instead (lib/e2ee restoreKeyBackup). The current version then still counts
+  // as untrusted, and the row should say what happened rather than ask for the code again.
+  // Holds when the current version was created, which is when the one just opened was
+  // replaced; cleared by every backup action so it can never describe a stale state.
+  const [restoredPreviousAt, setRestoredPreviousAt] = createSignal<string | null>(null);
 
   const thisDeviceId = () => getCurrentDeviceId();
 
@@ -45,6 +51,7 @@ export const DevicesSettingsPage: Component = () => {
     const userId = auth.user?.id;
     setLoading(true);
     setError('');
+    setRestoredPreviousAt(null);
     try {
       const [list, legacy] = await Promise.all([listOwnDevices(), hasLegacyPinBackup().catch(() => false)]);
       setDevices(list);
@@ -76,6 +83,7 @@ export const DevicesSettingsPage: Component = () => {
     if (!userId) return;
     setBackupError('');
     setBackupBusy(true);
+    setRestoredPreviousAt(null);
     try {
       await action(userId);
       setBackup(await getBackupStatus(userId).catch(() => null));
@@ -86,6 +94,12 @@ export const DevicesSettingsPage: Component = () => {
     } finally {
       setBackupBusy(false);
     }
+  }
+
+  async function restore(userId: string) {
+    if ((await restoreWithPrompt(userId)) === null) return;
+    const info = await getBackupVersion().catch(() => null);
+    setRestoredPreviousAt(info?.created_at ?? null);
   }
 
   const backupSummary = () => {
@@ -189,13 +203,27 @@ export const DevicesSettingsPage: Component = () => {
             <Show when={backup()?.outOfSync}>
               <p class="mt-1 text-xs leading-snug text-amber-500">{t('settings.devices.backupOutOfSync')}</p>
             </Show>
+            {/* The server's backup was set up elsewhere and this device has no proof of whose
+                key it is; it uploads nothing until the recovery code confirms it. */}
+            <Show when={backup()?.untrusted}>
+              <Show
+                when={restoredPreviousAt()}
+                fallback={<p class="mt-1 text-xs leading-snug text-amber-500">{t('settings.devices.backupUntrusted')}</p>}
+              >
+                {(at) => (
+                  <p class="mt-1 text-xs leading-snug text-amber-500">
+                    {t('settings.devices.backupPreviousRestored', { date: formatDate(at(), { dateStyle: 'medium' }) || at() })}
+                  </p>
+                )}
+              </Show>
+            </Show>
             {backupError() && <p class="mt-1 text-xs text-destructive">{backupError()}</p>}
           </div>
           <div class="flex shrink-0 flex-wrap justify-end gap-2">
             <Show when={backup()?.exists}>
               {/* Only useful on a device missing history the backup has - so it stays a
                   deliberate action here rather than a prompt the flow raises on its own. */}
-              <Button size="sm" variant="ghost" loading={backupBusy()} onClick={() => runBackupAction((id) => restoreWithPrompt(id))}>
+              <Button size="sm" variant="ghost" loading={backupBusy()} onClick={() => runBackupAction(restore)}>
                 {t('settings.devices.backupRestore')}
               </Button>
             </Show>

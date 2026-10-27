@@ -205,10 +205,92 @@ export function moveSpaceChannel(
   return api<void>(`/spaces/${spaceId}/rooms/move`, { method: 'POST', json: body });
 }
 
-/** Member in a space – mirrors RoomParticipant with optional metadata. */
-export interface SpaceMember extends RoomParticipant {
+/**
+ * The member's space profile, as every member serialization carries it (REST rows,
+ * SPACE_MEMBER_ADD / SPACE_MEMBER_UPDATE). Each one overrides the global profile inside that
+ * one space only; null (or blank) means "no override, show the global value".
+ *
+ * They are separate keys rather than overwriting `avatar`/`bio`/... on the member because
+ * USER_UPDATE writes the global profile onto every member row: an override stored in the
+ * global keys would be reverted by the member's next global profile edit.
+ */
+export const SPACE_PROFILE_KEYS = ['nick', 'space_avatar', 'space_banner', 'space_about_me', 'space_bio', 'space_pronouns'] as const;
+
+export interface SpaceProfileFields {
+  nick?: string | null;
+  space_avatar?: string | null;
+  space_banner?: string | null;
+  space_about_me?: string | null;
+  space_bio?: string | null;
+  space_pronouns?: string | null;
+}
+
+/** Member in a space – mirrors RoomParticipant with optional metadata. The RoomParticipant
+ * keys are always the member's GLOBAL profile; the space profile is the `SpaceProfileFields`
+ * keys, overlaid at render time by lib/spaceProfile's resolveProfile. */
+export interface SpaceMember extends RoomParticipant, SpaceProfileFields {
   joined_at?: string;
   roles?: string[];
+}
+
+/**
+ * A partial space-profile write (PATCH /spaces/:id/members/:userId). An absent key is left
+ * alone; null or "" clears it. Avatar and banner can only be cleared here - an image is set
+ * through the upload endpoints, so the server only ever stores its own Nebula URLs.
+ *
+ * On yourself (`@me`) every key is allowed. On someone else a moderator with Manage Nicknames
+ * who outranks them may set or clear `nick` and clear (null only) the other five.
+ */
+export type SpaceProfilePatch = {
+  nick?: string | null;
+  avatar?: null;
+  banner?: null;
+  about_me?: string | null;
+  bio?: string | null;
+  pronouns?: string | null;
+};
+
+/** One member with their space profile. `userId` may be `@me`. Never touches a store: the
+ * caller upserts the result (`upsertSpaceMember`), so web and mobile follow one rule. */
+export function getSpaceMember(spaceId: string, userId: string) {
+  // Not encodeURIComponent: the server's route params stay percent-encoded, so "%40me" would
+  // not match "@me", and real user ids are digits anyway.
+  return api<SpaceMember>(`/spaces/${spaceId}/members/${userId}`);
+}
+
+/** Write part of a space profile; returns the updated member. Like getSpaceMember, the caller
+ * upserts the result. A request that changes nothing comes back unchanged with no event. */
+export function patchSpaceMember(spaceId: string, userId: string, patch: SpaceProfilePatch) {
+  return api<SpaceMember>(`/spaces/${spaceId}/members/${userId}`, { method: 'PATCH', json: patch });
+}
+
+async function uploadSpaceMemberImage(spaceId: string, kind: 'avatar' | 'banner', file: File): Promise<SpaceMember> {
+  const form = new FormData();
+  form.append('file', file);
+  const token = getSessionToken();
+  const headers: HeadersInit = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const res = await fetch(`${getApiUrl()}/spaces/${spaceId}/members/@me/${kind}`, {
+    method: 'POST',
+    body: form,
+    headers,
+  });
+  if (!res.ok) {
+    const err = (await res.json().catch(() => ({}))) as { error?: string; code?: string } & Record<string, unknown>;
+    throw new ApiError(err.error ?? `HTTP ${res.status}`, res.status, undefined, err.code, err);
+  }
+  return res.json() as Promise<SpaceMember>;
+}
+
+/** Multipart upload of your own space avatar (returned as `space_avatar`). Only membership is
+ * needed. The caller upserts the returned member. */
+export function uploadSpaceMemberAvatar(spaceId: string, file: File): Promise<SpaceMember> {
+  return uploadSpaceMemberImage(spaceId, 'avatar', file);
+}
+
+/** Multipart upload of your own space banner (returned as `space_banner`). */
+export function uploadSpaceMemberBanner(spaceId: string, file: File): Promise<SpaceMember> {
+  return uploadSpaceMemberImage(spaceId, 'banner', file);
 }
 
 export interface SpaceRole {
@@ -308,6 +390,8 @@ export type AuditActionType =
   | 'member_ban_add'
   | 'member_ban_remove'
   | 'member_roles_update'
+  | 'member_nick_update'
+  | 'member_profile_reset'
   | 'bot_add'
   | 'invite_create'
   | 'invite_delete'
@@ -333,6 +417,8 @@ export const AUDIT_ACTION_TYPES: AuditActionType[] = [
   'member_ban_add',
   'member_ban_remove',
   'member_roles_update',
+  'member_nick_update',
+  'member_profile_reset',
   'bot_add',
   'invite_create',
   'invite_delete',

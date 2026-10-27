@@ -58,6 +58,16 @@ new i18n keys.
 - **Permissions**: `src/lib/spacePermissions.ts` mirrors the backend's permission
   bitmask bit-for-bit. If a permission bit is added or renamed on the backend, update
   this file in the same change so the two don't drift.
+- **Space profiles** (per-space nickname, avatar, banner, About Me, bio, pronouns): a member
+  row carries the global profile in the usual keys and the space one in `nick` /
+  `space_*`, and nothing merges them in a store. Any surface that names or pictures a
+  person inside a space resolves through `resolveProfile` / `resolveSpaceUser`
+  (`src/lib/spaceProfile.ts`) instead of reading `display_name` or `avatar`; the shared
+  points (`getSenderDisplay`, the popover subject builders, `voiceParticipantName`,
+  mentions) already do. PMs, friends, invites, bans, the audit log's names and the admin
+  pages stay global on purpose. Mentions still insert and tokenize the exact `@username` -
+  a nickname is not unique and must never capture one. Nickname menus decide through
+  `canEditNicknameOf`, the client copy of the server's rule.
 - **Voice/video**: everything goes through `src/stores/voice.ts` - components never
   touch the LiveKit `Room` directly. Voice states and calls come from the server (READY,
   `VOICE_STATE_UPDATE`, `CALL_*`); the store only adds this device's connection, mic

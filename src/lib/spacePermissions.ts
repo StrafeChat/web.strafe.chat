@@ -38,6 +38,15 @@ export const PermSendMessagesInThreads = 1 << 26;
 export const PermManageThreads = 1 << 27;
 export const AllThreadsPermMask =
   PermCreatePublicThreads | PermCreatePrivateThreads | PermSendMessagesInThreads | PermManageThreads;
+/** Nicknames (appended after threads; space-scoped, never a room override). Change Nickname: a
+ * member may set or clear their own nickname in the space (on for @everyone, as on Discord).
+ * Manage Nicknames: change or clear other members' nicknames, subject to the role hierarchy,
+ * and your own. Only the owner may change the owner's nickname.
+ *
+ * Bit 30 is the last one this file's 32-bit bitwise maths can hold (bit 31 is its sign bit);
+ * anything past 30 needs `&`/`|` replaced first. */
+export const PermChangeNickname = 1 << 28;
+export const PermManageNicknames = 1 << 29;
 
 export const AllVoicePermMask =
   PermConnect |
@@ -90,7 +99,12 @@ export const SPACE_ROLE_PERM_GROUPS: { category: string; rows: PermRow[] }[] = [
     row(PermManageEmojis, 'manageEmojis'),
     row(PermCreateInvite, 'createInvite'),
   ]),
-  group('membership', [row(PermKickMembers, 'kickMembers'), row(PermBanMembers, 'banMembers')]),
+  group('membership', [
+    row(PermChangeNickname, 'changeNickname'),
+    row(PermManageNicknames, 'manageNicknames'),
+    row(PermKickMembers, 'kickMembers'),
+    row(PermBanMembers, 'banMembers'),
+  ]),
   group('text', [
     row(PermViewChannel, 'viewRoom'),
     row(PermSendMessages, 'sendMessages'),
@@ -613,4 +627,100 @@ export function memberCanCreateInvite(
   const base = memberEffectivePermBase(space, roles, member, userId);
   if (base === null) return false;
   return hasPerm(base, PermCreateInvite) || hasPerm(base, PermAdministrator);
+}
+
+/** Change Nickname or Manage Nicknames (or Administrator / owner): may set their own nickname.
+ * Manage Nicknames counts because the server lets it cover your own nickname too. */
+export function memberCanChangeNickname(
+  space: { owner_id: string; everyone_role_id?: string } | undefined,
+  roles: SpaceRole[] | undefined,
+  member: { id: string; roles?: string[] } | undefined,
+  userId: string | undefined
+): boolean {
+  if (!space || !userId || !roles?.length) return false;
+  if (space.owner_id === userId) return true;
+  const base = memberEffectivePermBase(space, roles, member, userId);
+  if (base === null) return false;
+  return hasPerm(base, PermChangeNickname) || hasPerm(base, PermManageNicknames) || hasPerm(base, PermAdministrator);
+}
+
+/** Manage Nicknames (or Administrator / owner): may change or clear other members' nicknames
+ * and reset their space profiles, for members ranked below them. */
+export function memberCanManageNicknames(
+  space: { owner_id: string; everyone_role_id?: string } | undefined,
+  roles: SpaceRole[] | undefined,
+  member: { id: string; roles?: string[] } | undefined,
+  userId: string | undefined
+): boolean {
+  if (!space || !userId || !roles?.length) return false;
+  if (space.owner_id === userId) return true;
+  const base = memberEffectivePermBase(space, roles, member, userId);
+  if (base === null) return false;
+  return hasPerm(base, PermManageNicknames) || hasPerm(base, PermAdministrator);
+}
+
+/**
+ * THE client copy of the server's nicknamePermission (spaces/member_profile.go), from
+ * precomputed inputs so menus that already hold them need no member lookups. Same order as
+ * the server: the owner may change anyone's (their own included); nobody else may change the
+ * owner's, Administrator included; your own needs Change Nickname (or Manage Nicknames);
+ * someone else's needs Manage Nicknames and a target ranked strictly below you - equal rank is
+ * refused, as for kick and ban.
+ */
+export function canEditNicknameOf(o: {
+  viewerId?: string;
+  targetId: string;
+  spaceOwnerId?: string;
+  canChangeOwnNickname?: boolean;
+  canManageNicknames?: boolean;
+  /** Number.MAX_SAFE_INTEGER / Infinity for the owner. */
+  viewerHighestRolePosition?: number;
+  /** memberHighestRolePosition(...) of the target. */
+  targetHighestRolePosition: number;
+}): boolean {
+  if (!o.viewerId) return false;
+  if (o.spaceOwnerId && o.viewerId === o.spaceOwnerId) return true;
+  if (o.spaceOwnerId && o.targetId === o.spaceOwnerId) return false;
+  if (o.viewerId === o.targetId) return !!o.canChangeOwnNickname;
+  return !!o.canManageNicknames && o.targetHighestRolePosition < (o.viewerHighestRolePosition ?? -1);
+}
+
+/** canEditNicknameOf for surfaces holding member objects. `viewer` is the viewer's own member
+ * row (or just `{ id }` while the list loads, which falls back to @everyone's permissions). */
+export function memberCanEditNickname(
+  space: { owner_id: string; everyone_role_id?: string } | undefined,
+  roles: SpaceRole[] | undefined,
+  viewer: { id: string; roles?: string[] } | undefined,
+  target: { id: string; roles?: string[] } | undefined
+): boolean {
+  if (!space || !viewer || !target) return false;
+  return canEditNicknameOf({
+    viewerId: viewer.id,
+    targetId: target.id,
+    spaceOwnerId: space.owner_id,
+    canChangeOwnNickname: memberCanChangeNickname(space, roles, viewer, viewer.id),
+    canManageNicknames: memberCanManageNicknames(space, roles, viewer, viewer.id),
+    viewerHighestRolePosition:
+      space.owner_id === viewer.id
+        ? Number.MAX_SAFE_INTEGER
+        : memberHighestRolePosition(space.everyone_role_id, roles, viewer),
+    targetHighestRolePosition: memberHighestRolePosition(space.everyone_role_id, roles, target),
+  });
+}
+
+/**
+ * Whether the viewer may reset (clear) someone else's space avatar, banner, pronouns, About Me
+ * and bio - the moderator half of space profiles. The same rule as changing their nickname
+ * (Manage Nicknames, a target ranked below you, the owner's profile only by the owner), but
+ * never yourself: your own reset is in Settings > Space Profiles. Whether the target has
+ * anything to reset is a separate question (lib/spaceProfile's hasResettableSpaceProfile).
+ */
+export function memberCanResetSpaceProfile(
+  space: { owner_id: string; everyone_role_id?: string } | undefined,
+  roles: SpaceRole[] | undefined,
+  viewer: { id: string; roles?: string[] } | undefined,
+  target: { id: string; roles?: string[] } | undefined
+): boolean {
+  if (!viewer || !target || viewer.id === target.id) return false;
+  return memberCanEditNickname(space, roles, viewer, target);
 }

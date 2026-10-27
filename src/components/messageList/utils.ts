@@ -2,6 +2,7 @@ import type { DecryptedMessage } from '../../stores/messages';
 import { auth } from '../../stores/auth';
 import { spaces } from '../../stores/spaces';
 import type { RoomParticipant } from '../../api/rooms';
+import { resolveProfile } from '../../lib/spaceProfile';
 import { birthdayIsToday } from '../../lib/utils/birthday';
 import { formatTimestamp, timestampStyle } from '../../lib/utils/messageTimestamp';
 import { t } from '../../i18n';
@@ -59,9 +60,12 @@ export function isSystemMessage(msg: DecryptedMessage): msg is DecryptedMessage 
 }
 
 function participantName(id: string, participants?: RoomParticipant[], currentUserId?: string): string {
-  if (id === currentUserId) return auth.user?.display_name || auth.user?.username || t('common.you');
+  // Same two branches as getSenderDisplay: your own global profile from auth.user (the
+  // freshest copy), overlaid with your row in this list - which, in a space, carries your
+  // nickname. System lines, reply strips and mention previews all name people through here.
   const p = participants?.find((x) => x.id === id);
-  return p?.display_name || p?.username || t('common.someone');
+  if (id === currentUserId) return resolveProfile(auth.user, p, t('common.you')).name;
+  return resolveProfile(p, p, t('common.someone')).name;
 }
 
 export function formatSystemMessageText(
@@ -174,7 +178,12 @@ export function isEdited(msg: DecryptedMessage): boolean {
 
 export interface SenderDisplay {
   userId: string;
+  /** The name to show: their nickname in this space, else their display name. */
   name: string;
+  /** Their global display name (else username), whatever `name` resolved to. */
+  globalName?: string;
+  /** Their space nickname, when the participants are a space's and one is set. */
+  nick?: string;
   avatar?: string;
   banner?: string;
   username?: string;
@@ -192,21 +201,33 @@ export interface SenderDisplay {
   homeDomain?: string;
 }
 
+/**
+ * Who sent a message, as every message-side surface shows them (author rows, typing, reply
+ * strips, pins, search). `participants` are the room's people: in a space, its member rows,
+ * which carry each member's space profile - so a nickname or space avatar shows wherever this
+ * is used, and in a PM (no space fields) the global profile does.
+ */
 export function getSenderDisplay(
   senderId: string,
   participants?: RoomParticipant[],
   currentUserId?: string
 ): SenderDisplay {
   if (senderId === currentUserId) {
+    // Your global profile comes from auth.user, but your space profile only exists on your
+    // member row; without that overlay you would be the one person whose nickname never
+    // showed on their own messages.
+    const r = resolveProfile(auth.user, participants?.find((x) => x.id === senderId), t('common.you'));
     return {
       userId: senderId,
-      name: auth.user?.display_name || auth.user?.username || t('common.you'),
-      avatar: auth.user?.avatar,
-      banner: auth.user?.banner,
+      name: r.name,
+      globalName: r.globalName,
+      ...(r.nick ? { nick: r.nick } : {}),
+      avatar: r.avatar,
+      banner: r.banner,
       username: auth.user?.username,
-      bio: auth.user?.bio,
-      aboutMe: auth.user?.about_me,
-      pronouns: auth.user?.pronouns,
+      bio: r.bio,
+      aboutMe: r.aboutMe,
+      pronouns: r.pronouns,
       birthday: auth.user?.birthday,
       isBirthday: birthdayIsToday(auth.user?.birthday),
       publicFlags: auth.user?.public_flags,
@@ -215,15 +236,18 @@ export function getSenderDisplay(
     };
   }
   const p = participants?.find((x) => x.id === senderId);
+  const r = resolveProfile(p, p);
   return {
     userId: senderId,
-    name: p?.display_name || p?.username || t('common.unknown'),
-    avatar: p?.avatar,
-    banner: p?.banner,
+    name: r.name,
+    globalName: r.globalName,
+    ...(r.nick ? { nick: r.nick } : {}),
+    avatar: r.avatar,
+    banner: r.banner,
     username: p?.username,
-    bio: p?.bio,
-    aboutMe: p?.about_me,
-    pronouns: p?.pronouns,
+    bio: r.bio,
+    aboutMe: r.aboutMe,
+    pronouns: r.pronouns,
     birthday: p?.birthday,
     isBirthday: birthdayIsToday(p?.birthday, p?.is_birthday),
     publicFlags: p?.public_flags,
