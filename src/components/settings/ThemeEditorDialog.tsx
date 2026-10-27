@@ -6,6 +6,7 @@ import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Tabs } from '../ui/Tabs';
 import { Textarea } from '../ui/Textarea';
+import { ColorPicker } from '../ui/ColorPicker';
 import {
   THEME_TOKENS,
   THEME_TOKEN_GROUPS,
@@ -20,7 +21,6 @@ import { newCustomThemeId, saveCustomTheme, setPreviewTheme } from '../../stores
 import { appDialogActions, appSectionLabel, zLayer } from '../../theme/appChrome';
 import { t } from '../../i18n';
 
-/** Token names/hints come from the theme catalogue; translated when a key exists. */
 function tokenLabel(tok: { key: string; label: string }): string {
   return t(`themeEditor.tokens.${tok.key}.label`, { defaultValue: tok.label });
 }
@@ -108,6 +108,11 @@ export const ThemeEditorDialog: Component<ThemeEditorDialogProps> = (props) => {
     setHexDrafts(key, undefined as unknown as string);
   }
 
+  function onPickerColor(key: ThemeTokenKey, value: string) {
+    setHexDrafts(key, undefined as unknown as string);
+    setColor(key, value);
+  }
+
   function resetToBase() {
     if (!props.base) return;
     setDraft('colors', { ...props.base.colors });
@@ -132,9 +137,7 @@ export const ThemeEditorDialog: Component<ThemeEditorDialogProps> = (props) => {
       );
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch {
-      // ignore
-    }
+    } catch { }
   }
 
   function applyImport() {
@@ -193,16 +196,12 @@ export const ThemeEditorDialog: Component<ThemeEditorDialogProps> = (props) => {
                     <For each={THEME_TOKENS.filter((tok) => tok.group === group)}>
                       {(tk) => (
                         <div class="flex items-center gap-3 rounded-lg px-2 py-1.5 hover:bg-muted/20">
-                          <label class="relative size-8 shrink-0 cursor-pointer overflow-hidden rounded-lg border border-border/70 shadow-inner">
-                            <span class="absolute inset-0" style={{ 'background-color': draft.colors[tk.key] }} />
-                            <input
-                              type="color"
-                              value={draft.colors[tk.key]}
-                              onInput={(e) => setColor(tk.key, e.currentTarget.value)}
-                              aria-label={t('themeEditor.colorFor', { name: tokenLabel(tk) })}
-                              class="absolute inset-0 size-full cursor-pointer opacity-0"
-                            />
-                          </label>
+                          <ColorPicker
+                            compact
+                            label={t('themeEditor.colorFor', { name: tokenLabel(tk) })}
+                            value={draft.colors[tk.key]}
+                            onChange={(hex) => onPickerColor(tk.key, hex)}
+                          />
                           <div class="min-w-0 flex-1">
                             <p class="text-sm font-medium text-foreground">{tokenLabel(tk)}</p>
                             <p class="truncate text-[11px] text-muted-foreground">{tokenHint(tk)}</p>

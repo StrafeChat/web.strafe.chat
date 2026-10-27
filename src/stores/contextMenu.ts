@@ -3,10 +3,12 @@ import { createSignal } from 'solid-js';
 export interface ContextMenuItem {
   label: string;
   icon?: string;
+  color?: string;
   /** Receives the click event so handlers can e.g. check shiftKey. */
   onClick: (e?: MouseEvent) => void;
   disabled?: boolean;
   danger?: boolean;
+  submenu?: ContextMenuItem[];
 }
 
 const [state, setState] = createSignal<{
