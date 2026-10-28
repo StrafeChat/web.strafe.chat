@@ -482,6 +482,7 @@ export default {
       color: 'Color',
       icon: 'Icono',
       iconPlaceholder: 'fa-solid fa-folder',
+      chooseIcon: 'Elegir un icono',
       iconHint: 'Cualquier clase de Font Awesome, por ejemplo fa-solid fa-star.',
       useSpaceIcons: 'Usar iconos de espacios',
       useSpaceIconsHint: 'Muestra los primeros cuatro espacios de esta carpeta en lugar de un icono de carpeta.',

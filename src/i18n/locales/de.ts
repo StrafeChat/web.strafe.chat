@@ -470,6 +470,7 @@ export default {
       color: 'Farbe',
       icon: 'Symbol',
       iconPlaceholder: 'fa-solid fa-folder',
+      chooseIcon: 'Symbol auswählen',
       iconHint: 'Beliebige Font-Awesome-Klasse, zum Beispiel fa-solid fa-star.',
       useSpaceIcons: 'Space-Symbole verwenden',
       useSpaceIconsHint: 'Zeigt die ersten vier Spaces dieses Ordners statt eines Ordnersymbols.',
