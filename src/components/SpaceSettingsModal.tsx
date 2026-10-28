@@ -1,19 +1,21 @@
 import type { Component } from 'solid-js';
 import { userOptionLabel } from '../stores/instance';
 import { resolveProfile } from '../lib/spaceProfile';
-import { createSignal, createEffect, createMemo, For, Show, untrack } from 'solid-js';
+import { batch, createSignal, createEffect, createMemo, For, Show, untrack } from 'solid-js';
 import {
   createSpaceRole,
   deleteSpaceRole,
   patchSpaceRole,
   putRoomPermissionOverride,
   putRoomUserPermissionOverride,
+  saveSpaceRoleOrder,
   setMemberSpaceRoles,
   type Space,
   type SpaceMember,
   type SpaceRole,
 } from '../api/spaces';
 import {
+  canChangeMemberRole,
   hasPerm,
   memberCanBanMembers,
   memberCanKickMembers,
@@ -32,15 +34,18 @@ import {
   applyRoomUserOverride,
   ensureSpaceRoles,
   ensureSpaceRooms,
+  mergeSpaceRoles,
   removeSpaceRole,
   roomOverrides,
   spaceRoles,
   spaces,
   upsertSpaceRole,
 } from '../stores/spaces';
+import { customRolesHighestFirst, planRoleOrder } from '../lib/roleOrder';
+import { translateRoleApiError } from '../lib/formatApiError';
 import { auth } from '../stores/auth';
 import { Button } from './ui/Button';
-import { Input, inputBaseClass } from './ui/Input';
+import { Input } from './ui/Input';
 import { SearchInput } from './ui/SearchInput';
 import { Select } from './ui/Select';
 import { Tabs } from './ui/Tabs';
@@ -71,14 +76,6 @@ const MemberCell: Component<{ m: SpaceMember }> = (props) => {
   const r = () => resolveProfile(props.m, props.m, props.m.username);
   return <UserCell size="sm" name={r().name} bot={props.m.bot} username={props.m.username} avatar={r().avatar} />;
 };
-
-/** Discord's default role palette, offered as quick swatches next to the custom colour picker. */
-const ROLE_COLOR_SWATCHES = [
-  '#1abc9c', '#2ecc71', '#3498db', '#9b59b6', '#e91e63',
-  '#f1c40f', '#e67e22', '#e74c3c', '#95a5a6', '#607d8b',
-  '#11806a', '#1f8b4c', '#206694', '#71368a', '#ad1457',
-  '#c27c0e', '#a84300', '#992d22', '#979c9f', '#546e7a',
-];
 
 /** Role color (24-bit RGB). */
 function intToHex(c: number): string {
@@ -169,6 +166,54 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
     () => canManageSpace() || userCanManageRoles() || canKick() || canBan() || canManageNicknames()
   );
 
+  // --- The role hierarchy as the viewer may touch it ---
+  const everyoneRoleId = createMemo(
+    () => props.space?.everyone_role_id ?? roles()?.find((r) => r.name === EVERYONE)?.id
+  );
+  const isEveryoneRole = (role: SpaceRole) => role.id === everyoneRoleId() || role.name === EVERYONE;
+  /** Custom roles highest first, the way Discord draws the hierarchy (the store keeps them lowest first). */
+  const customRoles = createMemo(() => customRolesHighestFirst(roles() ?? [], everyoneRoleId()));
+
+  /**
+   * How high the viewer may reach: no ceiling for the owner, otherwise their own highest role's
+   * position. Roles at or above it can be neither edited, moved, given out nor taken away - what
+   * the server enforces too. Administrator does not lift it; only ownership does.
+   */
+  const viewerHighestPosition = createMemo(() => {
+    const me = viewerId();
+    if (!me) return -1;
+    if (props.ownerId === me) return Number.POSITIVE_INFINITY;
+    return memberHighestRolePosition(everyoneRoleId(), roles(), viewerMember());
+  });
+  /** @everyone takes permission edits from anyone with Manage Roles (it sits under every rank);
+   * any other role only from someone ranked above it. */
+  const roleEditable = (role: SpaceRole) =>
+    userCanManageRoles() && (isEveryoneRole(role) || role.position < viewerHighestPosition());
+  /** The custom roles the viewer may drag: those below their own highest (owner: all of them). */
+  const roleMovable = (role: SpaceRole) =>
+    userCanManageRoles() && !isEveryoneRole(role) && role.position < viewerHighestPosition();
+
+  /** While a new order is being saved, the order it asks for - drawn instead of the store's, so a
+   * dropped row stays where it was dropped instead of jumping back until the answer arrives. */
+  const [pendingRoleOrder, setPendingRoleOrder] = createSignal<string[] | null>(null);
+  const shownCustomRoles = createMemo(() => {
+    const list = customRoles();
+    const order = pendingRoleOrder();
+    if (!order) return list;
+    const byId = new Map(list.map((r) => [r.id, r]));
+    const shown = order.map((id) => byId.get(id)).filter((r): r is SpaceRole => !!r);
+    // A role someone created meanwhile is new, and new roles start at the bottom.
+    return [...shown, ...list.filter((r) => !order.includes(r.id))];
+  });
+  /** The role list: highest first, @everyone pinned at the bottom (Discord's layout). */
+  const roleRows = createMemo((): SpaceRole[] => {
+    const everyone = roles()?.find(isEveryoneRole);
+    return everyone ? [...shownCustomRoles(), everyone] : shownCustomRoles();
+  });
+
+  /** A failed role write, in the viewer's language. */
+  const roleErrorText = (e: unknown, fallbackKey: string) => translateRoleApiError(e, t).join(' ') || t(fallbackKey);
+
   const allowed = (id: SpaceSettingsSection): boolean => {
     switch (id) {
       case 'general':
@@ -220,11 +265,12 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
 
   createEffect(() => {
     if (!props.open) return;
-    const list = roles();
-    if (!list?.length) return;
+    const list = roleRows();
+    if (!list.length) return;
     const cur = selectedRoleId();
     if (!cur || !list.some((r) => r.id === cur)) {
-      setSelectedRoleId(list[0]!.id);
+      // The highest role the viewer can work on, as the list runs top down.
+      setSelectedRoleId((list.find(roleEditable) ?? list[0]!).id);
     }
   });
 
@@ -333,7 +379,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
     const sid = props.spaceId;
     const rid = selectedRoleId();
     const r = currentRole();
-    if (!rid || !r || !props.canManageRoles) return;
+    if (!rid || !r || !roleEditable(r)) return;
     setBusy(true);
     setErr('');
     try {
@@ -358,7 +404,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
       // role before the save, which this one did by definition.
       if (selectedRoleId() === rid) resetRoleEdits();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : t('common.saveFailed'));
+      setErr(roleErrorText(e, 'common.saveFailed'));
     } finally {
       setBusy(false);
     }
@@ -366,18 +412,22 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
 
   async function createRole() {
     const n = newRoleName().trim();
-    if (!n || !props.canManageRoles) return;
+    if (!n || !userCanManageRoles()) return;
     setBusy(true);
     setErr('');
     try {
       // Discord starts a new role as a copy of @everyone's current permissions, not empty -
       // toggles read as "on" for whatever a member can already do, off only for the extras
       // this role is meant to grant.
-      const everyonePerms = roles()?.find((r) => r.name === EVERYONE)?.permissions ?? 0;
-      upsertSpaceRole(props.spaceId, await createSpaceRole(props.spaceId, { name: n, permissions: everyonePerms }));
+      const everyonePerms = roles()?.find(isEveryoneRole)?.permissions ?? 0;
+      const role = await createSpaceRole(props.spaceId, { name: n, permissions: everyonePerms });
+      // It goes in at the bottom, just above @everyone (the roles it moved up arrive as one
+      // SPACE_UPDATE); open it, since that is where the person goes next.
+      upsertSpaceRole(props.spaceId, role);
+      setSelectedRoleId(role.id);
       setNewRoleName('');
     } catch (e) {
-      setErr(e instanceof Error ? e.message : t('spaceSettings.createRoleFailed'));
+      setErr(roleErrorText(e, 'spaceSettings.createRoleFailed'));
     } finally {
       setBusy(false);
     }
@@ -386,7 +436,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
   async function removeRole() {
     const rid = selectedRoleId();
     const r = roles()?.find((x) => x.id === rid);
-    if (!rid || !r || r.name === EVERYONE || !props.canManageRoles) return;
+    if (!rid || !r || isEveryoneRole(r) || r.bot_id || !roleEditable(r)) return;
     // Asked first, like deleting a room or a section: the role comes off everyone who has it,
     // with what it granted, and there is no undo.
     const ok = await confirmDialog({
@@ -404,57 +454,56 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
       removeSpaceRole(props.spaceId, rid);
       setSelectedRoleId('');
     } catch (e) {
-      setErr(e instanceof Error ? e.message : t('common.deleteFailed'));
+      setErr(roleErrorText(e, 'common.deleteFailed'));
     } finally {
       setBusy(false);
     }
   }
 
+  /**
+   * Move a role to the gap before/after another, in the highest-first list. Only roles below the
+   * viewer move, and only among themselves: they are the bottom of the list (every role under
+   * the viewer's highest), so a drop above them lands at their top, under the viewer's own rank.
+   * The new order is saved by swapping the positions those roles already hold (lib/roleOrder),
+   * so no role at or above the viewer is written and no two roles end up sharing a position.
+   */
   async function reorderRoles(dragId: string, overId: string, placement: 'before' | 'after') {
-    if (!props.canManageRoles || busy()) return;
-    if (!dragId || !overId) return;
-    if (dragId === overId) return;
+    if (!userCanManageRoles() || busy() || !dragId || !overId || dragId === overId) return;
+    const order = customRoles();
+    const moved = order.find((r) => r.id === dragId);
+    if (!moved || !roleMovable(moved)) return;
 
-    const list = roles();
-    if (!list?.length) return;
-    const everyoneRow = list.find((r) => r.name === EVERYONE);
-    const custom = list.filter((r) => r.name !== EVERYONE);
+    const next = order.filter((r) => r.id !== dragId);
+    const ti = next.findIndex((r) => r.id === overId);
+    if (ti < 0) return;
+    const firstMovable = next.findIndex(roleMovable);
+    const top = firstMovable < 0 ? next.length : firstMovable;
+    next.splice(Math.max(top, placement === 'before' ? ti : ti + 1), 0, moved);
+    if (next.every((r, i) => r.id === order[i]!.id)) return;
 
-    const moved = custom.find((r) => r.id === dragId);
-    if (!moved) return;
-
-    const next = custom.filter((r) => r.id !== dragId);
-
-    let insertAt: number;
-    if (everyoneRow && overId === everyoneRow.id) {
-      if (placement !== 'after') return;
-      insertAt = 0;
-    } else {
-      const target = custom.find((r) => r.id === overId);
-      if (!target) return;
-      const ti = next.findIndex((r) => r.id === overId);
-      if (ti < 0) return;
-      insertAt = placement === 'before' ? ti : ti + 1;
-    }
-
-    next.splice(insertAt, 0, moved);
-
-    const origIds = custom.map((x) => x.id);
-    const newIds = next.map((x) => x.id);
-    if (origIds.length === newIds.length && origIds.every((id, i) => id === newIds[i])) {
+    const movable = new Set(order.filter(roleMovable).map((r) => r.id));
+    const plan = planRoleOrder(next, movable);
+    // Only when legacy ties leave more roles than free places under the viewer's own; the server
+    // would refuse it, so say so before anything is written.
+    if (plan.positions.some((p) => p.position >= viewerHighestPosition())) {
+      setErr(t('errors.api.roleHierarchyRole'));
       return;
     }
 
+    setPendingRoleOrder(next.map((r) => r.id));
     setBusy(true);
     setErr('');
     try {
-      // Keep @everyone fixed at position 0. Custom roles get positions 1..N in their new order.
-      for (let i = 0; i < next.length; i += 1) {
-        upsertSpaceRole(props.spaceId, await patchSpaceRole(props.spaceId, next[i]!.id, { position: i + 1 }));
-      }
+      const saved = await saveSpaceRoleOrder(props.spaceId, plan);
+      const sid = props.spaceId;
+      // Merged, not swapped in: role events from the gateway can land before this answer, and
+      // replacing the list with it would undo a role created, deleted or edited meanwhile.
+      if (saved.complete) mergeSpaceRoles(sid, saved.roles);
+      else batch(() => saved.roles.forEach((role) => upsertSpaceRole(sid, role)));
     } catch (e) {
-      setErr(e instanceof Error ? e.message : t('spaceSettings.reorderFailed'));
+      setErr(roleErrorText(e, 'spaceSettings.reorderFailed'));
     } finally {
+      setPendingRoleOrder(null);
       setBusy(false);
     }
   }
@@ -463,22 +512,26 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
   let roleListScrollEl: HTMLDivElement | undefined;
   const roleRowEls = new Map<string, HTMLElement>();
 
-  /** The before/after slot the cursor is over among the custom roles (@everyone stays pinned). */
+  /**
+   * The before/after gap the cursor is over among the rows the viewer may move - the bottom of the
+   * list, above @everyone. Over a locked row (at or above the viewer) the drop clamps to the top
+   * of the movable rows, over @everyone to their bottom: nothing lands at or above the viewer.
+   */
   function roleDropSlotAt(clientY: number): { overId: string; placement: 'before' | 'after' } | null {
-    const custom = roles()?.filter((x) => x.name !== EVERYONE) ?? [];
-    for (const role of custom) {
+    const movable = shownCustomRoles().filter(roleMovable);
+    for (const role of movable) {
       const el = roleRowEls.get(role.id);
       if (!el) continue;
       const rect = el.getBoundingClientRect();
       if (clientY < rect.top + rect.height / 2) return { overId: role.id, placement: 'before' };
       if (clientY <= rect.bottom) return { overId: role.id, placement: 'after' };
     }
-    const last = custom[custom.length - 1];
+    const last = movable[movable.length - 1];
     return last ? { overId: last.id, placement: 'after' } : null;
   }
 
   const roleDrag = createPointerDrag({
-    enabled: () => props.canManageRoles === true && !busy(),
+    enabled: () => userCanManageRoles() && !busy(),
     scrollEl: () => roleListScrollEl,
     onMove: (_id, _x, y) => setDropIndicator(roleDropSlotAt(y)),
     onDrop: (id) => {
@@ -491,7 +544,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
   async function saveOverride() {
     const sid = props.spaceId;
     const rid = props.roomId;
-    if (!rid || !props.canManageRoles) return;
+    if (!rid || !userCanManageRoles()) return;
     const allow = allowMask();
     const deny = denyMask();
     setBusy(true);
@@ -516,21 +569,9 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
     }
   }
 
-  /**
-   * How high the viewer may reach when handing out roles: no ceiling for the owner,
-   * otherwise their own highest role's position. Roles at or above it are locked, which
-   * is what the server enforces too.
-   */
-  const viewerHighestPosition = createMemo(() => {
-    const me = viewerId();
-    if (!me) return -1;
-    if (props.ownerId === me) return Number.POSITIVE_INFINITY;
-    const everyoneId = props.space?.everyone_role_id ?? roles()?.find((r) => r.name === EVERYONE)?.id;
-    return memberHighestRolePosition(everyoneId, roles(), viewerMember());
-  });
-  const roleLockedForViewer = (role: SpaceRole) => role.position >= viewerHighestPosition();
-  /** Only the owner may change the owner's roles - but they may, on themselves. */
-  const canAssignTo = (userId: string) => userId === viewerId() || userId !== props.ownerId;
+  /** Whether the viewer may give this role to members and take it back - any member, the owner and
+   * people ranked above the viewer included (Discord: only the role's position counts). */
+  const roleAssignable = (role: SpaceRole) => userCanManageRoles() && canChangeMemberRole(role, viewerHighestPosition());
 
   // --- Manage Members: who holds the selected role (Discord's per-role member list) ---
   const roleMemberCount = (roleId: string) =>
@@ -544,7 +585,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
     if (!rid) return [];
     const q = memberSearch().trim().toLowerCase();
     return props.members
-      .filter((m) => !m.roles?.includes(rid) && canAssignTo(m.id))
+      .filter((m) => !m.roles?.includes(rid))
       .filter(
         (m) =>
           !q ||
@@ -555,15 +596,16 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
       .slice(0, 50);
   });
 
-  /** Add or remove the selected role from one member, preserving their other custom roles. */
+  /** Add or remove the selected role from one member, preserving their other custom roles. The
+   * full-list PUT rather than the single-role one, which instances from before October 2026 lack;
+   * the server keeps any role above the viewer whatever the list says. */
   async function toggleMemberInRole(userId: string, add: boolean) {
     const rid = selectedRoleId();
     const role = currentRole();
-    if (!rid || !role || role.name === EVERYONE) return;
-    if (!props.canManageRoles || !canAssignTo(userId) || roleLockedForViewer(role)) return;
-    const custom = roles()?.filter((r) => r.name !== EVERYONE) ?? [];
+    if (!rid || !role || !roleAssignable(role)) return;
+    const customIds = new Set(customRoles().map((r) => r.id));
     const m = props.members.find((x) => x.id === userId);
-    const next = new Set((m?.roles ?? []).filter((id) => custom.some((r) => r.id === id)));
+    const next = new Set((m?.roles ?? []).filter((id) => customIds.has(id)));
     if (add) next.add(rid);
     else next.delete(rid);
     setBusy(true);
@@ -572,7 +614,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
       await setMemberSpaceRoles(props.spaceId, userId, [...next]);
       props.onMembersUpdated?.();
     } catch (e) {
-      setErr(e instanceof Error ? e.message : t('spaceSettings.memberUpdateFailed'));
+      setErr(roleErrorText(e, 'spaceSettings.memberUpdateFailed'));
     } finally {
       setBusy(false);
     }
@@ -687,10 +729,10 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                   ref={(el) => (roleListScrollEl = el)}
                   class="flex max-h-48 flex-col gap-0.5 overflow-y-auto rounded-xl border border-border/80 bg-card/20 p-1 lg:max-h-[min(420px,50vh)]"
                 >
-                  <For each={roles()!}>
+                  <For each={roleRows()}>
                     {(r) => {
-                      const isEveryone = r.name === EVERYONE;
-                      const showGrip = () => props.canManageRoles && !isEveryone;
+                      const isEveryone = isEveryoneRole(r);
+                      const movable = () => roleMovable(r);
                       const lineBefore = () => dropIndicator()?.overId === r.id && dropIndicator()?.placement === 'before';
                       const lineAfter = () => dropIndicator()?.overId === r.id && dropIndicator()?.placement === 'after';
                       let rowEl: HTMLDivElement | undefined;
@@ -722,9 +764,23 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                               }
                             }}
                           >
+                            {/* A grip on the rows the viewer may move; a lock on the custom roles at or
+                                above their own highest (which are not drop targets either);
+                                nothing on @everyone, which always stays at the bottom. */}
                             <Show
-                              when={showGrip()}
-                              fallback={<span class="size-4 shrink-0" aria-hidden="true" />}
+                              when={movable()}
+                              fallback={
+                                <Show when={!isEveryone} fallback={<span class="size-4 shrink-0" aria-hidden="true" />}>
+                                  <span
+                                    role="img"
+                                    class="flex size-4 shrink-0 items-center justify-center text-muted-foreground/70"
+                                    data-tooltip={t('spaceSettings.members.roleLocked')}
+                                    aria-label={t('spaceSettings.members.roleLocked')}
+                                  >
+                                    <i class="fa-solid fa-lock text-[10px]" aria-hidden="true" />
+                                  </span>
+                                </Show>
+                              }
                             >
                               <span
                                 class={`shrink-0 touch-none text-muted-foreground hover:text-foreground ${
@@ -772,7 +828,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                     }}
                   </For>
                 </div>
-                <Show when={props.canManageRoles}>
+                <Show when={userCanManageRoles()}>
                   <form
                     class="mt-2 flex gap-2"
                     onSubmit={(e) => {
@@ -807,8 +863,20 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                           {t('spaceSettings.editRole')} <span class="text-primary">{r().name}</span>
                         </h3>
                         <p class="text-sm text-muted-foreground">{t('spaceSettings.editRoleHint')}</p>
+                        <Show when={r().bot_id}>
+                          <p class="mt-2 flex items-start gap-2 text-sm text-muted-foreground">
+                            <i class="fa-solid fa-robot mt-1 shrink-0 text-xs text-primary" aria-hidden="true" />
+                            <span>{t('spaceSettings.botRoleOrderHint')}</span>
+                          </p>
+                        </Show>
+                        <Show when={!roleEditable(r())}>
+                          <p class="mt-2 flex items-start gap-2 text-sm text-muted-foreground">
+                            <i class="fa-solid fa-lock mt-1 shrink-0 text-xs" aria-hidden="true" />
+                            <span>{t('spaceSettings.members.roleLocked')}</span>
+                          </p>
+                        </Show>
                       </div>
-                      <Show when={props.canManageRoles && r().name !== EVERYONE && !r().bot_id}>
+                      <Show when={roleEditable(r()) && !isEveryoneRole(r()) && !r().bot_id}>
                         <Button
                           type="button"
                           variant="destructive"
@@ -841,7 +909,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                           label={t('spaceSettings.roleName')}
                           type="text"
                           value={roleName()}
-                          disabled={!props.canManageRoles || r().name === EVERYONE}
+                          disabled={!roleEditable(r()) || isEveryoneRole(r())}
                           onInput={(e) => setRoleName(e.currentTarget.value)}
                         />
                         <div class="space-y-2">
@@ -849,7 +917,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                             label={t('spaceSettings.roleColor')}
                             value={roleColorHex()}
                             onChange={setRoleColorHex}
-                            disabled={!props.canManageRoles}
+                            disabled={!roleEditable(r())}
                           />
                         </div>
                         <div class="flex flex-col gap-4 rounded-xl border border-border/60 bg-card/20 p-4">
@@ -860,7 +928,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                             </div>
                             <Toggle
                               checked={roleHoist()}
-                              disabled={!props.canManageRoles}
+                              disabled={!roleEditable(r())}
                               label={t('spaceSettings.hoist')}
                               onChange={setRoleHoist}
                             />
@@ -872,7 +940,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                             </div>
                             <Toggle
                               checked={roleMentionable()}
-                              disabled={!props.canManageRoles}
+                              disabled={!roleEditable(r())}
                               label={t('spaceSettings.mentionable')}
                               onChange={setRoleMentionable}
                             />
@@ -892,7 +960,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                             onValueChange={setPermSearch}
                             wrapperClass="w-full sm:w-64"
                           />
-                          <Show when={props.canManageRoles}>
+                          <Show when={roleEditable(r())}>
                             <Button type="button" variant="outline" size="sm" class="h-9 shrink-0" onClick={() => setPermMask(0)}>
                               {t('spaceSettings.clearAll')}
                             </Button>
@@ -904,7 +972,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                               <div>
                                 <div class="mb-1.5 flex items-center justify-between gap-2 px-1">
                                   <p class={appSectionLabel}>{group.category}</p>
-                                  <Show when={props.canManageRoles}>
+                                  <Show when={roleEditable(r())}>
                                     <Toggle
                                       checked={group.rows.every((row) => hasPerm(permMask(), row.bit))}
                                       label={group.category}
@@ -924,7 +992,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                                         </div>
                                         <Toggle
                                           checked={hasPerm(permMask(), row.bit)}
-                                          disabled={!props.canManageRoles}
+                                          disabled={!roleEditable(r())}
                                           label={row.label}
                                           onChange={(on) => setPermMask(togglePerm(permMask(), row.bit, on))}
                                         />
@@ -981,14 +1049,14 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                                   </div>
                                   <TriStateToggle
                                     state={overrideState(row.bit)}
-                                    disabled={!props.canManageRoles}
+                                    disabled={!userCanManageRoles()}
                                     onChange={(next) => setOverrideState(row.bit, next)}
                                   />
                                 </div>
                               )}
                             </For>
                           </div>
-                          <Show when={props.canManageRoles}>
+                          <Show when={userCanManageRoles()}>
                             <Button
                               type="button"
                               onClick={() => saveOverride()}
@@ -1004,7 +1072,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
 
                     <Show when={rolesSubTab() === 'members'}>
                       <Show
-                        when={r().name !== EVERYONE}
+                        when={!isEveryoneRole(r())}
                         fallback={<p class="text-sm text-muted-foreground">{t('spaceSettings.everyoneAllMembers')}</p>}
                       >
                         <div class="space-y-5">
@@ -1021,7 +1089,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                                   {(m) => (
                                     <div class="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 hover:bg-muted/20">
                                       <MemberCell m={m} />
-                                      <Show when={props.canManageRoles && canAssignTo(m.id) && !roleLockedForViewer(r()) && !r().bot_id}>
+                                      <Show when={roleAssignable(r())}>
                                         <button
                                           type="button"
                                           class="flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-destructive/15 hover:text-destructive disabled:opacity-50"
@@ -1042,7 +1110,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                           <Show when={r().bot_id}>
                             <p class="text-sm text-muted-foreground">{t('spaceSettings.botRoleHint')}</p>
                           </Show>
-                          <Show when={props.canManageRoles && !roleLockedForViewer(r()) && !r().bot_id}>
+                          <Show when={roleAssignable(r())}>
                             <div>
                               <p class={`mb-2 ${appSectionLabel}`}>{t('spaceSettings.addMembers')}</p>
                               <SearchInput
@@ -1082,7 +1150,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                     {/* Unsaved-changes bar for Display/Permissions edits (Members / This room save on the spot). */}
                     <Show
                       when={
-                        props.canManageRoles &&
+                        roleEditable(r()) &&
                         (rolesSubTab() === 'display' || rolesSubTab() === 'permissions') &&
                         roleDirty()
                       }

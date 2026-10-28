@@ -8,6 +8,7 @@ import {
   memberHighestRolePosition,
   spaceRoleColorHex,
 } from '../../../lib/spacePermissions';
+import { compareRolesHighestFirst, customRolesHighestFirst } from '../../../lib/roleOrder';
 import { hasResettableSpaceProfile, resolveProfile } from '../../../lib/spaceProfile';
 import { confirmResetSpaceProfile } from '../../../lib/userContextMenu';
 import { openNicknameDialog } from '../../../stores/nicknameDialog';
@@ -83,7 +84,9 @@ export const SpaceMembersPage: Component<Props> = (props) => {
       .filter((rid) => rid !== everyoneId())
       .map((rid) => rolesById().get(rid))
       .filter((r): r is SpaceRole => !!r)
-      .sort((a, b) => b.position - a.position);
+      .sort(compareRolesHighestFirst);
+  /** The role filter lists roles as the hierarchy runs, highest first. */
+  const filterRoles = createMemo(() => customRolesHighestFirst(props.roles, everyoneId()));
 
   const filtered = createMemo(() => {
     const q = query().trim().toLowerCase();
@@ -124,18 +127,12 @@ export const SpaceMembersPage: Component<Props> = (props) => {
   }
 
   /**
-   * Role editing is a separate question from moderation: you may edit your own roles
-   * (the owner included - that is how they give themselves a colour), you may not edit
-   * anyone else's owner roles, and otherwise the target must rank below you. The dialog
-   * locks the individual roles you may not hand out.
+   * Role editing is a separate question from moderation, and Discord's answer: Manage Roles is
+   * enough on anyone - yourself, the owner, a member ranked above you - because what decides is
+   * each role's position, not the member's rank. The dialog locks the roles at or above your own
+   * highest (and bot roles), which you can neither hand out nor take away.
    */
-  function canEditRoles(m: SpaceMember): boolean {
-    if (!props.canManageRoles) return false;
-    if (m.id === props.viewerId) return true;
-    if (isOwner(m.id)) return false;
-    if (props.viewerId && isOwner(props.viewerId)) return true;
-    return memberHighestRolePosition(everyoneId(), props.roles, m) < viewerHighest();
-  }
+  const canEditRoles = () => props.canManageRoles;
 
   async function kick(m: SpaceMember) {
     const ok = await confirmDialog({
@@ -161,13 +158,10 @@ export const SpaceMembersPage: Component<Props> = (props) => {
   function openMenu(e: MouseEvent, m: SpaceMember) {
     const items: ContextMenuItem[] = [];
     const mod = canModerate(m);
-    if (props.canManageRoles && (canEditRoles(m) || !isOwner(m.id))) {
-      // Shown disabled rather than hidden for a member ranked at or above you, so the
-      // rule is visible; the server enforces the same one on PUT /members/:id/roles.
+    if (canEditRoles()) {
       items.push({
         label: t('spaceSettings.members.editRoles'),
         icon: 'fa-solid fa-shield-halved',
-        disabled: !canEditRoles(m),
         onClick: () => setRolesTarget(m),
       });
     }
@@ -206,7 +200,7 @@ export const SpaceMembersPage: Component<Props> = (props) => {
     memberCanEditNickname(props.space, props.roles, viewerRow(), viewerRow());
   /** Whether this row's menu would hold anything at all. */
   const hasMenu = (m: SpaceMember) =>
-    (props.canManageRoles && (canEditRoles(m) || !isOwner(m.id))) ||
+    canEditRoles() ||
     props.canKick ||
     props.canBan ||
     offersNickname(m) ||
@@ -226,7 +220,7 @@ export const SpaceMembersPage: Component<Props> = (props) => {
         <div class="grid grid-cols-2 gap-3 md:w-[26rem]">
           <Select value={roleFilter()} onValueChange={setRoleFilter} aria-label={t('spaceSettings.members.filterRole')}>
             <option value="">{t('spaceSettings.members.allRoles')}</option>
-            <For each={props.roles.filter((r) => r.name !== EVERYONE)}>{(r) => <option value={r.id}>{r.name}</option>}</For>
+            <For each={filterRoles()}>{(r) => <option value={r.id}>{r.name}</option>}</For>
           </Select>
           <Select value={sort()} onValueChange={(v) => setSort(v as SortKey)} aria-label={t('spaceSettings.members.sort')}>
             <option value="joined_desc">{t('spaceSettings.members.sortNewest')}</option>

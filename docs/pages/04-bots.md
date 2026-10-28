@@ -208,9 +208,32 @@ What a bot usually asks for:
 | React | Add Reactions (`8`), Use External Emojis (`16`) |
 | Moderate | Manage Messages (`64`), Kick Members (`512`), Ban Members (`1024`) |
 | Make invites | Create Invite (`8192`) |
-| Manage rooms and roles | Manage Rooms (`256`), Manage Roles (`128`) |
+| Give members roles | Manage Roles (`128`), and its role placed above the roles it gives - see [Giving people roles](#giving-people-roles) |
+| Manage rooms | Manage Rooms (`256`) |
 
 Add the values together for the `permissions` parameter. The full table, and how overrides and hierarchy apply, is on the [Permissions](/docs/permissions/) page.
+
+## Giving people roles
+
+Verification bots, reaction roles, level rewards: a bot with **Manage Roles** (`128`) can give members roles and take them away. It follows the same rule as a person, Discord's: **a bot can only give out or take away roles below its own highest role.** Whose roles they are does not matter - the bot can give a role to the space owner, or to someone ranked above it - only where the role sits.
+
+The bot's highest role is normally its managed role, and that starts at the **bottom**: position 1, just above `@everyone`, below every role the space already had. So straight after an install the bot can give out nothing that existed before it. Someone with Manage Roles fixes that once, in **Space settings → Roles**: drag the bot's role (it has a robot badge) **above the roles it should hand out**. Roles the bot creates itself (`POST /spaces/:id/roles`) go in at position 1, below its own role, so it can give those out right away.
+
+| To | Call |
+| --- | --- |
+| Give a member one role | `PUT /spaces/:id/members/:userId/roles/:roleId` → `204` |
+| Take one role away | `DELETE /spaces/:id/members/:userId/roles/:roleId` → `204` |
+| Set all of a member's roles | `PUT /spaces/:id/members/:userId/roles` with `{"role_ids": [...]}` → `204` |
+
+Prefer the single-role calls. Each is one atomic change, so two bots - or a bot and a moderator - changing different roles of the same person at once cannot undo each other, and giving a role someone already has (or removing one they lack) is a harmless `204`. That holds on every instance once the space's origin is up to date; in a space mirrored from an older origin the single-role calls fall back to a full-list write there. The full-list form replaces every role it may change with the list you send.
+
+```js
+// Give the member the "Verified" role. The bot's own role must sit above it.
+const res = await fetch(`${API}/spaces/${spaceId}/members/${userId}/roles/${verifiedRoleId}`, { method: 'PUT', headers });
+if (res.status === 403) console.log('move my role above "Verified" in Space settings → Roles');
+```
+
+A role at or above the bot's highest role is refused with `403` and `{"error": "cannot manage a role or member at or above your own highest role"}` - nothing is written, and the way out is moving the bot's role up. A managed role, the bot's own or another bot's, is never assignable (`400` `this role belongs to a bot and cannot be deleted or assigned`). To check before calling, compare positions: `GET /spaces/:id/roles` (or the space's `roles` in `READY`) has every role's `position`, and `GET /spaces/:id/members/@me` the bot's own `roles`. See [REST › Members](/docs/rest/#members) and [Permissions › Hierarchy](/docs/permissions/#hierarchy).
 
 ## Encryption and what a bot can see
 

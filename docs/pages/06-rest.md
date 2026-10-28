@@ -134,7 +134,15 @@ Kick. A kicked bot's managed role is removed with it.
 
 ### `PUT` /spaces/:id/members/:userId/roles — *Manage Roles*
 
-`{"role_ids": ["…"]}` replaces the member's roles (`@everyone` is implied). Hierarchy applies: you can only add or remove roles below your own highest, and roles at or above it that the member already holds are kept. A bot's managed role can neither be given to anyone else nor taken from the bot (`400`).
+`{"role_ids": ["…"]}` replaces the member's roles (`@everyone` is implied); `204`. As on Discord, only the **roles** decide, never the member's rank: you can change anyone's roles - your own, the space owner's, a member ranked above you - as long as every role you add or remove is below your own highest (the owner has no limit). Roles at or above it that the member already holds are kept whatever the list says, so leaving one out does not remove it. A bot's managed role can neither be given to anyone else nor taken from the bot.
+
+Errors: `400` `unknown role id`, `400` `this role belongs to a bot and cannot be deleted or assigned`, `403` `missing permission`, `403` `cannot manage a role or member at or above your own highest role` (a role you add is at or above yours), `403` `not a member of this space`.
+
+### `PUT` /spaces/:id/members/:userId/roles/:roleId, `DELETE` /spaces/:id/members/:userId/roles/:roleId — *Manage Roles*
+
+Give a member one role, or take one away - Discord's Add / Remove Guild Member Role. `204`, also when they already have the role (or, for `DELETE`, do not), in which case nothing is written and no event is sent. Each is a single atomic change to the member's role set, so two bots giving out different roles to the same person at the same moment cannot undo each other; prefer these to the full-list `PUT` whenever you change one role. (That holds on every instance once the space's origin is up to date; in a space mirrored from an older origin, the change reaches the origin as a full-list write.) The same rules apply: the role must be below your own highest role, whatever the member's rank (the owner included), and a managed role is never assignable. Unlike the full-list `PUT`, which quietly keeps a role at or above yours, `DELETE` refuses to take one away (`403`). A change sends `SPACE_MEMBER_UPDATE` and is written to the audit log as `member_roles_update`.
+
+Errors: `400` when `:roleId` is `@everyone` (every member always has it), `400` `this role belongs to a bot and cannot be deleted or assigned`, `403` `missing permission`, `403` `cannot manage a role or member at or above your own highest role`, `403` `not a member of this space` (the user is not in the space), `404` `role not found`.
 
 ### `PUT` /spaces/:id/members/:userId — *Create Invite; scope spaces.join on the token in the body*
 
@@ -152,21 +160,39 @@ Add a user who authorized your application with `spaces.join`: `{"access_token":
 { "id": "2105144670576185344", "name": "Docs Bot", "permissions": 8768, "position": 1, "color": 0, "hoist": false, "mentionable": false, "bot_id": "2105141069376131072", "created_at": "…", "updated_at": "…" }
 ```
 
-`position` orders roles (`@everyone` is `0`; higher outranks lower). `bot_id` is present on a **managed role** created by a bot install: the bot's user id.
+`position` orders roles: `@everyone` is always `0`, custom roles hold unique positions from `1` up, and higher outranks lower (see [Permissions › Hierarchy](/docs/permissions/#hierarchy)). `bot_id` is present on a **managed role** created by a bot install: the bot's user id.
 
 ### `GET` /spaces/:id/roles
 
+Every role of the space, `@everyone` included. Any member may list them.
+
 ### `POST` /spaces/:id/roles — *Manage Roles*
 
-`{"name", "permissions"?, "color"?, "hoist"?, "mentionable"?}`. You cannot grant permission bits you do not hold (`403`). The new role goes on top of the custom roles.
+`{"name", "permissions"?, "color"?, "hoist"?, "mentionable"?}`. You cannot grant permission bits you do not hold (`403`). The new role goes in at **position 1**, just above `@everyone` - as on Discord, and so that whoever created the role (a moderator, a bot) can manage it and give it out straight away. Only the unbroken run of roles directly above it moves up one to make room; roles above a gap in the positions keep theirs. Returns the role (`201`) with its position. Members get `SPACE_ROLE_CREATE`, and when roles moved up they arrive in one `SPACE_UPDATE` carrying `roles`. Read the new positions from the response and that event rather than working them out.
+
+### `PATCH` /spaces/:id/roles — *Manage Roles*
+
+Move several roles at once - Discord's Modify Guild Role Positions. The body is a list of `{"id", "position"}`:
+
+```json
+[{ "id": "2105144670576185344", "position": 5 }, { "id": "2105144670576185999", "position": 4 }]
+```
+
+Each listed role is placed at its `position` and every other role keeps its order around them: a listed role that lands on a taken position takes it, and the role there (and any above it in the way) moves up one. Two listed roles asking for the same position: the newer one goes lower. Positions stay unique. To reorder a block of roles without touching anything else, give them the positions they already hold, in the new order - the example swaps two roles that sit at 4 and 5.
+
+1 to 250 entries, each id once, each an existing custom role of the space, each `position` from 1 to 2147483397; managed roles can be moved, `@everyone` cannot. Except for the owner, every listed role must be below your own highest role **and** so must every position you ask for - otherwise nothing is written. Returns `200` with every role of the space (the `GET` shape). Members get one `SPACE_UPDATE` carrying the full `roles` list. Each listed role whose position changed is written to the audit log (`role_update` with `changes.position`); roles pushed up along the way are not.
+
+Errors: `400` for a malformed list - `invalid JSON` (not a list of `{"id", "position"}`), `invalid role id in list` (an `id` that is not a snowflake), `role positions must list from 1 to 250 roles, each once` (empty, more than 250 entries, a repeated id) - `400` `role position must be from 1 to 2147483397`, `400` `unknown role id` (a listed id that is not a role of the space), `400` `cannot move @everyone`, `403` `missing permission`, `403` `cannot manage a role or member at or above your own highest role`.
 
 ### `PATCH` /spaces/:id/roles/:roleId — *Manage Roles*
 
-Any of the fields above plus `position`. `@everyone` can only have `permissions` changed; a role at or above your own highest is off limits.
+Any of the fields above plus `position`. `@everyone` can only have `permissions` changed; a role at or above your own highest is off limits. `position` (1 to 2147483397) **swaps** the role with the role holding that position, or, when no role holds it, puts the role there as sent; except for the owner it must be below your own highest role. When the move swapped another role, the space's roles arrive in one `SPACE_UPDATE` carrying `roles`. To reorder several roles, use [`PATCH /spaces/:id/roles`](#patch-spaces-id-roles-manage-roles) instead: one request, all or nothing.
 
 ### `DELETE` /spaces/:id/roles/:roleId — *Manage Roles*
 
-Not `@everyone`, not a managed role.
+Not `@everyone`, not a managed role, and except for the owner only a role below your own highest.
+
+Errors for the role endpoints: `400` `role name must be 1-100 characters and not @everyone`, `400` `cannot rename or delete the @everyone role`, `400` `cannot move @everyone`, `400` `role position must be from 1 to 2147483397`, `400` `this role belongs to a bot and cannot be deleted or assigned`, `400` `a space can have at most 250 roles`, `403` `missing permission`, `403` `cannot grant permissions you do not have`, `403` `cannot manage a role or member at or above your own highest role`, `404` `role not found`.
 
 ### Room overrides — *Manage Roles*
 
@@ -389,6 +415,7 @@ The end-to-end encryption key backup (`m.megolm_backup.v1.curve25519-aes-sha2`, 
 | Gateway `op 2` frames | Burst of 20 per connection, refilling one every 250 ms |
 | Messages in a room with slowmode | One per `slowmode_seconds` per member; `429` with `retry_after` (seconds) and a `Retry-After` header. Members with Manage Messages are exempt |
 | Space member profiles | Per account: 60 per minute reading one member, 20 per minute `PATCH`, 10 per minute image uploads |
+| Member roles (`PUT …/members/:userId/roles`, `PUT` / `DELETE …/members/:userId/roles/:roleId`) | 120 per minute per account |
 | Sign-in, registration, key backup | Separate tight limits (not relevant to bots) |
 
 Other endpoints are not individually limited today; be a good citizen anyway - batch what you can, cache what does not change, and back off on `429` and `5xx`.

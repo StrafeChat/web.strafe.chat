@@ -20,7 +20,7 @@ Add the values of the bits you need to build a mask; test a bit with `(mask & bi
 | 4 | `16` | Use External Emojis | room | Use custom emoji from other spaces |
 | 5 | `32` | Mention @everyone | room | Ping everyone with `mention_everyone`, and ping roles that are not mentionable |
 | 6 | `64` | Manage Messages | room | Delete and pin other members' messages; exempt from slowmode |
-| 7 | `128` | Manage Roles | space | Create, edit, delete and assign roles below their own; edit room permission overrides (only bits they hold in that room) |
+| 7 | `128` | Manage Roles | space | Create, edit, reorder and delete roles below their own, and give them to or take them from anyone; edit room permission overrides (only bits they hold in that room) |
 | 8 | `256` | Manage Rooms | space | Create, edit, reorder and delete rooms and sections; exempt from slowmode |
 | 9 | `512` | Kick Members | space | Kick members ranked below them |
 | 10 | `1024` | Ban Members | space | Ban and unban |
@@ -76,20 +76,30 @@ A room can allow or deny room-scoped bits per role or per member, independent of
 
 ## Hierarchy
 
-Roles are ordered by `position` (`@everyone` is 0). A member's rank is their highest role's position. Except for the owner:
+Roles are ordered by `position`: `@everyone` is always `0`, the custom roles hold unique positions from `1` up, and higher outranks lower. A member's rank is their highest role's position. The rules are Discord's, and they bind everyone but the owner - Administrators included:
 
-- You can only create, edit, delete, assign or remove roles **below** your rank.
-- You can only kick or ban members whose rank is below yours.
-- You can only change the nickname of, or reset the space profile of, members whose rank is below yours; only the owner can change the owner's.
-- You can only grant permission bits you hold yourself (Administrators hold all).
+- **Roles**: you can only create, edit, reorder or delete roles **below** your rank.
+- **Giving or taking a role depends only on the role.** You can give anyone a role below your rank, or take one away - the owner, and members ranked above you, included. Roles the member holds at or above your rank are kept as they are.
+- **Kicking, banning and nicknames depend on the member**: you can only kick or ban members whose rank is below yours, and only change the nickname of (or reset the space profile of) members whose rank is below yours. Only the owner can change the owner's; nobody can kick or ban the owner.
+- You can only grant permission bits you hold yourself (Administrators hold all), on roles and in room overrides.
 - You may always edit your own roles within those rules - including the owner, which is how they give themselves a colour.
+- A bot's managed role is never given to anyone else, nor taken from its bot.
 
-A bot is subject to the same rules: give it a role high enough for what it must moderate.
+A bot follows the same rules: to give out a role it needs Manage Roles and a role **above** that role, and to kick or ban someone a role above theirs - see [Bots › Giving people roles](/docs/bots/#giving-people-roles).
+
+### Positions
+
+- A **new role** goes in at position `1`, just above `@everyone` - so whoever creates a role (a moderator, a bot) ranks above it and can manage it. Only the unbroken run of roles directly above it moves up one to make room; roles above a gap in the positions keep theirs. Read the new positions from the response and the `SPACE_UPDATE` that carries them rather than working them out.
+- **Moving one role** (`PATCH /spaces/:id/roles/:roleId` with `position`) swaps it with the role holding that position, or puts it there as sent when no role holds it.
+- **Moving several roles** at once ([`PATCH /spaces/:id/roles`](/docs/rest/#patch-spaces-id-roles-manage-roles)) puts each listed role in its slot; the role there, and any above it in the way, move up one, and every role not listed keeps its order around them. It is all or nothing - use it for any reorder of more than one role.
+- Either way, no two roles ever share a position.
+- Two roles with the same position - possible only in data from an instance that predates unique positions - rank by id: the newer one is lower.
 
 ## Bots and permissions
 
 - An install link's `permissions` value becomes the bot's **managed role**, inserted at position 1 (just above `@everyone`) so the person who installed it outranks it. The installer can uncheck bits on the consent page, and the server drops any bit they do not hold themselves. Administrators and the owner can grant everything.
-- The managed role can be edited afterwards like any other, moved up if the bot must outrank people it moderates, and shows a bot badge. It cannot be deleted or given to anyone else; it disappears when the bot leaves.
+- Because the managed role starts at the bottom, a bot that gives out roles can at first only give out roles created after it. Drag its role above the roles it should hand out, under **Space settings → Roles** - see [Bots › Giving people roles](/docs/bots/#giving-people-roles).
+- The managed role can be edited afterwards like any other, moved up if the bot must give out roles or outrank people it moderates, and shows a bot badge. It cannot be deleted or given to anyone else; it disappears when the bot leaves.
 - Additional roles can be assigned to the bot normally.
 - Re-approving the install link re-applies the requested bits to the managed role - the way to change a bot's permissions from a link.
 

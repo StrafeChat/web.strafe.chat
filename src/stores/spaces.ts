@@ -134,6 +134,39 @@ export function upsertSpaceRole(spaceId: string, role: SpaceRole): void {
   );
 }
 
+/** A role's updated_at in milliseconds (-Infinity when missing or unreadable). Milliseconds
+ * because that is what the database keeps: a role read back from it and the same role as an
+ * event announced it can differ below that, and must still compare equal. */
+function roleStamp(role: SpaceRole): number {
+  const ms = role.updated_at ? Date.parse(role.updated_at) : Number.NaN;
+  return Number.isNaN(ms) ? Number.NEGATIVE_INFINITY : ms;
+}
+
+/**
+ * Fold roles a write answered with (PATCH /spaces/:id/roles returns them all) into the space's
+ * roles without letting that answer undo what arrived while it was on its way: the gateway can
+ * announce a role created, deleted or edited meanwhile before the HTTP answer lands. So only a
+ * role the store still has is touched, and only when the answer's copy is not older than the
+ * store's (updated_at); a role the answer lacks is kept and one the store lacks is not added.
+ */
+export function mergeSpaceRoles(spaceId: string, roles: readonly SpaceRole[]): void {
+  if (roles.length === 0) return;
+  const incoming = new Map(roles.map((r) => [r.id, r]));
+  setSpaces('spaces', (list) =>
+    list.map((s) => {
+      if (s.id !== spaceId || !s.roles) return s;
+      let changed = false;
+      const next = s.roles.map((r) => {
+        const fresh = incoming.get(r.id);
+        if (!fresh || roleStamp(fresh) < roleStamp(r)) return r;
+        changed = true;
+        return { ...r, ...fresh };
+      });
+      return changed ? { ...s, roles: sortRoles(next) } : s;
+    })
+  );
+}
+
 export function removeSpaceRole(spaceId: string, roleId: string): void {
   setSpaces('spaces', (list) =>
     list.map((s) => (s.id !== spaceId || !s.roles ? s : { ...s, roles: s.roles.filter((r) => r.id !== roleId) }))

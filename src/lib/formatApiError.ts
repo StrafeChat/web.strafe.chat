@@ -81,6 +81,14 @@ const SERVER_MESSAGE_TO_KEY: Record<string, string> = {
   'member not found': 'errors.api.memberNotFound',
   'cannot manage a role or member at or above your own highest role': 'errors.api.roleHierarchy',
   'missing permission': 'errors.api.missingPermission',
+  // Roles (spaces/service_roles.go): the editor, the role order and member roles.
+  'this role belongs to a bot and cannot be deleted or assigned': 'errors.api.managedRole',
+  'cannot grant permissions you do not have': 'errors.api.permissionEscalation',
+  'cannot move @everyone': 'errors.api.cannotMoveEveryone',
+  'role not found': 'errors.api.roleNotFound',
+  'unknown role id': 'errors.api.roleNotFound',
+  // Only an instance from before member roles followed Discord's rule still refuses this.
+  'cannot change roles of the space owner': 'errors.api.ownerRolesForbidden',
   // A 409: two writes (normally two uploads at once) raced and this one lost twice.
   'the space profile changed while saving; try again': 'errors.api.spaceProfileChanged',
   // Image uploads judge the type by extension, so an image/* the picker let through (HEIC,
@@ -166,6 +174,22 @@ const VERIFICATION_REQUIREMENT_KEY: Record<string, string> = {
   account_age: 'errors.api.verificationAccountAge',
   member_age: 'errors.api.verificationMemberAge',
 };
+
+/** The server's one hierarchy refusal, worded for roles and members alike. */
+const ROLE_HIERARCHY_MESSAGE = 'cannot manage a role or member at or above your own highest role';
+
+/**
+ * translateCaughtApiError for the role surfaces: the role editor and list, and giving members
+ * roles. There the hierarchy refusal is about a role - giving or taking a role depends on the
+ * role alone, as on Discord - so it is worded that way first. An instance from before that rule
+ * sends the same message when the member outranks you, so the wording covers that too.
+ */
+export function translateRoleApiError(err: unknown, t: ErrorTranslateFn): string[] {
+  if (err instanceof Error && normalizeSegment(err.message).toLowerCase() === ROLE_HIERARCHY_MESSAGE) {
+    return [t('errors.api.roleHierarchyRole')];
+  }
+  return translateCaughtApiError(err, t);
+}
 
 export function translateCaughtApiError(err: unknown, t: ErrorTranslateFn): string[] {
   // A burned pending login is a 429 too, but it means "log in again", not "slow down" -

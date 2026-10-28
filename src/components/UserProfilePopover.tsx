@@ -26,7 +26,9 @@ import { openNicknameDialog } from '../stores/nicknameDialog';
 import { IconButton } from './ui/IconButton';
 import { setMemberSpaceRoles } from '../api/spaces';
 import type { SpaceRole } from '../api/spaces';
-import { spaceRoleColorHex } from '../lib/spacePermissions';
+import { canChangeMemberRole, spaceRoleColorHex } from '../lib/spacePermissions';
+import { compareRolesHighestFirst } from '../lib/roleOrder';
+import { translateRoleApiError } from '../lib/formatApiError';
 import { appMenuItemDefault, appMenuPanel, appSectionLabel, zLayer } from '../theme/appChrome';
 import { isMdViewport } from '../stores/mobileShellLayout';
 import { t } from '../i18n';
@@ -230,13 +232,12 @@ export const UserProfilePopover: Component = () => {
 
   const isSelf = () => subject()?.userId === userProfilePopover.currentUserId;
 
+  // Discord's rule: with Manage Roles you may change anyone's roles - your own, the owner's,
+  // someone ranked above you - and what you may hand out or take away depends only on each
+  // role's position (canChangeMemberRole), which the chips and the add menu apply.
   const canEditMemberRoles = createMemo(() => {
     const ctx = roleEditCtx();
-    const s = subject();
-    if (!ctx?.canManageMemberRoles || !s) return false;
-    // Only the owner may change the owner's roles - and they may, on themselves, which is
-    // how the owner gives themselves a colour or a hoisted title.
-    if (s.userId === ctx.spaceOwnerId && s.userId !== userProfilePopover.currentUserId) return false;
+    if (!ctx?.canManageMemberRoles || !subject()) return false;
     return ctx.spaceRoles.some((r) => r.name !== EVERYONE_ROLE_NAME);
   });
 
@@ -250,7 +251,7 @@ export const UserProfilePopover: Component = () => {
         const r = byId.get(id);
         if (r && r.name !== EVERYONE_ROLE_NAME) list.push(r);
       }
-      list.sort((a, b) => b.position - a.position);
+      list.sort(compareRolesHighestFirst);
       return list;
     }
     return rolesForMemberChips(ctx.subjectRoleIds, ctx.spaceRoles);
@@ -265,15 +266,15 @@ export const UserProfilePopover: Component = () => {
 
   /** Roles at or above this the viewer may neither add nor take away (Infinity = owner). */
   const roleCeiling = () => roleEditCtx()?.viewerHighestPosition ?? Number.POSITIVE_INFINITY;
-  const roleLocked = (role: SpaceRole) => role.position >= roleCeiling();
+  const roleChangeable = (role: SpaceRole) => canChangeMemberRole(role, roleCeiling());
 
   const rolesAvailableToAdd = createMemo(() => {
     if (!canEditMemberRoles()) return [];
     const ctx = roleEditCtx();
     if (!ctx) return [];
     return ctx.spaceRoles
-      .filter((r) => r.name !== EVERYONE_ROLE_NAME && !r.bot_id && !pickedCustomRoleIds().has(r.id) && !roleLocked(r))
-      .sort((a, b) => b.position - a.position);
+      .filter((r) => !pickedCustomRoleIds().has(r.id) && roleChangeable(r))
+      .sort(compareRolesHighestFirst);
   });
 
   const filteredRolesToAdd = createMemo(() => {
@@ -302,7 +303,7 @@ export const UserProfilePopover: Component = () => {
       setUserProfilePopover('subject', 'nameColor', memberNameColorHex(merged, ctx.spaceRoles));
       ctx.onMemberRolesUpdated?.();
     } catch (e) {
-      setRoleSaveErr(e instanceof Error ? e.message : t('profile.rolesUpdateFailed'));
+      setRoleSaveErr(translateRoleApiError(e, t).join(' ') || t('profile.rolesUpdateFailed'));
       revertPickedFromContext();
     } finally {
       setRoleSaveBusy(false);
@@ -615,7 +616,7 @@ export const UserProfilePopover: Component = () => {
                     <p class={`mb-1.5 ${appSectionLabel}`}>{t('profile.roles')}</p>
                     <div class="flex flex-wrap items-center gap-1.5">
                       <For each={visibleRoleChips()}>
-                        {(role) => <RoleChip role={role} showRemove={canEditMemberRoles() && !roleLocked(role) && !role.bot_id} />}
+                        {(role) => <RoleChip role={role} showRemove={canEditMemberRoles() && roleChangeable(role)} />}
                       </For>
                       <Show when={hiddenRoleChipCount() > 0}>
                         <span

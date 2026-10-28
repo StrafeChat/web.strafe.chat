@@ -1,7 +1,9 @@
 import type { Component } from 'solid-js';
 import { createEffect, createSignal, For, Show } from 'solid-js';
 import { setMemberSpaceRoles, type SpaceMember, type SpaceRole } from '../../../api/spaces';
-import { spaceRoleColorHex } from '../../../lib/spacePermissions';
+import { canChangeMemberRole, spaceRoleColorHex } from '../../../lib/spacePermissions';
+import { customRolesHighestFirst } from '../../../lib/roleOrder';
+import { translateRoleApiError } from '../../../lib/formatApiError';
 import { resolveProfile } from '../../../lib/spaceProfile';
 import { Button } from '../../ui/Button';
 import { Toggle } from '../../ui/Toggle';
@@ -19,7 +21,11 @@ interface Props {
   onSaved: () => void;
 }
 
-/** Toggle a member's custom roles (the @everyone role always applies). */
+/**
+ * Toggle a member's custom roles (the @everyone role always applies). Any member's - the owner's
+ * and those ranked above the viewer included, as on Discord: what is locked is a role at or above
+ * the viewer's own highest, and a bot's managed role, which only its bot holds.
+ */
 export const EditMemberRolesDialog: Component<Props> = (props) => {
   const [picked, setPicked] = createSignal<Set<string>>(new Set());
   const [busy, setBusy] = createSignal(false);
@@ -31,7 +37,9 @@ export const EditMemberRolesDialog: Component<Props> = (props) => {
     setError('');
   });
 
-  const custom = () => props.roles.filter((r) => r.name !== '@everyone').sort((a, b) => b.position - a.position);
+  // Highest first; another bot's managed role is left out (nobody else can ever hold it), the
+  // member's own - when the member is that bot - is shown, held and locked.
+  const custom = () => customRolesHighestFirst(props.roles).filter((r) => !r.bot_id || r.bot_id === props.member?.id);
 
   async function save() {
     const m = props.member;
@@ -44,7 +52,7 @@ export const EditMemberRolesDialog: Component<Props> = (props) => {
       props.onSaved();
       props.onClose();
     } catch (e) {
-      setError(e instanceof Error ? e.message : t('spaceSettings.memberUpdateFailed'));
+      setError(translateRoleApiError(e, t).join(' ') || t('spaceSettings.memberUpdateFailed'));
     } finally {
       setBusy(false);
     }
@@ -64,14 +72,21 @@ export const EditMemberRolesDialog: Component<Props> = (props) => {
           <div class="max-h-72 space-y-1 overflow-y-auto rounded-xl border border-border/60 bg-card/10 p-2">
             <For each={custom()}>
               {(role) => {
-                const locked = () => role.position >= props.viewerHighestPosition;
+                const locked = () => !canChangeMemberRole(role, props.viewerHighestPosition);
                 return (
                   <div class="flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 hover:bg-muted/20">
                     <span class="flex min-w-0 items-center gap-2 text-sm text-foreground">
                       <span class="size-2.5 shrink-0 rounded-full border border-border/40" style={{ 'background-color': spaceRoleColorHex(role.color ?? 0) }} />
                       <span class="truncate">{role.name}</span>
-                      <Show when={locked()}>
-                        <i class="fa-solid fa-lock text-[10px] text-muted-foreground" title={t('spaceSettings.members.roleLocked')} aria-hidden="true" />
+                      <Show
+                        when={role.bot_id}
+                        fallback={
+                          <Show when={locked()}>
+                            <i class="fa-solid fa-lock text-[10px] text-muted-foreground" title={t('spaceSettings.members.roleLocked')} aria-hidden="true" />
+                          </Show>
+                        }
+                      >
+                        <i class="fa-solid fa-robot text-[10px] text-primary" title={t('spaceSettings.botRoleHint')} aria-hidden="true" />
                       </Show>
                     </span>
                     <Toggle

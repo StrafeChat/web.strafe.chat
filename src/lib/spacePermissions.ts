@@ -578,8 +578,8 @@ export function memberCanBanMembers(
 
 /** Highest position among a member's roles, excluding @everyone (always the floor, 0).
  * -1 if they hold no role above @everyone. Mirrors equinox's highestRolePosition -
- * used so the UI can pre-emptively hide kick/ban/edit-role actions the server would
- * reject for outranking the target (or the role), instead of only erroring after the fact. */
+ * used so the UI can pre-emptively hide what the server would refuse: kick, ban and nickname
+ * actions on a member who outranks the viewer, and roles at or above the viewer's own. */
 export function memberHighestRolePosition(
   everyoneRoleId: string | undefined,
   roles: SpaceRole[] | undefined,
@@ -613,6 +613,18 @@ export function viewerRoleCeiling(
   if (!viewerId) return -1;
   if (spaceOwnerId && spaceOwnerId === viewerId) return Number.POSITIVE_INFINITY;
   return memberHighestRolePosition(everyoneRoleId, roles, members?.find((m) => m.id === viewerId));
+}
+
+/**
+ * Whether a viewer with Manage Roles may give this role to a member or take it away - the client
+ * copy of the server's rule (SetMemberRoles / resolveMemberRoles). As on Discord it depends on
+ * the role alone, never on the member: anyone's roles can be changed, the owner's and those of
+ * people ranked above you included, as long as the role is below `viewerCeiling`
+ * (viewerRoleCeiling: Infinity for the owner). @everyone is implicit, and a bot's managed role is
+ * never given to anyone nor taken from its bot.
+ */
+export function canChangeMemberRole(role: Pick<SpaceRole, 'name' | 'position' | 'bot_id'>, viewerCeiling: number): boolean {
+  return role.name !== '@everyone' && !role.bot_id && role.position < viewerCeiling;
 }
 
 /** Owner or Create invite / Administrator — matches the server default (on for @everyone). */

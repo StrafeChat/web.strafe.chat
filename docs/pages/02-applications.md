@@ -69,6 +69,7 @@ https://your-instance.example/oauth2/authorize
 What happens on approval:
 
 - The bot joins the space with the `@everyone` role and a **managed role** named after it, holding the granted permissions. Managed roles show a bot badge in the roles editor; they can be edited like any role but not deleted or given to anyone else, and they are removed when the bot leaves.
+- The managed role goes in at the **bottom** of the role list (position 1, just above `@everyone`), below every existing role, so whoever installed the bot outranks it. A bot can only give out roles below its own, so if yours hands out roles, have the space's admins drag its role above those roles - see [Bots › Giving people roles](/docs/bots/#giving-people-roles).
 - The person may **uncheck** permissions they would rather not grant, and can never grant more than they hold themselves: the server intersects the request with what they may hand out (everything for the owner and Administrators).
 - If the bot is already in the space, approving again re-applies the requested permissions to its managed role instead of adding it twice.
 - The install is written to the space's **audit log** (`bot_add`).

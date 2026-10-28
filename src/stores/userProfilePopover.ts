@@ -10,6 +10,9 @@ export type SpaceMemberRoleEditContext = {
   /** Target member’s role ids (includes @everyone). */
   subjectRoleIds: string[];
   spaceRoles: SpaceRole[];
+  /** The viewer holds Manage Roles (or Administrator, or owns the space). That alone decides
+   * whether the card edits roles - on anyone, the owner and higher-ranked members included, as
+   * on Discord; which roles is a question of each role's position (`viewerHighestPosition`). */
   canManageMemberRoles: boolean;
   /** Highest role position the viewer may hand out below (Infinity for the owner). Roles
    * at or above it are shown locked, matching what the server enforces. */

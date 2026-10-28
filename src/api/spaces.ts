@@ -1,6 +1,7 @@
 import { api, getApiUrl } from './client';
-import { ApiError } from './ApiError';
+import { ApiError, isApiError } from './ApiError';
 import type { RoomParticipant } from './rooms';
+import type { RoleOrderPlan, RolePosition } from '../lib/roleOrder';
 
 export interface Space {
   id: string;
@@ -297,6 +298,8 @@ export interface SpaceRole {
   id: string;
   name: string;
   permissions: number;
+  /** Higher outranks lower; @everyone is 0 and custom roles are unique from 1 up (an instance
+   * from before that may still have ties - lib/roleOrder breaks them as the server does). */
   position: number;
   color: number;
   hoist: boolean;
@@ -638,6 +641,10 @@ export function listSpaceRoles(spaceId: string) {
   return api<SpaceRole[]>(`/spaces/${spaceId}/roles`);
 }
 
+/** A new role goes in at position 1, just above @everyone (Discord's default), so whoever made
+ * it can manage it. Only the unbroken run of roles directly above it moves up one; roles above a
+ * gap keep their positions. Read the new positions from the response and SPACE_UPDATE rather
+ * than working them out. */
 export function createSpaceRole(
   spaceId: string,
   body: { name: string; permissions: number; color?: number; hoist?: boolean; mentionable?: boolean }
@@ -645,6 +652,59 @@ export function createSpaceRole(
   return api<SpaceRole>(`/spaces/${spaceId}/roles`, { method: 'POST', json: body });
 }
 
+/**
+ * PATCH /spaces/:id/roles - Discord's Modify Guild Role Positions: move several roles at once,
+ * all or nothing. Needs Manage Roles; except for the owner, every role listed must be below your
+ * highest and so must every position asked for. Returns every role of the space.
+ *
+ * Build the list with lib/roleOrder (planRoleOrder), and save through saveSpaceRoleOrder, which
+ * also covers instances from before this endpoint.
+ */
+export function reorderSpaceRoles(spaceId: string, positions: RolePosition[]): Promise<SpaceRole[]> {
+  return api<SpaceRole[]>(`/spaces/${spaceId}/roles`, { method: 'PATCH', json: positions });
+}
+
+/**
+ * An instance older than an endpoint: 404 for a path it has no route for, 405 for one it only
+ * routes other methods on - as opposed to the endpoint's own "not found" answers.
+ */
+function isMissingEndpoint(e: unknown, ownNotFound: readonly string[]): boolean {
+  if (!isApiError(e)) return false;
+  if (e.status === 405) return true;
+  return e.status === 404 && !ownNotFound.includes(e.message.trim().toLowerCase());
+}
+
+/** What saveSpaceRoleOrder got back. */
+export interface SavedRoleOrder {
+  /** Every role of the space when `complete` - merge it in (stores/spaces mergeSpaceRoles), never
+   * replace the list with it, as role events may have overtaken it; otherwise only the roles an
+   * older instance returned for the single-role writes (upsert them). */
+  roles: SpaceRole[];
+  complete: boolean;
+}
+
+/**
+ * Save a role order on any instance: PATCH /spaces/:id/roles, or - when the instance predates
+ * it - the plan's single-role writes, one PATCH /spaces/:id/roles/:roleId after another in the
+ * order given. Nothing is sent when the plan changes nothing.
+ */
+export async function saveSpaceRoleOrder(spaceId: string, plan: RoleOrderPlan): Promise<SavedRoleOrder> {
+  if (plan.positions.length === 0) return { roles: [], complete: false };
+  try {
+    return { roles: await reorderSpaceRoles(spaceId, plan.positions), complete: true };
+  } catch (e) {
+    if (!isMissingEndpoint(e, ['role not found', 'space not found'])) throw e;
+  }
+  const roles: SpaceRole[] = [];
+  for (const w of plan.sequential) {
+    roles.push(await patchSpaceRole(spaceId, w.id, { position: w.position }));
+  }
+  return { roles, complete: false };
+}
+
+/** `position` swaps the role with the one holding that position, or puts it there as sent when
+ * the position is free, so positions stay unique. Except for the owner, both the role and the
+ * position must be below your highest role. To reorder several roles use saveSpaceRoleOrder. */
 export function patchSpaceRole(
   spaceId: string,
   roleId: string,
@@ -664,11 +724,34 @@ export function deleteSpaceRole(spaceId: string, roleId: string) {
   return api<void>(`/spaces/${spaceId}/roles/${roleId}`, { method: 'DELETE' });
 }
 
+/**
+ * Replace a member's custom roles (@everyone is implied). As on Discord only the roles decide:
+ * any member may be changed - yourself, the owner, someone ranked above you - as long as every
+ * role added or taken away is below your own highest (owner: any). Roles at or above it that the
+ * member holds are kept whatever the list says, and a bot's managed role never moves. Every
+ * instance has this, so the client's role toggles use it.
+ */
 export function setMemberSpaceRoles(spaceId: string, userId: string, roleIds: string[]) {
   return api<void>(`/spaces/${spaceId}/members/${userId}/roles`, {
     method: 'PUT',
     json: { role_ids: roleIds },
   });
+}
+
+/**
+ * PUT /spaces/:id/members/:userId/roles/:roleId - Discord's Add Guild Member Role: one role, as
+ * an atomic add, so two bots giving out different roles at once cannot undo each other (once
+ * the space's origin is up to date; a space mirrored from an older origin gets a full-list write
+ * instead). 204, also when they already have it. The same rules as setMemberSpaceRoles;
+ * instances from before October 2026 answer 404 or 405.
+ */
+export function addMemberSpaceRole(spaceId: string, userId: string, roleId: string) {
+  return api<void>(`/spaces/${spaceId}/members/${userId}/roles/${roleId}`, { method: 'PUT' });
+}
+
+/** DELETE /spaces/:id/members/:userId/roles/:roleId - Remove Guild Member Role; see addMemberSpaceRole. */
+export function removeMemberSpaceRole(spaceId: string, userId: string, roleId: string) {
+  return api<void>(`/spaces/${spaceId}/members/${userId}/roles/${roleId}`, { method: 'DELETE' });
 }
 
 export function listRoomPermissionOverrides(spaceId: string, roomId: string) {
