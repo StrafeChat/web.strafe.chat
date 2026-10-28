@@ -512,6 +512,7 @@ export default {
       color: 'اللون',
       icon: 'الأيقونة',
       iconPlaceholder: 'fa-solid fa-folder',
+      chooseIcon: 'اختر أيقونة',
       iconHint: 'أي صنف من Font Awesome، مثل fa-solid fa-star.',
       useSpaceIcons: 'استخدام أيقونات المساحات',
       useSpaceIconsHint: 'اعرض أول أربع مساحات في هذا المجلد بدلًا من أيقونة المجلد.',
