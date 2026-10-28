@@ -681,6 +681,8 @@ export const SpaceBar: Component = () => {
       return target?.kind === 'folder' && target.id === folder.id;
     };
     const folderColor = () => folder.color || DEFAULT_FOLDER_COLOR;
+    const folderUnread = createMemo(() => folderSpaces().reduce((n, s) => n + spaceUnreadCount(s.id), 0));
+    const folderMentions = createMemo(() => folderSpaces().reduce((n, s) => n + spaceMentionCount(s.id), 0));
     return (
       <div
         data-folder-id={folder.id}
@@ -698,7 +700,10 @@ export const SpaceBar: Component = () => {
           }}
           style={!collapsed() ? { 'background-color': folderSurfaceColor(folderColor()) } : undefined}
         >
-          <div class="w-12" onPointerDown={(e) => reorder.start(e, folder.id, e.currentTarget)}>
+          <div class="relative w-12" onPointerDown={(e) => reorder.start(e, folder.id, e.currentTarget)}>
+            <Show when={collapsed() && folderUnread() > 0}>
+              <div class="absolute -left-3 top-1/2 -translate-y-1/2 w-1 h-2 rounded-r-full bg-foreground pointer-events-none" />
+            </Show>
             <Tooltip label={folder.name}>
               <button
                 type="button"
@@ -741,6 +746,11 @@ export const SpaceBar: Component = () => {
                   <Show when={isFolderTarget()}>
                     <span class="absolute inset-0 flex items-center justify-center rounded-[16px] bg-black/20">
                       <i class="fa-solid fa-arrow-down animate-bounce text-xs text-white" aria-hidden="true" />
+                    </span>
+                  </Show>
+                  <Show when={collapsed() && folderMentions() > 0}>
+                    <span class="absolute -top-1 -right-1 z-10 min-w-[16px] h-[16px] flex items-center justify-center rounded-full bg-destructive text-destructive-foreground text-[10px] font-semibold px-1 ring-2 ring-background">
+                      {folderMentions() > 99 ? '99+' : folderMentions()}
                     </span>
                   </Show>
                   <Show when={collapsed() && folderSpaces().length > 0}>
@@ -921,22 +931,6 @@ export const SpaceBar: Component = () => {
       </Show>
 
       <Divider />
-      <Tooltip label={t('space.folders.create')}>
-        <div class="group relative w-full flex items-center justify-center min-h-12">
-          <div class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full bg-foreground opacity-0 transition-opacity duration-200 group-hover:opacity-100 pointer-events-none" />
-          <button
-            type="button"
-            aria-label={t('space.folders.create')}
-            class="relative flex items-center justify-center size-12 rounded-[24px] text-muted-foreground hover:text-foreground hover:bg-primary/20 hover:rounded-[16px] transition-all duration-200"
-            onClick={() => {
-              setEditingFolderId(null);
-              setShowFolderSettings(true);
-            }}
-          >
-            <i class="fa-solid fa-folder-plus text-xl" aria-hidden="true" />
-          </button>
-        </div>
-      </Tooltip>
       <Tooltip label={t('space.addSpace')}>
         <div class="group relative w-full flex items-center justify-center min-h-12">
           <div class="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full bg-foreground opacity-0 transition-opacity duration-200 group-hover:opacity-100 pointer-events-none" />
