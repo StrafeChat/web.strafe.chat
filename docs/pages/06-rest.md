@@ -16,10 +16,12 @@ All paths are relative to this instance's API base: <code data-instance="api">ht
 What this instance is and what it has switched on. Clients read it before anyone signs in.
 
 ```json
-{ "strafe": { "version": "…" }, "federation": { "enabled": true, "domain": "your-instance.example" }, "features": { "captcha": { "enabled": true, "provider": "altcha" }, "email": { "enabled": true, "verification_required": false }, "invite_only": { "enabled": false }, "voice": { "enabled": true }, "gifs": { "enabled": true, "providers": ["giphy"] } }, "services": { "cdn": { "enabled": true, "url": "…" }, "voice": { "enabled": true, "url": "…" } } }
+{ "strafe": { "version": "…" }, "federation": { "enabled": true, "domain": "your-instance.example" }, "features": { "captcha": { "enabled": true, "provider": "altcha" }, "email": { "enabled": true, "verification_required": false }, "invite_only": { "enabled": false }, "voice": { "enabled": true }, "gifs": { "enabled": true, "providers": ["giphy"] }, "activities": { "enabled": true } }, "services": { "cdn": { "enabled": true, "url": "…" }, "voice": { "enabled": true, "url": "…" } } }
 ```
 
 `features.gifs.providers` lists the GIF providers (`giphy`, `heypster`) this instance has an API key for, and `enabled` is true when there is at least one; see [GIFs](#gifs). The keys themselves never leave the server.
+
+`features.activities.enabled` is true when the instance takes activities ("Playing …") over the gateway's `op 9` and shows them on presences; see [Gateway › Activity](/docs/gateway/#activity). Clients send none to an instance without it.
 
 ## Users
 
@@ -31,11 +33,25 @@ The authenticated account. `email` is present for sessions and bots (a bot's is 
 { "id": "…", "email": "", "username": "Docs_Bot", "display_name": "Docs Bot", "bio": "", "about_me": "", "pronouns": "they/them", "birthday": "09-01", "birthday_opt_in": true, "avatar": "", "banner": "", "accent_color": "", "public_flags": 0, "bot": true, "presence": { "status": "online" } }
 ```
 
+`presence` is [the presence object](#the-presence-object), as only you see it. Its `activities` reach sessions and bots only: an OAuth2 access token gets the status and custom status but never the activity, since no scope asks for it.
+
 `pronouns` is free text (max 40 characters) and is public, like the bio - it rides along on every user object (message authors, `mention_users`, space members, relationships). `birthday` is `"MM-DD"` with no year, derived from the date of birth given at registration, and `birthday_opt_in` says whether the account wants it announced in spaces. The owner's own `birthday` is returned whether or not they opted in so their settings can show it; on other people's user objects both `birthday` and `is_birthday` appear only after they opt in.
+
+### The presence object
+
+```json
+{ "status": "online", "custom_status": "brb", "activities": [ { "type": "playing", "name": "Factory Builder", "started_at": 1761000000000 } ] }
+```
+
+| Field | |
+| --- | --- |
+| `status` | `online`, `idle`, `dnd` or `offline`. Your own presence can also be `invisible`; everyone else sees an invisible account as `offline` |
+| `custom_status` | The account's custom status, absent when there is none |
+| `activities` | What the account is doing right now, absent when nothing: at most one entry, `type` `"playing"`, the game's `name` (1-128 characters; show it as plain text) and `started_at` (unix ms). Set over the gateway with [`op 9`](/docs/gateway/#activity) and kept only in the instance's short-lived cache while the reporting connection is open - never in its database. It appears on your own presence, on space [member objects](#the-member-object) and on friends' entries - never while the account appears offline or invisible to you, and not on every user object: a message author or a PM's recipients carry none, so keep the last value you saw rather than clearing it from those. Sessions and bot tokens see it; an OAuth2 access token never does (`GET /users/@me` gives it the status without `activities`) |
 
 ### `PATCH` /users/@me
 
-Update the account's profile: `display_name`, `bio`, `about_me`, `pronouns` (free text, max 40 characters; `""` clears it), `birthday_opt_in` (`true` lets spaces celebrate the account's birthday - the server keeps the announcement index itself), `accent_color` (hex), `presence` (`{"status": "online" | "idle" | "dnd" | "invisible", "custom_status": "…"}`). Avatar and banner are uploaded with `POST /users/@me/avatar` and `/users/@me/banner` (multipart `file`). The date of birth itself cannot be changed over the API.
+Update the account's profile: `display_name`, `bio`, `about_me`, `pronouns` (free text, max 40 characters; `""` clears it), `birthday_opt_in` (`true` lets spaces celebrate the account's birthday - the server keeps the announcement index itself), `accent_color` (hex), `presence` (`{"status": "online" | "idle" | "dnd" | "invisible", "custom_status": "…"}` - `activities` is not set here but over the gateway). Avatar and banner are uploaded with `POST /users/@me/avatar` and `/users/@me/banner` (multipart `file`). The date of birth itself cannot be changed over the API.
 
 ### `GET` /users/@me/spaces — *scope: spaces*
 
@@ -101,7 +117,7 @@ Leave the space (the owner cannot; they transfer or delete it).
 }
 ```
 
-The user fields (`display_name`, `avatar`, `bio`, `about_me`, `pronouns`, …) are always the member's **global** profile. The six space-profile keys are their profile in this space only, and every member object carries all six, each a string or `null`: `nick` (max 32 characters), `space_avatar` and `space_banner` (image URLs, set only through the upload endpoints below), `space_about_me` and `space_bio` (max 190 each), `space_pronouns` (max 40). Where one is set it replaces the global value inside this space - show `nick` instead of the display name, `space_avatar` instead of `avatar`, and so on. A space profile is visible to the space's members only, and it is deleted with the membership: leaving, a kick, a ban or the space's deletion removes it.
+`presence` is the member's [presence](#the-presence-object), including what they are playing. The user fields (`display_name`, `avatar`, `bio`, `about_me`, `pronouns`, …) are always the member's **global** profile. The six space-profile keys are their profile in this space only, and every member object carries all six, each a string or `null`: `nick` (max 32 characters), `space_avatar` and `space_banner` (image URLs, set only through the upload endpoints below), `space_about_me` and `space_bio` (max 190 each), `space_pronouns` (max 40). Where one is set it replaces the global value inside this space - show `nick` instead of the display name, `space_avatar` instead of `avatar`, and so on. A space profile is visible to the space's members only, and it is deleted with the membership: leaving, a kick, a ban or the space's deletion removes it.
 
 ### `GET` /spaces/:id/members
 

@@ -14,7 +14,8 @@ export type SectionId =
   | 'language'
   | 'developers'
   | 'instance'
-  | 'desktop';
+  | 'desktop'
+  | 'activity';
 
 export interface SettingsNavItem {
   id: SectionId;
@@ -60,6 +61,17 @@ export const DESKTOP_ITEM: SettingsNavItem = {
   id: 'desktop',
   labelKey: 'settings.sections.desktop.title',
   icon: 'fa-display',
+};
+
+/**
+ * Sharing the game you are playing. Only a desktop shell can see what is running, and only
+ * one that knows how (gamesAvailable), so it is not part of APP_ITEMS - the modal appends it
+ * once the shell says yes.
+ */
+export const ACTIVITY_ITEM: SettingsNavItem = {
+  id: 'activity',
+  labelKey: 'settings.sections.activity.title',
+  icon: 'fa-gamepad',
 };
 
 export const APP_ITEMS: SettingsNavItem[] = [

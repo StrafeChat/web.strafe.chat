@@ -89,6 +89,29 @@ new i18n keys.
   this bit us once); the sender of an incoming key comes from the Olm decryption, never
   the payload; and there is no plaintext fallback, so never let a join proceed when
   encryption can't be set up.
+- **Game activity ("Playing X")**: the desktop shell recognises the game; the page only
+  forwards what the shell says to share, as gateway `op 9`, from `src/stores/activity.ts` -
+  started once from `installAppWideIndicators()` in `src/desktop/boot.ts` (main window only,
+  never a popup or the phone app) and imported from nowhere else. Sharing is off by default
+  and set per desktop account (Settings -> Activity, shown only when `gamesAvailable()`).
+  On the display side `presence.byUser[id].activities` is written only by
+  `setUserPresence(id, p, { activities: true })`, and only from the payloads the server puts
+  activities on (PRESENCE_UPDATE, our own presence in READY / GET /users/@me, friend
+  relationship entries, space member lists and SPACE_MEMBER_ADD); every other presence
+  write leaves it alone, or opening a room would wipe a live game. Someone leaving everything
+  that showed us their game (unfriend or block, `SPACE_MEMBER_REMOVE`, our leaving the space,
+  a READY that no longer lists them) is cleared with `dropActivitiesOutsideAudience`, since
+  no event would ever clear it. Our own presence is never seeded from a room participant or
+  a member row (that is the others' view, where invisible reads offline); the status menu
+  goes through `setOwnStatus`, which applies a change to or from invisible only after the
+  PATCH, so the report's clear never reaches the gateway ahead of the status. The store only
+  reports while this page's own desktop account (`pageDesktopAccountId()`) is the active one,
+  the shell's `games_get_state` is for it, and no account switch is under way. Show a row's
+  custom status through `customStatusOf` (the store's whenever it has the user, so a cleared
+  one cannot come back from the snapshot and hide the game). Read the activity through
+  `activityOf(userId)`, never from a snapshot, and render the name as plain text in a
+  `<bdi>` (`SentenceWithName` in `src/components/ActivityStatus.tsx`). Shared, non-JSX rules
+  (name cleaning, the duration formatter) live in `src/lib/activity.ts`.
 - **Solid.js `<select>` gotcha**: the native `value` prop can silently fail to apply if
   set before/independent of its `<option>` children rendering. `src/components/ui/
   Select.tsx` already works around this with a `ref` + `createEffect` re-assert — don't

@@ -2,7 +2,9 @@ import { createStore, produce } from 'solid-js/store';
 import { listSpaceMembers, SPACE_PROFILE_KEYS, type SpaceMember, type SpaceProfileFields } from '../api/spaces';
 import { onStargateEvent } from '../services/stargate/client';
 import { registerUserIdentity } from './federationIds';
-import { setUserPresence } from './presence';
+import { dropActivitiesOutsideAudience, setUserPresence } from './presence';
+// Read only inside functions, never at load: auth imports stores that import this one.
+import { auth } from './auth';
 import { stargateEventInnerRecord } from './spaceSync';
 
 /**
@@ -46,8 +48,12 @@ export function ensureSpaceMembers(spaceId: string, opts: { force?: boolean } = 
       // grouping - without this a member the sidebar lists as online showed an offline
       // dot, because the dot reads only presence.byUser and the list also falls back to
       // the member object's own presence.
+      const self = auth.user?.id;
       for (const m of list) {
-        if (m.presence?.status) setUserPresence(m.id, m.presence);
+        // Member rows carry the member's activity, so a fresh list replaces it. Not our own
+        // row: it is the view others get (invisible reads offline, with no activity), and
+        // ours comes from READY and PRESENCE_UPDATE on our own channel.
+        if (m.presence?.status && m.id !== self) setUserPresence(m.id, m.presence, { activities: true });
         // Members of a space that spans instances carry their home; the E2EE engine
         // needs it to address their devices.
         registerUserIdentity(m);
@@ -165,7 +171,10 @@ export function initSpaceMembersHandlers(): () => void {
         ...profileFromPayload(d),
       };
       upsertSpaceMember(spaceId, member);
-      if (member.presence?.status) setUserPresence(member.id, member.presence);
+      // Our own join is the view others get, like our row in a list (see above).
+      if (member.presence?.status && member.id !== auth.user?.id) {
+        setUserPresence(member.id, member.presence, { activities: true });
+      }
       return;
     }
 
@@ -177,6 +186,9 @@ export function initSpaceMembersHandlers(): () => void {
       const uid = d?.user_id != null ? String(d.user_id) : null;
       if (!spaceId || !uid) return;
       setSpaceMembers('bySpaceId', spaceId, (prev) => (prev ?? []).filter((m) => m.id !== uid));
+      // They left this space: their game stays shown only if we still share a friendship or
+      // another space with them. Nothing tells us when it changes otherwise.
+      dropActivitiesOutsideAudience([uid]);
       return;
     }
 

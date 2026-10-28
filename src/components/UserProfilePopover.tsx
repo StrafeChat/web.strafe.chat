@@ -8,6 +8,8 @@ import { RolePill } from './RolePill';
 import { SearchInput } from './ui/SearchInput';
 import { MessageBody } from './messageList/MessageBody';
 import { PresenceDot } from './PresenceDot';
+import { ProfileActivity } from './ActivityStatus';
+import { activityOf } from '../stores/presence';
 import { createPM } from '../api/rooms';
 import { authorizeUrl, getPublicApplication } from '../api/developers';
 import { sendMessage } from '../stores/messages';
@@ -142,6 +144,8 @@ export const UserProfilePopover: Component = () => {
     // Re-run whenever content that changes height changes.
     addRolesMenuOpen();
     void displayedSortedRoles().length;
+    // The activity card comes and goes live while the card is open (a game starts or ends).
+    void !!activityOf(subject()?.userId);
     queueMicrotask(() => remeasureUserProfilePopover(el.getBoundingClientRect().height));
   });
 
@@ -368,6 +372,7 @@ export const UserProfilePopover: Component = () => {
 
   /** Whether anything renders under the identity block, so the divider never trails empty. */
   const hasDetailSections = () =>
+    !!activityOf(subject()?.userId) ||
     showEditSpaceProfile() ||
     !!(subject()?.bot && botApp()?.has_bot && botApp()?.bot_public) ||
     !!subject()?.aboutMe?.trim() ||
@@ -570,6 +575,8 @@ export const UserProfilePopover: Component = () => {
             <Show when={hasDetailSections()}>
               <div class="mx-4 my-2.5 border-t border-border/60" />
             </Show>
+
+            <ProfileActivity userId={subject()?.userId} class="px-4 pb-3" />
 
             <Show when={showEditSpaceProfile()}>
               <div class="px-4 pb-3">

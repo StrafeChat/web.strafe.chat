@@ -6,7 +6,8 @@ import { VoiceDock } from '../voice/VoiceDock';
 import { CreateGroupModal } from '../CreateGroupModal';
 import { rooms, roomDisplayName, isNotesRoom, sortRoomsByLastMessage } from '../../stores/rooms';
 import { auth } from '../../stores/auth';
-import { presence, isPresentStatus } from '../../stores/presence';
+import { presence, isPresentStatus, activityOf, customStatusOf, type Activity } from '../../stores/presence';
+import { PlayingText } from '../ActivityStatus';
 import { getUnreadCountForDisplay, ackRoomOptimistic } from '../../stores/readState';
 import { messages } from '../../stores/messages';
 import { PresenceDot } from '../PresenceDot';
@@ -84,6 +85,8 @@ interface ConvItemProps {
   system?: boolean;
   /** Optional subtitle (e.g. custom status or @username) */
   subtitle?: string;
+  /** What the other person is playing; shown only when there is no subtitle. */
+  activity?: Activity;
   href?: string;
   roomId?: string;
   /** User ID for presence indicator (1:1 PMs) */
@@ -131,7 +134,14 @@ const ConvItem: Component<ConvItemProps> = (props) => {
             <i class="fa-solid fa-bell-slash shrink-0 text-[10px] text-muted-foreground/70" aria-hidden="true" />
           </Show>
         </span>
-        <Show when={props.subtitle}>
+        <Show
+          when={props.subtitle}
+          fallback={
+            <Show when={props.activity}>
+              {(a) => <PlayingText activity={a()} class="block truncate text-xs text-muted-foreground" />}
+            </Show>
+          }
+        >
           <span class="block truncate text-xs text-muted-foreground">{props.subtitle}</span>
         </Show>
       </div>
@@ -266,7 +276,9 @@ export const RoomsBar: Component = () => {
                   // as if they're around (the space members list already hides it offline).
                   const st = presence.byUser[other.id]?.status ?? other.presence?.status;
                   if (!isPresentStatus(st)) return undefined;
-                  return presence.byUser[other.id]?.custom_status ?? other.presence?.custom_status ?? undefined;
+                  // The store's whenever it knows them: one cleared since the room list was
+                  // fetched must not come back from the participant snapshot.
+                  return customStatusOf(other.id, other.presence);
                 };
                 return (
                   <ConvItem
@@ -274,6 +286,7 @@ export const RoomsBar: Component = () => {
                     bot={!isGroup() && otherParticipant()?.bot === true}
                     system={!isGroup() && otherParticipant()?.system === true}
                     subtitle={!isGroup() ? subtitle() : undefined}
+                    activity={!isGroup() ? activityOf(otherParticipant()?.id) : undefined}
                     href={`/rooms/${room.id}`}
                     roomId={room.id}
                     presenceUserId={isGroup() ? undefined : otherParticipant()?.id}

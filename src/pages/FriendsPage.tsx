@@ -10,7 +10,8 @@ import {
   removeRelationshipLocally,
 } from '../stores/relationships';
 import type { Relationship } from '../api/relationships';
-import { presence, isVisibleStatus, isPresentStatus } from '../stores/presence';
+import { presence, isVisibleStatus, isPresentStatus, activityOf, customStatusOf } from '../stores/presence';
+import { PlayingText } from '../components/ActivityStatus';
 import { PresenceDot } from '../components/PresenceDot';
 import { MessageAvatar } from '../components/messageList/MessageAvatar';
 import { sendFriendRequest, putRelationship, removeRelationship } from '../api/relationships';
@@ -35,7 +36,8 @@ function friendStatusText(rel: Relationship): string | undefined {
   // uses, so an offline friend never shows a stale custom status.
   const st = presence.byUser[rel.user.id]?.status ?? rel.user.presence?.status;
   if (!isPresentStatus(st)) return undefined;
-  return presence.byUser[rel.user.id]?.custom_status ?? rel.user.presence?.custom_status;
+  // The store's whenever it knows them, never falling back past a cleared one.
+  return customStatusOf(rel.user.id, rel.user.presence);
 }
 
 /** The username, plus @domain for someone on another instance. */
@@ -72,7 +74,14 @@ const FriendRow: Component<{
       </div>
       <div class="min-w-0">
         <div class="truncate text-sm font-medium text-foreground">{friendDisplayName(props.rel)}</div>
-        <div class="truncate text-xs text-muted-foreground">{friendStatusText(props.rel) || userTag(props.rel)}</div>
+        {/* A custom status first, then what they are playing (friends only - the rows of the
+            pending and blocked tabs show no presence), then their handle. */}
+        <Show
+          when={!friendStatusText(props.rel) && props.showPresence ? activityOf(props.rel.user.id) : undefined}
+          fallback={<div class="truncate text-xs text-muted-foreground">{friendStatusText(props.rel) || userTag(props.rel)}</div>}
+        >
+          {(a) => <PlayingText activity={a()} class="block truncate text-xs text-muted-foreground" />}
+        </Show>
       </div>
     </div>
     <div class="flex shrink-0 gap-2">{props.actions}</div>

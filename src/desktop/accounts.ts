@@ -44,8 +44,27 @@ const SESSION_KEY = 'session_token';
 const [accounts, setAccounts] = createSignal<DesktopAccount[]>([]);
 const [activeId, setActiveId] = createSignal<string | null>(null);
 const [loaded, setLoaded] = createSignal(false);
+// True from the moment a switch to another account starts until the page reloads: the shell
+// learns the new active account from the save, before this page is gone, and anything this
+// page still reports would then be the next account's (stores/activity.ts stops at once).
+const [switching, setSwitching] = createSignal(false);
 
-export { accounts as desktopAccounts, activeId as activeDesktopAccountId, loaded as desktopAccountsLoaded };
+export {
+  accounts as desktopAccounts,
+  activeId as activeDesktopAccountId,
+  loaded as desktopAccountsLoaded,
+  switching as desktopAccountSwitching,
+};
+
+/** This page's own desktop account id - the instance it talks to and the user signed in on
+ * it - built the way the accounts file names accounts. Null until both are known. It differs
+ * from activeDesktopAccountId() whenever the file has moved on (an account switch, "add an
+ * account") and this page has not reloaded yet. Reactive on the signed-in user. */
+export function pageDesktopAccountId(): string | null {
+  const uid = auth.user?.id;
+  const inst = getDesktopInstance();
+  return uid && inst ? accountId(inst, uid) : null;
+}
 
 /** Active first, then most recently used. */
 export function sortedDesktopAccounts(): DesktopAccount[] {
@@ -232,10 +251,14 @@ export async function initDesktopAccounts(): Promise<void> {
 export async function switchDesktopAccount(id: string): Promise<void> {
   const acc = accounts().find((a) => a.id === id);
   if (!acc) return;
+  // Before anything changes: once saved, the shell shares for the next account, and this
+  // page - still signed in as the current one until the reload - must not pass that on.
+  setSwitching(true);
   setDesktopInstance(acc.instance);
   try {
     window.localStorage.setItem(SESSION_KEY, acc.token);
   } catch {
+    setSwitching(false);
     return;
   }
   setAccounts((list) => list.map((a) => (a.id === id ? { ...a, lastUsedAt: Date.now() } : a)));

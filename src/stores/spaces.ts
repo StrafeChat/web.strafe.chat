@@ -16,6 +16,9 @@ import { getThread } from '../api/threads';
 import { removeRoom } from './rooms';
 import { registerRoomIdentity } from './federationIds';
 import { setReadStateFromRoom } from './readState';
+// Read only inside functions, never at load: both import stores that import this one.
+import { spaceMembers } from './spaceMembers';
+import { dropActivitiesOutsideAudience } from './presence';
 
 /**
  * Spaces, their rooms, their roles and every room's permission overrides.
@@ -78,6 +81,9 @@ export function removeSpace(spaceId: string): void {
   // space" bug: a rejoin was treated differently from a first join, which starts from a clean
   // ref count. Collect the ids before deleting the room list below.
   const roomIds = (spaces.spaceRoomsBySpaceId[spaceId] ?? []).map((r) => r.id);
+  // Its members' games were shown to us because we shared this space; collected before it
+  // goes, checked after (the audience counts only the spaces we are still in).
+  const memberIds = (spaceMembers.bySpaceId[spaceId] ?? []).map((m) => m.id);
   setSpaces('spaces', (list) => list.filter((s) => s.id !== spaceId));
   // `produce`, not a spread copy: a store setter handed a plain object *merges* it, so
   // "everything except this key" quietly leaves the space's room list cached forever.
@@ -87,6 +93,8 @@ export function removeSpace(spaceId: string): void {
     })
   );
   for (const rid of roomIds) removeRoom(rid);
+  // Unless they are friends, or members of another space we are in.
+  dropActivitiesOutsideAudience(memberIds);
 }
 
 // ---- roles -----------------------------------------------------------------------------

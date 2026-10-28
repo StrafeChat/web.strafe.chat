@@ -4,8 +4,7 @@ import { useNavigate } from '@solidjs/router';
 import { MessageAvatar } from '../messageList/MessageAvatar';
 import { PresenceDot } from '../PresenceDot';
 import { auth } from '../../stores/auth';
-import { presence, setUserPresence, type UserPresence } from '../../stores/presence';
-import { patchMe } from '../../api/users';
+import { presence, setOwnStatus, type UserPresence } from '../../stores/presence';
 import { openUserSettings } from '../../stores/userSettingsModal';
 import { openMobileRoom, setMobileTab } from '../../stores/mobileShellLayout';
 import { incomingFriendRequests } from '../../lib/mobileNotifications';
@@ -32,10 +31,11 @@ export const MobileYouPanel: Component = () => {
   const requestCount = () => incomingFriendRequests().length;
 
   async function setStatus(status: UserPresence['status']) {
-    setUserPresence(userId(), { ...me(), status });
     setSaving(true);
     try {
-      await patchMe({ presence: { status } });
+      // Instant, except to or from invisible, which shows once the server has it (see
+      // setOwnStatus); a failed save puts the old status back.
+      await setOwnStatus(status);
     } catch (err) {
       console.error('Failed to update status:', err);
     } finally {

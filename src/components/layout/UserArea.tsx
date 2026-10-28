@@ -3,7 +3,7 @@ import { useNavigate } from '@solidjs/router';
 import { createSignal, Show, For, onCleanup, onMount, createEffect } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { auth } from '../../stores/auth';
-import { presence, setUserPresence, type UserPresence } from '../../stores/presence';
+import { presence, setOwnStatus, setUserPresence, type UserPresence } from '../../stores/presence';
 import { PresenceDot } from '../PresenceDot';
 import { patchMe } from '../../api/users';
 import { MessageAvatar } from '../messageList/MessageAvatar';
@@ -89,18 +89,15 @@ export const UserArea: Component = () => {
   }
 
   async function setStatus(status: UserPresence['status']) {
-    // A plain copy: p() is a live store proxy and would read the new value after the update.
-    const cur = p();
-    const prev = cur ? { ...cur } : undefined;
-    setUserPresence(userId(), { ...p(), status });
     setStatusMenuOpen(false);
     setStatusError('');
     setSaving(true);
     try {
-      await patchMe({ presence: { status } });
+      // Instant, except to or from invisible, which shows once the server has it (see
+      // setOwnStatus); a failed save puts the old status back.
+      await setOwnStatus(status);
     } catch (err) {
       console.error('Set status failed:', err);
-      rollBackPresence(prev);
       setStatusError(t('common.saveFailed'));
     } finally {
       setSaving(false);

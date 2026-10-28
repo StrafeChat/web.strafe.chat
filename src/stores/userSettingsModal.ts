@@ -13,7 +13,8 @@ export type UserSettingsSection =
   | 'voice'
   | 'notifications'
   | 'keybinds'
-  | 'language';
+  | 'language'
+  | 'activity';
 
 const [userSettingsOpen, setUserSettingsOpen] = createSignal(false);
 

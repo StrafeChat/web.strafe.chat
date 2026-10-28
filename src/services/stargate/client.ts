@@ -283,6 +283,32 @@ export function subscribe(spaceId?: string, userId?: string): void {
   ws.send(JSON.stringify({ op: Op.Subscribe, d: { space_id: spaceId, user_id: userId } }));
 }
 
+/** One entry of `op 9`: the game this connection reports. */
+export interface ActivityReport {
+  type: 'playing';
+  name: string;
+  /** Unix ms the game started; 0 or absent means now. */
+  started_at?: number;
+}
+
+/**
+ * Report what the user is playing on this connection (`op 9`); null clears it. The report
+ * belongs to the socket: the server forgets it when the connection goes, and a new socket
+ * starts with none, so the caller sends it again after every READY. False when there is no
+ * open socket to send it on. The server takes at most one entry, a burst of five reports and
+ * then one every 12 s (it applies the latest when a token frees, without an error), and
+ * answers a malformed one with error 4007.
+ */
+export function sendActivity(activities: ActivityReport[] | null): boolean {
+  if (!ws || ws.readyState !== WebSocket.OPEN) return false;
+  try {
+    ws.send(JSON.stringify({ op: Op.Activity, d: { activities: activities ?? [] } }));
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function unsubscribe(spaceId?: string, userId?: string): void {
   const key = subKey(spaceId, userId);
   const current = subRefCounts.get(key) ?? 0;

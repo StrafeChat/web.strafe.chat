@@ -34,6 +34,9 @@ export interface InstanceState {
   /** GIF providers the instance has an API key for and proxies (GET /gifs/*). The keys
    * themselves never reach the client. Empty means the GIF tab shows "not configured". */
   gifProviders: GifProviderId[];
+  /** The instance shows game activity ("Playing X") and accepts it over the gateway (op 9).
+   * The desktop app reports nothing to an instance without it. */
+  activitiesEnabled: boolean;
 }
 
 export const [instance, setInstance] = createStore<InstanceState>({
@@ -47,6 +50,7 @@ export const [instance, setInstance] = createStore<InstanceState>({
   email: { enabled: false, verificationRequired: false },
   instanceAdmin: false,
   gifProviders: [],
+  activitiesEnabled: false,
 });
 
 interface IndexResponse {
@@ -58,6 +62,7 @@ interface IndexResponse {
     invite_only?: { enabled?: boolean };
     email?: { enabled?: boolean; verification_required?: boolean };
     gifs?: { enabled?: boolean; providers?: unknown };
+    activities?: { enabled?: boolean };
   };
 }
 
@@ -98,6 +103,7 @@ export function resetInstanceInfo(): void {
     email: { enabled: false, verificationRequired: false },
     instanceAdmin: false,
     gifProviders: [],
+    activitiesEnabled: false,
   });
 }
 
@@ -143,6 +149,7 @@ export function loadInstanceInfo(): Promise<void> {
             verificationRequired: res.features?.email?.enabled === true && res.features?.email?.verification_required === true,
           },
           gifProviders: parseGifProviders(res.features?.gifs?.providers),
+          activitiesEnabled: res.features?.activities?.enabled === true,
         });
       })
       .catch((e) => {

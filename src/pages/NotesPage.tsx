@@ -3,7 +3,6 @@ import { createSignal, createEffect, onMount, Show } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import { getNotesRoom } from '../api/rooms';
 import { rooms, setRooms, isNotesRoom } from '../stores/rooms';
-import { setUserPresence } from '../stores/presence';
 import { auth } from '../stores/auth';
 import { appPageHeader, appPageTitle } from '../theme/appChrome';
 import { MobileRailsOpenButton } from '../components/layout/MobileRailsOpenButton';
@@ -51,12 +50,9 @@ const NotesPage: Component = () => {
     setLoading(true);
     getNotesRoom()
       .then((room) => {
-        // Seed presence for self (notes room has only current user as participant)
-        for (const p of room.participants ?? []) {
-          if (p.presence?.status) {
-            setUserPresence(p.id, p.presence);
-          }
-        }
+        // No presence seeding: the notes room's only participant is us, and a participant's
+        // presence is the view others get (invisible reads offline). Ours comes from READY
+        // and PRESENCE_UPDATE on our own channel.
         // Ensure room is in store
         const existing = rooms.rooms.find((r) => r.id === room.id);
         if (!existing) {

@@ -13,6 +13,7 @@ import { voice } from '../stores/voice';
 import { auth } from '../stores/auth';
 import { instance } from '../stores/instance';
 import { getDesktopInstance } from './instanceOverride';
+import { startActivityReporting } from '../stores/activity';
 import { t } from '../i18n';
 
 let started = false;
@@ -103,8 +104,13 @@ function refuseUnhandledDrops(): void {
   }
 }
 
-/** The app icon's unread badge and the Discord presence: the main window's view only. */
+/** The app icon's unread badge, the Discord presence and the game being played: the main
+ * window's view only. */
 function installAppWideIndicators(): void {
+  // "Playing X" goes out from one socket per app: a popup's own connection reporting (or
+  // clearing) it would fight the main window's.
+  startActivityReporting();
+
   createRoot(() => {
     // Unread mentions on the app icon, summed over every room we know about.
     const total = createMemo(() => Object.values(readState.byRoom).reduce((n, r) => n + (r.mentionCount || 0), 0));

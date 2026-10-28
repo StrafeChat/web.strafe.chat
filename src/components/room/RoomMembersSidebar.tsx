@@ -4,7 +4,8 @@ import type { RoomParticipant } from '../../api/rooms';
 import type { SpaceRole } from '../../api/spaces';
 import { PresenceDot, presenceStatusLabel } from '../PresenceDot';
 import { MessageAvatar } from '../messageList/MessageAvatar';
-import { presence } from '../../stores/presence';
+import { activityOf, customStatusOf, presence } from '../../stores/presence';
+import { PlayingText } from '../ActivityStatus';
 import { showContextMenu, type ContextMenuItem } from '../../stores/contextMenu';
 import { buildUserMenuItems, buildSpaceModerationItems } from '../../lib/userContextMenu';
 import { appActivityRail, appSectionLabel } from '../../theme/appChrome';
@@ -292,14 +293,22 @@ const MemberRow: Component<{
     memberNameColorHex(getMemberRoleIds(props.p), props.spaceRoles)
   );
 
-  // Mirror the user area under the avatar: the member's custom status if set, otherwise the
-  // status label ("Online" / "Idle" / …). Nothing when offline - a status line reads wrong
-  // there (and for others invisible is already reported as offline).
-  const subline = () => {
+  // Mirror the user area under the avatar: the member's custom status if set, then what
+  // they are playing, otherwise the status label ("Online" / "Idle" / …). Nothing when
+  // offline - a status line reads wrong there (and for others invisible is already reported
+  // as offline). The activity comes from the presence store only, never the row's snapshot.
+  const present = () => {
     const st = presence.byUser[props.p.id]?.status ?? props.p.presence?.status;
-    if (st !== 'online' && st !== 'idle' && st !== 'dnd') return undefined;
-    const custom = presence.byUser[props.p.id]?.custom_status ?? props.p.presence?.custom_status;
-    return custom || presenceStatusLabel(st);
+    return st === 'online' || st === 'idle' || st === 'dnd' ? st : undefined;
+  };
+  // The store's custom status whenever it knows the member: a status cleared since the list
+  // was fetched must not come back from the row's snapshot (and hide what they are playing).
+  const customStatus = () => (present() ? customStatusOf(props.p.id, props.p.presence) : undefined);
+  const activity = () => (present() && !customStatus() ? activityOf(props.p.id) : undefined);
+  const subline = () => {
+    const st = present();
+    if (!st) return undefined;
+    return customStatus() || presenceStatusLabel(st);
   };
 
   function openProfile(e: MouseEvent) {
@@ -400,8 +409,15 @@ const MemberRow: Component<{
               <i class="fa-solid fa-crown shrink-0 text-[10px] text-amber-400" title={t('room.members.owner')} aria-hidden="true" />
             )}
           </p>
-          <Show when={subline()}>
-            <p class="mt-0.5 truncate text-xs leading-snug text-muted-foreground">{subline()}</p>
+          <Show
+            when={activity()}
+            fallback={
+              <Show when={subline()}>
+                <p class="mt-0.5 truncate text-xs leading-snug text-muted-foreground">{subline()}</p>
+              </Show>
+            }
+          >
+            {(a) => <PlayingText activity={a()} class="mt-0.5 block truncate text-xs leading-snug text-muted-foreground" />}
           </Show>
         </div>
       </button>

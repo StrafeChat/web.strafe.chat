@@ -3,7 +3,7 @@ import { createSignal, createMemo, Show, createEffect } from 'solid-js';
 import { userSettingsOpen, closeUserSettings, takePendingSettingsSection, hasPendingSettingsSection } from '../stores/userSettingsModal';
 import { confirmDialog } from '../stores/confirmDialog';
 import { getInstanceCapabilities } from '../api/instance';
-import { ACCOUNT_ITEMS, APP_ITEMS, INSTANCE_ITEM, DEVELOPERS_ITEM, DESKTOP_ITEM, sectionDescription, sectionTitle, type SectionId, type SettingsNavItem } from './settings/types.js';
+import { ACCOUNT_ITEMS, APP_ITEMS, INSTANCE_ITEM, DEVELOPERS_ITEM, DESKTOP_ITEM, ACTIVITY_ITEM, sectionDescription, sectionTitle, type SectionId, type SettingsNavItem } from './settings/types.js';
 import {
   SettingsShell,
   SettingsNav,
@@ -22,9 +22,11 @@ import {
   DevelopersSettingsPage,
   AuthorizedAppsSettingsPage,
   DesktopSettingsPage,
+  ActivitySettingsPage,
   type SettingsNavGroup,
 } from './settings';
-import { isDesktop } from '../desktop/env';
+import { desktopShell, isDesktop } from '../desktop/env';
+import { gamesAvailable } from '../desktop/native';
 import { SearchInput } from './ui/SearchInput';
 import { Button } from './ui/Button';
 import { t } from '../i18n';
@@ -40,6 +42,9 @@ export const UserSettingsModal: Component = () => {
   // Asked of the server rather than inferred: only it knows who administers the instance.
   // Failing closed simply hides the section, which is the right way to be wrong.
   const [isInstanceAdmin, setIsInstanceAdmin] = createSignal(false);
+  // Settings -> Activity exists only in a desktop shell that can detect games (an older build
+  // cannot, and neither can a browser or the phone app, whose isDesktop() is also true).
+  const [gamesOk, setGamesOk] = createSignal(false);
   const [searchQuery, setSearchQuery] = createSignal('');
   // One flag per page with drafts, not a shared one: either page reporting "clean" (its load
   // finishing, a save) must not wipe the other's unsaved edits from the close guard.
@@ -61,6 +66,11 @@ export const UserSettingsModal: Component = () => {
       void getInstanceCapabilities()
         .then((res) => setIsInstanceAdmin(res.instance_admin))
         .catch(() => setIsInstanceAdmin(false));
+      if (desktopShell() !== null) {
+        void gamesAvailable()
+          .then(setGamesOk)
+          .catch(() => setGamesOk(false));
+      }
     } else {
       setSection('account');
       setSpaceProfilesMounted(false);
@@ -76,7 +86,9 @@ export const UserSettingsModal: Component = () => {
     const q = searchQuery().trim();
     const toDef = (i: SettingsNavItem) => ({ id: i.id, label: t(i.labelKey), icon: i.icon });
     const account = ACCOUNT_ITEMS.filter((i) => navMatches(i, q)).map(toDef);
-    const app = [...APP_ITEMS, ...(isDesktop() ? [DESKTOP_ITEM] : [])].filter((i) => navMatches(i, q)).map(toDef);
+    const app = [...APP_ITEMS, ...(isDesktop() ? [DESKTOP_ITEM] : []), ...(gamesOk() ? [ACTIVITY_ITEM] : [])]
+      .filter((i) => navMatches(i, q))
+      .map(toDef);
     const groups: SettingsNavGroup<SectionId>[] = [];
     if (account.length) groups.push({ label: t('settings.groups.account'), items: account });
     if (app.length) groups.push({ label: t('settings.groups.app'), items: app });
@@ -214,6 +226,9 @@ export const UserSettingsModal: Component = () => {
           </Show>
           <Show when={section() === 'desktop' && isDesktop()}>
             <DesktopSettingsPage />
+          </Show>
+          <Show when={section() === 'activity' && gamesOk()}>
+            <ActivitySettingsPage />
           </Show>
         </SettingsPanel>
       </SettingsShell>

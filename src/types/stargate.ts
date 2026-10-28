@@ -13,6 +13,8 @@ export const Op = {
   Ping: 6,
   Pong: 7,
   Error: 8,
+  /** Client -> server: what this connection reports the user is playing (null clears). */
+  Activity: 9,
 } as const;
 
 export type ConnectionStatus =

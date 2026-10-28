@@ -14,7 +14,8 @@ import { lastVisited } from './lastVisited';
 import { lastSpaceRoom } from './lastSpaceRoom';
 import { spaceOrder } from './spaceOrder';
 import { spaceRailOrder } from './spaceRailOrder';
-import { setUserPresence } from './presence';
+import { pruneActivitiesAfterReady, setUserPresence, type UserPresence } from './presence';
+import { normalizeActivities } from '../lib/activity';
 import { loadRooms, clearRooms, hydrateRoomsFromReady } from './rooms';
 import { loadRelationships, clearRelationships, hydrateRelationshipsFromReady } from './relationships';
 import { loadSpaces, clearSpaces, hydrateSpacesFromReady, hydrateSpaceRoomsFromReady } from './spaces';
@@ -50,6 +51,10 @@ export interface AuthState {
   loading: boolean;
   hydrated: boolean;
 }
+
+/** The statuses our own presence can have in READY and GET /users/@me: the self view, where
+ * invisible stays invisible (only others see it as offline). */
+const SELF_STATUSES: readonly string[] = ['online', 'idle', 'dnd', 'offline', 'invisible'];
 
 export const [auth, setAuth] = createStore<AuthState>({
   user: null,
@@ -136,7 +141,7 @@ export function hydrateFromReady(payload: {
     bot?: boolean;
     verified_email?: boolean;
     created_at?: string;
-    presence?: { status: string; custom_status?: string };
+    presence?: { status: string; custom_status?: string; activities?: unknown };
   };
   session_id?: string;
   rooms?: unknown[];
@@ -170,11 +175,18 @@ export function hydrateFromReady(payload: {
     setAuth('user', user);
     if (payload.user.presence?.status) {
       const p = payload.user.presence;
-      if (['online', 'idle', 'dnd', 'offline'].includes(p.status)) {
-        setUserPresence(user.id, {
-          status: p.status as 'online' | 'idle' | 'dnd' | 'offline',
-          custom_status: p.custom_status,
-        });
+      // Our own view: invisible is a real status here (others see offline), and the
+      // activity we are reporting from any of our devices rides along.
+      if (SELF_STATUSES.includes(p.status)) {
+        setUserPresence(
+          user.id,
+          {
+            status: p.status as UserPresence['status'],
+            custom_status: p.custom_status,
+            activities: normalizeActivities(p.activities),
+          },
+          { activities: true },
+        );
       }
     }
   }
@@ -193,6 +205,9 @@ export function hydrateFromReady(payload: {
   if (payload.space_rooms && typeof payload.space_rooms === 'object' && !Array.isArray(payload.space_rooms)) {
     hydrateSpaceRoomsFromReady(payload.space_rooms as Record<string, unknown[]>);
   }
+  // Games shown for people who left our audience while the socket was down: READY's friends
+  // and the spaces we are still in say who is left. After both are hydrated.
+  pruneActivitiesAfterReady();
   // Absent when the instance has no voice: an empty picture is the right one then.
   hydrateVoiceFromReady(payload.voice_states ?? [], payload.calls ?? []);
   setAuth({ loading: false, hydrated: true });
@@ -250,12 +265,17 @@ export async function bootstrapFromRest() {
     // instead of waiting on getMe() first, to shave a full round trip off this fallback.
     const [me] = await Promise.all([getMe(), loadRooms(), loadRelationships(), loadSpaces()]);
     if (me.presence && typeof me.presence === 'object' && 'status' in me.presence) {
-      const p = me.presence as { status: string; custom_status?: string };
-      if (['online', 'idle', 'dnd', 'offline'].includes(p.status)) {
-        setUserPresence(me.id, {
-          status: p.status as 'online' | 'idle' | 'dnd' | 'offline',
-          custom_status: p.custom_status,
-        });
+      const p = me.presence as { status: string; custom_status?: string; activities?: unknown };
+      if (SELF_STATUSES.includes(p.status)) {
+        setUserPresence(
+          me.id,
+          {
+            status: p.status as UserPresence['status'],
+            custom_status: p.custom_status,
+            activities: normalizeActivities(p.activities),
+          },
+          { activities: true },
+        );
       }
     }
     restRetryDelay = REST_RETRY_MS;

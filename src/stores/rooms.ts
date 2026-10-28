@@ -1,6 +1,9 @@
+import { untrack } from 'solid-js';
 import { createStore } from 'solid-js/store';
 import { listRooms, type Room, type RoomParticipant } from '../api/rooms';
 import { setUserPresence } from './presence';
+// Read only inside functions, never at load: auth imports this store.
+import { auth } from './auth';
 import { setReadStateFromRoom, setReadState } from './readState';
 import { onStargateEvent } from '../services/stargate/client';
 import { registerRoomIdentity, registerUserIdentity } from './federationIds';
@@ -12,6 +15,20 @@ import { t } from '../i18n';
 function registerIdentities(room: Room): void {
   registerRoomIdentity(room);
   for (const p of room.participants ?? []) registerUserIdentity(p);
+}
+
+/** Seed the presence map from a room's participants - everyone's but our own. A participant's
+ * presence is the view others get, where invisible reads offline; ours comes from READY,
+ * GET /users/@me and PRESENCE_UPDATE on our own channel, which carry what it really is. Taken
+ * from here, opening a room while invisible made this client think we were offline - and the
+ * game we report (stores/activity.ts) follows our own status. Participants carry no
+ * activities, so this leaves those alone (see setUserPresence). */
+function seedParticipantPresence(room: Room): void {
+  // Untracked: a room opened from inside an effect must not re-run it on profile edits.
+  const self = untrack(() => auth.user?.id);
+  for (const p of room.participants ?? []) {
+    if (p.presence?.status && p.id !== self) setUserPresence(p.id, p.presence);
+  }
 }
 
 export interface RoomsState {
@@ -76,11 +93,7 @@ export async function loadRooms(): Promise<void> {
     const list = await listRooms();
     for (const room of list) {
       registerIdentities(room);
-      for (const p of room.participants ?? []) {
-        if (p.presence?.status) {
-          setUserPresence(p.id, p.presence);
-        }
-      }
+      seedParticipantPresence(room);
       setReadStateFromRoom(room.id, room, { authoritative: true });
     }
     setRooms({ rooms: keepMirroredSpaceRooms(list), loading: false, hydrated: true });
@@ -140,9 +153,7 @@ export function patchRoomNotifySettings(
  * with E2EE off was treated as E2EE on and every send was rejected by the server. */
 export function addOrUpdateRoom(room: Room): void {
   registerIdentities(room);
-  for (const p of room.participants ?? []) {
-    if (p.presence?.status) setUserPresence(p.id, p.presence);
-  }
+  seedParticipantPresence(room);
   setReadStateFromRoom(room.id, room);
   setRooms('rooms', (list) => {
     const idx = list.findIndex((r) => r.id === room.id);
@@ -161,11 +172,7 @@ export function hydrateRoomsFromReady(roomsData: unknown[]): void {
   const list = roomsData as import('../api/rooms').Room[];
   for (const room of list) {
     registerIdentities(room);
-    for (const p of room.participants ?? []) {
-      if (p.presence?.status) {
-        setUserPresence(p.id, p.presence);
-      }
-    }
+    seedParticipantPresence(room);
     setReadStateFromRoom(room.id, room, { authoritative: true });
   }
   setRooms({ rooms: keepMirroredSpaceRooms(list), loading: false, hydrated: true });

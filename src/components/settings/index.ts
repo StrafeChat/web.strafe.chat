@@ -1,5 +1,5 @@
 export type { SectionId, SettingsNavItem } from './types.js';
-export { sectionTitle, sectionDescription, ACCOUNT_ITEMS, APP_ITEMS, INSTANCE_ITEM, DEVELOPERS_ITEM, DESKTOP_ITEM } from './types.js';
+export { sectionTitle, sectionDescription, ACCOUNT_ITEMS, APP_ITEMS, INSTANCE_ITEM, DEVELOPERS_ITEM, DESKTOP_ITEM, ACTIVITY_ITEM } from './types.js';
 export { SettingsShell, SettingsNav, settingsNavButtonBase, useSettingsMobileView } from './SettingsShell';
 export type { SettingsMobileView } from './SettingsShell';
 export type { SettingsShellProps, SettingsNavProps, SettingsNavGroup, SettingsNavItemDef } from './SettingsShell';
@@ -21,3 +21,4 @@ export { InstanceSettingsPage } from './InstanceSettingsPage';
 export { DevelopersSettingsPage } from './DevelopersSettingsPage';
 export { AuthorizedAppsSettingsPage } from './AuthorizedAppsSettingsPage';
 export { DesktopSettingsPage } from './DesktopSettingsPage';
+export { ActivitySettingsPage } from './ActivitySettingsPage';

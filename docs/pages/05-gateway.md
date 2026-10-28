@@ -40,6 +40,7 @@ Every frame is a JSON object with an `op` and, usually, a `d`.
 | `2` | Send | `{"space_id": "<room id>", "type": "typing", "content": {…}}` | Publish a lightweight event to a room's subscribers (typing). Messages are **not** sent this way - use REST |
 | `5` | Unsubscribe | `{"space_id": "…"}` | Stop receiving a space's or a room's events |
 | `6` | Ping | - | Answered with `op 7` |
+| `9` | Activity | `{"activities": [{"type": "playing", "name": "…", "started_at": 1761000000000}]}` | Say what the account is doing on this connection; `null` or `[]` clears it. At most one entry, rate limited per connection (a burst of 5, then one every 12 s; over budget the latest report is applied when a token frees, without an error). See [Activity](#activity) |
 
 ### Server → client
 
@@ -98,9 +99,10 @@ An event frame nests: the outer `d` is the envelope, its `t` is the event type a
 
 | Field | |
 | --- | --- |
-| `user` | The connected account |
+| `user` | The connected account, with its own `presence` as only you see it: `invisible` stays `invisible`, and `activities` holds what any of your connections reports (see [Activity](#activity)) |
 | `session_id` | The client session's id; `"0"` for a bot (a bot has no session row - its token is the credential) |
 | `rooms` | Private messages and group PMs (room types `1` and `2`) with their `recipients` |
+| `relationships` | Friends and friend requests; a friend's `user.presence` carries their `activities` |
 | `spaces` | Every space the account is in, each with its `roles` (sorted by position) and settings |
 | `space_rooms` | Space id → its rooms (text `3`, voice `4`, section `5`), each with `e2ee_enabled`, `slowmode_seconds` and its permission overrides |
 | `voice_states`, `calls` | Who is in which voice room, and ringing PM calls |
@@ -137,6 +139,22 @@ A subscription is refused (silently) when the account cannot access that room or
 ```
 
 It is rate limited per connection (a burst of 20, refilling one every 250 ms) and requires the room subscription. Everything that is *stored* - messages, reactions, membership changes - goes through REST, and the gateway reports it back as an event.
+
+## Activity
+
+`op 9` sets what the account is doing - in this version, the game it is playing. The Strafe desktop app sends it when someone turns on sharing in its settings, and a bot can use it to show "Playing …" too:
+
+```json
+{ "op": 9, "d": { "activities": [ { "type": "playing", "name": "Factory Builder", "started_at": 1761000000000 } ] } }
+{ "op": 9, "d": null }   // stopped playing
+```
+
+- **One entry at most.** `type` must be `"playing"`. `name` is cleaned before use - control characters, line and paragraph separators and bidi controls are removed, runs of whitespace become one space, the ends are trimmed - and must then hold 1 to 128 characters (counted in code points), at least one of them visible. `started_at` is unix milliseconds: `0` or absent means now, a time in the future becomes now, and one more than 7 days ago becomes 7 days ago.
+- **A malformed report** (a second entry, another `type`, a name that is empty or too long) is answered with error `4007` and changes nothing. The connection stays open.
+- **Rate limit:** a burst of 5 reports per connection, then one every 12 seconds. A report over the budget is not refused: it waits, a newer one replaces it, and the latest is applied when the next token frees, without an error frame. Reporting the same activity again changes nothing and costs nothing.
+- **It belongs to the connection.** It is never written to the database: the instance holds it in its short-lived cache and forgets it when the connection closes (after a short grace period, so a quick reconnect does not flicker). A new connection starts with none, so report again after every `READY`. When several of an account's connections report, the most recent report wins.
+- **Who sees it:** the account itself, its friends and the members of its spaces - in `PRESENCE_UPDATE`, on [member objects](/docs/rest/#the-member-object) and on friends' relationship entries, as `presence.activities`. Nobody else sees it while the account appears offline or invisible; its own connections still do. People on other instances see it the way they see the account's status.
+- **Show the name as plain text** - never as Markdown, a link, emoji or a mention - and isolate its direction (`<bdi>`, `dir="auto"`), since it is someone else's text.
 
 ## Events
 
@@ -190,7 +208,7 @@ Sent space-wide when everyone can view the parent channel, otherwise only to the
 | `SPACE_UPDATE` | space | The space's settings changed. May carry `roles` (the full list) after a change that reordered them, such as a bot install |
 | `SPACE_DELETE` | space | `{"space_id"}` - the space is gone |
 | `SPACE_LEAVE` | account | `{"space_id"}` - you were kicked, banned, or left from another session |
-| `SPACE_MEMBER_ADD` | space | The member's profile plus `space_id`, `role_ids`, `joined_at`, `bot`, `presence`, and their space profile: `nick`, `space_avatar`, `space_banner`, `space_about_me`, `space_bio`, `space_pronouns` (each a string, or `null` for none) |
+| `SPACE_MEMBER_ADD` | space | The member's profile plus `space_id`, `role_ids`, `joined_at`, `bot`, `presence` (with their `activities`), and their space profile: `nick`, `space_avatar`, `space_banner`, `space_about_me`, `space_bio`, `space_pronouns` (each a string, or `null` for none) |
 | `SPACE_MEMBER_REMOVE` | space | `{"space_id", "user_id"}` |
 | `SPACE_MEMBER_UPDATE` | space | `{"user_id", "role_ids", "nick", "space_avatar", "space_banner", "space_about_me", "space_bio", "space_pronouns"}` - roles or the space profile changed; always the full state, so replace all seven fields |
 | `SPACE_ROLE_CREATE` / `SPACE_ROLE_UPDATE` | space | The [role](/docs/rest/#the-role-object) |
@@ -200,7 +218,7 @@ Sent space-wide when everyone can view the parent channel, otherwise only to the
 
 | `t` | `d` |
 | --- | --- |
-| `PRESENCE_UPDATE` | `{"user_id", "presence": {"status": "online" \| "offline" \| …}}` for people you share a space or PM with |
+| `PRESENCE_UPDATE` | `{"user_id", "presence": {"status": "online" \| "offline" \| …, "custom_status"?, "activities"?}}` for people you share a space or PM with. `activities` is what they are doing now (see [Activity](#activity)), for friends and space members only; absent means nothing, so replace the stored value rather than merging. Sent again when the status, the custom status or the activity changes |
 | `USER_UPDATE` | A profile changed (display name, avatar, pronouns, …) - `{"user_id", "display_name", "avatar", "pronouns", …}` |
 | `RELATIONSHIP_REQUEST` / `RELATIONSHIP_ADD` / `RELATIONSHIP_REMOVE` | Friend requests and friendships (people only) |
 | `SESSION_REVOKED` | `{"reason"}` - this credential is dead: the account was banned from the instance, signed out everywhere, or (for a bot) the token was reset. The socket is closed right after |
@@ -221,6 +239,7 @@ Errors after the handshake arrive as `{"op": 8, "d": {"code", "message"}}` and n
 | `4003` | Invalid send payload |
 | `4004` | `op 2` without a `space_id` |
 | `4005` | `op 2` to a channel you have not subscribed to |
+| `4007` | Invalid activity (`op 9`): more than one entry, a `type` other than `playing`, or a name that is empty or longer than 128 characters once cleaned - see [Activity](#activity) |
 | `4403` | A subscribe to a space or room you cannot access |
 
-An `op 2` frame that exceeds the send bucket is dropped without an error.
+An `op 2` frame that exceeds the send bucket is dropped without an error. An `op 9` report over its budget is not dropped: the latest one is applied when the next token frees, also without an error.

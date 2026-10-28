@@ -11,7 +11,7 @@
  * the same release: bump `version` when a member's meaning changes.
  */
 
-import type { DesktopPrefs, DiscordPresence } from './native';
+import type { DesktopPrefs, DiscordPresence, GameActivity, GameRow, GamesState, RunningProgram } from './native';
 
 export interface ScreenSource {
   /** Opaque id to hand back to `screen.choose`. */
@@ -98,6 +98,30 @@ export interface ElectronDesktopBridge {
     sources(): Promise<ScreenSource[] | null>;
     /** The source the next getDisplayMedia call shares. */
     choose(id: string): Promise<void>;
+  };
+
+  /**
+   * Game detection ("Playing X"), over `strafe:games:*`. Optional: a shell from before it has
+   * no such member, and the page then shows no game features. Main window only. Rejections
+   * carry a readable message. Additive, so `version` stays 1.
+   */
+  games?: {
+    /** strafe:games:getState - never scans. `share` is for the active account. */
+    getState(): Promise<GamesState>;
+    /** strafe:games:setShare - `account` is the desktop account id (`domain:userId`). */
+    setShare(on: boolean, account: string): Promise<void>;
+    /** strafe:games:setHidden */
+    setHidden(key: string, hidden: boolean): Promise<void>;
+    /** strafe:games:rename - null goes back to the detected name. */
+    rename(key: string, name: string | null): Promise<void>;
+    /** strafe:games:running - opaque ids and file names only. */
+    runningPrograms(): Promise<RunningProgram[]>;
+    /** strafe:games:add - `id` from runningPrograms. */
+    add(id: string, name: string): Promise<GameRow>;
+    /** strafe:games:remove - user-added games only. */
+    remove(key: string): Promise<void>;
+    /** strafe:games:activity, pushed to the main window on change; returns the unsubscribe. */
+    onActivityChanged(cb: (activity: GameActivity | null) => void): () => void;
   };
 }
 

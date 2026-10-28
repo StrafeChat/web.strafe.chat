@@ -248,6 +248,7 @@ This is by design, not a gap to work around: a room that promises end-to-end enc
 ## Presence and rate limits
 
 - A bot shows as **online** while it holds at least one gateway connection and goes offline shortly after the last one closes.
+- A bot can show **"Playing …"** under its name, the same way the desktop app shows the game someone is playing: send `op 9` on its gateway connection, `{"op": 9, "d": {"activities": [{"type": "playing", "name": "with the docs"}]}}`, and `{"op": 9, "d": null}` to clear it. It lasts as long as that connection, so send it again after every reconnect. One activity at most, a name of 1 to 128 characters, a burst of 5 reports and then one every 12 seconds; see [Gateway › Activity](/docs/gateway/#activity).
 - The gateway allows a burst of 20 client frames and refills one every 250 ms; REST endpoints have their own limits ([REST › Rate limits](/docs/rest/#rate-limits)). Back off on `429` and honour `Retry-After`.
 - The gateway pings every 54 seconds and closes a connection that does not answer within 60 seconds; every WebSocket library answers pings for you. See [Gateway › Heartbeat](/docs/gateway/#heartbeat).
 

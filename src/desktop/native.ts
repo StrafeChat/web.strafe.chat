@@ -13,7 +13,7 @@
 import { invoke } from '@tauri-apps/api/core';
 import { getVersion } from '@tauri-apps/api/app';
 import { getCurrentWindow, UserAttentionType } from '@tauri-apps/api/window';
-import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { WebviewWindow, getCurrentWebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { openUrl } from '@tauri-apps/plugin-opener';
 import { isPermissionGranted, requestPermission, sendNotification } from '@tauri-apps/plugin-notification';
 import { disable as autostartDisable, enable as autostartEnable, isEnabled as autostartIsEnabled } from '@tauri-apps/plugin-autostart';
@@ -292,4 +292,212 @@ export function screenShareSources(): Promise<ScreenSource[] | null> {
 export function chooseScreenShareSource(id: string): Promise<void> {
   if (electron) return electron.screen.choose(id);
   return Promise.resolve();
+}
+
+// ---- games (activity) --------------------------------------------------------------------------
+
+/*
+ * The shell recognises the game being played (the process list never leaves it) and tells the
+ * page only what to share: the game's name and when it started, after the person's hides and
+ * renames, or null. Sharing is off until turned on, per desktop account, and while it is off
+ * the shell does not look at all. Tauri: the games_* commands and an `activity-changed` event on
+ * the main window. Electron: the bridge's optional `games` member. Both answer only the main
+ * window. A shell from before this has neither, and gamesAvailable() says so.
+ *
+ * Wire shapes are snake_case (started_at, detected_name), as the shells send them.
+ */
+
+/** What the shell says to share now. */
+export interface GameActivity {
+  name: string;
+  /** Unix ms the game's first process started (0 when unknown). */
+  started_at: number;
+}
+
+/** The game being shared, with its key: exactly the last `activity-changed` payload. */
+export interface CurrentGame extends GameActivity {
+  key: string;
+}
+
+export type GameSource = 'steam' | 'epic' | 'heroic' | 'lutris' | 'curated' | 'user';
+
+/** A game this device knows about: customised, added, or running now. */
+export interface GameRow {
+  /** `steam:<appid>`, `epic:<AppName>`, `heroic:<runner>:<app_name>`, `lutris:<slug>`, `curated:<id>` or `user:<id>`. Never a path. */
+  key: string;
+  /** The name that is shared (the rename, when there is one). */
+  name: string;
+  /** The name it was recognised by. */
+  detected_name: string;
+  source: GameSource;
+  hidden: boolean;
+  renamed: boolean;
+  running: boolean;
+}
+
+export interface GamesState {
+  /** Sharing is on for `account`. */
+  share: boolean;
+  /** The desktop account (`${domain}:${userId}`) the shell takes as signed in now - the one
+   * `share` and `current` are for - or null when there is none. A page must report a game
+   * only when this is its own account: around a switch the shell may already be on the
+   * next one. */
+  account: string | null;
+  /** Null when sharing is off, nothing is running, or the game is hidden. */
+  current: CurrentGame | null;
+  games: GameRow[];
+}
+
+/** A program running now, for "Add it": an opaque id the shell maps back to the program for a
+ * few minutes, and the program's file name. Never its path, command line or environment. */
+export interface RunningProgram {
+  id: string;
+  name: string;
+}
+
+const GAME_SOURCES: ReadonlySet<string> = new Set(['steam', 'epic', 'heroic', 'lutris', 'curated', 'user']);
+
+function str(v: unknown): string {
+  return typeof v === 'string' ? v : '';
+}
+
+function startedAt(v: unknown): number {
+  return typeof v === 'number' && Number.isFinite(v) && v > 0 ? Math.floor(v) : 0;
+}
+
+/** The activity-changed payload, or null when it is not one. */
+function toGameActivity(v: unknown): GameActivity | null {
+  if (!v || typeof v !== 'object') return null;
+  const o = v as Record<string, unknown>;
+  const name = str(o.name);
+  return name ? { name, started_at: startedAt(o.started_at) } : null;
+}
+
+function toGameRow(v: unknown): GameRow | null {
+  if (!v || typeof v !== 'object') return null;
+  const o = v as Record<string, unknown>;
+  const key = str(o.key);
+  const name = str(o.name);
+  if (!key || !name) return null;
+  const source = str(o.source);
+  return {
+    key,
+    name,
+    detected_name: str(o.detected_name) || name,
+    source: (GAME_SOURCES.has(source) ? source : 'curated') as GameSource,
+    hidden: o.hidden === true,
+    renamed: o.renamed === true,
+    running: o.running === true,
+  };
+}
+
+function toGamesState(v: unknown): GamesState {
+  const o = v && typeof v === 'object' ? (v as Record<string, unknown>) : {};
+  const cur = toGameActivity(o.current);
+  const key = o.current && typeof o.current === 'object' ? str((o.current as Record<string, unknown>).key) : '';
+  return {
+    share: o.share === true,
+    account: typeof o.account === 'string' && o.account ? o.account : null,
+    // The key is for the Settings page; what to share does not depend on it.
+    current: cur ? { ...cur, key } : null,
+    games: Array.isArray(o.games) ? o.games.map(toGameRow).filter((g): g is GameRow => g !== null) : [],
+  };
+}
+
+let gamesProbe: Promise<boolean> | null = null;
+
+/**
+ * Whether this shell can detect games: Electron has the bridge member, Tauri answers
+ * games_get_state. False in a browser, in an older desktop build, and in a popup window (the
+ * shell answers the main window only). A yes is remembered; a no is asked again next time.
+ */
+export function gamesAvailable(): Promise<boolean> {
+  if (electron) return Promise.resolve(!electron.isPopup && typeof electron.games?.getState === 'function');
+  if (!('__TAURI_INTERNALS__' in window) || desktopWindow.isPopup()) return Promise.resolve(false);
+  if (!gamesProbe) {
+    gamesProbe = invoke('games_get_state').then(
+      () => true,
+      () => {
+        gamesProbe = null;
+        return false;
+      },
+    );
+  }
+  return gamesProbe;
+}
+
+function electronGames() {
+  const g = electron?.games;
+  if (!g) throw new Error('This version of Strafe Desktop cannot detect games.');
+  return g;
+}
+
+/** The share switch, the game being shared and the games list. Never scans. */
+export async function gamesGetState(): Promise<GamesState> {
+  if (electron) return toGamesState(await bridged(() => electronGames().getState()));
+  return toGamesState(await invoke('games_get_state'));
+}
+
+/** Sharing on or off for one desktop account (`activeDesktopAccountId()`); off stops the scanner. */
+export async function gamesSetShare(on: boolean, account: string): Promise<void> {
+  if (electron) {
+    await bridged(() => electronGames().setShare(on, account));
+    return;
+  }
+  await invoke('games_set_share', { on, account });
+}
+
+export async function gamesSetHidden(key: string, hidden: boolean): Promise<void> {
+  if (electron) {
+    await bridged(() => electronGames().setHidden(key, hidden));
+    return;
+  }
+  await invoke('games_set_hidden', { key, hidden });
+}
+
+/** Share the game under another name; null goes back to the detected one. */
+export async function gamesRename(key: string, name: string | null): Promise<void> {
+  if (electron) {
+    await bridged(() => electronGames().rename(key, name));
+    return;
+  }
+  await invoke('games_rename', { key, name });
+}
+
+/** Programs running now, for "Add it". Asked for when the picker opens; nothing is kept. */
+export async function gamesRunningPrograms(): Promise<RunningProgram[]> {
+  const raw: unknown = electron ? await bridged(() => electronGames().runningPrograms()) : await invoke('games_running_programs');
+  if (!Array.isArray(raw)) return [];
+  const out: RunningProgram[] = [];
+  for (const p of raw) {
+    if (!p || typeof p !== 'object') continue;
+    const id = str((p as Record<string, unknown>).id);
+    const name = str((p as Record<string, unknown>).name);
+    if (id && name) out.push({ id, name });
+  }
+  return out;
+}
+
+/** Make a running program (by its id from gamesRunningPrograms) a game with this name. */
+export async function gamesAdd(id: string, name: string): Promise<GameRow | null> {
+  const raw: unknown = electron ? await bridged(() => electronGames().add(id, name)) : await invoke('games_add', { id, name });
+  return toGameRow(raw);
+}
+
+/** Forget a game the person added (`user:` keys only). */
+export async function gamesRemove(key: string): Promise<void> {
+  if (electron) {
+    await bridged(() => electronGames().remove(key));
+    return;
+  }
+  await invoke('games_remove', { key });
+}
+
+/**
+ * Calls back with what to share whenever it changes: the game, or null. Not buffered: a page
+ * that starts after the shell found a game reads gamesGetState().current first.
+ */
+export async function onActivityChanged(cb: (activity: GameActivity | null) => void): Promise<() => void> {
+  if (electron) return bridged(() => electronGames().onActivityChanged((v) => cb(toGameActivity(v))));
+  return getCurrentWebviewWindow().listen<unknown>('activity-changed', (e) => cb(toGameActivity(e.payload)));
 }

@@ -5,6 +5,7 @@ import { ProfileIdentity } from './ProfileIdentity';
 import { ProfileBirthday } from './ProfileBirthday';
 import { RolePill } from './RolePill';
 import { PresenceDot } from './PresenceDot';
+import { ProfileActivity } from './ActivityStatus';
 import { IconButton } from './ui/IconButton';
 import { openReportDialog } from './ReportDialog';
 import { ResponsiveDialog } from './ui/ResponsiveDialog';
@@ -145,6 +146,8 @@ export const UserProfileFullModal: Component = () => {
                 onCopyTag={copyTag}
               />
             </div>
+
+            <ProfileActivity userId={subject()?.userId} />
 
             <ProfileBirthday birthday={subject()?.birthday} />
 

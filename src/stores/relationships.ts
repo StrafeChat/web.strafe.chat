@@ -1,7 +1,7 @@
 import { createStore } from 'solid-js/store';
 import { notificationPrefs, playNotificationSound } from './notificationPrefs';
 import { listRelationships, type Relationship, type RelationshipUser, type RelationshipType } from '../api/relationships';
-import { setUserPresence, notificationsSuppressedByStatus, type UserPresence } from './presence';
+import { dropActivitiesOutsideAudience, setUserPresence, notificationsSuppressedByStatus, type UserPresence } from './presence';
 import { onStargateEvent } from '../services/stargate/client';
 import { t } from '../i18n';
 
@@ -33,7 +33,7 @@ export async function loadRelationships(): Promise<void> {
     const list = await listRelationships();
     for (const r of list) {
       if (r.user.presence?.status) {
-        setUserPresence(r.user.id, r.user.presence);
+        setUserPresence(r.user.id, r.user.presence, { activities: r.type === RelType.Friend });
       }
     }
     setRelationships({ relationships: dedupeByUserId(list), loading: false, hydrated: true });
@@ -61,7 +61,9 @@ export function hydrateRelationshipsFromReady(relsData: unknown[]): void {
   const list = dedupeByUserId(relsData as Relationship[]);
   for (const r of list) {
     if (r.user.presence?.status) {
-      setUserPresence(r.user.id, r.user.presence);
+      // Only a friend's entry carries their activity; a request or a block never does, and
+      // must not wipe one known from a shared space.
+      setUserPresence(r.user.id, r.user.presence, { activities: r.type === RelType.Friend });
     }
   }
   setRelationships({ relationships: list, loading: false, hydrated: true });
@@ -125,12 +127,15 @@ function applyRelationshipAdd(payload: unknown): void {
   const user = userFromPayload(d.user);
   if (!user) return;
   const otherUserId = user.id;
-  if (user.presence?.status) setUserPresence(otherUserId, user.presence);
+  if (user.presence?.status) setUserPresence(otherUserId, user.presence, { activities: type === RelType.Friend });
   setRelationships('relationships', (rels: Relationship[]) => {
     const filtered = rels.filter((r) => (normId(r.user.id) ?? r.user.id) !== otherUserId);
     const next = [...filtered, { id: otherUserId, type, user, nickname: undefined, is_spam_request: undefined, stranger_request: undefined, user_ignored: undefined, since: undefined }];
     return dedupeByUserId(next);
   });
+  // No longer a friend (blocked, or back to a request): their game stays shown only if we
+  // still share a space with them.
+  if (type !== RelType.Friend) dropActivitiesOutsideAudience([otherUserId]);
 }
 
 /** Ensure at most one relationship per user id (keeps last occurrence). */
@@ -155,6 +160,8 @@ function applyRelationshipRemove(payload: unknown): void {
 export function removeRelationshipLocally(userId: string): void {
   const uid = normId(userId) ?? userId;
   setRelationships('relationships', (rels: Relationship[]) => rels.filter((r) => (normId(r.user.id) ?? r.user.id) !== uid));
+  // An unfriend: their game stays shown only if we still share a space with them.
+  dropActivitiesOutsideAudience([uid]);
 }
 
 /** Apply RELATIONSHIP_REQUEST: add incoming request (from user sent us a request). */
