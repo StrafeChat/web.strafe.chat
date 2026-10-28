@@ -1,11 +1,12 @@
 import type { Component } from 'solid-js';
-import { createEffect, createMemo, createSignal, For, Show, untrack } from 'solid-js';
+import { createEffect, createMemo, createSignal, For, onCleanup, Show, untrack } from 'solid-js';
+import { Portal } from 'solid-js/web';
 import { ResponsiveDialog } from './ui/ResponsiveDialog';
 import { Button } from './ui/Button';
-import { Input, fieldLabelClass } from './ui/Input';
+import { Input, fieldLabelClass, inputBaseClass } from './ui/Input';
 import { Toggle } from './ui/Toggle';
 import { ColorPicker } from './ui/ColorPicker';
-import { appDialogActions } from '../theme/appChrome';
+import { appDialogActions, appMenuPanel, zLayer } from '../theme/appChrome';
 import { t } from '../i18n';
 import { spaceFolders, DEFAULT_FOLDER_COLOR } from '../stores/spaceFolders';
 import { spaces } from '../stores/spaces';
@@ -19,19 +20,107 @@ interface SpaceFolderSettingsModalProps {
   onCreated?: (folderId: string) => void;
 }
 
-const DEFAULT_ICONS = [
+const FOLDER_ICONS = [
   'fa-solid fa-folder',
+  'fa-solid fa-folder-open',
+  'fa-solid fa-folder-tree',
   'fa-solid fa-star',
   'fa-solid fa-heart',
   'fa-solid fa-bolt',
-  'fa-solid fa-gamepad',
-  'fa-solid fa-code',
-  'fa-solid fa-music',
-  'fa-solid fa-book',
-  'fa-solid fa-flask',
-  'fa-solid fa-rocket',
+  'fa-solid fa-fire',
   'fa-solid fa-crown',
+  'fa-solid fa-gem',
+  'fa-solid fa-gift',
+  'fa-solid fa-gamepad',
   'fa-solid fa-dice',
+  'fa-solid fa-chess',
+  'fa-solid fa-puzzle-piece',
+  'fa-solid fa-ghost',
+  'fa-solid fa-dragon',
+  'fa-solid fa-cat',
+  'fa-solid fa-dog',
+  'fa-solid fa-fish',
+  'fa-solid fa-dove',
+  'fa-solid fa-frog',
+  'fa-solid fa-paw',
+  'fa-solid fa-code',
+  'fa-solid fa-terminal',
+  'fa-solid fa-laptop-code',
+  'fa-solid fa-robot',
+  'fa-solid fa-microchip',
+  'fa-solid fa-atom',
+  'fa-solid fa-flask',
+  'fa-solid fa-dna',
+  'fa-solid fa-heart-pulse',
+  'fa-solid fa-stethoscope',
+  'fa-solid fa-music',
+  'fa-solid fa-headphones',
+  'fa-solid fa-guitar',
+  'fa-solid fa-microphone',
+  'fa-solid fa-film',
+  'fa-solid fa-camera',
+  'fa-solid fa-palette',
+  'fa-solid fa-paintbrush',
+  'fa-solid fa-pen-nib',
+  'fa-solid fa-book',
+  'fa-solid fa-book-open',
+  'fa-solid fa-bookmark',
+  'fa-solid fa-scroll',
+  'fa-solid fa-feather',
+  'fa-solid fa-rocket',
+  'fa-solid fa-plane',
+  'fa-solid fa-sailboat',
+  'fa-solid fa-car',
+  'fa-solid fa-bicycle',
+  'fa-solid fa-truck',
+  'fa-solid fa-train',
+  'fa-solid fa-compass',
+  'fa-solid fa-map',
+  'fa-solid fa-globe',
+  'fa-solid fa-earth-americas',
+  'fa-solid fa-mountain',
+  'fa-solid fa-tree',
+  'fa-solid fa-leaf',
+  'fa-solid fa-seedling',
+  'fa-solid fa-sun',
+  'fa-solid fa-moon',
+  'fa-solid fa-cloud',
+  'fa-solid fa-snowflake',
+  'fa-solid fa-umbrella',
+  'fa-solid fa-house',
+  'fa-solid fa-building',
+  'fa-solid fa-city',
+  'fa-solid fa-store',
+  'fa-solid fa-briefcase',
+  'fa-solid fa-chart-line',
+  'fa-solid fa-coins',
+  'fa-solid fa-wallet',
+  'fa-solid fa-trophy',
+  'fa-solid fa-medal',
+  'fa-solid fa-futbol',
+  'fa-solid fa-basketball',
+  'fa-solid fa-dumbbell',
+  'fa-solid fa-cake-candles',
+  'fa-solid fa-mug-hot',
+  'fa-solid fa-pizza-slice',
+  'fa-solid fa-ice-cream',
+  'fa-solid fa-carrot',
+  'fa-solid fa-apple-whole',
+  'fa-solid fa-bell',
+  'fa-solid fa-comment',
+  'fa-solid fa-envelope',
+  'fa-solid fa-flag',
+  'fa-solid fa-thumbtack',
+  'fa-solid fa-magnifying-glass',
+  'fa-solid fa-lock',
+  'fa-solid fa-key',
+  'fa-solid fa-user',
+  'fa-solid fa-user-astronaut',
+  'fa-solid fa-user-ninja',
+  'fa-solid fa-users',
+  'fa-solid fa-face-smile',
+  'fa-solid fa-shield-halved',
+  'fa-solid fa-wand-magic-sparkles',
 ];
 
 function spaceInitial(space: { name_acronym?: string; name?: string }): string {
@@ -43,9 +132,19 @@ export const SpaceFolderSettingsModal: Component<SpaceFolderSettingsModalProps> 
   const [name, setName] = createSignal('');
   const [color, setColor] = createSignal(DEFAULT_FOLDER_COLOR);
   const [icon, setIcon] = createSignal('');
+  const [iconMenuOpen, setIconMenuOpen] = createSignal(false);
+  const [iconMenuPos, setIconMenuPos] = createSignal<{
+    left: number;
+    top: number;
+    width: number;
+    maxHeight: number;
+  } | null>(null);
   const [useSpaceIcons, setUseSpaceIcons] = createSignal(false);
   const [saving, setSaving] = createSignal(false);
   const [error, setError] = createSignal('');
+  let iconMenuRoot: HTMLDivElement | undefined;
+  let iconTriggerEl: HTMLButtonElement | undefined;
+  let iconPanelEl: HTMLDivElement | undefined;
 
   const folder = createMemo(() => (props.folderId ? spaceFolders.get(props.folderId) : undefined));
   const isEdit = () => !!props.folderId;
@@ -60,7 +159,52 @@ export const SpaceFolderSettingsModal: Component<SpaceFolderSettingsModalProps> 
     setColor(current?.color || DEFAULT_FOLDER_COLOR);
     setIcon(current?.icon ?? '');
     setUseSpaceIcons(current?.useSpaceIcons ?? false);
+    setIconMenuOpen(false);
     setError('');
+  });
+
+  createEffect(() => {
+    if (!iconMenuOpen()) {
+      setIconMenuPos(null);
+      return;
+    }
+    function place() {
+      const anchor = iconTriggerEl;
+      if (!anchor) return;
+      const rect = anchor.getBoundingClientRect();
+      const edge = 8;
+      const gap = 6;
+      const preferred = 240;
+      const below = window.innerHeight - rect.bottom - gap - edge;
+      const above = rect.top - gap - edge;
+      const openUp = below < 140 && above > below;
+      const maxHeight = Math.max(120, Math.min(preferred, openUp ? above : below));
+      const top = openUp ? Math.max(edge, rect.top - gap - maxHeight) : rect.bottom + gap;
+      const width = Math.min(rect.width, window.innerWidth - edge * 2);
+      const left = Math.max(edge, Math.min(rect.left, window.innerWidth - width - edge));
+      setIconMenuPos({ left, top, width, maxHeight });
+    }
+    function onPointerDown(e: PointerEvent) {
+      const target = e.target as Node | null;
+      if (target && (iconMenuRoot?.contains(target) || iconPanelEl?.contains(target))) return;
+      setIconMenuOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== 'Escape') return;
+      e.stopPropagation();
+      setIconMenuOpen(false);
+    }
+    requestAnimationFrame(place);
+    document.addEventListener('pointerdown', onPointerDown, true);
+    document.addEventListener('keydown', onKey, true);
+    window.addEventListener('resize', place);
+    window.addEventListener('scroll', place, true);
+    onCleanup(() => {
+      document.removeEventListener('pointerdown', onPointerDown, true);
+      document.removeEventListener('keydown', onKey, true);
+      window.removeEventListener('resize', place);
+      window.removeEventListener('scroll', place, true);
+    });
   });
 
   function handleClose() {
@@ -171,27 +315,74 @@ export const SpaceFolderSettingsModal: Component<SpaceFolderSettingsModalProps> 
           </div>
 
           <Show when={!useSpaceIcons()}>
-            <div class="flex flex-col gap-2">
+            <div class="flex flex-col gap-2" ref={(el) => (iconMenuRoot = el)}>
               <span class={fieldLabelClass}>{t('space.folders.icon')}</span>
-              <div class="grid grid-cols-6 justify-items-center gap-2">
-                <For each={DEFAULT_ICONS}>
-                  {(candidate) => (
-                    <button
-                      type="button"
-                      class={`flex size-9 items-center justify-center rounded-lg border text-sm transition-colors ${
-                        icon() === candidate
-                          ? 'border-primary bg-primary/15 text-foreground'
-                          : 'border-border text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-                      }`}
-                      aria-label={candidate}
-                      aria-pressed={icon() === candidate}
-                      onClick={() => setIcon(icon() === candidate ? '' : candidate)}
-                    >
-                      <i class={candidate} aria-hidden="true" />
-                    </button>
-                  )}
-                </For>
-              </div>
+              <button
+                type="button"
+                ref={(el) => (iconTriggerEl = el)}
+                class={`${inputBaseClass} flex h-10 min-h-10 items-center gap-2 px-3 py-2 text-start focus:border-transparent! focus-visible:ring-0! focus:bg-muted/40 disabled:cursor-not-allowed disabled:opacity-50`}
+                aria-expanded={iconMenuOpen()}
+                aria-haspopup="listbox"
+                disabled={saving()}
+                onClick={() => setIconMenuOpen((open) => !open)}
+              >
+                <span class="flex size-7 shrink-0 items-center justify-center rounded-md border border-border/60 bg-muted/30 text-muted-foreground">
+                  <i class={icon() || 'fa-solid fa-folder'} aria-hidden="true" />
+                </span>
+                <span
+                  class={`min-w-0 flex-1 truncate font-mono text-xs ${icon() ? 'text-foreground' : 'text-muted-foreground'}`}
+                >
+                  {icon() || t('space.folders.chooseIcon')}
+                </span>
+                <i
+                  class={`fa-solid fa-chevron-down shrink-0 text-[11px] text-muted-foreground transition-transform duration-200 ${
+                    iconMenuOpen() ? 'rotate-180' : ''
+                  }`}
+                  aria-hidden="true"
+                />
+              </button>
+              <Show when={iconMenuOpen()}>
+                <Portal mount={document.body}>
+                  <div
+                    ref={(el) => (iconPanelEl = el)}
+                    role="listbox"
+                    aria-label={t('space.folders.icon')}
+                    class={`fixed ${zLayer.popover} overflow-y-auto overscroll-contain ${appMenuPanel}`}
+                    style={{
+                      left: `${iconMenuPos()?.left ?? 0}px`,
+                      top: `${iconMenuPos()?.top ?? 0}px`,
+                      width: `${iconMenuPos()?.width ?? 0}px`,
+                      'max-height': `${iconMenuPos()?.maxHeight ?? 240}px`,
+                      visibility: iconMenuPos() ? 'visible' : 'hidden',
+                    }}
+                  >
+                    <div class="grid grid-cols-[repeat(auto-fill,minmax(2rem,1fr))] justify-items-center gap-1">
+                      <For each={FOLDER_ICONS}>
+                        {(candidate) => (
+                          <button
+                            type="button"
+                            role="option"
+                            aria-selected={icon() === candidate}
+                            aria-label={candidate}
+                            class={`flex size-8 items-center justify-center rounded-lg text-[13px] transition-colors ${
+                              icon() === candidate
+                                ? 'bg-primary/20 text-foreground ring-1 ring-primary/50'
+                                : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                            }`}
+                            title={candidate}
+                            onClick={() => {
+                              setIcon(candidate);
+                              setIconMenuOpen(false);
+                            }}
+                          >
+                            <i class={candidate} aria-hidden="true" />
+                          </button>
+                        )}
+                      </For>
+                    </div>
+                  </div>
+                </Portal>
+              </Show>
               <Input
                 id="folder-icon"
                 type="text"
