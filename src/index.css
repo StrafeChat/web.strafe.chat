@@ -272,41 +272,6 @@ img.emoji.emoji-jumbo,
   transform: translate(-50%, calc(-50% + 1px));
 }
 
-/* Color picker hue slider */
-.color-picker-hue {
-  --cp-thumb: #fff;
-}
-.color-picker-hue::-webkit-slider-thumb {
-  appearance: none;
-  width: 18px;
-  height: 18px;
-  border: 2px solid rgb(255 255 255 / 0.92);
-  border-radius: 9999px;
-  background: var(--cp-thumb);
-  box-shadow:
-    0 0 0 1px rgb(0 0 0 / 0.55),
-    0 1px 4px rgb(0 0 0 / 0.45);
-  cursor: grab;
-}
-.color-picker-hue:active::-webkit-slider-thumb {
-  cursor: grabbing;
-}
-.color-picker-hue::-moz-range-thumb {
-  width: 18px;
-  height: 18px;
-  border: 2px solid rgb(255 255 255 / 0.92);
-  border-radius: 9999px;
-  background: var(--cp-thumb);
-  box-shadow:
-    0 0 0 1px rgb(0 0 0 / 0.55),
-    0 1px 4px rgb(0 0 0 / 0.45);
-  cursor: grab;
-}
-.color-picker-hue:focus-visible {
-  outline: 2px solid var(--color-ring);
-  outline-offset: 2px;
-}
-
 /* Accessibility: underline every link (settings → Accessibility) */
 html.underline-links a {
   text-decoration: underline;
