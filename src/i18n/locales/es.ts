@@ -828,6 +828,7 @@ export default {
   },
   profile: {
     report: 'Denunciar usuario',
+    moreActions: 'Más acciones',
     noBio: 'Aún no hay biografía.',
     birthday: 'Cumpleaños',
     birthdayToday: '¡Es su cumpleaños!',

@@ -828,6 +828,7 @@ export default {
   },
   profile: {
     report: "Signaler l'utilisateur",
+    moreActions: "Plus d'actions",
     noBio: 'Pas encore de bio.',
     birthday: 'Anniversaire',
     birthdayToday: "C'est son anniversaire !",

@@ -815,6 +815,7 @@ export default {
   },
   profile: {
     report: 'Report user',
+    moreActions: 'More actions',
     noBio: 'No bio yet.',
     birthday: 'Birthday',
     birthdayToday: "It's their birthday!",

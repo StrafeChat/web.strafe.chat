@@ -872,6 +872,7 @@ export default {
   },
   profile: {
     report: 'الإبلاغ عن المستخدم',
+    moreActions: 'المزيد من الإجراءات',
     noBio: 'لا توجد نبذة بعد.',
     birthday: 'عيد الميلاد',
     birthdayToday: '🎂 اليوم عيد ميلاده!',

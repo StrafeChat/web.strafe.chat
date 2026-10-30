@@ -812,6 +812,7 @@ export default {
   },
   profile: {
     report: 'Nutzer melden',
+    moreActions: 'Weitere Aktionen',
     noBio: 'Noch keine Bio.',
     birthday: 'Geburtstag',
     birthdayToday: 'Heute ist ihr Geburtstag!',
