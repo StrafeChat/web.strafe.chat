@@ -341,9 +341,7 @@ const MemberRow: Component<{
 
   return (
     <div
-      class={`group/member flex items-center gap-1 rounded-lg px-2 py-[var(--density-member-py)] transition-colors hover:bg-accent/50 ${
-        props.dim ? 'opacity-60 hover:opacity-100' : ''
-      }`}
+      class={`group/member flex items-center gap-1 rounded-lg px-2 py-[var(--density-member-py)] transition-colors hover:bg-accent/50`}
       onContextMenu={(e) => {
         const sid = props.spaceId;
         const extraItems = buildSpaceModerationItems({
@@ -390,12 +388,16 @@ const MemberRow: Component<{
         onClick={openProfile}
       >
         <div class="relative shrink-0">
-          <MessageAvatar name={displayName()} avatar={profile().avatar} class="size-8 text-[13px]" />
+          <MessageAvatar
+            name={displayName()}
+            avatar={profile().avatar}
+            class={`size-8 text-[13px] ${props.dim ? 'opacity-60 transition-opacity group-hover/member:opacity-100' : ''}`}
+          />
           <span class="absolute -bottom-px -end-px">
             <PresenceDot userId={props.p.id} class="size-3.5" />
           </span>
         </div>
-        <div class="min-w-0 flex-1">
+        <div class={`min-w-0 flex-1 ${props.dim ? 'opacity-60 transition-opacity group-hover/member:opacity-100' : ''}`}>
           <p class="flex items-center gap-1.5 truncate text-sm font-medium leading-tight">
             <span
               class="truncate"
