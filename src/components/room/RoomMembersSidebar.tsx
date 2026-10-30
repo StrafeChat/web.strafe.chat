@@ -8,6 +8,7 @@ import { activityOf, customStatusOf, presence } from '../../stores/presence';
 import { PlayingText } from '../ActivityStatus';
 import { showContextMenu, type ContextMenuItem } from '../../stores/contextMenu';
 import { buildUserMenuItems, buildSpaceModerationItems } from '../../lib/userContextMenu';
+import type { SpaceModerationContext } from '../../lib/userContextMenu';
 import { appActivityRail, appSectionLabel } from '../../theme/appChrome';
 import {
   canEditNicknameOf,
@@ -311,6 +312,33 @@ const MemberRow: Component<{
     return customStatus() || presenceStatusLabel(st);
   };
 
+  function moderationContext(): SpaceModerationContext {
+    const sid = props.spaceId;
+    return {
+      spaceId: props.spaceId,
+      targetUserId: props.p.id,
+      targetRoleIds: getMemberRoleIds(props.p),
+      currentUserId: props.currentUserId,
+      spaceOwnerId: props.spaceOwnerId,
+      spaceRoles: props.spaceRoles,
+      viewerHighestRolePosition: props.viewerHighestRolePosition,
+      canKickMembers: props.canKickMembers,
+      canBanMembers: props.canBanMembers,
+      onKick: props.onKickMember,
+      onBan: props.onBanMember,
+      canRemoveFromGroup: props.isCreator && !isSelf(),
+      onRemoveFromGroup: props.onRemoveMember,
+      canChangeOwnNickname: props.canChangeOwnNickname,
+      canManageNicknames: props.canManageNicknames,
+      ...(sid
+        ? {
+            onEditNickname: (uid: string) => openNicknameDialog({ spaceId: sid, userId: uid }),
+            onEditSpaceProfile: () => openUserSettings('spaceProfiles', { spaceId: sid }),
+          }
+        : {}),
+    };
+  }
+
   function openProfile(e: MouseEvent) {
     e.stopPropagation();
     const roles = props.spaceRoles;
@@ -335,6 +363,7 @@ const MemberRow: Component<{
       onMessageUser: props.onMessageUser,
       spaceRoles: props.spaceRoles,
       spaceRoleContext,
+      spaceModerationContext: moderationContext(),
       spaceId: sid,
     });
   }
@@ -343,30 +372,7 @@ const MemberRow: Component<{
     <div
       class={`group/member flex items-center gap-1 rounded-lg px-2 py-[var(--density-member-py)] transition-colors hover:bg-accent/50`}
       onContextMenu={(e) => {
-        const sid = props.spaceId;
-        const extraItems = buildSpaceModerationItems({
-          spaceId: props.spaceId,
-          targetUserId: props.p.id,
-          targetRoleIds: getMemberRoleIds(props.p),
-          currentUserId: props.currentUserId,
-          spaceOwnerId: props.spaceOwnerId,
-          spaceRoles: props.spaceRoles,
-          viewerHighestRolePosition: props.viewerHighestRolePosition,
-          canKickMembers: props.canKickMembers,
-          canBanMembers: props.canBanMembers,
-          onKick: props.onKickMember,
-          onBan: props.onBanMember,
-          canRemoveFromGroup: props.isCreator && !isSelf(),
-          onRemoveFromGroup: props.onRemoveMember,
-          canChangeOwnNickname: props.canChangeOwnNickname,
-          canManageNicknames: props.canManageNicknames,
-          ...(sid
-            ? {
-                onEditNickname: (uid: string) => openNicknameDialog({ spaceId: sid, userId: uid }),
-                onEditSpaceProfile: () => openUserSettings('spaceProfiles', { spaceId: sid }),
-              }
-            : {}),
-        });
+        const extraItems = buildSpaceModerationItems(moderationContext());
         const items = buildUserMenuItems({
           userId: props.p.id,
           bot: props.p.bot,

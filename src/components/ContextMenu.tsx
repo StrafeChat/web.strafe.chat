@@ -107,17 +107,20 @@ export const ContextMenu: Component = () => {
       closeContextMenu();
     };
     const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') closeContextMenu();
+      if (e.key !== 'Escape' || e.defaultPrevented) return;
+      e.preventDefault();
+      e.stopPropagation();
+      closeContextMenu();
     };
     const handleReflow = () => closeContextMenu();
     document.addEventListener('click', handleClick, true);
-    document.addEventListener('keydown', handleKey);
+    document.addEventListener('keydown', handleKey, true);
     window.addEventListener('resize', handleReflow);
     // onCleanup, not a returned function: createEffect passes a returned value to the next
     // run, it does not treat it as a teardown - so these listeners used to leak on close.
     onCleanup(() => {
       document.removeEventListener('click', handleClick, true);
-      document.removeEventListener('keydown', handleKey);
+      document.removeEventListener('keydown', handleKey, true);
       window.removeEventListener('resize', handleReflow);
     });
   });
@@ -140,10 +143,11 @@ export const ContextMenu: Component = () => {
         <div
           ref={(el) => {
             menuEl = el;
+            if (state().open) queueMicrotask(place);
           }}
           id="context-menu-portal"
           role="menu"
-          class={`fixed ${zLayer.popover} min-w-[180px] max-h-[min(70vh,24rem)] overflow-y-auto ${appMenuPanel}`}
+          class={`fixed ${zLayer.menu} min-w-[180px] max-h-[min(70vh,24rem)] overflow-y-auto ${appMenuPanel}`}
           style={{
             left: `${pos()?.left ?? state().x}px`,
             top: `${pos()?.top ?? state().y}px`,
@@ -192,7 +196,7 @@ export const ContextMenu: Component = () => {
               id="context-submenu-portal"
               role="menu"
               aria-label={current().label}
-              class={`fixed ${zLayer.popover} min-w-[180px] max-h-[min(70vh,24rem)] overflow-y-auto ${appMenuPanel}`}
+              class={`fixed ${zLayer.menu} min-w-[180px] max-h-[min(70vh,24rem)] overflow-y-auto ${appMenuPanel}`}
               style={{
                 left: `${submenuPos()?.left ?? current().anchor.right + SUBMENU_GAP}px`,
                 top: `${submenuPos()?.top ?? current().anchor.top}px`,

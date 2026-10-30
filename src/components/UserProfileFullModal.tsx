@@ -8,7 +8,6 @@ import { RolePill } from './RolePill';
 import { PresenceDot } from './PresenceDot';
 import { ProfileActivity } from './ActivityStatus';
 import { IconButton } from './ui/IconButton';
-import { openReportDialog } from './ReportDialog';
 import { ResponsiveDialog } from './ui/ResponsiveDialog';
 import { markdownAndHtmlToSanitizedBioHtml } from '../lib/profileRichText';
 import {
@@ -16,6 +15,9 @@ import {
   userProfileFullModal,
 } from '../stores/userProfileFullModal';
 import { openSafetyNumberModal } from '../stores/safetyNumberModal';
+import { contextMenuState, showContextMenu } from '../stores/contextMenu';
+import type { ContextMenuItem } from '../stores/contextMenu';
+import { buildUserMenuItems } from '../lib/userContextMenu';
 import { appSectionLabel } from '../theme/appChrome';
 import { t } from '../i18n';
 import { formatHandle } from '../stores/instance';
@@ -36,10 +38,43 @@ export const UserProfileFullModal: Component = () => {
     void navigator.clipboard.writeText(formatHandle({ username: s.username, home_domain: s.homeDomain }));
   }
 
-  function copyUserId() {
+  function openActionsMenu(e: MouseEvent) {
     const s = subject();
     if (!s) return;
-    void navigator.clipboard.writeText(s.userId);
+    const extraItems: ContextMenuItem[] = [];
+    if (!isSelf()) {
+      extraItems.push({
+        label: t('safety.title'),
+        icon: 'fa-shield-halved',
+        onClick: () => {
+          openSafetyNumberModal({ userId: s.userId, displayName: s.displayName });
+          closeUserProfileFullModal();
+        },
+      });
+    }
+    extraItems.push({ label: t('common.close'), icon: 'fa-xmark', onClick: () => closeUserProfileFullModal() });
+
+    showContextMenu(
+      e,
+      buildUserMenuItems({
+        userId: s.userId,
+        username: s.username,
+        displayName: s.displayName,
+        homeDomain: s.homeDomain,
+        currentUserId: userProfileFullModal.currentUserId,
+        bot: s.bot,
+        spaceId: s.spaceId,
+        onMessage:
+          !isSelf() && userProfileFullModal.onMessageUser
+            ? (id) => {
+                const fn = userProfileFullModal.onMessageUser;
+                closeUserProfileFullModal();
+                fn?.(id);
+              }
+            : undefined,
+        extraItems,
+      }),
+    );
   }
 
   return (
@@ -54,52 +89,15 @@ export const UserProfileFullModal: Component = () => {
         <div class="relative shrink-0">
           <ProfileBanner banner={subject()?.banner} class="max-h-36 sm:max-h-44" fit="natural" />
           <div class="absolute end-3 top-3 flex items-center gap-2">
-            <Show when={!isSelf() && userProfileFullModal.onMessageUser}>
-              <IconButton
-                size="lg"
-                tone="overlay"
-                icon="fa-solid fa-paper-plane"
-                label={t('friends.actions.message')}
-                onClick={() => {
-                  const id = subject()?.userId;
-                  const fn = userProfileFullModal.onMessageUser;
-                  if (id && fn) {
-                    closeUserProfileFullModal();
-                    fn(id);
-                  }
-                }}
-              />
-            </Show>
-            <Show when={!isSelf()}>
-              <IconButton
-                size="lg"
-                tone="overlay"
-                icon="fa-solid fa-shield-halved"
-                label={t('safety.title')}
-                onClick={() => {
-                  const s = subject();
-                  if (!s) return;
-                  openSafetyNumberModal({ userId: s.userId, displayName: s.displayName });
-                  closeUserProfileFullModal();
-                }}
-              />
-            </Show>
-            <Show when={!isSelf()}>
-              <IconButton
-                size="lg"
-                tone="overlay"
-                icon="fa-solid fa-flag"
-                label={t('profile.report')}
-                onClick={() => {
-                  const s = subject();
-                  if (!s) return;
-                  closeUserProfileFullModal();
-                  openReportDialog({ targetType: 'user', targetId: s.userId, targetName: s.displayName });
-                }}
-              />
-            </Show>
-            <IconButton size="lg" tone="overlay" icon="fa-regular fa-id-card" label={t('userArea.copyUserId')} onClick={copyUserId} />
-            <IconButton size="lg" tone="overlay" icon="fa-solid fa-xmark" label={t('common.close')} onClick={() => closeUserProfileFullModal()} />
+            <IconButton
+              size="lg"
+              tone="overlay"
+              icon="fa-solid fa-ellipsis"
+              label={t('profile.moreActions')}
+              aria-haspopup="menu"
+              aria-expanded={contextMenuState().open}
+              onClick={openActionsMenu}
+            />
           </div>
           <div class="relative -mt-12 px-6">
             <div class="relative inline-block">

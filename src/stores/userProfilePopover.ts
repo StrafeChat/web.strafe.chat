@@ -1,6 +1,7 @@
 import { createStore } from 'solid-js/store';
 import type { RoomParticipant } from '../api/rooms';
 import type { SpaceRole } from '../api/spaces';
+import type { SpaceModerationContext } from '../lib/userContextMenu';
 import { popoverSubjectFromParticipant } from '../lib/userProfilePopoverHelpers';
 
 /** When set, popover may show role toggles for this space member (requires permission). */
@@ -141,6 +142,7 @@ type PopoverState = {
   currentUserId: string | undefined;
   onMessageUser: ((userId: string) => void) | undefined;
   spaceRoleContext: SpaceMemberRoleEditContext | null;
+  spaceModerationContext: SpaceModerationContext | null;
 };
 
 export const [userProfilePopover, setUserProfilePopover] = createStore<PopoverState>({
@@ -152,6 +154,7 @@ export const [userProfilePopover, setUserProfilePopover] = createStore<PopoverSt
   currentUserId: undefined,
   onMessageUser: undefined,
   spaceRoleContext: null,
+  spaceModerationContext: null,
 });
 
 export function closeUserProfilePopover(): void {
@@ -161,6 +164,7 @@ export function closeUserProfilePopover(): void {
     anchor: null,
     onMessageUser: undefined,
     spaceRoleContext: null,
+    spaceModerationContext: null,
   });
 }
 
@@ -185,6 +189,7 @@ export function openUserProfilePopover(opts: {
   currentUserId?: string;
   onMessageUser?: (userId: string) => void;
   spaceRoleContext?: SpaceMemberRoleEditContext | null;
+  spaceModerationContext?: SpaceModerationContext | null;
 }): void {
   const rect = toAnchorRect(opts.anchor.getBoundingClientRect());
   const left = computeHorizontal(rect);
@@ -198,6 +203,7 @@ export function openUserProfilePopover(opts: {
     currentUserId: opts.currentUserId,
     onMessageUser: opts.onMessageUser,
     spaceRoleContext: opts.spaceRoleContext ?? null,
+    spaceModerationContext: opts.spaceModerationContext ?? null,
   });
 }
 
@@ -208,6 +214,7 @@ export function openUserProfileFromParticipant(opts: {
   onMessageUser?: (userId: string) => void;
   spaceRoles?: SpaceRole[];
   spaceRoleContext?: SpaceMemberRoleEditContext | null;
+  spaceModerationContext?: SpaceModerationContext | null;
   /** The space the participant is shown in, so the card carries their space profile. */
   spaceId?: string;
 }): void {
@@ -220,5 +227,6 @@ export function openUserProfileFromParticipant(opts: {
     currentUserId: opts.currentUserId,
     onMessageUser: opts.onMessageUser,
     spaceRoleContext: opts.spaceRoleContext,
+    spaceModerationContext: opts.spaceModerationContext,
   });
 }
