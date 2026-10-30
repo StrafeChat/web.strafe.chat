@@ -195,7 +195,7 @@ const MediaEmbed: Component<{ href: string; kind: MediaKind; allowLinkPreviews?:
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={guardClick(props.href)}
-                class="text-primary underline underline-offset-2 break-all hover:text-primary/90"
+                class="text-primary underline underline-offset-2 break-words hover:text-primary/90"
               >
                 {props.href}
               </a>
@@ -369,7 +369,7 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
                 href={href}
                 target="_blank"
                 rel="noopener noreferrer"
-                class="text-primary underline underline-offset-2 break-all hover:text-primary/90 cursor-pointer"
+                class="text-primary underline underline-offset-2 break-words hover:text-primary/90 cursor-pointer"
                 onClick={(e) => {
                   if (!isExternalLink(href)) return;
                   if (e.shiftKey) return;
@@ -394,7 +394,7 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
               href={href}
               target="_blank"
               rel="noopener noreferrer"
-              class="text-primary underline underline-offset-2 break-all hover:text-primary/90 cursor-pointer"
+              class="text-primary underline underline-offset-2 break-words hover:text-primary/90 cursor-pointer"
               onClick={(e) => {
                 if (!isExternalLink(href)) return;
                 if (e.shiftKey) return; // Shift+click: bypass modal, open directly

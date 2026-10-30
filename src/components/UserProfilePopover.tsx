@@ -2,6 +2,7 @@ import type { Component } from 'solid-js';
 import { Show, For, onMount, onCleanup, createEffect, createSignal, createMemo, createResource } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { MessageAvatar } from './messageList/MessageAvatar';
+import { ProfileBanner } from './ProfileBanner';
 import { ProfileIdentity } from './ProfileIdentity';
 import { ProfileBirthday } from './ProfileBirthday';
 import { RolePill } from './RolePill';
@@ -35,6 +36,9 @@ import { appMenuItemDefault, appMenuPanel, appSectionLabel, zLayer } from '../th
 import { isMdViewport } from '../stores/mobileShellLayout';
 import { t } from '../i18n';
 import { openAppWindow } from '../lib/openWindow';
+import { contextMenuState, showContextMenu } from '../stores/contextMenu';
+import type { ContextMenuItem } from '../stores/contextMenu';
+import { buildSpaceModerationItems, buildUserMenuItems } from '../lib/userContextMenu';
 
 const EVERYONE_ROLE_NAME = '@everyone';
 /** How many role pills to show before a “+N” overflow chip (popover is narrow). */
@@ -54,6 +58,7 @@ const BannerIconButton: Component<{
     type="button"
     title={p.title}
     aria-label={p.title}
+    aria-haspopup="menu"
     aria-expanded={p.expanded}
     class="flex size-8 items-center justify-center rounded-full bg-black/45 text-white/90 backdrop-blur transition-colors hover:bg-black/65 hover:text-white"
     onClick={(e) => p.onClick(e)}
@@ -226,8 +231,10 @@ export const UserProfilePopover: Component = () => {
       if (!userProfilePopover.open) return;
       const el = document.getElementById('user-profile-popover-root');
       const menu = document.getElementById('profile-role-add-menu');
+      const actions = document.getElementById('context-menu-portal');
+      const submenu = document.getElementById('context-submenu-portal');
       const t = e.target as Node;
-      if (el?.contains(t) || menu?.contains(t)) return;
+      if (el?.contains(t) || menu?.contains(t) || actions?.contains(t) || submenu?.contains(t)) return;
       closeUserProfilePopover();
     };
     document.addEventListener('mousedown', onDoc, true);
@@ -340,10 +347,41 @@ export const UserProfilePopover: Component = () => {
   );
 
 
-  function copyUserId() {
+  function openActionsMenu(e: MouseEvent) {
     const s = subject();
     if (!s) return;
-    void navigator.clipboard.writeText(s.userId);
+    const extraItems: ContextMenuItem[] = [];
+    const moderation = userProfilePopover.spaceModerationContext;
+    if (moderation) extraItems.push(...buildSpaceModerationItems(moderation));
+    if (!isSelf()) {
+      extraItems.push({
+        label: t('safety.title'),
+        icon: 'fa-shield-halved',
+        onClick: () => openSafetyNumberModal({ userId: s.userId, displayName: s.displayName }),
+      });
+    }
+    const onMessageUser = userProfilePopover.onMessageUser;
+    const items = buildUserMenuItems({
+      userId: s.userId,
+      username: s.username,
+      displayName: s.displayName,
+      homeDomain: s.homeDomain,
+      currentUserId: userProfilePopover.currentUserId,
+      bot: s.bot,
+      spaceId: s.spaceId,
+      onMessage:
+        !isSelf() && onMessageUser
+          ? (id) => onMessageUser(id)
+          : undefined,
+      extraItems,
+    }).map((item) => ({
+      ...item,
+      onClick: (ev?: MouseEvent) => {
+        closeUserProfilePopover();
+        item.onClick(ev);
+      },
+    }));
+    showContextMenu(e, items);
   }
 
   // Your own card, opened inside a space, leads to that space's profile editor - the quickest
@@ -479,47 +517,14 @@ export const UserProfilePopover: Component = () => {
           </Show>
           <div class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             <div class="relative">
-              <div
-                class="h-20 bg-gradient-to-br from-primary/60 via-primary/30 to-primary/10 bg-cover bg-center"
-                style={{
-                  ...(subject()?.banner ? { 'background-image': `url(${subject()!.banner})` } : {}),
-                  ...(subject()?.banner
-                    ? {}
-                    : {
-                        'background-image':
-                          'radial-gradient(circle, rgba(255,255,255,0.14) 1px, transparent 1px)',
-                        'background-size': '14px 14px',
-                      }),
-                }}
-              />
+              <ProfileBanner banner={subject()?.banner} class="h-20" />
               <div class="absolute end-2.5 top-2.5 flex items-center gap-1.5">
-                <Show when={!isSelf() && userProfilePopover.onMessageUser}>
-                  <BannerIconButton
-                    icon="fa-solid fa-paper-plane"
-                    title={t('friends.actions.message')}
-                    onClick={() => {
-                      const id = subject()?.userId;
-                      const fn = userProfilePopover.onMessageUser;
-                      if (id && fn) {
-                        closeUserProfilePopover();
-                        fn(id);
-                      }
-                    }}
-                  />
-                </Show>
-                <Show when={!isSelf()}>
-                  <BannerIconButton
-                    icon="fa-solid fa-shield-halved"
-                    title={t('safety.title')}
-                    onClick={() => {
-                      const s = subject();
-                      if (!s) return;
-                      openSafetyNumberModal({ userId: s.userId, displayName: s.displayName });
-                      closeUserProfilePopover();
-                    }}
-                  />
-                </Show>
-                <BannerIconButton icon="fa-regular fa-id-card" title={t('userArea.copyUserId')} onClick={copyUserId} />
+                <BannerIconButton
+                  icon="fa-solid fa-ellipsis"
+                  title={t('profile.moreActions')}
+                  expanded={contextMenuState().open}
+                  onClick={openActionsMenu}
+                />
               </div>
               <div class="relative px-4 -mt-10">
                 <button

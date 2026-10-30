@@ -26,6 +26,7 @@ import { OfficialTag } from './OfficialTag';
 import { showContextMenu } from '../stores/contextMenu';
 import { onEditLastMessageRequest } from '../lib/chatShortcuts';
 import { buildUserMenuItems, buildSpaceModerationItems } from '../lib/userContextMenu';
+import type { SpaceModerationContext } from '../lib/userContextMenu';
 import { isBlocked } from '../stores/relationships';
 import { openReportDialog } from './ReportDialog';
 import { deleteMessage as deleteMessageApi } from '../api/messages';
@@ -336,24 +337,30 @@ export const MessageList: Component<MessageListProps> = (props) => {
       onMessage: props.onMessageUser,
       spaceId: props.spaceId,
       roomId: props.roomId,
-      extraItems: buildSpaceModerationItems({
-        spaceId: props.spaceId,
-        targetUserId: msg.sender_id,
-        targetRoleIds: (participant as { roles?: string[] } | undefined)?.roles,
-        currentUserId: currentUserId(),
-        spaceOwnerId: props.spaceOwnerId,
-        spaceRoles: props.spaceRoles,
-        viewerHighestRolePosition: props.viewerHighestRolePosition,
-        canKickMembers: props.canKickMembers,
-        canBanMembers: props.canBanMembers,
-        onKick: props.onKickMember,
-        onBan: props.onBanMember,
-        canChangeOwnNickname: props.canChangeOwnNickname,
-        canManageNicknames: props.canManageNicknames,
-        ...spaceProfileMenuActions(msg.sender_id),
-      }),
+      extraItems: buildSpaceModerationItems(
+        spaceModerationContext(msg.sender_id, (participant as { roles?: string[] } | undefined)?.roles),
+      ),
     });
     if (items.length) showContextMenu(e, items);
+  }
+
+  function spaceModerationContext(targetUserId: string, targetRoleIds?: string[]): SpaceModerationContext {
+    return {
+      spaceId: props.spaceId,
+      targetUserId,
+      targetRoleIds,
+      currentUserId: currentUserId(),
+      spaceOwnerId: props.spaceOwnerId,
+      spaceRoles: props.spaceRoles,
+      viewerHighestRolePosition: props.viewerHighestRolePosition,
+      canKickMembers: props.canKickMembers,
+      canBanMembers: props.canBanMembers,
+      onKick: props.onKickMember,
+      onBan: props.onBanMember,
+      canChangeOwnNickname: props.canChangeOwnNickname,
+      canManageNicknames: props.canManageNicknames,
+      ...spaceProfileMenuActions(targetUserId),
+    };
   }
 
   /** The space-profile menu callbacks: only inside a space (PMs and groups have none), and
@@ -411,6 +418,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
       currentUserId: uid,
       onMessageUser: props.onMessageUser,
       spaceRoleContext,
+      spaceModerationContext: spaceModerationContext(userId, subjectRoleIds),
     });
   }
 

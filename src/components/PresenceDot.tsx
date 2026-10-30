@@ -6,8 +6,8 @@ const STATUS_COLORS: Record<string, string> = {
   online: 'bg-primary',
   idle: 'bg-yellow-500',
   dnd: 'bg-red-500',
-  offline: 'bg-muted-foreground/50',
-  invisible: 'bg-muted-foreground/50',
+  offline: 'bg-muted-foreground',
+  invisible: 'bg-muted-foreground',
 };
 
 const KNOWN_STATUSES = new Set(['online', 'idle', 'dnd', 'offline', 'invisible']);
@@ -29,16 +29,11 @@ interface PresenceDotProps {
 export const PresenceDot: Component<PresenceDotProps> = (props) => {
   const p = () => presence.byUser[props.userId];
   const status = () => p()?.status ?? 'offline';
-  const titleText = () => {
-    if (props.title) return props.title;
-    const pres = p();
-    const label = presenceStatusLabel(pres?.status);
-    return pres?.custom_status ? `${label}: ${pres.custom_status}` : label;
-  };
+  const titleText = () => props.title ?? presenceStatusLabel(p()?.status);
   return (
     <div
       class={`shrink-0 rounded-full border-3 ${props.borderClass ?? 'border-background'} ${
-        STATUS_COLORS[status()] ?? 'bg-muted-foreground/50'
+        STATUS_COLORS[status()] ?? 'bg-muted-foreground'
       } ${props.class ?? 'size-2.5'}`}
       title={titleText()}
       aria-hidden

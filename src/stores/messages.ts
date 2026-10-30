@@ -102,7 +102,7 @@ function mergeMessages(existing: DecryptedMessage[] | undefined, incoming: Decry
       merged.push(m);
     }
   }
-  return sortByCreatedAt(merged);
+  return sortWithPendingLast(merged);
 }
 
 /** A server timestamp in milliseconds. Messages are stored to the millisecond, but the copy a
@@ -112,6 +112,13 @@ function timestampMs(value: string | undefined): number {
   const m = value ? /^([^.]+?)(?:\.(\d+))?(Z|[+-]\d\d:\d\d)$/.exec(value) : null;
   if (!m) return value ? Date.parse(value) : NaN;
   return Date.parse(`${m[1]}.${(m[2] ?? '').slice(0, 3).padEnd(3, '0')}${m[3]}`);
+}
+
+function sortWithPendingLast(list: DecryptedMessage[]): DecryptedMessage[] {
+  return [...list].sort((a, b) => {
+    if (!!a.pending !== !!b.pending) return a.pending ? 1 : -1;
+    return timestampMs(a.created_at) - timestampMs(b.created_at);
+  });
 }
 
 function sameJson(a: unknown, b: unknown): boolean {
@@ -884,7 +891,7 @@ export async function sendMessage(
     attachments: tempAttachments,
   };
 
-  setMessages('byRoom', roomId, (prev) => sortByCreatedAt([...(prev ?? []), tempMsg]));
+  setMessages('byRoom', roomId, (prev) => [...(prev ?? []), tempMsg]);
   // Your own message always takes you to it, wherever you were reading (Discord's behaviour).
   setMessages('scrollToBottomForce', roomId, (t) => (t ?? 0) + 1);
   trimHead(roomId);
@@ -984,17 +991,19 @@ export async function sendMessage(
         didReplaceInPlace = true;
         // The echo arrived first without being matched to the optimistic row (it couldn't be
         // read yet); that row is this same message, so it goes rather than sending forever.
-        return list
-          .map((m, i) => (i === existingIdx ? { ...m, ...confirmed, plaintext } : m))
-          .filter((m) => m.id !== nonce);
+        return sortWithPendingLast(
+          list
+            .map((m, i) => (i === existingIdx ? { ...m, ...confirmed, plaintext } : m))
+            .filter((m) => m.id !== nonce)
+        );
       }
       if (tempIdx >= 0) {
         didReplaceInPlace = true;
         const merged = [...list];
         merged[tempIdx] = confirmed;
-        return merged;
+        return sortWithPendingLast(merged);
       }
-      return sortByCreatedAt([...list, confirmed]);
+      return sortWithPendingLast([...list, confirmed]);
     });
     holdSentPreviews(roomId, msg.id, sentAttachments);
     if (!didReplaceInPlace) {
@@ -1087,7 +1096,7 @@ export async function addMessageFromEvent(payload: {
       const list = prev ?? [];
       if (list.some((m) => m.id === msg.id)) return list;
       didAppend = true;
-      return sortByCreatedAt([...list, msg]);
+      return sortWithPendingLast([...list, msg]);
     });
     if (didAppend) {
       setMessages('scrollToBottomTick', roomId, (t) => (t ?? 0) + 1);
@@ -1130,7 +1139,7 @@ export async function addMessageFromEvent(payload: {
       merged[tempIdx] = msg;
       return merged;
     }
-    return sortByCreatedAt([...list, msg]);
+    return sortWithPendingLast([...list, msg]);
   });
   if (!didReplaceInPlace) {
     setMessages('scrollToBottomTick', roomId, (t) => (t ?? 0) + 1);

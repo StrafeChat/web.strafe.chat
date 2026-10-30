@@ -46,6 +46,7 @@ export const zLayer = {
   lightbox: 'z-[260]',
   /** Context menus, tooltips, popovers, dropdowns. */
   popover: 'z-[300]',
+  menu: 'z-[310]',
   /** Recovery PIN / environment errors - above everything. */
   critical: 'z-[400]',
 } as const;
