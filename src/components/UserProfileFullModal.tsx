@@ -1,6 +1,7 @@
 import type { Component } from 'solid-js';
 import { Show, For, createMemo } from 'solid-js';
 import { MessageAvatar } from './messageList/MessageAvatar';
+import { ProfileBanner } from './ProfileBanner';
 import { ProfileIdentity } from './ProfileIdentity';
 import { ProfileBirthday } from './ProfileBirthday';
 import { RolePill } from './RolePill';
@@ -51,19 +52,7 @@ export const UserProfileFullModal: Component = () => {
         panelClass="md:max-h-[min(88vh,680px)]"
       >
         <div class="relative shrink-0">
-          <div
-            class="h-32 bg-gradient-to-br from-primary/60 via-primary/30 to-primary/10 bg-cover bg-center sm:h-36"
-            style={{
-              ...(subject()?.banner ? { 'background-image': `url(${subject()!.banner})` } : {}),
-              ...(subject()?.banner
-                ? {}
-                : {
-                    'background-image':
-                      'radial-gradient(circle, rgba(255,255,255,0.14) 1px, transparent 1px)',
-                    'background-size': '16px 16px',
-                  }),
-            }}
-          />
+          <ProfileBanner banner={subject()?.banner} class="max-h-36 sm:max-h-44" fit="natural" />
           <div class="absolute end-3 top-3 flex items-center gap-2">
             <Show when={!isSelf() && userProfileFullModal.onMessageUser}>
               <IconButton

@@ -2,6 +2,7 @@ import type { Component } from 'solid-js';
 import { Show, For, onMount, onCleanup, createEffect, createSignal, createMemo, createResource } from 'solid-js';
 import { Portal } from 'solid-js/web';
 import { MessageAvatar } from './messageList/MessageAvatar';
+import { ProfileBanner } from './ProfileBanner';
 import { ProfileIdentity } from './ProfileIdentity';
 import { ProfileBirthday } from './ProfileBirthday';
 import { RolePill } from './RolePill';
@@ -479,19 +480,7 @@ export const UserProfilePopover: Component = () => {
           </Show>
           <div class="min-h-0 flex-1 overflow-y-auto overflow-x-hidden [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden">
             <div class="relative">
-              <div
-                class="h-20 bg-gradient-to-br from-primary/60 via-primary/30 to-primary/10 bg-cover bg-center"
-                style={{
-                  ...(subject()?.banner ? { 'background-image': `url(${subject()!.banner})` } : {}),
-                  ...(subject()?.banner
-                    ? {}
-                    : {
-                        'background-image':
-                          'radial-gradient(circle, rgba(255,255,255,0.14) 1px, transparent 1px)',
-                        'background-size': '14px 14px',
-                      }),
-                }}
-              />
+              <ProfileBanner banner={subject()?.banner} class="h-20" />
               <div class="absolute end-2.5 top-2.5 flex items-center gap-1.5">
                 <Show when={!isSelf() && userProfilePopover.onMessageUser}>
                   <BannerIconButton
