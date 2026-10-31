@@ -1,5 +1,5 @@
 import type { Component } from 'solid-js';
-import { createSignal, Show } from 'solid-js';
+import { createEffect, createSignal, on, Show } from 'solid-js';
 
 interface ProfileBannerProps {
   banner?: string;
@@ -9,6 +9,16 @@ interface ProfileBannerProps {
 
 export const ProfileBanner: Component<ProfileBannerProps> = (props) => {
   const [ratio, setRatio] = createSignal<number | null>(null);
+
+  createEffect(
+    on(
+      () => props.banner,
+      (banner) => {
+        if (!banner) setRatio(null);
+      },
+      { defer: true },
+    ),
+  );
 
   return (
     <div

@@ -16,7 +16,7 @@ import { onInputModeChanged } from '../../stores/voice';
 import { createMicPipeline, type MicPipeline } from '../../lib/voice/micPipeline';
 import { Button } from '../ui/Button';
 import { RangeField } from '../ui/RangeField';
-import { Select } from '../ui/Select';
+import { MenuSelect } from '../ui/MenuSelect';
 import { Toggle } from '../ui/Toggle';
 import { Tabs } from '../ui/Tabs';
 import { settingsGroupFrame, settingsRowIcon, settingsRowShell, settingsSectionTitle } from './settingsChrome';
@@ -244,24 +244,32 @@ export const VoiceVideoSettingsPage: Component = () => {
           </Show>
         </div>
         <div class={`grid gap-4 sm:grid-cols-2 ${settingsGroupFrame}`}>
-          <Select
+          <MenuSelect
             label={t('settings.voice.inputDevice')}
             value={voiceSettings.inputDeviceId}
+            options={[
+              { value: '', label: t('settings.voice.defaultDevice') },
+              ...devices().inputs.map((d) => ({
+                value: d.deviceId,
+                label: deviceLabel(d, t('settings.voice.microphone')),
+              })),
+            ]}
             disabled={!supported}
             onValueChange={(v) => setVoiceSettings({ inputDeviceId: v })}
-          >
-            <option value="">{t('settings.voice.defaultDevice')}</option>
-            <For each={devices().inputs}>{(d) => <option value={d.deviceId}>{deviceLabel(d, t('settings.voice.microphone'))}</option>}</For>
-          </Select>
-          <Select
+          />
+          <MenuSelect
             label={t('settings.voice.outputDevice')}
             value={voiceSettings.outputDeviceId}
+            options={[
+              { value: '', label: t('settings.voice.defaultDevice') },
+              ...devices().outputs.map((d) => ({
+                value: d.deviceId,
+                label: deviceLabel(d, t('settings.voice.speaker')),
+              })),
+            ]}
             disabled={!supported}
             onValueChange={(v) => setVoiceSettings({ outputDeviceId: v })}
-          >
-            <option value="">{t('settings.voice.defaultDevice')}</option>
-            <For each={devices().outputs}>{(d) => <option value={d.deviceId}>{deviceLabel(d, t('settings.voice.speaker'))}</option>}</For>
-          </Select>
+          />
           <RangeField
             label={t('settings.voice.inputVolume')}
             min={0}
@@ -411,15 +419,16 @@ export const VoiceVideoSettingsPage: Component = () => {
             description={t('settings.voice.noiseHint')}
             control={
               <div class="w-44">
-                <Select
-                  aria-label={t('settings.voice.noise')}
+                <MenuSelect
+                  ariaLabel={t('settings.voice.noise')}
                   value={voiceSettings.noiseSuppression}
+                  options={[
+                    { value: 'rnnoise', label: t('settings.voice.noiseMode.rnnoise') },
+                    { value: 'browser', label: t('settings.voice.noiseMode.browser') },
+                    { value: 'off', label: t('settings.voice.noiseMode.off') },
+                  ]}
                   onValueChange={(v) => setVoiceSettings({ noiseSuppression: v as NoiseSuppressionMode })}
-                >
-                  <option value="rnnoise">{t('settings.voice.noiseMode.rnnoise')}</option>
-                  <option value="browser">{t('settings.voice.noiseMode.browser')}</option>
-                  <option value="off">{t('settings.voice.noiseMode.off')}</option>
-                </Select>
+                />
               </div>
             }
           />
@@ -441,26 +450,24 @@ export const VoiceVideoSettingsPage: Component = () => {
       <section class="space-y-3">
         <h3 class={settingsSectionTitle}>{t('settings.voice.screenShareTitle')}</h3>
         <div class={`grid gap-4 sm:grid-cols-2 ${settingsGroupFrame}`}>
-          <Select
+          <MenuSelect
             label={t('voice.screenShare.resolution')}
             value={voiceSettings.screenShareResolution}
+            options={SCREEN_SHARE_RESOLUTIONS.map((r) => ({
+              value: r,
+              label: r === 'source' ? t('voice.screenShare.source') : t('voice.screenShare.resolutionValue', { height: r }),
+            }))}
             onValueChange={(v) => setVoiceSettings({ screenShareResolution: v as ScreenShareResolution })}
-          >
-            <For each={SCREEN_SHARE_RESOLUTIONS}>
-              {(r) => (
-                <option value={r}>
-                  {r === 'source' ? t('voice.screenShare.source') : t('voice.screenShare.resolutionValue', { height: r })}
-                </option>
-              )}
-            </For>
-          </Select>
-          <Select
+          />
+          <MenuSelect
             label={t('voice.screenShare.frameRate')}
             value={String(voiceSettings.screenShareFps)}
+            options={SCREEN_SHARE_FPS.map((f) => ({
+              value: String(f),
+              label: t('voice.screenShare.fpsValue', { fps: f }),
+            }))}
             onValueChange={(v) => setVoiceSettings({ screenShareFps: Number(v) as ScreenShareFps })}
-          >
-            <For each={SCREEN_SHARE_FPS}>{(f) => <option value={String(f)}>{t('voice.screenShare.fpsValue', { fps: f })}</option>}</For>
-          </Select>
+          />
           <p class="text-xs text-muted-foreground sm:col-span-2">{t('settings.voice.screenShareHint')}</p>
         </div>
       </section>
@@ -481,9 +488,16 @@ export const VoiceVideoSettingsPage: Component = () => {
         />
         <div class={`space-y-4 ${settingsGroupFrame}`}>
           <div class="grid gap-4 sm:grid-cols-[1fr_auto] sm:items-end">
-            <Select
+            <MenuSelect
               label={t('settings.voice.camera')}
               value={voiceSettings.cameraDeviceId}
+              options={[
+                { value: '', label: t('settings.voice.defaultDevice') },
+                ...devices().cameras.map((d) => ({
+                  value: d.deviceId,
+                  label: deviceLabel(d, t('settings.voice.cameraFallback')),
+                })),
+              ]}
               disabled={!supported}
               onValueChange={(v) => {
                 setVoiceSettings({ cameraDeviceId: v });
@@ -493,10 +507,7 @@ export const VoiceVideoSettingsPage: Component = () => {
                   void startCamera();
                 }
               }}
-            >
-              <option value="">{t('settings.voice.defaultDevice')}</option>
-              <For each={devices().cameras}>{(d) => <option value={d.deviceId}>{deviceLabel(d, t('settings.voice.cameraFallback'))}</option>}</For>
-            </Select>
+            />
             <Button
               size="sm"
               variant={cameraOn() ? 'destructive' : 'outline'}

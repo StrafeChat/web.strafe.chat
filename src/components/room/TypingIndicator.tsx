@@ -28,6 +28,42 @@ function message(people: TypingPerson[]): string {
   return t('room.typingMany');
 }
 
+export const TypingFaces: Component<{ people: TypingPerson[] }> = (props) => {
+  const faces = () => props.people.slice(0, MAX_FACES);
+  const overflow = () => Math.max(0, props.people.length - MAX_FACES);
+
+  return (
+    <span class="isolate flex shrink-0 items-center" aria-hidden="true">
+      <For each={faces()}>
+        {(person, i) => (
+          <span
+            class={`relative rounded-full ring-2 ring-background ${i() > 0 ? '-ms-1.5' : ''}`}
+            style={{ 'z-index': MAX_FACES + 1 - i() }}
+          >
+            <MessageAvatar name={person.name} avatar={person.avatar ?? undefined} class="size-4.5 text-[8px]" />
+          </span>
+        )}
+      </For>
+      <Show when={overflow() > 0}>
+        <span
+          class="relative -ms-1.5 flex size-4.5 items-center justify-center rounded-full bg-muted text-[8px] font-semibold text-muted-foreground ring-2 ring-background"
+          style={{ 'z-index': 1 }}
+        >
+          +{overflow()}
+        </span>
+      </Show>
+    </span>
+  );
+};
+
+export const TypingDots: Component = () => (
+  <span class="inline-flex shrink-0 gap-0.5" aria-hidden="true">
+    <span class="size-1 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]" />
+    <span class="size-1 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]" />
+    <span class="size-1 animate-bounce rounded-full bg-muted-foreground" />
+  </span>
+);
+
 /**
  * The row under the composer: the faces of everyone currently typing, overlapping into one
  * stack, then the animated dots and the usual "X is typing…" line.
@@ -39,41 +75,12 @@ function message(people: TypingPerson[]): string {
  * the avatars look clipped into each other.
  */
 export const TypingIndicator: Component<TypingIndicatorProps> = (props) => {
-  const faces = () => props.people.slice(0, MAX_FACES);
-  const overflow = () => Math.max(0, props.people.length - MAX_FACES);
-
   return (
     <div class="flex h-6 shrink-0 items-center px-5">
       <Show when={props.people.length > 0}>
         <p class="flex min-w-0 items-center gap-2 text-xs text-muted-foreground" aria-live="polite" aria-atomic="true">
-          <span class="isolate flex shrink-0 items-center" aria-hidden="true">
-            <For each={faces()}>
-              {(person, i) => (
-                // The ring lives on a wrapper, not on MessageAvatar: the avatar already
-                // sets `ring-1 ring-border/50`, and two ring utilities on one element
-                // resolve by stylesheet order, not by the order they're written in.
-                <span
-                  class={`relative rounded-full ring-2 ring-background ${i() > 0 ? '-ms-1.5' : ''}`}
-                  style={{ 'z-index': MAX_FACES + 1 - i() }}
-                >
-                  <MessageAvatar name={person.name} avatar={person.avatar ?? undefined} class="size-4.5 text-[8px]" />
-                </span>
-              )}
-            </For>
-            <Show when={overflow() > 0}>
-              <span
-                class="relative -ms-1.5 flex size-4.5 items-center justify-center rounded-full bg-muted text-[8px] font-semibold text-muted-foreground ring-2 ring-background"
-                style={{ 'z-index': 1 }}
-              >
-                +{overflow()}
-              </span>
-            </Show>
-          </span>
-          <span class="inline-flex shrink-0 gap-0.5" aria-hidden="true">
-            <span class="size-1 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.3s]" />
-            <span class="size-1 animate-bounce rounded-full bg-muted-foreground [animation-delay:-0.15s]" />
-            <span class="size-1 animate-bounce rounded-full bg-muted-foreground" />
-          </span>
+          <TypingFaces people={props.people} />
+          <TypingDots />
           <span class="truncate">{message(props.people.slice(0, MAX_NAMED + 1))}</span>
         </p>
       </Show>

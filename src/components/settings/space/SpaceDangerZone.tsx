@@ -1,12 +1,12 @@
 import type { Component } from 'solid-js';
 import { userOptionLabel } from '../../../stores/instance';
-import { createMemo, createSignal, For, Show } from 'solid-js';
+import { createMemo, createSignal, Show } from 'solid-js';
 import { deleteSpace, transferSpaceOwnership, type Space, type SpaceMember } from '../../../api/spaces';
 import { addOrUpdateSpace, removeSpace } from '../../../stores/spaces';
 import { resolveProfile } from '../../../lib/spaceProfile';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
-import { Select } from '../../ui/Select';
+import { MenuSelect } from '../../ui/MenuSelect';
 import { Toggle } from '../../ui/Toggle';
 import { ResponsiveDialog } from '../../ui/ResponsiveDialog';
 import { appDialogActions, zLayer } from '../../../theme/appChrome';
@@ -132,21 +132,16 @@ export const SpaceDangerZone: Component<Props> = (props) => {
           description={t('spaceSettings.danger.transferBody')}
         >
           <div class="space-y-4">
-            <Select
+            <MenuSelect
               label={t('spaceSettings.danger.transferSelect')}
               value={newOwnerId()}
+              options={[
+                { value: '', label: t('spaceSettings.danger.transferPick') },
+                ...candidates().map((m) => ({ value: m.id, label: memberLabel(m) })),
+              ]}
               disabled={busy()}
               onValueChange={setNewOwnerId}
-            >
-              <option value="">{t('spaceSettings.danger.transferPick')}</option>
-              <For each={candidates()}>
-                {(m) => (
-                  <option value={m.id}>
-                    {memberLabel(m)}
-                  </option>
-                )}
-              </For>
-            </Select>
+            />
             <label class="flex items-start justify-between gap-3 rounded-xl border border-border/60 bg-card/20 p-3">
               <span class="text-sm text-foreground">{t('spaceSettings.danger.transferConfirm')}</span>
               <Toggle label={t('spaceSettings.danger.transferConfirm')} checked={acknowledged()} disabled={busy()} onChange={setAcknowledged} />

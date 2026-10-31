@@ -17,7 +17,7 @@ import { confirmDialog } from '../../../stores/confirmDialog';
 import { showContextMenu, type ContextMenuItem } from '../../../stores/contextMenu';
 import { IconButton } from '../../ui/IconButton';
 import { SearchInput } from '../../ui/SearchInput';
-import { Select } from '../../ui/Select';
+import { MenuSelect } from '../../ui/MenuSelect';
 import { UserCell } from '../../ui/UserCell';
 import { EmptyState } from '../../ui/EmptyState';
 import { BanMemberDialog } from './BanMemberDialog';
@@ -218,15 +218,25 @@ export const SpaceMembersPage: Component<Props> = (props) => {
           wrapperClass="flex-1"
         />
         <div class="grid grid-cols-2 gap-3 md:w-[26rem]">
-          <Select value={roleFilter()} onValueChange={setRoleFilter} aria-label={t('spaceSettings.members.filterRole')}>
-            <option value="">{t('spaceSettings.members.allRoles')}</option>
-            <For each={filterRoles()}>{(r) => <option value={r.id}>{r.name}</option>}</For>
-          </Select>
-          <Select value={sort()} onValueChange={(v) => setSort(v as SortKey)} aria-label={t('spaceSettings.members.sort')}>
-            <option value="joined_desc">{t('spaceSettings.members.sortNewest')}</option>
-            <option value="joined_asc">{t('spaceSettings.members.sortOldest')}</option>
-            <option value="name">{t('spaceSettings.members.sortName')}</option>
-          </Select>
+          <MenuSelect
+            value={roleFilter()}
+            options={[
+              { value: '', label: t('spaceSettings.members.allRoles') },
+              ...filterRoles().map((r) => ({ value: r.id, label: r.name })),
+            ]}
+            onValueChange={setRoleFilter}
+            ariaLabel={t('spaceSettings.members.filterRole')}
+          />
+          <MenuSelect
+            value={sort()}
+            options={[
+              { value: 'joined_desc', label: t('spaceSettings.members.sortNewest') },
+              { value: 'joined_asc', label: t('spaceSettings.members.sortOldest') },
+              { value: 'name', label: t('spaceSettings.members.sortName') },
+            ]}
+            onValueChange={(v) => setSort(v as SortKey)}
+            ariaLabel={t('spaceSettings.members.sort')}
+          />
         </div>
       </div>
       <p class="text-xs text-muted-foreground">{t('spaceSettings.members.showing', { shown: filtered().length, total: props.members.length })}</p>

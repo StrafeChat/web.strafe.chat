@@ -1,10 +1,12 @@
 import type { Component } from 'solid-js';
-import { Show } from 'solid-js';
+import { createMemo, Show } from 'solid-js';
 import { A } from '@solidjs/router';
 import type { SpaceRoom } from '../../../api/spaces';
 import { auth } from '../../../stores/auth';
 import { messages } from '../../../stores/messages';
 import { rooms } from '../../../stores/rooms';
+import { spaceMembers } from '../../../stores/spaceMembers';
+import { getTypingUserIds } from '../../../stores/typing';
 import { getUnreadCountForDisplay, readState } from '../../../stores/readState';
 import { isRoomMuted } from '../../../lib/roomNotify';
 import type { ReorderPayload } from '../../../lib/roomReorder';
@@ -16,6 +18,8 @@ import { isRoomPrivate } from '../../../lib/spacePermissions';
 import { isConnectedTo, joinVoiceRoom, voiceStatesForRoom } from '../../../stores/voice';
 import { voicePermsFor } from '../../../lib/voice/perms';
 import { VoiceChannelUsers } from '../../voice/VoiceChannelUsers';
+import { getSenderDisplay } from '../../messageList/utils';
+import { TypingDots, TypingFaces, type TypingPerson } from '../../room/TypingIndicator';
 import { t } from '../../../i18n';
 
 const ROOM_TYPE_TEXT = 3;
@@ -51,6 +55,15 @@ export const SpaceChannelRow: Component<SpaceChannelRowProps> = (props) => {
   };
   const uid = () => auth.user?.id ?? '';
   const isTextChannel = () => props.room.type === ROOM_TYPE_TEXT;
+  const typingPeople = createMemo((): TypingPerson[] => {
+    const me = uid();
+    if (!me || !isTextChannel() || props.activeRoomId === props.room.id) return [];
+    const members = spaceMembers.bySpaceId[props.spaceId] ?? [];
+    return getTypingUserIds(props.room.id, me).map((id) => {
+      const sender = getSenderDisplay(id, members, me);
+      return { id, name: sender.name, avatar: sender.avatar };
+    });
+  });
   /** Server-authoritative count (room_mention_counts) - real for every room, not just loaded ones. */
   const mentions = () => {
     if (!isTextChannel()) return 0;
@@ -186,6 +199,12 @@ export const SpaceChannelRow: Component<SpaceChannelRowProps> = (props) => {
       <Show when={mentions() > 0 && !muted()}>
         <span class="shrink-0 min-w-[16px] h-[16px] flex items-center justify-center rounded-full bg-primary text-primary-foreground text-[10px] font-semibold px-1.5">
           {mentions() > 99 ? '99+' : mentions()}
+        </span>
+      </Show>
+      <Show when={typingPeople().length > 0}>
+        <span class="flex shrink-0 items-center gap-1.5">
+          <TypingFaces people={typingPeople()} />
+          <TypingDots />
         </span>
       </Show>
     </A>

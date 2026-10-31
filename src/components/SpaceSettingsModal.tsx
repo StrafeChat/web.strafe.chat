@@ -47,7 +47,7 @@ import { auth } from '../stores/auth';
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { SearchInput } from './ui/SearchInput';
-import { Select } from './ui/Select';
+import { MenuSelect } from './ui/MenuSelect';
 import { Tabs } from './ui/Tabs';
 import { Toggle } from './ui/Toggle';
 import { TriStateToggle, type TriState } from './ui/TriStateToggle';
@@ -1026,17 +1026,18 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
                           />
                           <Show when={overrideTargetType() === 'user'}>
                             <div class="max-w-md">
-                              <Select label={t('spaceSettings.targetMember')} value={selectedOverrideUserId()} onValueChange={setSelectedOverrideUserId}>
-                                <option value="">{t('spaceSettings.selectMember')}</option>
-                                <For each={props.members}>
-                                  {(m) => (
-                                    <option value={m.id}>
-                                      {/* Their name in this space, with the handle beside it. */}
-                                      {userOptionLabel({ username: m.username, display_name: resolveProfile(m, m, m.username).name })}
-                                    </option>
-                                  )}
-                                </For>
-                              </Select>
+                              <MenuSelect
+                                label={t('spaceSettings.targetMember')}
+                                value={selectedOverrideUserId()}
+                                options={[
+                                  { value: '', label: t('spaceSettings.selectMember') },
+                                  ...props.members.map((m) => ({
+                                    value: m.id,
+                                    label: userOptionLabel({ username: m.username, display_name: resolveProfile(m, m, m.username).name }),
+                                  })),
+                                ]}
+                                onValueChange={setSelectedOverrideUserId}
+                              />
                             </div>
                           </Show>
                           <div class="space-y-1 rounded-xl border border-border/60 bg-card/10 p-2">

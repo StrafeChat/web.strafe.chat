@@ -27,7 +27,7 @@ import { PermAdministrator, SPACE_ROLE_PERM_GROUPS } from '../../lib/spacePermis
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
-import { Select } from '../ui/Select';
+import { MenuSelect } from '../ui/MenuSelect';
 import { Checkbox } from '../ui/Checkbox';
 import { Toggle } from '../ui/Toggle';
 import { ResponsiveDialog } from '../ui/ResponsiveDialog';
@@ -875,9 +875,12 @@ export const DevelopersSettingsPage: Component = () => {
                 when={app().redirect_uris.length > 0}
                 fallback={<p class="text-xs text-destructive">{t('settings.developers.redirectRequired')}</p>}
               >
-                <Select label={t('settings.developers.redirectUri')} value={genRedirect()} onValueChange={setGenRedirect}>
-                  <For each={app().redirect_uris}>{(u) => <option value={u}>{u}</option>}</For>
-                </Select>
+                <MenuSelect
+                  label={t('settings.developers.redirectUri')}
+                  value={genRedirect()}
+                  options={app().redirect_uris.map((u) => ({ value: u, label: u }))}
+                  onValueChange={setGenRedirect}
+                />
               </Show>
             </Show>
 

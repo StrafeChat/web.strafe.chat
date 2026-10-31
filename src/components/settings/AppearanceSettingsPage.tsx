@@ -36,7 +36,7 @@ import { Emoji } from '../emoji/Emoji';
 import { Toggle } from '../ui/Toggle';
 import { Tabs } from '../ui/Tabs';
 import { RangeField } from '../ui/RangeField';
-import { Select } from '../ui/Select';
+import { MenuSelect } from '../ui/MenuSelect';
 import { Button } from '../ui/Button';
 import { IconButton } from '../ui/IconButton';
 import { Textarea } from '../ui/Textarea';
@@ -217,11 +217,16 @@ export const AppearanceSettingsPage: Component = () => {
             description={t('settings.appearance.font.description')}
             control={
               <div class="w-40">
-                <Select value={appearance.font} onValueChange={(v) => setFont(v as FontChoice)} aria-label={t('settings.appearance.font.title')}>
-                  <option value="system">{t('settings.appearance.font.system')}</option>
-                  <option value="inter">Inter</option>
-                  <option value="outfit">Outfit</option>
-                </Select>
+                <MenuSelect
+                  value={appearance.font}
+                  options={[
+                    { value: 'system', label: t('settings.appearance.font.system') },
+                    { value: 'inter', label: 'Inter' },
+                    { value: 'outfit', label: 'Outfit' },
+                  ]}
+                  onValueChange={(v) => setFont(v as FontChoice)}
+                  ariaLabel={t('settings.appearance.font.title')}
+                />
               </div>
             }
           />
@@ -279,13 +284,12 @@ export const AppearanceSettingsPage: Component = () => {
             description={t(`emoji.providers.${getEmojiProvider(appearance.emojiProvider).id}`)}
             control={
               <div class="w-44">
-                <Select
+                <MenuSelect
                   value={appearance.emojiProvider}
+                  options={EMOJI_PROVIDERS.map((p) => ({ value: p.id, label: p.name }))}
                   onValueChange={(v) => setEmojiProvider(v as EmojiProviderId)}
-                  aria-label={t('settings.appearance.emoji.style')}
-                >
-                  <For each={EMOJI_PROVIDERS}>{(p) => <option value={p.id}>{p.name}</option>}</For>
-                </Select>
+                  ariaLabel={t('settings.appearance.emoji.style')}
+                />
               </div>
             }
           />
@@ -435,13 +439,12 @@ export const AppearanceSettingsPage: Component = () => {
             description={t('settings.appearance.gif.description')}
             control={
               <div class="w-40">
-                <Select
+                <MenuSelect
                   value={appearance.gifProvider}
+                  options={GIF_PROVIDERS.map((p) => ({ value: p.id, label: p.name }))}
                   onValueChange={(v) => setGifProvider(v as GifProviderId)}
-                  aria-label={t('settings.appearance.gif.title')}
-                >
-                  <For each={GIF_PROVIDERS}>{(p) => <option value={p.id}>{p.name}</option>}</For>
-                </Select>
+                  ariaLabel={t('settings.appearance.gif.title')}
+                />
               </div>
             }
           />

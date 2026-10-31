@@ -1,5 +1,5 @@
 import type { Component } from 'solid-js';
-import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js';
+import { createEffect, createMemo, createSignal, on, Show } from 'solid-js';
 import {
   patchSpace,
   uploadSpaceIcon,
@@ -11,7 +11,7 @@ import {
 import { addOrUpdateSpace } from '../../../stores/spaces';
 import { Button } from '../../ui/Button';
 import { Input } from '../../ui/Input';
-import { Select } from '../../ui/Select';
+import { MenuSelect } from '../../ui/MenuSelect';
 import { Textarea } from '../../ui/Textarea';
 import { SpaceDangerZone } from './SpaceDangerZone';
 import { settingsGroupFrame, settingsSectionTitle } from '../settingsChrome';
@@ -241,15 +241,16 @@ export const SpaceOverviewPage: Component<Props> = (props) => {
         <h3 class={settingsSectionTitle}>{t('spaceSettings.overview.birthdaysTitle')}</h3>
         <p class="text-sm text-muted-foreground">{t('spaceSettings.overview.birthdaysHint')}</p>
         <div class={`space-y-4 ${settingsGroupFrame}`}>
-          <Select
+          <MenuSelect
             label={t('spaceSettings.overview.birthdayChannel')}
             value={birthdayChannelId()}
+            options={[
+              { value: '', label: t('spaceSettings.overview.birthdayNoChannel') },
+              ...textRooms().map((r) => ({ value: r.id, label: `#${r.name}` })),
+            ]}
             disabled={!props.canManage || birthdaySaving()}
             onValueChange={setBirthdayChannelId}
-          >
-            <option value="">{t('spaceSettings.overview.birthdayNoChannel')}</option>
-            <For each={textRooms()}>{(r) => <option value={r.id}>#{r.name}</option>}</For>
-          </Select>
+          />
           <Input
             label={t('spaceSettings.overview.birthdayMessage')}
             value={birthdayMessage()}
