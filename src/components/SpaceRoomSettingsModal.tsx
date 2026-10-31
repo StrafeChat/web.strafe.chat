@@ -24,7 +24,7 @@ import {
 import { Button } from './ui/Button';
 import { Input } from './ui/Input';
 import { RangeField } from './ui/RangeField';
-import { Select } from './ui/Select';
+import { MenuSelect } from './ui/MenuSelect';
 import { Tabs } from './ui/Tabs';
 import { Toggle } from './ui/Toggle';
 import { TriStateToggle, type TriState } from './ui/TriStateToggle';
@@ -454,14 +454,13 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
               <p class="text-xs text-muted-foreground">{t('roomSettings.userLimitHint')}</p>
             </div>
             <div class="space-y-1.5">
-              <Select
+              <MenuSelect
                 label={t('roomSettings.bitrate')}
                 value={String(bitrate())}
+                options={BITRATE_OPTIONS.map((b) => ({ value: String(b), label: `${b / 1000} kbps` }))}
                 disabled={!props.canManageRooms || busy()}
                 onValueChange={(v) => setBitrate(Number(v))}
-              >
-                <For each={BITRATE_OPTIONS}>{(b) => <option value={String(b)}>{b / 1000} kbps</option>}</For>
-              </Select>
+              />
               <p class="text-xs text-muted-foreground">{t('roomSettings.bitrateHint')}</p>
             </div>
             <div class="pt-1">
@@ -520,21 +519,23 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
 
             <div class="max-w-md">
               <Show when={targetType() === 'role'}>
-                <Select label={t('roomSettings.role')} value={selectedRoleId()} onValueChange={setSelectedRoleId}>
-                  <For each={roles() ?? []}>{(r) => <option value={r.id}>{r.name}</option>}</For>
-                </Select>
+                <MenuSelect
+                  label={t('roomSettings.role')}
+                  value={selectedRoleId()}
+                  options={(roles() ?? []).map((r) => ({ value: r.id, label: r.name }))}
+                  onValueChange={setSelectedRoleId}
+                />
               </Show>
               <Show when={targetType() === 'user'}>
-                <Select label={t('roomSettings.member')} value={selectedUserId()} onValueChange={setSelectedUserId}>
-                  <For each={props.members}>
-                    {(m) => (
-                      <option value={m.id}>
-                        {/* Their name in this space, with the handle beside it. */}
-                        {userOptionLabel({ username: m.username, display_name: resolveProfile(m, m, m.username).name })}
-                      </option>
-                    )}
-                  </For>
-                </Select>
+                <MenuSelect
+                  label={t('roomSettings.member')}
+                  value={selectedUserId()}
+                  options={props.members.map((m) => ({
+                    value: m.id,
+                    label: userOptionLabel({ username: m.username, display_name: resolveProfile(m, m, m.username).name }),
+                  }))}
+                  onValueChange={setSelectedUserId}
+                />
               </Show>
             </div>
 

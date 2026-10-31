@@ -10,7 +10,7 @@ import {
   type UserSummary,
 } from '../../../api/spaces';
 import { Button } from '../../ui/Button';
-import { Select } from '../../ui/Select';
+import { MenuSelect } from '../../ui/MenuSelect';
 import { EmptyState } from '../../ui/EmptyState';
 import { MessageAvatar } from '../../messageList/MessageAvatar';
 import { formatDate, t } from '../../../i18n';
@@ -194,17 +194,18 @@ export const SpaceAuditLogPage: Component<Props> = (props) => {
     <div class="space-y-4">
       <div class="flex flex-col gap-3 sm:flex-row sm:items-end">
         <div class="sm:w-72">
-          <Select
+          <MenuSelect
             label={t('spaceSettings.audit.filter')}
             value={action()}
+            options={[
+              { value: '', label: t('spaceSettings.audit.allActions') },
+              ...AUDIT_ACTION_TYPES.map((a) => ({ value: a, label: t(`spaceSettings.audit.names.${a}`) })),
+            ]}
             onValueChange={(v) => {
               setAction(v);
               void load(true);
             }}
-          >
-            <option value="">{t('spaceSettings.audit.allActions')}</option>
-            <For each={AUDIT_ACTION_TYPES}>{(a) => <option value={a}>{t(`spaceSettings.audit.names.${a}`)}</option>}</For>
-          </Select>
+          />
         </div>
         <Button size="sm" variant="ghost" class="sm:ms-auto" onClick={() => void load(true)} disabled={loading()}>
           <i class="fa-solid fa-rotate text-xs" aria-hidden="true" />

@@ -4,7 +4,7 @@ import { createSpaceInvite, deleteSpaceInvite, listSpaceInvites, type SpaceInvit
 import { confirmDialog } from '../../../stores/confirmDialog';
 import { Button } from '../../ui/Button';
 import { IconButton } from '../../ui/IconButton';
-import { Select } from '../../ui/Select';
+import { MenuSelect } from '../../ui/MenuSelect';
 import { UserCell } from '../../ui/UserCell';
 import { EmptyState } from '../../ui/EmptyState';
 import { appTable, appTableCell, appTableFrame, appTableHeadCell, appTableRow } from '../../../theme/appChrome';
@@ -113,14 +113,23 @@ export const SpaceInvitesPage: Component<Props> = (props) => {
         <section class="space-y-3">
           <h3 class={settingsSectionTitle}>{t('spaceSettings.invites.createTitle')}</h3>
           <div class={`flex flex-col gap-3 sm:flex-row sm:items-end ${settingsGroupFrame}`}>
-            <Select label={t('spaceSettings.invites.expireAfter')} value={maxAge()} onValueChange={setMaxAge} disabled={creating()}>
-              <For each={[...EXPIRY_OPTIONS]}>{(s) => <option value={String(s)}>{expiryLabel(s)}</option>}</For>
-            </Select>
-            <Select label={t('spaceSettings.invites.maxUses')} value={maxUses()} onValueChange={setMaxUses} disabled={creating()}>
-              <For each={[...USES_OPTIONS]}>
-                {(n) => <option value={String(n)}>{n === 0 ? t('spaceSettings.invites.unlimited') : t('spaceSettings.invites.uses', { count: n })}</option>}
-              </For>
-            </Select>
+            <MenuSelect
+              label={t('spaceSettings.invites.expireAfter')}
+              value={maxAge()}
+              options={EXPIRY_OPTIONS.map((s) => ({ value: String(s), label: expiryLabel(s) }))}
+              onValueChange={setMaxAge}
+              disabled={creating()}
+            />
+            <MenuSelect
+              label={t('spaceSettings.invites.maxUses')}
+              value={maxUses()}
+              options={USES_OPTIONS.map((n) => ({
+                value: String(n),
+                label: n === 0 ? t('spaceSettings.invites.unlimited') : t('spaceSettings.invites.uses', { count: n }),
+              }))}
+              onValueChange={setMaxUses}
+              disabled={creating()}
+            />
             <Button class="shrink-0" onClick={() => void create()} loading={creating()}>
               <i class="fa-solid fa-link text-xs" aria-hidden="true" />
               {t('spaceSettings.invites.create')}

@@ -11,6 +11,8 @@ export interface MenuSelectOption {
 
 interface MenuSelectProps {
   label?: string;
+  /** Accessible name when the control has no visible label. */
+  ariaLabel?: string;
   value: string;
   options: MenuSelectOption[];
   onValueChange: (value: string) => void;
@@ -173,6 +175,7 @@ export const MenuSelect: Component<MenuSelectProps> = (props) => {
         class={`${inputBaseClass} h-10 min-h-10 cursor-pointer items-center gap-2 px-3 py-2 text-start disabled:cursor-not-allowed disabled:opacity-50 ${props.class ?? ''}`}
         aria-haspopup="listbox"
         aria-expanded={open()}
+        aria-label={props.label ? undefined : props.ariaLabel}
         aria-labelledby={props.label ? labelId : undefined}
         disabled={props.disabled}
         onClick={() => (open() ? closePanel(false) : openPanel())}
@@ -189,6 +192,7 @@ export const MenuSelect: Component<MenuSelectProps> = (props) => {
           <div
             ref={(el) => (panelEl = el)}
             role="listbox"
+            aria-label={props.label ? undefined : props.ariaLabel}
             aria-labelledby={props.label ? labelId : undefined}
             class={`fixed ${zLayer.popover} ${appMenuPanel} overflow-y-auto overscroll-contain`}
             style={{

@@ -1,5 +1,5 @@
 import type { Component } from 'solid-js';
-import { createEffect, createMemo, createSignal, For, Match, on, onCleanup, Show, Switch, untrack } from 'solid-js';
+import { createEffect, createMemo, createSignal, Match, on, onCleanup, Show, Switch, untrack } from 'solid-js';
 import { useLocation } from '@solidjs/router';
 import {
   getSpaceMember,
@@ -22,10 +22,11 @@ import { translateCaughtApiError } from '../../lib/formatApiError';
 import { inputMaxLength, spaceProfileFieldError } from '../../lib/spaceProfileLimits';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
-import { Select } from '../ui/Select';
+import { MenuSelect } from '../ui/MenuSelect';
 import { Textarea } from '../ui/Textarea';
 import { MessageAvatar } from '../messageList/MessageAvatar';
 import { MessageBody } from '../messageList/MessageBody';
+import { ProfileBanner } from '../ProfileBanner';
 import { ProfileIdentity } from '../ProfileIdentity';
 import { ProfileMediaEditor } from './ProfileMediaEditor';
 import { settingsGroupFrame, settingsRowIcon, settingsSectionTitle } from './settingsChrome';
@@ -384,14 +385,13 @@ export const SpaceProfilesSettingsPage: Component<SpaceProfilesSettingsPageProps
         }
       >
         <div class="max-w-2xl space-y-3">
-          <Select
+          <MenuSelect
             label={t('settings.spaceProfiles.space')}
             value={pickerValue()}
+            options={spaces.spaces.map((sp) => ({ value: sp.id, label: sp.name }))}
             onValueChange={(id) => void pickSpace(id)}
             disabled={busy()}
-          >
-            <For each={spaces.spaces}>{(sp) => <option value={sp.id}>{sp.name}</option>}</For>
-          </Select>
+          />
           <div class={`${settingsGroupFrame} space-y-2 text-sm leading-relaxed text-muted-foreground`}>
             <p>{t('settings.spaceProfiles.intro', { space: spaceName() })}</p>
             <p>{t('settings.spaceProfiles.visibility', { space: spaceName() })}</p>
@@ -429,16 +429,10 @@ export const SpaceProfilesSettingsPage: Component<SpaceProfilesSettingsPageProps
               <aside class="min-w-0 space-y-2 lg:sticky lg:top-0 lg:order-last lg:self-start">
                 <h3 class={settingsSectionTitle}>{t('settings.spaceProfiles.preview')}</h3>
                 <div class="overflow-hidden rounded-2xl border border-border bg-popover/80 shadow-lg shadow-black/20">
-                  <div
-                    class="h-20 bg-gradient-to-br from-primary/60 via-primary/30 to-primary/10 bg-cover bg-center"
-                    style={
-                      preview().banner
-                        ? { 'background-image': `url(${preview().banner})` }
-                        : {
-                            'background-image': 'radial-gradient(circle, rgba(255,255,255,0.14) 1px, transparent 1px)',
-                            'background-size': '14px 14px',
-                          }
-                    }
+                  <ProfileBanner
+                    banner={preview().banner}
+                    fit="natural"
+                    class="max-h-36 sm:max-h-44"
                   />
                   <div class="relative -mt-10 px-4">
                     <MessageAvatar

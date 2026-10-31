@@ -13,7 +13,7 @@ import {
 } from '../../../api/spaces';
 import { addOrUpdateSpace } from '../../../stores/spaces';
 import { Button } from '../../ui/Button';
-import { Select } from '../../ui/Select';
+import { MenuSelect } from '../../ui/MenuSelect';
 import { Toggle } from '../../ui/Toggle';
 import { settingsGroupFrame, settingsRowIcon, settingsRowShell, settingsSectionTitle } from '../settingsChrome';
 import { t } from '../../../i18n';
@@ -100,15 +100,16 @@ export const SpaceSystemPage: Component<Props> = (props) => {
       <section class="space-y-3">
         <h3 class={settingsSectionTitle}>{t('spaceSettings.system.messagesTitle')}</h3>
         <div class={`space-y-4 ${settingsGroupFrame}`}>
-          <Select
+          <MenuSelect
             label={t('spaceSettings.system.room')}
             value={props.space?.system_room_id ?? ''}
+            options={[
+              { value: '', label: t('spaceSettings.system.noRoom') },
+              ...textRooms().map((r) => ({ value: r.id, label: `#${r.name}` })),
+            ]}
             disabled={disabled()}
             onValueChange={(v) => void patch({ system_room_id: v })}
-          >
-            <option value="">{t('spaceSettings.system.noRoom')}</option>
-            <For each={textRooms()}>{(r) => <option value={r.id}>#{r.name}</option>}</For>
-          </Select>
+          />
           <p class="text-xs text-muted-foreground">{t('spaceSettings.system.roomHint')}</p>
           <div class="space-y-2">
             <Row
@@ -182,25 +183,26 @@ export const SpaceSystemPage: Component<Props> = (props) => {
       <section class="space-y-3">
         <h3 class={settingsSectionTitle}>{t('spaceSettings.system.afkTitle')}</h3>
         <div class={`grid gap-4 sm:grid-cols-2 ${settingsGroupFrame}`}>
-          <Select
+          <MenuSelect
             label={t('spaceSettings.system.afkRoom')}
             value={props.space?.afk_room_id ?? ''}
+            options={[
+              { value: '', label: t('spaceSettings.system.noAfkRoom') },
+              ...voiceRooms().map((r) => ({ value: r.id, label: r.name })),
+            ]}
             disabled={disabled()}
             onValueChange={(v) => void patch({ afk_room_id: v })}
-          >
-            <option value="">{t('spaceSettings.system.noAfkRoom')}</option>
-            <For each={voiceRooms()}>{(r) => <option value={r.id}>{r.name}</option>}</For>
-          </Select>
-          <Select
+          />
+          <MenuSelect
             label={t('spaceSettings.system.afkTimeout')}
             value={String(props.space?.afk_timeout || 300)}
+            options={AFK_TIMEOUTS.map((s) => ({
+              value: String(s),
+              label: t('spaceSettings.system.minutes', { count: s / 60 }),
+            }))}
             disabled={disabled() || !props.space?.afk_room_id}
             onValueChange={(v) => void patch({ afk_timeout: Number(v) })}
-          >
-            <For each={[...AFK_TIMEOUTS]}>
-              {(s) => <option value={String(s)}>{t('spaceSettings.system.minutes', { count: s / 60 })}</option>}
-            </For>
-          </Select>
+          />
           <p class="text-xs text-muted-foreground sm:col-span-2">{t('spaceSettings.system.afkHint')}</p>
         </div>
       </section>
@@ -221,15 +223,16 @@ export const SpaceSystemPage: Component<Props> = (props) => {
               />
             }
           />
-          <Select
+          <MenuSelect
             label={t('spaceSettings.system.widgetRoom')}
             value={props.space?.widget_room_id ?? ''}
+            options={[
+              { value: '', label: t('spaceSettings.system.widgetNoInvite') },
+              ...textRooms().map((r) => ({ value: r.id, label: `#${r.name}` })),
+            ]}
             disabled={disabled() || !props.space?.widget_enabled}
             onValueChange={(v) => void patch({ widget_room_id: v })}
-          >
-            <option value="">{t('spaceSettings.system.widgetNoInvite')}</option>
-            <For each={textRooms()}>{(r) => <option value={r.id}>#{r.name}</option>}</For>
-          </Select>
+          />
           <Show when={props.space?.widget_enabled}>
             <div class="space-y-1.5">
               <p class="text-sm font-medium text-foreground">{t('spaceSettings.system.widgetUrl')}</p>

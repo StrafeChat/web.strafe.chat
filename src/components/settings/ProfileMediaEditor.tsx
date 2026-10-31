@@ -2,6 +2,7 @@ import type { Component, JSX } from 'solid-js';
 import { Show } from 'solid-js';
 import { MessageAvatar } from '../messageList/MessageAvatar';
 import { PresenceDot } from '../PresenceDot';
+import { ProfileBanner } from '../ProfileBanner';
 import { t } from '../../i18n';
 
 /** The cap the picker enforces before anything is uploaded; the server checks again. */
@@ -83,12 +84,16 @@ export const ProfileMediaEditor: Component<ProfileMediaEditorProps> = (props) =>
         disabled={props.bannerUploading}
         title={t('settings.profile.changeBanner')}
         aria-label={props.bannerLabel ?? t('settings.profile.changeBannerAria')}
-        class="group/banner relative flex h-28 w-full cursor-pointer border-0 bg-gradient-to-br from-primary/30 to-primary/10 bg-cover bg-center p-0 text-start outline-none ring-inset ring-ring transition focus-visible:ring-2 disabled:cursor-wait disabled:opacity-70"
-        style={props.banner ? { 'background-image': `url(${props.banner})` } : undefined}
+        class="group/banner relative block w-full cursor-pointer border-0 bg-transparent p-0 text-start outline-none ring-inset ring-ring transition focus-visible:ring-2 disabled:cursor-wait disabled:opacity-70"
         onClick={() => {
           if (!props.bannerUploading) bannerFileInput?.click();
         }}
       >
+        <ProfileBanner
+          banner={props.banner}
+          fit="natural"
+          class="pointer-events-none max-h-36 sm:max-h-44"
+        />
         <span class="pointer-events-none absolute inset-0 bg-black/0 transition-colors group-hover/banner:bg-black/50 group-focus-visible/banner:bg-black/45" />
         <span class="pointer-events-none absolute inset-0 flex items-center justify-center px-4 text-center text-sm font-medium text-white opacity-0 transition-opacity group-hover/banner:opacity-100 group-focus-visible/banner:opacity-100">
           {t('settings.profile.changeBanner')}
