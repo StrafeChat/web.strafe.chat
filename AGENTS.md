@@ -70,8 +70,13 @@ new i18n keys.
   `canEditNicknameOf`, the client copy of the server's rule.
 - **Voice/video**: everything goes through `src/stores/voice.ts` - components never
   touch the LiveKit `Room` directly. Voice states and calls come from the server (READY,
-  `VOICE_STATE_UPDATE`, `CALL_*`); the store only adds this device's connection, mic
-  pipeline (`src/lib/voice/micPipeline.ts`), per-user volume and speaking flags. Map-shaped
+  `VOICE_STATE_UPDATE`, `CALL_*`, the join reply, `refreshVoiceStates`); the store only adds
+  this device's connection, mic pipeline (`src/lib/voice/micPipeline.ts`), per-user volume
+  and speaking flags. A snapshot of a room replaces its list and replays the events that
+  landed meanwhile, never merges into it, and a left is matched by session, since a relay
+  between instances can arrive after a rejoin. While in a call, LiveKit's
+  `ParticipantDisconnected` takes that exact identity off the lists after a grace period (and
+  fires for everyone on our own full reconnect, which must not count). Map-shaped
   store fields (`speaking`, `media`, `byRoom`) are written with `produce`/`reconcile`, never
   a plain setter (which merges and keeps stale keys - that bug shipped once). One
   48 kHz `AudioContext` per call carries both capture and playback (`webAudioMix` with

@@ -30,6 +30,7 @@ import {
   disconnectVoiceMember,
   joinVoice,
   leaveVoice,
+  listVoiceStates,
   moderateVoice,
   patchVoiceState,
   ringCall,
@@ -96,6 +97,9 @@ export interface ParticipantMedia {
   screenAudio?: string;
 }
 
+/** What VOICE_STATE_UPDATE carries: a state, or with `left` the one that just ended. */
+type VoiceStateEvent = VoiceState & { left?: boolean; moved_to?: string };
+
 export interface IncomingCall {
   roomId: string;
   startedBy: string;
@@ -137,6 +141,13 @@ const VOLUMES_KEY = 'strafe_voice_volumes';
 const LOCAL_MUTED_KEY = 'strafe_voice_local_muted';
 /** How long an incoming call rings before the prompt gives up. */
 export const RING_TIMEOUT_MS = 45_000;
+/** How long LiveKit may say someone left before we believe it: a resume or a reconnect under
+ * the same identity reads as a disconnect followed straight away by a connect. */
+const PARTICIPANT_GONE_GRACE_MS = 3_000;
+/** How long the gateway gets to announce someone LiveKit already shows us. */
+const PARTICIPANT_STATE_GRACE_MS = 1_500;
+/** Least time between two reads of one room's states (see refreshVoiceStates). */
+const VOICE_REFRESH_MIN_MS = 5_000;
 
 function loadJSON<T>(key: string, fallback: T): T {
   try {
@@ -300,6 +311,15 @@ const live = {
   rotateTimer: 0 as number,
   /** Rotations run one after another; a second membership change waits for the first. */
   rotation: Promise.resolve(),
+  /**
+   * State events the gateway delivered while a snapshot of a room (a join reply, a refresh)
+   * was on its way, one list per snapshot in flight. See settleRoomSnapshot.
+   */
+  snapshotEvents: new Set<VoiceStateEvent[]>(),
+  /** Refreshes in flight by room; one dropped from here no longer writes (see refreshVoiceStates). */
+  refreshes: new Map<string, Promise<void>>(),
+  /** When each room was last refreshed, for VOICE_REFRESH_MIN_MS. */
+  refreshedAt: new Map<string, number>(),
 };
 
 const [trackVersion, setTrackVersion] = createSignal(0);
@@ -604,6 +624,36 @@ function wireRoom(room: Room, gen: number) {
     // The server's state change usually gets here first and has already rotated; this
     // covers the case where LiveKit sees them before the gateway event lands.
     syncCallKeys();
+    // Still unknown a moment later: their event was lost, or they came back after the
+    // handler below took them off. Key recipients only ever come from server states, so ask
+    // the server rather than trust the identity, and the sync after the refresh keys them.
+    const identity = p.identity;
+    window.setTimeout(() => {
+      const rid = voice.session.roomId;
+      if (!mine() || !rid || !room.remoteParticipants.has(identity) || stateByIdentity(rid, identity)) return;
+      void refreshVoiceStates(rid);
+    }, PARTICIPANT_STATE_GRACE_MS);
+  });
+
+  // The one authoritative signal we have while in a call: a gateway event can be late or
+  // lost (a relay between instances above all), and until now whoever left stayed on the
+  // tiles and in the rooms list, and stayed a key recipient. Only their exact identity goes,
+  // which carries the session, so a rejoin under a new one is never removed. The server
+  // stays the authority; this stops us showing what we can see is false.
+  room.on(RoomEvent.ParticipantDisconnected, (p: RemoteParticipant) => {
+    if (!mine()) return;
+    const identity = p.identity;
+    window.setTimeout(() => {
+      const rid = voice.session.roomId;
+      if (!mine() || !rid || room.remoteParticipants.has(identity)) return;
+      // A full reconnect of our own reports everybody as gone: that is us, not them.
+      if (room.state !== ConnectionState.Connected) return;
+      const st = stateByIdentity(rid, identity);
+      if (!st) return;
+      removeState(rid, st.user_id, st.session_id);
+      setVoice('session', 'keyed', (list) => list.filter((id) => id !== identity));
+      syncCallKeys();
+    }, PARTICIPANT_GONE_GRACE_MS);
   });
 
   room.on(RoomEvent.ParticipantEncryptionStatusChanged, (encrypted: boolean, participant?: Participant) => {
@@ -783,6 +833,15 @@ export class CallEncryptionUnsupportedError extends Error {
   }
 }
 
+/** The LiveKit identity a state was issued for. */
+function identityOfState(st: VoiceState): string {
+  return st.identity ?? `${st.user_id}.${st.session_id}`;
+}
+
+function stateByIdentity(roomId: string, identity: string): VoiceState | undefined {
+  return voice.byRoom[roomId]?.find((st) => identityOfState(st) === identity);
+}
+
 /** Other people currently in the room, by user id (the key recipients). */
 function otherParticipantUserIds(roomId: string): string[] {
   const me = auth.user?.id;
@@ -805,7 +864,7 @@ function memberSignature(roomId: string): string {
   const identities: string[] = [];
   for (const st of voice.byRoom[roomId] ?? []) {
     if (st.user_id === me) continue;
-    identities.push(st.identity ?? `${st.user_id}.${st.session_id}`);
+    identities.push(identityOfState(st));
   }
   return identities.sort().join(',');
 }
@@ -991,6 +1050,7 @@ export async function joinVoiceRoom(roomId: string, opts: { video?: boolean } = 
   });
   stopRingtone();
   let res;
+  const stateEvents = openSnapshotEvents();
   const request = joinVoice(roomId, { self_mute: voice.session.selfMute, self_deaf: voice.session.selfDeaf });
   live.joinRequest = request;
   try {
@@ -999,10 +1059,13 @@ export async function joinVoiceRoom(roomId: string, opts: { video?: boolean } = 
     if (gen === live.gen) setVoice('session', { ...voice.session, roomId: null, status: 'idle' });
     throw err;
   } finally {
+    live.snapshotEvents.delete(stateEvents);
     if (live.joinRequest === request) live.joinRequest = null;
   }
   if (gen !== live.gen) return;
-  applyStates(res.states);
+  // The reply is who is in the room, ourselves included: anyone else we had listed there
+  // is a ghost, and must not become a key recipient the moment we connect.
+  settleRoomSnapshot(roomId, res.states, stateEvents);
   if (res.call) setVoice('calls', roomId, res.call);
   batch(() => {
     setVoice('session', {
@@ -1421,7 +1484,14 @@ function applyStates(states: VoiceState[]) {
   );
 }
 
-function removeState(roomId: string, userId: string) {
+/**
+ * Drop someone from a room. With a session, only that session: a left relayed between
+ * instances can arrive after the same person rejoined, and must not take the new state with
+ * it. Returns false when it refused to for that reason.
+ */
+function removeState(roomId: string, userId: string, sessionId?: string): boolean {
+  const held = voice.byRoom[roomId]?.find((x) => x.user_id === userId);
+  if (held && sessionId && held.session_id !== sessionId) return false;
   setVoice(
     produce((s) => {
       const list = s.byRoom[roomId];
@@ -1431,12 +1501,119 @@ function removeState(roomId: string, userId: string) {
       if (list.length === 0) delete s.byRoom[roomId];
     })
   );
+  return true;
+}
+
+/** Put one gateway event in the store. False for a left that no longer applies (see removeState). */
+function applyStateEvent(st: VoiceStateEvent): boolean {
+  if (st.left) return removeState(st.room_id, st.user_id, st.session_id);
+  applyStates([st]);
+  return true;
+}
+
+/**
+ * Make a room's list exactly `states`. Keyed by user rather than swapped wholesale: a
+ * refresh lands during a call, and a tile rebuilt for the same person re-attaches their video.
+ */
+function replaceRoomStates(roomId: string, states: VoiceState[]) {
+  for (const st of states) registerUserIdentity(st.user);
+  const users = new Set(states.map((st) => st.user_id));
+  batch(() => {
+    setVoice(
+      produce((s) => {
+        // One voice room per user, as in applyStates.
+        for (const [rid, list] of Object.entries(s.byRoom)) {
+          if (rid === roomId) continue;
+          for (let i = list.length - 1; i >= 0; i--) {
+            if (users.has(list[i].user_id)) list.splice(i, 1);
+          }
+          if (list.length === 0) delete s.byRoom[rid];
+        }
+        if (states.length === 0) delete s.byRoom[roomId];
+      })
+    );
+    if (states.length > 0) setVoice('byRoom', roomId, reconcile(states, { key: 'user_id', merge: false }));
+  });
+}
+
+/** Start collecting state events for a snapshot about to be requested. */
+function openSnapshotEvents(): VoiceStateEvent[] {
+  const events: VoiceStateEvent[] = [];
+  live.snapshotEvents.add(events);
+  return events;
+}
+
+/**
+ * Apply a snapshot of a room: replace the list, never merge into it, or nothing could ever
+ * leave it. A snapshot is one moment on the server, though, and by the time it lands the
+ * gateway may already have reported what came after. So the events that arrived while it
+ * was on its way go back on top, in order, across all rooms (someone moving out arrives as
+ * a state in the other room). Someone who left after the snapshot stays gone, and someone
+ * who joined after it stays listed.
+ */
+function settleRoomSnapshot(roomId: string, states: VoiceState[], events: VoiceStateEvent[]) {
+  batch(() => {
+    replaceRoomStates(roomId, states);
+    for (const st of events) applyStateEvent(st);
+  });
+}
+
+/**
+ * Ask the server who is in a room and replace what we have. Deduped per room: a request in
+ * flight is shared, and a room read in the last few seconds is not read again. It never
+ * rejects, since the states it would have replaced are no worse than before; a room we
+ * cannot see is refused here like anywhere else.
+ */
+export function refreshVoiceStates(roomId: string): Promise<void> {
+  const pending = live.refreshes.get(roomId);
+  if (pending) return pending;
+  if (Date.now() - (live.refreshedAt.get(roomId) ?? 0) < VOICE_REFRESH_MIN_MS) return Promise.resolve();
+  live.refreshedAt.set(roomId, Date.now());
+  const events = openSnapshotEvents();
+  const refresh: Promise<void> = listVoiceStates(roomId)
+    .then((res) => {
+      // READY, sign-out or forgetVoiceRooms got there first: what came back is older than them.
+      if (live.refreshes.get(roomId) !== refresh) return;
+      settleRoomSnapshot(roomId, res.states, events);
+      if (voice.session.roomId !== roomId) return;
+      applyAllVolumes();
+      syncCallKeys();
+    })
+    .catch((err) => console.warn('[voice] could not refresh states of room', roomId, err))
+    .finally(() => {
+      live.snapshotEvents.delete(events);
+      if (live.refreshes.get(roomId) === refresh) live.refreshes.delete(roomId);
+    });
+  live.refreshes.set(roomId, refresh);
+  return refresh;
+}
+
+/**
+ * Forget rooms we can no longer see: a space we left, a room deleted or hidden from us.
+ * Nothing would ever update them again, so the list would come back frozen on a rejoin. A
+ * call in one of them ends with it.
+ */
+export function forgetVoiceRooms(roomIds: string[]): void {
+  if (voice.session.roomId && roomIds.includes(voice.session.roomId)) void leaveVoiceRoom();
+  setVoice(
+    produce((s) => {
+      for (const id of roomIds) delete s.byRoom[id];
+    })
+  );
+  for (const id of roomIds) {
+    live.refreshes.delete(id);
+    live.refreshedAt.delete(id);
+  }
 }
 
 /** Our own state changed on the server: a moderator acted, or we moved. */
-function applyOwnState(st: VoiceState & { left?: boolean; moved_to?: string }) {
+function applyOwnState(st: VoiceStateEvent) {
   const s = voice.session;
   if (st.left) {
+    // A session this device has moved on from: a relayed left that a rejoin overtook. A
+    // moderator's disconnect or move and another device taking over all name the session
+    // being ended, which is this one.
+    if (live.sessionId && st.session_id && st.session_id !== live.sessionId) return;
     // Left the room we are connected to - by a moderator's disconnect or move, another
     // of our devices joining elsewhere, or our own leave echoing back. Only react when
     // it is the live room and we did not initiate it. A move names the destination;
@@ -1530,15 +1707,30 @@ function maybeRing(call: VoiceCall, rerung: boolean, since = Date.now()) {
   }
 }
 
+/** A state's join time, in milliseconds (0 when missing or unreadable). */
+function joinedAtMs(st: VoiceState): number {
+  return Date.parse(st.joined_at) || 0;
+}
+
 /** READY: replace what we know. */
 export function hydrateVoiceFromReady(states: unknown, calls: unknown): void {
+  // This is newer than anything still on its way, and than every event collected for a
+  // snapshot in flight: replayed on top of it, one from before a reconnect would undo it.
+  live.refreshes.clear();
+  for (const events of live.snapshotEvents) events.length = 0;
   const list = Array.isArray(states) ? (states as VoiceState[]) : [];
-  const byRoom: Record<string, VoiceState[]> = {};
+  // One voice room per user here too, as in applyStates. A mirror can hold a stale entry for
+  // someone who has since joined elsewhere, and they would show in both rooms; the newest
+  // join is the real one.
+  const newest = new Map<string, VoiceState>();
   for (const st of list) {
     if (!st || typeof st !== 'object' || !st.room_id || !st.user_id) continue;
     registerUserIdentity(st.user);
-    (byRoom[st.room_id] ??= []).push(st);
+    const held = newest.get(st.user_id);
+    if (!held || joinedAtMs(st) > joinedAtMs(held)) newest.set(st.user_id, st);
   }
+  const byRoom: Record<string, VoiceState[]> = {};
+  for (const st of newest.values()) (byRoom[st.room_id] ??= []).push(st);
   const callMap: Record<string, VoiceCall> = {};
   for (const c of Array.isArray(calls) ? (calls as Record<string, unknown>[]) : []) {
     const call = readCall(c);
@@ -1605,10 +1797,10 @@ export function initVoiceHandlers(): () => void {
     if (!payload || typeof payload !== 'object') return;
     switch (event.t) {
       case 'VOICE_STATE_UPDATE': {
-        const st = payload as unknown as VoiceState & { left?: boolean; moved_to?: string };
+        const st = payload as unknown as VoiceStateEvent;
         if (!st.room_id || !st.user_id) return;
-        if (st.left) removeState(st.room_id, st.user_id);
-        else applyStates([st]);
+        for (const events of live.snapshotEvents) events.push(st);
+        const applied = applyStateEvent(st);
         if (st.user_id === auth.user?.id) applyOwnState(st);
         // Someone answering ends the ring for them; someone leaving may end the call.
         const call = voice.calls[st.room_id];
@@ -1617,7 +1809,7 @@ export function initVoiceHandlers(): () => void {
         }
         if (live.room && voice.session.roomId === st.room_id) applyAllVolumes();
         if (voice.session.roomId === st.room_id) {
-          if (st.left) {
+          if (st.left && applied) {
             setVoice('session', 'keyed', (list) => list.filter((id) => userIdOfIdentity(id) !== st.user_id));
           }
           // Membership changed: roll our key so a leaver loses access and a joiner
@@ -1650,7 +1842,7 @@ export function initVoiceHandlers(): () => void {
       }
       case 'SPACE_ROOM_DELETE': {
         const roomId = payload.room_id != null ? String(payload.room_id) : null;
-        if (roomId && voice.session.roomId === roomId) void leaveVoiceRoom();
+        if (roomId) forgetVoiceRooms([roomId]);
         return;
       }
       default:
@@ -1670,6 +1862,9 @@ export function clearVoice(): void {
   stopRingtone();
   void live.audioContext?.close().catch(() => undefined);
   live.audioContext = null;
+  live.snapshotEvents.clear();
+  live.refreshes.clear();
+  live.refreshedAt.clear();
   setVoice(
     produce((s) => {
       s.byRoom = {};

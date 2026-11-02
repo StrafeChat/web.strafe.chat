@@ -370,6 +370,12 @@ export function channelOverridesSource(
  * Whether a member can see a space channel - used to hide private channels (and private
  * categories, via sync) from the sidebar, the way Discord does. Permissive (true) until the
  * roles/overrides needed to decide are loaded, so nothing flickers out during hydration.
+ *
+ * The one thing that is not permissive is a synced room whose section is missing from
+ * `allRooms`. The server leaves a section out only for a member who cannot view it, and a
+ * room synced to it is no more visible than it is; falling back to the room's own (empty)
+ * overrides listed every such room at the top level. The owner and Administrators are never
+ * denied a section, so for them it is merely dangling, and they keep the room.
  */
 export function canViewSpaceChannel(input: {
   room: {
@@ -388,7 +394,18 @@ export function canViewSpaceChannel(input: {
   roles: SpaceRole[] | undefined;
 }): boolean {
   if (!input.memberUserId || !input.roles) return true;
-  const { overrides, userOverrides } = channelOverridesSource(input.room, input.allRooms);
+  const { room, allRooms } = input;
+  if (room.permissions_synced && room.parent_id && allRooms && !allRooms.some((r) => r.id === room.parent_id)) {
+    if (input.memberUserId === input.ownerId) return true;
+    const base = memberEffectivePermBase(
+      { owner_id: input.ownerId ?? "", everyone_role_id: input.everyoneRoleId },
+      input.roles,
+      { id: input.memberUserId, roles: input.memberRoleIds },
+      input.memberUserId
+    );
+    return base !== null && hasPerm(base, PermAdministrator);
+  }
+  const { overrides, userOverrides } = channelOverridesSource(room, allRooms);
   if (overrides === undefined) return true;
   const mask = effectiveChannelPermissionsForMember({
     memberUserId: input.memberUserId,

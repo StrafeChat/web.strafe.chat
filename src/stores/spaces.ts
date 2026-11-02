@@ -16,9 +16,10 @@ import { getThread } from '../api/threads';
 import { removeRoom } from './rooms';
 import { registerRoomIdentity } from './federationIds';
 import { setReadStateFromRoom } from './readState';
-// Read only inside functions, never at load: both import stores that import this one.
+// Read only inside functions, never at load: these import stores that import this one.
 import { spaceMembers } from './spaceMembers';
 import { dropActivitiesOutsideAudience } from './presence';
+import { forgetVoiceRooms, refreshVoiceStates } from './voice';
 
 /**
  * Spaces, their rooms, their roles and every room's permission overrides.
@@ -36,6 +37,8 @@ export interface SpacesState {
   loading: boolean;
   hydrated: boolean;
 }
+
+const ROOM_TYPE_VOICE = 4;
 
 export const [spaces, setSpaces] = createStore<SpacesState>({
   spaces: [],
@@ -93,6 +96,9 @@ export function removeSpace(spaceId: string): void {
     })
   );
   for (const rid of roomIds) removeRoom(rid);
+  // Who is in its voice rooms: no event will touch that again, and a rejoin would show it as
+  // current. A voice handler could not do this, the room list is gone by the time it runs.
+  forgetVoiceRooms(roomIds);
   // Unless they are friends, or members of another space we are in.
   dropActivitiesOutsideAudience(memberIds);
 }
@@ -528,11 +534,16 @@ export function initSpaceHandlers(): () => void {
         // Other members' clients used to learn about a new channel only on reload.
         const room = spaceRoomFromReady(d);
         if (!room) return;
+        const known = (spaces.spaceRoomsBySpaceId[spaceID] ?? []).some((r) => r.id === room.id);
         setSpaces('spaceRoomsBySpaceId', spaceID, (list) => {
           const current = list ?? [];
           if (current.some((r) => r.id === room.id)) return current.map((r) => (r.id === room.id ? { ...r, ...room } : r));
           return [...current, room];
         });
+        // A voice room we were just let into may have a call running, and its states only
+        // reach those who can view it. A room created moments ago has nobody in it yet, and
+        // every member would ask at once.
+        if (!known && room.type === ROOM_TYPE_VOICE && !createdJustNow(d.created_at)) void refreshVoiceStates(room.id);
         return;
       }
       case 'SPACE_ROOM_OVERRIDE_UPDATE': {
@@ -715,6 +726,8 @@ export function hydrateSpaceRoomsFromReady(spaceRoomsData: Record<string, unknow
  * not from the room objects directly, so skipping this left them stuck at nothing-loaded
  * until a WS READY happened to hydrate the room by some other path. */
 export function setSpaceRooms(spaceId: string, roomList: SpaceRoom[]): void {
+  // Empty counts too: an event for a room of a space not loaded yet leaves an empty list here.
+  const newToSession = !spaces.spaceRoomsBySpaceId[spaceId]?.length;
   for (const r of roomList) {
     if (r.last_read_message_id != null || (r.mention_count ?? 0) > 0) {
       setReadStateFromRoom(
@@ -725,6 +738,25 @@ export function setSpaceRooms(spaceId: string, roomList: SpaceRoom[]): void {
     }
   }
   setSpaces('spaceRoomsBySpaceId', (prev) => ({ ...prev, [spaceId]: roomList }));
+  if (newToSession) void refreshSpaceVoiceStates(roomList);
+}
+
+/** Whether a room's created_at is within the last half minute (false when unreadable). */
+function createdJustNow(createdAt: unknown): boolean {
+  const t = typeof createdAt === 'string' ? Date.parse(createdAt) : NaN;
+  return Number.isFinite(t) && Date.now() - t < 30_000;
+}
+
+/**
+ * READY carries the voice states of every space it lists. A space whose rooms first arrive
+ * after it (joined or rejoined this session, by any path) has none, and its voice rooms
+ * would read as empty until the next event. One room at a time: this runs once per space,
+ * and a space with many voice rooms should not cost a burst of requests.
+ */
+async function refreshSpaceVoiceStates(roomList: SpaceRoom[]): Promise<void> {
+  for (const r of roomList) {
+    if (r.type === ROOM_TYPE_VOICE) await refreshVoiceStates(r.id);
+  }
 }
 
 const roomsInflight = new Map<string, Promise<void>>();

@@ -124,7 +124,7 @@ Events are published on channels, one per **space** (space-wide events: roles, m
 { "op": 1, "d": { "space_id": "2102443061534523392" } }   // a room in it
 ```
 
-A subscription is refused (silently) when the account cannot access that room or is not in that space.
+A subscription is refused (silently) when the account cannot access that room or is not in that space. It also ends without a frame of its own when that stops being true; `SPACE_LEAVE` or `SPACE_ROOM_DELETE` on the account's own channel is how you hear.
 
 - **Bots are auto-subscribed** on connect to every space in `READY.spaces`, every room in `READY.space_rooms`, and every PM in `READY.rooms`. A bot only subscribes by hand to a space it joins *after* connecting (announced by `SPACE_CREATE`) and that space's rooms, or a room created while it is connected (`SPACE_ROOM_CREATE`).
 - The account's **own channel** (`user_id` events: relationship requests, new PMs, `SPACE_CREATE`, `SESSION_REVOKED`, read receipts) is always subscribed.
@@ -176,9 +176,13 @@ Room events reach every subscriber of the room; space events reach every subscri
 
 | `t` | Channel | `d` |
 | --- | --- | --- |
-| `SPACE_ROOM_CREATE` | space | The new room, with overrides |
-| `SPACE_ROOM_UPDATE` | space | The room (name, topic, slowmode, position, encryption, voice limits) |
-| `SPACE_ROOM_DELETE` | space | `{"space_id", "room_id"}` |
+| `SPACE_ROOM_CREATE` | space or account | The room, with overrides. Handle it as an upsert: it can name a room you already have |
+| `SPACE_ROOM_UPDATE` | space or account | The room (name, topic, slowmode, position, encryption, voice limits) |
+| `SPACE_ROOM_DELETE` | space or account | `{"space_id", "room_id"}`. On your own channel it can also mean you lost sight of the room, not that it is gone |
+
+A room event goes to the space's channel only when nobody is kept out of the room; otherwise it goes to each member who can view it, on their own channel, with `space_id` in the payload.
+
+Who can view a room can change without the room changing. When an override, the Section a room is synced to, or a member's roles change, when a role's View Room, Administrator or Manage Threads bit changes, or when a role is deleted, members who can view the affected rooms get `SPACE_ROOM_CREATE` and members who cannot get `SPACE_ROOM_DELETE`, which also ends their subscription to the room. A thread sent this way carries its `thread` block with the member's own `joined`; archived threads are not sent.
 
 ### Threads
 
@@ -222,7 +226,8 @@ Sent space-wide when everyone can view the parent channel, otherwise only to the
 | `USER_UPDATE` | A profile changed (display name, avatar, pronouns, …) - `{"user_id", "display_name", "avatar", "pronouns", …}` |
 | `RELATIONSHIP_REQUEST` / `RELATIONSHIP_ADD` / `RELATIONSHIP_REMOVE` | Friend requests and friendships (people only) |
 | `SESSION_REVOKED` | `{"reason"}` - this credential is dead: the account was banned from the instance, signed out everywhere, or (for a bot) the token was reset. The socket is closed right after |
-| `VOICE_STATE_UPDATE`, `CALL_RING`, `CALL_DECLINE`, `CALL_END` | Voice and video (see the client) |
+| `VOICE_STATE_UPDATE` | A voice state; `left: true` when it ended, with `moved_to` (a room id) when a moderator moved them. In a space, sent to the space's channel only when nobody is kept out of the room, otherwise to the room's own channel (subscribe to it to hear a private room) and to the person it is about. `moved_to` names a room nobody else may see only to the person moved |
+| `CALL_CREATE`, `CALL_UPDATE`, `CALL_DELETE` | A PM or group PM call started (ringing the others), its ringing list changed (`rerung: true` restarts the ringtone), or it ended |
 | `TO_DEVICE`, `DEVICE_REVOKED`, `SESSION_ROTATE` | End-to-end encryption key traffic between devices. A bot can ignore these |
 | `KEY_BACKUP_UPDATE` | `{"action": "created" \| "deleted", "version"}` - the account's [key backup](/docs/rest/#key-backup-session-only) version was created or deleted (for `deleted`, the version that went). A device pinned to a version that is no longer current stops uploading to it and asks the user to confirm the new one with the recovery code, without waiting for its next upload to fail |
 

@@ -313,6 +313,8 @@ Every active thread in the space the caller can see, and a channel's archived th
 
 `?limit=` (default 50, ≤100) `&before=<message id>` for older history. Newest first. Needs **View Room** and **Read Message History** in the room.
 
+In a space hosted on another instance, that instance answers this, `GET /rooms/:id/messages/:msg_id` and search. Its refusal reaches you with its status and fields, and this instance's own copy is served only when it cannot be reached; with no copy to serve, the answer is `502`.
+
 ### `GET` /rooms/:id/messages/:msg_id
 
 ### `POST` /rooms/:id/messages — *Send Messages*
@@ -418,7 +420,7 @@ The end-to-end encryption key backup (`m.megolm_backup.v1.curve25519-aes-sha2`, 
 | `409` | A conflict (an application that already has a bot, the application limit) |
 | `429` | Rate limited or slowmode; see below |
 | `500` | Something broke server-side. Retry with backoff |
-| `502`, `503` | A service the instance relays to (a GIF provider) failed or is limiting the instance. Retry later |
+| `502`, `503` | A service the instance relays to (a GIF provider, or the instance hosting a space) failed or is limiting the instance. Retry later |
 
 ## Rate limits
 
