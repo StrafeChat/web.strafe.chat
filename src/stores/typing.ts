@@ -161,9 +161,7 @@ export function initTypingHandler() {
         inner && typeof inner === 'object' && !Array.isArray(inner)
           ? (inner as Record<string, unknown>)
           : serverEvt ?? {};
-      const roomId = String(
-        data?.room_id ?? (evt as { room_id?: string }).room_id ?? (evt as { space_id?: string }).space_id ?? ''
-      ).trim();
+      const roomId = String(data?.room_id ?? (evt as { room_id?: string }).room_id ?? '').trim();
       const senderId = String(data?.sender_id ?? data?.user_id ?? '').trim();
       if (roomId && senderId && roomId !== 'undefined' && senderId !== 'undefined') {
         removeTyping(roomId, senderId);

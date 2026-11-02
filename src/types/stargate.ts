@@ -1,6 +1,6 @@
 /**
  * Stargate WebSocket protocol types
- * @see docs/STARGATE_CLIENT.md
+ * @see docs/pages/05-gateway.md (the published gateway reference; docs/STARGATE_CLIENT.md is superseded)
  */
 
 export const Op = {
@@ -25,6 +25,7 @@ export type ConnectionStatus =
   | 'disconnected'
   | 'failed';
 
+/** op 1 / op 5. `space_id` names the CHANNEL: a space's own id or a room's id. */
 export interface SubscribePayload {
   space_id?: string;
   user_id?: string;
@@ -42,12 +43,16 @@ export interface ReadyPayload {
   session_id: string;
 }
 
+/** op 3's envelope. Unlike the subscribe frames, its ids mean what they say. */
 export interface EventPayload {
   t: string;
+  /** The space the event belongs to; absent for PM / group PM events and account events about no space. */
   space_id?: string;
+  /** The room (channel, thread, PM) the event is about; absent for space-wide events. */
+  room_id?: string;
+  /** Only on events delivered on the account's own channel: names that account, never the actor. */
   user_id?: string;
   d: unknown;
-  from?: number;
 }
 
 export interface ErrorPayload {

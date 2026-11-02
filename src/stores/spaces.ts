@@ -459,6 +459,18 @@ export function spaceRoomFromPayload(d: Record<string, unknown>): SpaceRoom | nu
   return spaceRoomFromReady(d);
 }
 
+/** Normalize a list of raw rooms (READY's space_rooms entry, SPACE_CREATE's `rooms`). */
+function spaceRoomsFromPayload(raw: unknown[]): SpaceRoom[] {
+  const out: SpaceRoom[] = [];
+  for (const item of raw) {
+    if (item && typeof item === 'object') {
+      const r = spaceRoomFromReady(item as Record<string, unknown>);
+      if (r) out.push(r);
+    }
+  }
+  return out;
+}
+
 function upsertSpaceRoom(spaceId: string, room: SpaceRoom): void {
   setSpaces('spaceRoomsBySpaceId', spaceId, (list) => {
     const current = list ?? [];
@@ -467,10 +479,24 @@ function upsertSpaceRoom(spaceId: string, room: SpaceRoom): void {
   });
 }
 
-/** Normalize a raw room record and put it in the store (a thread just created or fetched). */
+/** Normalize a raw room record and put it in the store (a thread just created or fetched). The
+ * caller is about to show it, so it goes in at once; in a space this session has no room list
+ * for, the whole list is loaded too (see hasRoomList), and the room is put back if that list
+ * lacks it - an archived thread is not part of it. */
 export function upsertSpaceRoomFromPayload(spaceId: string, raw: Record<string, unknown>): SpaceRoom | null {
   const room = spaceRoomFromReady(raw);
-  if (room) upsertSpaceRoom(spaceId, room);
+  if (!room) return null;
+  const listed = hasRoomList(spaceId);
+  upsertSpaceRoom(spaceId, room);
+  if (!listed) {
+    void loadSpaceRoomList(spaceId).then(() => {
+      const list = spaces.spaceRoomsBySpaceId[spaceId] ?? [];
+      if (!list.some((r) => r.id === room.id)) upsertSpaceRoom(spaceId, room);
+      // setSpaceRooms found this room in place and took the list for one it had; the space's
+      // voice rooms are new to the session all the same.
+      void refreshSpaceVoiceStates(list);
+    });
+  }
   return room;
 }
 
@@ -501,7 +527,9 @@ export function initSpaceHandlers(): () => void {
     const payload = (event.d as { d?: unknown })?.d ?? event.d;
     if (event.t === 'SPACE_CREATE' || event.t === 'SPACE_UPDATE') {
       const space = spaceFromPayload(payload);
-      if (space) addOrUpdateSpace(space);
+      if (!space) return;
+      addOrUpdateSpace(space);
+      if (event.t === 'SPACE_CREATE') hydrateCreatedSpaceRooms(space.id, (payload as Record<string, unknown>).rooms);
       return;
     }
     if (!payload || typeof payload !== 'object') return;
@@ -534,6 +562,12 @@ export function initSpaceHandlers(): () => void {
         // Other members' clients used to learn about a new channel only on reload.
         const room = spaceRoomFromReady(d);
         if (!room) return;
+        // Into a space whose list this session never had, the room alone would pass for the
+        // list: load all of it instead (it has this room, and reads that space's voice rooms).
+        if (!hasRoomList(spaceID)) {
+          void loadSpaceRoomList(spaceID);
+          return;
+        }
         const known = (spaces.spaceRoomsBySpaceId[spaceID] ?? []).some((r) => r.id === room.id);
         setSpaces('spaceRoomsBySpaceId', spaceID, (list) => {
           const current = list ?? [];
@@ -608,6 +642,11 @@ export function initSpaceHandlers(): () => void {
       case 'THREAD_CREATE': {
         const room = spaceRoomFromReady(d);
         if (!room) return;
+        // As SPACE_ROOM_CREATE: the space's whole list, which carries this thread as we see it.
+        if (!hasRoomList(spaceID)) {
+          void loadSpaceRoomList(spaceID);
+          return;
+        }
         // A fresh thread's broadcast carries the creator's view and nobody else is in it yet
         // (Discord's newly_created); a THREAD_CREATE sent to one person - on being added to
         // a private thread - already describes that person's own membership.
@@ -667,10 +706,16 @@ export function initSpaceHandlers(): () => void {
         const known = spaces.spaceRoomsBySpaceId[spaceID]?.some((r) => r.id === roomID);
         if (!known && d.joined === true) {
           // Joined a thread this client has never seen (added while offline, or a private one
-          // whose THREAD_CREATE was missed): fetch it rather than patch nothing.
-          void getThread(roomID)
-            .then((raw) => upsertSpaceRoomFromPayload(spaceID, raw))
-            .catch((err) => console.error('Loading joined thread failed:', err));
+          // whose THREAD_CREATE was missed): fetch it rather than patch nothing. In a space with
+          // no list yet, the whole list first: it has the thread unless the thread is archived.
+          const fetchThread = () => {
+            if (spaces.spaceRoomsBySpaceId[spaceID]?.some((r) => r.id === roomID)) return;
+            void getThread(roomID)
+              .then((raw) => upsertSpaceRoomFromPayload(spaceID, raw))
+              .catch((err) => console.error('Loading joined thread failed:', err));
+          };
+          if (hasRoomList(spaceID)) fetchThread();
+          else void loadSpaceRoomList(spaceID).then(fetchThread);
           return;
         }
         patchRoom(spaceID, roomID, (r) => (r.thread ? { ...r, thread: { ...r.thread, joined: d.joined === true } } : r));
@@ -718,6 +763,49 @@ export function hydrateSpaceRoomsFromReady(spaceRoomsData: Record<string, unknow
     next[spaceId] = rooms;
   }
   setSpaces('spaceRoomsBySpaceId', (prev) => ({ ...prev, ...next }));
+}
+
+/**
+ * Whether this session has a space's room list. Everything that reads the list takes a
+ * non-empty one for the whole of it (ensureSpaceRooms, SpacePage, SpaceRoomsBar), so a room
+ * event must never be what starts one: a SPACE_ROOM_CREATE or THREAD_CREATE adding its room to
+ * a space whose list was never loaded (a space joined in another session, now that its events
+ * reach us) would leave the space showing that room alone until a reload. Those load the whole
+ * list instead. An empty list counts as none - an event's patch can leave one behind - and a
+ * space that really has no room we can see only costs a fetch.
+ */
+function hasRoomList(spaceId: string): boolean {
+  return (spaces.spaceRoomsBySpaceId[spaceId]?.length ?? 0) > 0;
+}
+
+/**
+ * Load the room list of a space this session has none for, because an event touched one of
+ * its rooms. A fetch already on its way may have been answered before that room existed, so a
+ * fresh one follows it instead of sharing its answer (the rooms of a SPACE_CREATE without
+ * `rooms`, then a SPACE_ROOM_CREATE, would otherwise miss the room). Only for a space we are in.
+ */
+function loadSpaceRoomList(spaceId: string): Promise<void> {
+  if (!spaces.spaces.some((s) => s.id === spaceId)) return Promise.resolve();
+  const pending = roomsInflight.get(spaceId);
+  const p = pending
+    ? pending.catch(() => undefined).then(() => refreshSpaceRooms(spaceId))
+    : refreshSpaceRooms(spaceId);
+  return p.catch((err) => console.error('Loading space rooms failed:', err));
+}
+
+/**
+ * SPACE_CREATE reaches every session of an account that joins or creates a space (and a bot
+ * being installed), with the rooms it may see there in READY's space_rooms form, as Discord's
+ * GUILD_CREATE carries its channels. They go in like any loaded list, through setSpaceRooms, so
+ * read state, the space's voice states and the gateway subscriptions follow, and the space has
+ * live unread badges without being opened. An older server sends none: fetch the list instead.
+ */
+function hydrateCreatedSpaceRooms(spaceId: string, raw: unknown): void {
+  if (Array.isArray(raw)) {
+    setSpaceRooms(spaceId, spaceRoomsFromPayload(raw));
+    return;
+  }
+  if (!hasRoomList(spaceId)) void loadSpaceRoomList(spaceId);
 }
 
 /** Set space rooms for a space (e.g. after fetch or from READY). Also hydrates readState

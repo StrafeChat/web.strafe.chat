@@ -203,9 +203,12 @@ export function initPresenceHandler(): () => void {
     if (userId == null || !p?.status) return;
 
     // Space broadcasts carry the "others" view (invisible → offline). Applying that to our
-    // OWN user would wrongly show us offline; our real status arrives on the user channel
-    // (no space_id), so ignore a self update that came in via a space.
-    if (event.space_id && userId === auth.user?.id) return;
+    // OWN user would wrongly show us offline; our real status arrives on our own channel,
+    // which the envelope marks by naming us in user_id with no space_id. Take a self update
+    // only from there, so any other delivery of our presence (a space today, anything added
+    // later) can never stand in for it.
+    const me = auth.user?.id;
+    if (me && userId === me && !(event.user_id === me && !event.space_id)) return;
 
     const valid = ['online', 'idle', 'dnd', 'offline', 'invisible'].includes(p.status);
     if (!valid) return;

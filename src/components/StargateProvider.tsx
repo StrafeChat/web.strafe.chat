@@ -230,7 +230,9 @@ export const StargateProvider: Component<{ children?: import('solid-js').JSX.Ele
   // membership isn't visible to its authorization read yet - leaving the space with no live
   // messages/typing until a reconnect. When a new space id appears, re-assert subscriptions a
   // couple of times to ride out that window; channels already held are cheap no-ops (the gateway
-  // dedupes), only the rejected new ones get re-authorized.
+  // dedupes), only the rejected new ones get re-authorized. A current gateway subscribes the
+  // connection itself when it delivers SPACE_CREATE (and ROOM_CREATE, SPACE_ROOM_CREATE,
+  // THREAD_CREATE), so this only still matters against an older one; it is kept as a backstop.
   let knownSpaceIds = new Set<string>();
   createEffect(() => {
     if (!stargate.ready) return;

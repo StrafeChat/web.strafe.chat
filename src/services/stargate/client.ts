@@ -130,10 +130,14 @@ export function connectStargate(token: string): void {
           if (eventType) {
             for (const h of eventHandlers) {
               try {
+                // The envelope's ids mean what they say: space_id is the space (absent for a
+                // PM), room_id the room (absent for a space-wide event). Older gateways put the
+                // channel id in space_id and this once fell back to it for room_id, which would
+                // now hand a space-wide event the space id as its room.
                 h({
                   t: typeof eventType === 'string' ? eventType : 'UNKNOWN',
                   space_id: evt?.space_id,
-                  room_id: evt?.room_id ?? evt?.space_id,
+                  room_id: evt?.room_id,
                   user_id: evt?.user_id,
                   d: evt,
                 });

@@ -307,7 +307,7 @@ Every active thread in the space the caller can see, and a channel's archived th
 }
 ```
 
-`plaintext` is present in plain rooms; encrypted rooms carry `ciphertext` instead. `reactions` is included when fetching messages, not in gateway events. `pinned`, `pinned_at` and `pinned_by` are present while the message is pinned in its room. Deleted messages keep their id with a `deleted_at`. System notices have `sender_id: "0"`, a `system_type` (`space_member_join`, `space_member_leave`, `space_birthday`, …) and a `system_payload`. `space_birthday` is posted once a day in the space's `birthday_channel_id` for each opted-in member whose birthday is that day (UTC); its payload is `{"user_id": "…", "message": "…"}`, with `message` being the space's `birthday_message` (possibly empty, meaning use the default greeting).
+`plaintext` is present in plain rooms; encrypted rooms carry `ciphertext` instead. `reactions` is included when fetching messages, not in gateway events; gateway events add `space_id` for a room in a space. `pinned`, `pinned_at` and `pinned_by` are present while the message is pinned in its room. Deleted messages keep their id with a `deleted_at`. System notices have `sender_id: "0"`, a `system_type` (`space_member_join`, `space_member_leave`, `space_birthday`, …) and a `system_payload`. `space_birthday` is posted once a day in the space's `birthday_channel_id` for each opted-in member whose birthday is that day (UTC); its payload is `{"user_id": "…", "message": "…"}`, with `message` being the space's `birthday_message` (possibly empty, meaning use the default greeting).
 
 ### `GET` /rooms/:id/messages
 

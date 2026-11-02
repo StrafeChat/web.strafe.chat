@@ -10,7 +10,7 @@ A bot is an application's bot account: a member of the spaces it was added to, d
 The shape of every bot is the same:
 
 1. **Connect** to the gateway with the bot token. The first frame is `READY`: the bot's user, every space it is in with their roles, every room in those spaces, and its private messages.
-2. **Listen** for events - `MESSAGE_CREATE` when someone posts, `SPACE_CREATE` when the bot is added somewhere new, and so on. A bot is subscribed to everything it can see from the start; there is no subscription bookkeeping.
+2. **Listen** for events - `MESSAGE_CREATE` when someone posts, `SPACE_CREATE` when the bot is added somewhere new, and so on. A bot is subscribed to everything it can see from the start, and to every space, room and thread it gains while connected; there is no subscription bookkeeping.
 3. **Act** through REST: post a message, add a reaction, kick a member, create an invite.
 
 ## Before you start
@@ -118,15 +118,16 @@ Both examples do the three things every bot must: authenticate with the `Bot` he
 | Field | |
 | --- | --- |
 | `room_id` | Where it was posted - use it to reply |
+| `space_id` | The space that room is in. Absent in a private message or group PM |
 | `sender_id` | Who posted it. `"0"` for system notices (joins, leaves), which also carry `system_type` |
 | `plaintext` | The text, when the room is not encrypted. Absent in encrypted rooms |
 | `mentions`, `mention_roles`, `mention_everyone` | Who the message pings (user ids, role ids) |
 | `reply_to_id` | The message it replies to, if any |
 | `attachments` | Uploaded files, each with `id`, `filename`, `url`, `content_type`, `size` and image dimensions |
 
-`MESSAGE_UPDATE` carries the edited message and `MESSAGE_DELETE` just `{room_id, message_id}`. Reactions arrive as `MESSAGE_REACTION_ADD` / `MESSAGE_REACTION_REMOVE` with `{room_id, message_id, user_id, emoji}`.
+`MESSAGE_UPDATE` carries the edited message and `MESSAGE_DELETE` just `{room_id, space_id, message_id}`. Reactions arrive as `MESSAGE_REACTION_ADD` / `MESSAGE_REACTION_REMOVE` with `{room_id, space_id, message_id, user_id, emoji}` (`space_id`, as everywhere, only for a room in a space).
 
-To know *which space* a room belongs to, look the room up in the `space_rooms` map from `READY` (or `GET /rooms/:id`, whose `space_id` names the space; private messages have none).
+To know *which space* a message belongs to, read `space_id` - on the payload (`frame.d.d.space_id`) or the event envelope (`frame.d.space_id`); both are absent for a private message or group PM. The envelope's `room_id` and the payload's name the room. See [Gateway › Event envelope](/docs/gateway/#event-envelope).
 
 ## Sending messages
 
@@ -187,12 +188,7 @@ The response is the attachment record; put its `id` in the message's `attachment
 
 ## Being added to a space
 
-When someone installs the bot, the connected bot receives `SPACE_CREATE` on its own channel with the space (and its roles). Rooms are not included and events for the new space are not yet flowing, so:
-
-1. `GET /spaces/:id/rooms` to learn the rooms.
-2. Subscribe: send `{"op": 1, "d": {"space_id": "<space id>"}}` for space-wide events and one `{"op": 1, "d": {"space_id": "<room id>"}}` per room for messages. (Yes, the field is `space_id` for both - see [Gateway › Subscriptions](/docs/gateway/#subscriptions).)
-
-Or simply reconnect: everything is subscribed automatically on `READY`.
+When someone installs the bot, each of its connections receives `SPACE_CREATE` on its own channel: the space, its roles, and `rooms` - every room the bot can see there, in the same form as `READY.space_rooms`. The gateway subscribes the connection to the space and those rooms as the event arrives, so the new space's messages and member events reach the bot from then on with nothing to send - starting with the `SPACE_UPDATE` that follows it, carrying the space's roles reordered around the bot's managed role. Rooms created later, rooms the bot is let into, and threads arrive as `SPACE_ROOM_CREATE` / `THREAD_CREATE` and are subscribed the same way. (`op 1` is still there for a channel the bot dropped itself with `op 5` - see [Gateway › Subscriptions](/docs/gateway/#subscriptions).)
 
 `SPACE_LEAVE` (kicked, banned, or the space was deleted → `SPACE_DELETE`) means the bot is out. Its managed role is removed with it.
 
