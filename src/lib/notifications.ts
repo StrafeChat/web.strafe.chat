@@ -11,7 +11,7 @@ import { spaceMembers } from '../stores/spaceMembers';
 import { extractMentionedRoleIds, extractMentionedUserIds, mentionsEveryone } from '../stores/readState';
 import { notificationPrefs, playNotificationSound, showDesktopNotification } from '../stores/notificationPrefs';
 import { notificationsSuppressedByStatus } from '../stores/presence';
-import { getMessageBodyText, isSystemMessage, messagePreviewText } from '../components/messageList/utils';
+import { getMessageBodyText, getMessagePreviewSource, isSystemMessage, messagePreviewText } from '../components/messageList/utils';
 import { isRoomMuted, NotifyModeAll, NotifyModeMentions, NotifyModeNone } from './roomNotify';
 import { resolveProfile, resolveSpaceUser, type ProfileBase } from './spaceProfile';
 import { t } from '../i18n';
@@ -174,8 +174,10 @@ export function maybeNotifyMessage(roomId: string, messageId: string): void {
     // In a space, its member list names the people the body mentions (with their nicknames
     // there) instead of "@Someone".
     const participants = spaceId ? spaceMembers.bySpaceId[spaceId] : undefined;
+    // A bot's embed-only message previews as its first embed's title or description; whether
+    // it mentions the reader is still judged on the text alone, above.
     const preview = prefs.preview
-      ? messagePreviewText(body, participants, me, 140) || t('notifications.newMessage')
+      ? messagePreviewText(getMessagePreviewSource(msg), participants, me, 140) || t('notifications.newMessage')
       : t('notifications.newMessage');
     showDesktopNotification({
       title: ctx.title,

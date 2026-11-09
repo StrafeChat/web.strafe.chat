@@ -38,7 +38,7 @@ import { stargate } from '../stores/stargate';
 import { messageIdGt, readState, ackRoomOptimistic, getUnreadBannerInfo } from '../stores/readState';
 import { createViewportAck } from '../lib/viewportAck';
 import { dismissNewHeader, clearNewHeaderDismissed, newHeaderDismissed } from '../stores/newHeaderDismissed';
-import { getMessageBodyText, getSenderDisplay, messagePreviewText } from '../components/messageList';
+import { getMessagePreviewSource, getSenderDisplay, messagePreviewText } from '../components/messageList';
 import { buildMentionCatalog, serializeDraft } from '../lib/utils/mentions';
 import type { ReplyTarget, TypingPerson } from '../components/room';
 import { createRoomDrafts } from '../components/room/roomDrafts';
@@ -184,7 +184,7 @@ const RoomPage: Component = () => {
     const sender = target ? getSenderDisplay(target.sender_id, room()?.participants ?? [], auth.user?.id) : null;
     return {
       name: sender?.name ?? t('room.replyFallback'),
-      preview: target ? messagePreviewText(getMessageBodyText(target), room()?.participants, auth.user?.id, 120) : '',
+      preview: target ? messagePreviewText(getMessagePreviewSource(target), room()?.participants, auth.user?.id, 120) : '',
       onJump: target ? () => scrollToMessage(id) : undefined,
       onCancel: () => setReplyToMessageId(null),
     };

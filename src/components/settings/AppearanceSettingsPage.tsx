@@ -5,6 +5,7 @@ import {
   setMessageCompact,
   setMembersPanelOpen,
   setLinkPreviewsInEncrypted,
+  setBotEmbeds,
   type SettingsData,
 } from '../../stores/settings';
 import {
@@ -430,6 +431,18 @@ export const AppearanceSettingsPage: Component = () => {
                 label={t('settings.appearance.chat.linkPreviewsEncrypted')}
                 checked={!!(settings as SettingsData).linkPreviewsInEncrypted}
                 onChange={(on) => setLinkPreviewsInEncrypted(on)}
+              />
+            }
+          />
+          <SettingRow
+            icon="fa-robot"
+            title={t('settings.appearance.chat.botEmbeds')}
+            description={t('settings.appearance.chat.botEmbedsDescription')}
+            control={
+              <Toggle
+                label={t('settings.appearance.chat.botEmbeds')}
+                checked={(settings as SettingsData).botEmbeds !== false}
+                onChange={(on) => setBotEmbeds(on)}
               />
             }
           />

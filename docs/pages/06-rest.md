@@ -1,6 +1,6 @@
 ---
 title: REST API
-description: Reference for the endpoints bots and applications use - the instance, users, spaces, members, roles, invites, rooms, messages, reactions, attachments, GIFs - plus error and rate-limit behaviour.
+description: Reference for the endpoints bots and applications use - the instance, users, spaces, members, roles, invites, rooms, messages, reactions, attachments, GIFs, the image proxy - plus error and rate-limit behaviour.
 ---
 
 # REST API
@@ -298,6 +298,7 @@ Every active thread in the space the caller can see, and a channel's archived th
   "mention_roles": [],
   "mention_everyone": false,
   "attachments": [ { "id": "…", "filename": "chart.png", "url": "https://…/cdn/…", "content_type": "image/png", "size": 48213, "width": 1280, "height": 720 } ],
+  "embeds": [ { "type": "rich", "title": "Deploy finished", "color": 3066993, "image": { "url": "https://…/cdn/…/chart.png", "proxy_url": "https://…/cdn/…/chart.png", "width": 1280, "height": 720 } } ],
   "reactions": [ { "emoji": "👋", "count": 1, "me": false } ],
   "pinned": true,
   "pinned_at": "2026-10-06T01:12:00.000Z",
@@ -307,7 +308,7 @@ Every active thread in the space the caller can see, and a channel's archived th
 }
 ```
 
-`plaintext` is present in plain rooms; encrypted rooms carry `ciphertext` instead. `reactions` is included when fetching messages, not in gateway events; gateway events add `space_id` for a room in a space. `pinned`, `pinned_at` and `pinned_by` are present while the message is pinned in its room. Deleted messages keep their id with a `deleted_at`. System notices have `sender_id: "0"`, a `system_type` (`space_member_join`, `space_member_leave`, `space_birthday`, …) and a `system_payload`. `space_birthday` is posted once a day in the space's `birthday_channel_id` for each opted-in member whose birthday is that day (UTC); its payload is `{"user_id": "…", "message": "…"}`, with `message` being the space's `birthday_message` (possibly empty, meaning use the default greeting).
+`plaintext` is present in plain rooms; encrypted rooms carry `ciphertext` instead. `embeds` is always an array - a bot's rich embeds, empty when there are none and in every encrypted room; load their pictures from `proxy_url` / `proxy_icon_url` ([Embeds](/docs/embeds/#receiving-embeds)). `reactions` is included when fetching messages, not in gateway events; gateway events add `space_id` for a room in a space. `pinned`, `pinned_at` and `pinned_by` are present while the message is pinned in its room. Deleted messages keep their id with a `deleted_at`. System notices have `sender_id: "0"`, a `system_type` (`space_member_join`, `space_member_leave`, `space_birthday`, …) and a `system_payload`. `space_birthday` is posted once a day in the space's `birthday_channel_id` for each opted-in member whose birthday is that day (UTC); its payload is `{"user_id": "…", "message": "…"}`, with `message` being the space's `birthday_message` (possibly empty, meaning use the default greeting).
 
 ### `GET` /rooms/:id/messages
 
@@ -319,11 +320,11 @@ In a space hosted on another instance, that instance answers this, `GET /rooms/:
 
 ### `POST` /rooms/:id/messages — *Send Messages*
 
-See [Bots › Sending messages](/docs/bots/#sending-messages). `201` with the message.
+See [Bots › Sending messages](/docs/bots/#sending-messages). `201` with the message. `embeds` (bots only, plain rooms only) also needs **Embed Links** in a space room; the object and its errors are on the [Embeds](/docs/embeds/) page.
 
 ### `PATCH` /rooms/:id/messages/:msg_id
 
-`{"plaintext": "…"}` - own messages only.
+`{"plaintext": "…"}` - own messages only. A bot may also send `"embeds"`: a list replaces its embeds, `[]` or `null` removes them, and leaving the key out keeps them; `{"embeds": […]}` alone leaves the text as it is ([Embeds › Editing](/docs/embeds/#editing)).
 
 ### `DELETE` /rooms/:id/messages/:msg_id — *own, or Manage Messages*
 
@@ -365,6 +366,25 @@ Results are rated up to PG-13.
 ```
 
 `url` is the rendition to send or embed, `preview_url` a smaller animated one for a picker grid, and `still_url` (absent when the provider has none) a single frame to show while it loads. Every URL is `https://`; an item without a usable preview and full rendition is left out, so a page can hold fewer than `limit`. Pass `next_offset` as `offset` for the next page, and stop once it reaches `total_count`.
+
+## Image proxy
+
+### `GET` /media/v1/external/:sig/:src — *no auth*
+
+Serves the instance's copy of a picture from elsewhere: the addresses message objects give as an embed's `proxy_url` / `proxy_icon_url` ([Embeds › Images](/docs/embeds/#images)). Do not build these yourself; the signature is what lets a request through, and only the instance can make one. On an instance without a configured public URL, `proxy_url` is a path starting with `/media/v1/`: resolve it against your API base.
+
+A success is the image (png, jpeg, gif or webp, its type judged from the bytes) with `Cache-Control: public, max-age=86400`, `X-Content-Type-Options: nosniff` and a sandboxing `Content-Security-Policy`. Errors are `{"error": "…"}`:
+
+| Status | |
+| --- | --- |
+| `400` | A bad or forged signature |
+| `404` | The source has no such picture |
+| `413` | Larger than the instance's size limit (8 MB by default) |
+| `415` | Not a png, jpeg, gif or webp, or more than 16384 pixels a side |
+| `502` | The source could not be reached or did not answer properly |
+| `429` | Too many uncached fetches from one address (more than 60 a minute); see `Retry-After` |
+
+`404`, `413`, `415` and `502` are remembered for 15 minutes and sent with `Cache-Control: public, max-age=900`.
 
 | Status | Body | When |
 | --- | --- | --- |
@@ -413,7 +433,7 @@ The end-to-end encryption key backup (`m.megolm_backup.v1.curve25519-aes-sha2`, 
 
 | Status | When |
 | --- | --- |
-| `400` | Invalid JSON, a missing or invalid field, an id that is not a snowflake; OAuth2 `invalid_*` errors |
+| `400` | Invalid JSON, a missing or invalid field, an id that is not a snowflake; OAuth2 `invalid_*` errors. A refused embed adds `"code": "invalid_embed"` and the `path` of the field, e.g. `"embeds[0].fields[3].value"` ([Embeds › Errors](/docs/embeds/#errors)) |
 | `401` | No credential, or an invalid / expired / reset one |
 | `403` | Not a member, missing permission, role hierarchy, banned, or an OAuth2 token without the needed scope (`insufficient_scope`) |
 | `404` | No such space / room / message / role, or one you cannot see |

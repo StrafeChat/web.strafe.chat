@@ -43,17 +43,18 @@ Add the values of the bits you need to build a mask; test a bit with `(mask & bi
 | 27 | `134217728` | Manage Threads | room | Rename, archive, lock and delete any thread; see private threads |
 | 28 | `268435456` | Change Nickname | space | Set or clear their own nickname in the space (on for `@everyone` by default) |
 | 29 | `536870912` | Manage Nicknames | space | Change or clear the nicknames of members ranked below them, and reset those members' space profiles (avatar, banner, pronouns, About Me, bio); their own nickname too |
+| 30 | `1073741824` | Embed Links | room | Post a message with rich [embeds](/docs/embeds/) (bots), on top of Send Messages. On for `@everyone` by default; spaces created before it existed have it wherever Send Messages was granted |
 
-New permissions are only ever appended; existing values never change meaning.
+New permissions are only ever appended; existing values never change meaning. Bit 30 is the highest a signed 32-bit integer holds: masks now reach `2147483647`, so keep them in a 64-bit integer (or a JavaScript number, not a 32-bit int) if you compute with them.
 
 ### Useful masks
 
 | Mask | Value |
 | --- | --- |
 | Read and post (View Room + Send Messages + Read Message History) | `7` |
-| `@everyone` in a new space (read, post, attach files, react, external emoji, invite, start public threads and talk in threads, join and talk in voice, change their nickname) | `363044895` |
-| Every room-scoped bit | `268402815` |
-| Every bit | `1073741823` |
+| `@everyone` in a new space (read, post, attach files, embed links, react, external emoji, invite, start public threads and talk in threads, join and talk in voice, change their nickname) | `1436786719` |
+| Every room-scoped bit | `1342144639` |
+| Every bit | `2147483647` |
 
 ## How permissions resolve
 
@@ -64,7 +65,7 @@ For a member in a space:
 3. **Administrator?** If bit 11 is set, the member has every permission in every room; stop here.
 4. **Room overrides**, applied in order to the space-wide mask for that room: the `@everyone` override, then overrides of the member's other roles (every deny first, then every allow), then the member's own user override (deny, then allow). Overrides can only touch room-scoped bits.
 5. **Threads** have no overrides of their own: a thread resolves against its channel's effective overrides (and so a synced section's), with the thread bits above on top. A private thread yields no permissions at all to anyone who is neither a member nor a Manage Threads holder.
-6. **Two implicit rules**, the same as Discord's: without View Room the member has no permission at all in that room, whatever the bits say; and without Send Messages they cannot Attach Files or Mention @everyone either.
+6. **Two implicit rules**, the same as Discord's: without View Room the member has no permission at all in that room, whatever the bits say; and without Send Messages they cannot Attach Files, Embed Links or Mention @everyone either.
 
 Administrator also grants every space-scoped permission for management actions (adding bots, editing the space, invites, emoji, roles, nicknames, kicks and bans), though role hierarchy still applies to Administrators - only the owner is above it.
 
@@ -72,7 +73,7 @@ Administrator also grants every space-scoped permission for management actions (
 
 ## Room overrides
 
-A room can allow or deny room-scoped bits per role or per member, independent of the space-wide mask. Each override is `{allow, deny}`; a bit in `deny` removes the permission for that role in that room, a bit in `allow` grants it, and a bit in neither leaves the space-wide value. Text rooms accept the text bits (0–6 and 23); voice rooms accept View Room and the voice bits (15–22). Managing overrides needs **Manage Roles**, and you cannot grant through an override what you do not hold yourself.
+A room can allow or deny room-scoped bits per role or per member, independent of the space-wide mask. Each override is `{allow, deny}`; a bit in `deny` removes the permission for that role in that room, a bit in `allow` grants it, and a bit in neither leaves the space-wide value. Text rooms accept the text bits (0–6, 23 and 30); voice rooms accept View Room and the voice bits (15–22). Managing overrides needs **Manage Roles**, and you cannot grant through an override what you do not hold yourself.
 
 ## Hierarchy
 

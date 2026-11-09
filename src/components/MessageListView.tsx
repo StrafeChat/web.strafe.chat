@@ -49,6 +49,8 @@ import {
 } from './messageList';
 import { appFloatToolbar, zLayer } from '../theme/appChrome';
 import { MessageAttachments } from './messageList/MessageAttachments';
+import { MessageEmbeds } from './messageList/MessageEmbed';
+import { attachmentsBesideEmbeds, safeHttpUrl } from '../lib/embeds/messageEmbeds';
 import { EmojiPicker, type EmojiPick } from './emoji/EmojiPicker';
 import { IconButton } from './ui/IconButton';
 import { pinMessage, unpinMessage } from '../stores/pinnedMessages';
@@ -263,6 +265,18 @@ export const MessageList: Component<MessageListProps> = (props) => {
   // Link previews always render in non-encrypted rooms; in E2EE rooms only when the user opts
   // in (unfurling sends the link to the server, which it otherwise never sees there).
   const allowLinkPreviews = () => props.e2eeEnabled !== true || settings.linkPreviewsInEncrypted;
+  // A bot's embeds: plain rooms only (an encrypted message never resolves any, and an E2EE room
+  // shows none whatever arrives), and only while the reader keeps "Show embeds from bots" on.
+  const showEmbeds = () => props.e2eeEnabled !== true && settings.botEmbeds !== false;
+  const embedsOf = (msg: DecryptedMessage) => (showEmbeds() ? (msg.embeds ?? []) : []);
+  // The pictures a shown embed already carries (a bot's attachment:// images) are not repeated in
+  // the file grid. With embeds hidden, every attachment shows.
+  const visibleAttachments = (msg: DecryptedMessage) => attachmentsBesideEmbeds(msg.attachments ?? [], embedsOf(msg));
+  // A link in the text that an embed already shows a card for gets no preview card of its own.
+  const embedLinkUrls = (msg: DecryptedMessage) =>
+    embedsOf(msg)
+      .map((e) => safeHttpUrl(e.url))
+      .filter((u): u is string => !!u);
   const canReact = () => props.canReact !== false;
   const canJoinReactions = () => props.canJoinReactions ?? canReact();
 
@@ -1266,6 +1280,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                           spaceRoles={props.spaceRoles}
                           onMentionClick={openProfileForUser}
                           allowLinkPreviews={allowLinkPreviews()}
+                          skipPreviewUrls={embedLinkUrls(msg)}
                           trailing={
                             <Show when={isEdited(msg)}>
                               <Tooltip label={t('messages.editedAt', { time: formatMessageTimestamp(new Date(msg.updated_at!)) })} inline side="top">
@@ -1279,8 +1294,16 @@ export const MessageList: Component<MessageListProps> = (props) => {
                         <span class="text-[10px] text-amber-500/90 shrink-0">Not encrypted</span>
                       </Show> */}
                     </div>
-                    <Show when={msg.attachments?.length}>
-                      <MessageAttachments attachments={msg.attachments!} />
+                    <Show when={visibleAttachments(msg).length}>
+                      <MessageAttachments attachments={visibleAttachments(msg)} />
+                    </Show>
+                    <Show when={embedsOf(msg).length}>
+                      <MessageEmbeds
+                        embeds={embedsOf(msg)}
+                        participants={resolvedParticipants()}
+                        spaceRoles={props.spaceRoles}
+                        onMentionClick={openProfileForUser}
+                      />
                     </Show>
                     <Show when={msg.thread_id}>
                       {(tid) => <MessageThreadFooter threadId={tid()} spaceId={props.spaceId} />}
@@ -1337,6 +1360,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                         spaceRoles={props.spaceRoles}
                         onMentionClick={openProfileForUser}
                         allowLinkPreviews={allowLinkPreviews()}
+                        skipPreviewUrls={embedLinkUrls(msg)}
                         trailing={
                           <Show when={isEdited(msg)}>
                             <Tooltip label={t('messages.editedAt', { time: formatMessageTimestamp(new Date(msg.updated_at!)) })} inline side="top">
@@ -1349,8 +1373,16 @@ export const MessageList: Component<MessageListProps> = (props) => {
                         <span class="text-[10px] text-amber-500/90">Not encrypted</span>
                       </Show> */}
                     </div>
-                    <Show when={msg.attachments?.length}>
-                      <MessageAttachments attachments={msg.attachments!} />
+                    <Show when={visibleAttachments(msg).length}>
+                      <MessageAttachments attachments={visibleAttachments(msg)} />
+                    </Show>
+                    <Show when={embedsOf(msg).length}>
+                      <MessageEmbeds
+                        embeds={embedsOf(msg)}
+                        participants={resolvedParticipants()}
+                        spaceRoles={props.spaceRoles}
+                        onMentionClick={openProfileForUser}
+                      />
                     </Show>
                     <Show when={msg.thread_id}>
                       {(tid) => <MessageThreadFooter threadId={tid()} spaceId={props.spaceId} />}

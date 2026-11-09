@@ -2,7 +2,7 @@ import type { Component } from 'solid-js';
 import { Show, createMemo } from 'solid-js';
 import type { DecryptedMessage } from '../../stores/messages';
 import type { RoomParticipant } from '../../api/rooms';
-import { getMessageBodyText, getSenderDisplay, messagePreviewText } from './utils';
+import { getMessagePreviewSource, getSenderDisplay, messagePreviewText } from './utils';
 import { MessageAvatar } from './MessageAvatar';
 import { jumpToMessage } from '../../stores/messages';
 import { t } from '../../i18n';
@@ -41,7 +41,9 @@ export const ReplyReference: Component<ReplyReferenceProps> = (props) => {
   const preview = createMemo(() => {
     const r = replied();
     if (!r) return '';
-    return messagePreviewText(getMessageBodyText(r), props.participants, props.currentUserId, PREVIEW_MAX);
+    // A raw `referenced_message` was never resolved, so it has no notEncrypted flag and its
+    // embeds (if any) are not used.
+    return messagePreviewText(getMessagePreviewSource(r), props.participants, props.currentUserId, PREVIEW_MAX);
   });
 
   return (

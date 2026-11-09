@@ -1,5 +1,6 @@
 import type { Component } from 'solid-js';
 import { For, Show, createEffect, createMemo, createSignal, on } from 'solid-js';
+import type { DecryptedMessage } from '../../stores/messages';
 import type { RoomParticipant } from '../../api/rooms';
 import type { SpaceRole } from '../../api/spaces';
 import { appActivityRail, appSectionLabel } from '../../theme/appChrome';
@@ -8,6 +9,9 @@ import { getMessageBodyText, getSenderDisplay } from '../messageList';
 import { MessageAvatar } from '../messageList/MessageAvatar';
 import { MessageBody } from '../messageList/MessageBody';
 import { MessageAttachments } from '../messageList/MessageAttachments';
+import { MessageEmbeds } from '../messageList/MessageEmbed';
+import { attachmentsBesideEmbeds } from '../../lib/embeds/messageEmbeds';
+import { settings } from '../../stores/settings';
 import {
   isEmptyQuery,
   parseSearchQuery,
@@ -43,6 +47,8 @@ export interface RoomSearchPanelProps {
 /** Discord-style results column: the query is built in the header search box, this only
  * renders what came back - as real messages, the same way the chat does. */
 export const RoomSearchPanel: Component<RoomSearchPanelProps> = (props) => {
+  // A bot's embeds, while the reader keeps them on. Only a message read in the clear resolves any.
+  const embedsOf = (msg: DecryptedMessage) => (settings.botEmbeds !== false ? (msg.embeds ?? []) : []);
   const [loading, setLoading] = createSignal(false);
   const [results, setResults] = createSignal<SearchMatch[]>([]);
   const [hasMore, setHasMore] = createSignal(false);
@@ -219,8 +225,16 @@ export const RoomSearchPanel: Component<RoomSearchPanelProps> = (props) => {
                                 onMentionClick={openMentionProfile}
                               />
                             </div>
-                            <Show when={msg.attachments?.length}>
-                              <MessageAttachments attachments={msg.attachments!} />
+                            <Show when={attachmentsBesideEmbeds(msg.attachments ?? [], embedsOf(msg)).length}>
+                              <MessageAttachments attachments={attachmentsBesideEmbeds(msg.attachments ?? [], embedsOf(msg))} />
+                            </Show>
+                            <Show when={embedsOf(msg).length}>
+                              <MessageEmbeds
+                                embeds={embedsOf(msg)}
+                                participants={props.participants}
+                                spaceRoles={props.spaceRoles}
+                                onMentionClick={openMentionProfile}
+                              />
                             </Show>
                           </div>
                           <span class="pointer-events-none absolute end-2 top-2 rounded-md bg-primary/15 px-1.5 py-0.5 text-[10px] font-medium text-primary opacity-0 transition-opacity group-hover/hit:opacity-100">

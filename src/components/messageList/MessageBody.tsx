@@ -1,7 +1,7 @@
 import type { Component } from 'solid-js';
 import { For, Show, createMemo, createSignal, onCleanup, onMount, untrack } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
-import { parseMessageContent, walkSegments, type MessageSegment } from '../../lib/utils/markdown';
+import { parseMessageContent, parseStyleOnlyContent, walkSegments, type MessageSegment } from '../../lib/utils/markdown';
 import { CodeBlock } from './CodeBlock';
 import { Emoji } from '../emoji/Emoji';
 import { CustomEmoji } from '../emoji/CustomEmoji';
@@ -15,6 +15,7 @@ import { getMediaDimensions, recordMediaDimensions, hasRecentMediaFailure, recor
 import { mediaKind, type MediaKind } from '../../lib/gif/providers';
 import { openMediaViewer } from '../../stores/mediaViewer';
 import { previewUrlsFor } from '../../lib/linkPreviewUrls';
+import { previewUrlsBesideEmbeds } from '../../lib/embeds/messageEmbeds';
 import { isExternalLink, requestOpenExternalLink } from '../../stores/externalLink';
 import { spaces } from '../../stores/spaces';
 import type { RoomParticipant } from '../../api/rooms';
@@ -38,6 +39,17 @@ export interface MessageBodyProps {
   /** Render link-preview cards under the text for the http(s) URLs in this message. The caller
    * decides (non-encrypted room, or the per-user opt-in for encrypted ones). */
   allowLinkPreviews?: boolean;
+  /** Links not to preview: the ones a bot's embed on the same message already shows a card for
+   * (compared normalized, so a link written `https://Example.com` matches the embed's
+   * `https://example.com/`). */
+  skipPreviewUrls?: readonly string[];
+  /** Text inside a bot's embed. Links stay links - no inline media, invite card or preview
+   * card, since an embed never nests another and its images come only through the instance -
+   * and emoji are never jumbo. A masked link shows where it really goes on hover. */
+  embedded?: boolean;
+  /** Styling only (an embed's title or a field's name): bold, italic, code, emoji - no blocks,
+   * links or mentions. */
+  styleOnly?: boolean;
 }
 
 const pillBase = 'rounded px-1 py-0.5 font-medium';
@@ -93,7 +105,9 @@ const Spoiler: Component<{ children: (open: () => boolean) => import('solid-js')
   );
 };
 
-const guardClick = (href: string) => (e: MouseEvent) => {
+/** A link's click handler: an external link goes through the "leaving Strafe" check (which
+ * shows where a masked link really goes); Shift+click skips it. */
+export const guardClick = (href: string) => (e: MouseEvent) => {
   if (!isExternalLink(href)) return;
   if (e.shiftKey) return;
   e.preventDefault();
@@ -257,8 +271,9 @@ const MediaEmbed: Component<{ href: string; kind: MediaKind; allowLinkPreviews?:
 
 export const MessageBody: Component<MessageBodyProps> = (props) => {
   const navigate = useNavigate();
-  const segments = createMemo(() => parseMessageContent(props.text));
+  const segments = createMemo(() => (props.styleOnly ? parseStyleOnlyContent(props.text) : parseMessageContent(props.text)));
   const jumbo = createMemo(() => {
+    if (props.embedded) return false;
     let count = 0;
     for (const s of segments()) {
       if (s.type === 'emoji' || s.type === 'customEmoji') count++;
@@ -271,6 +286,7 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
   // GIF-picker / tenor-giphy behaviour). Image, video and page links keep their URL - and the
   // media or a fallback preview card is embedded below it - so the link is never swallowed.
   const loneGif = createMemo((): { href: string; kind: MediaKind } | null => {
+    if (props.embedded) return null;
     let found: { href: string; kind: MediaKind } | null = null;
     for (const s of segments()) {
       if (s.type === 'link') {
@@ -288,7 +304,10 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
 
   // Distinct http(s) links worth a preview card - not inline media (GIF/image/video, rendered
   // directly) or space invites (their own embed). Capped so a link-dump doesn't fill the screen.
-  const previewUrls = createMemo(() => (props.allowLinkPreviews ? previewUrlsFor(props.text) : []));
+  const previewUrls = createMemo(() => {
+    if (!props.allowLinkPreviews || props.embedded) return [];
+    return previewUrlsBesideEmbeds(previewUrlsFor(props.text), props.skipPreviewUrls);
+  });
 
 
     /** One node, recursively: an inline container renders its children through the same
@@ -362,7 +381,7 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
           const embedShown = () => revealed?.() ?? true;
           // <https://…>: the author suppressed this link's embed, so it stays a bare link -
           // no invite card, no inline image or video, no preview below it.
-          const inviteCode = seg.suppressed ? null : extractSpaceInviteCodeFromUrl(href);
+          const inviteCode = seg.suppressed || props.embedded ? null : extractSpaceInviteCodeFromUrl(href);
           if (inviteCode) {
             const inviteAnchor = () => (
               <a
@@ -394,6 +413,7 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
               href={href}
               target="_blank"
               rel="noopener noreferrer"
+              title={props.embedded && seg.text !== href ? href : undefined}
               class="text-primary underline underline-offset-2 break-words hover:text-primary/90 cursor-pointer"
               onClick={(e) => {
                 if (!isExternalLink(href)) return;
@@ -408,7 +428,7 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
           // A media link (GIF/image/video): keep the link and add the media (or, if the URL
           // turns out to be an HTML page, a preview card) below it. A message that is only a
           // GIF is handled by loneGif above and shows just the animation.
-          const kind = seg.suppressed ? null : mediaKind(href);
+          const kind = seg.suppressed || props.embedded ? null : mediaKind(href);
           if (kind) {
             return (
               <Show when={embedShown()} fallback={linkAnchor()}>

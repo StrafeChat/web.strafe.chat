@@ -3,6 +3,7 @@ import {
   PermAddReactions,
   PermAdministrator,
   PermAttachFiles,
+  PermEmbedLinks,
   PermMentionEveryone,
   PermSendMessages,
   PermViewChannel,
@@ -84,18 +85,45 @@ export const permissionMatrixCases: PermissionMatrixCase[] = [
     expectDenied: PermSendMessages | PermAttachFiles | PermAddReactions,
   },
   {
-    name: 'no Send Messages clears Attach Files and @everyone only',
+    name: 'no Send Messages clears Attach Files, Embed Links and @everyone only',
     input: {
       memberUserId: 'u2',
       ownerId: 'u1',
       everyoneRoleId: 'r0',
       memberRoleIds: ['r0'],
-      roles: [{ id: 'r0', name: '@everyone', permissions: PermViewChannel | PermSendMessages | PermAttachFiles | PermMentionEveryone | PermAddReactions, position: 0, color: 0, hoist: false, mentionable: false, created_at: '', updated_at: '' }],
+      roles: [{ id: 'r0', name: '@everyone', permissions: PermViewChannel | PermSendMessages | PermAttachFiles | PermEmbedLinks | PermMentionEveryone | PermAddReactions, position: 0, color: 0, hoist: false, mentionable: false, created_at: '', updated_at: '' }],
       overrides: [],
       userOverrides: [{ user_id: 'u2', allow: 0, deny: PermSendMessages, created_at: '', updated_at: '' }],
     },
     expectMask: PermViewChannel | PermAddReactions,
-    expectDenied: PermAttachFiles | PermMentionEveryone,
+    expectDenied: PermAttachFiles | PermEmbedLinks | PermMentionEveryone,
+  },
+  {
+    // Bit 30 is the top of the client's 32-bit maths: the owner's mask must still carry it
+    // (and stay a positive number) when @everyone denies it in the room.
+    name: 'owner keeps Embed Links when @everyone denies it',
+    input: {
+      memberUserId: 'u1',
+      ownerId: 'u1',
+      everyoneRoleId: 'r0',
+      memberRoleIds: ['r0'],
+      roles: [{ id: 'r0', name: '@everyone', permissions: PermViewChannel | PermSendMessages | PermEmbedLinks, position: 0, color: 0, hoist: false, mentionable: false, created_at: '', updated_at: '' }],
+      overrides: [{ role_id: 'r0', allow: 0, deny: PermEmbedLinks, created_at: '', updated_at: '' }],
+    },
+    expectMask: AllRoomPermMask | PermEmbedLinks,
+  },
+  {
+    name: 'a room override denying Embed Links keeps Send Messages',
+    input: {
+      memberUserId: 'u2',
+      ownerId: 'u1',
+      everyoneRoleId: 'r0',
+      memberRoleIds: ['r0'],
+      roles: [{ id: 'r0', name: '@everyone', permissions: PermViewChannel | PermSendMessages | PermEmbedLinks, position: 0, color: 0, hoist: false, mentionable: false, created_at: '', updated_at: '' }],
+      overrides: [{ role_id: 'r0', allow: 0, deny: PermEmbedLinks, created_at: '', updated_at: '' }],
+    },
+    expectMask: PermViewChannel | PermSendMessages,
+    expectDenied: PermEmbedLinks,
   },
 ];
 

@@ -358,6 +358,14 @@ export default {
       threadRenamed: '{{actor}} renamed the thread to {{name}}',
       default: 'System message',
     },
+    embed: {
+      label: 'Embed',
+      image: 'Image',
+      openImage: 'Open image',
+      externalImage: 'Image from {{host}}',
+      externalImageWarning: 'Loading it shows your IP address to that site.',
+      loadImage: 'Load image',
+    },
     preview: {
       role: 'role',
       room: 'room',
@@ -873,6 +881,7 @@ export default {
       viewRoom: { label: 'View rooms', description: 'See rooms by default and read their names.' },
       sendMessages: { label: 'Send messages', description: 'Send messages in text rooms.' },
       attachFiles: { label: 'Attach files', description: 'Upload files and images with messages in text rooms.' },
+      embedLinks: { label: 'Embed links', description: 'Post messages with rich embeds, the cards bots attach, in text rooms.' },
       createPublicThreads: { label: 'Create public threads', description: 'Start threads anyone in the room can see and join.' },
       createPrivateThreads: { label: 'Create private threads', description: 'Start invite-only threads.' },
       sendMessagesInThreads: { label: 'Send messages in threads', description: 'Talk in threads. Send Messages alone does not allow this.' },
@@ -895,6 +904,7 @@ export default {
       viewRoom: { label: 'View room', description: 'See this room in the room list.' },
       sendMessages: { label: 'Send messages', description: 'Send messages in this room.' },
       attachFiles: { label: 'Attach files', description: 'Upload files and images in this room.' },
+      embedLinks: { label: 'Embed links', description: 'Post messages with rich embeds in this room.' },
       createPublicThreads: { label: 'Create public threads', description: 'Start public threads in this room.' },
       createPrivateThreads: { label: 'Create private threads', description: 'Start private threads in this room.' },
       sendMessagesInThreads: { label: 'Send messages in threads', description: 'Talk in this room\'s threads.' },
@@ -2347,6 +2357,9 @@ export default {
         linkPreviewsEncrypted: 'Link previews in encrypted chats',
         linkPreviewsEncryptedDescription:
           'Show previews for links in PMs, groups and encrypted rooms. Generating one sends the link to the server to fetch — off by default so encrypted chats stay private.',
+        botEmbeds: 'Show embeds from bots',
+        botEmbedsDescription:
+          'Show the rich cards bots attach to their messages. Turned off, you see only their text and files.',
       },
       gif: {
         title: 'GIF provider',

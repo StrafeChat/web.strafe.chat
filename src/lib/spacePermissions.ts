@@ -41,12 +41,15 @@ export const AllThreadsPermMask =
 /** Nicknames (appended after threads; space-scoped, never a room override). Change Nickname: a
  * member may set or clear their own nickname in the space (on for @everyone, as on Discord).
  * Manage Nicknames: change or clear other members' nicknames, subject to the role hierarchy,
- * and your own. Only the owner may change the owner's nickname.
- *
- * Bit 30 is the last one this file's 32-bit bitwise maths can hold (bit 31 is its sign bit);
- * anything past 30 needs `&`/`|` replaced first. */
+ * and your own. Only the owner may change the owner's nickname. */
 export const PermChangeNickname = 1 << 28;
 export const PermManageNicknames = 1 << 29;
+/** Embed Links (room-scoped, on for @everyone): post a message with rich embeds - a bot's
+ * `embeds`, on top of Send Messages, as on Discord. Private messages need no bit.
+ *
+ * This is bit 30, the last one this file's 32-bit bitwise maths can hold (bit 31 is its sign
+ * bit): the next permission needs `&`/`|`/`~` replaced (BigInt, or two halves) first. */
+export const PermEmbedLinks = 1 << 30;
 
 export const AllVoicePermMask =
   PermConnect |
@@ -109,6 +112,7 @@ export const SPACE_ROLE_PERM_GROUPS: { category: string; rows: PermRow[] }[] = [
     row(PermViewChannel, 'viewRoom'),
     row(PermSendMessages, 'sendMessages'),
     row(PermAttachFiles, 'attachFiles'),
+    row(PermEmbedLinks, 'embedLinks'),
     row(PermReadMessageHistory, 'readMessageHistory'),
     row(PermAddReactions, 'addReactions'),
     row(PermUseExternalEmojis, 'useExternalEmojis'),
@@ -140,6 +144,7 @@ export const ROOM_OVERRIDE_PERM_ROWS: PermRow[] = [
   row(PermViewChannel, 'viewRoom', 'roomRows'),
   row(PermSendMessages, 'sendMessages', 'roomRows'),
   row(PermAttachFiles, 'attachFiles', 'roomRows'),
+  row(PermEmbedLinks, 'embedLinks', 'roomRows'),
   row(PermReadMessageHistory, 'readMessageHistory', 'roomRows'),
   row(PermAddReactions, 'addReactions', 'roomRows'),
   row(PermUseExternalEmojis, 'useExternalEmojis', 'roomRows'),
@@ -228,6 +233,7 @@ export const AllRoomPermMask =
   PermMentionEveryone |
   PermManageMessages |
   PermAttachFiles |
+  PermEmbedLinks |
   AllThreadsPermMask |
   AllVoicePermMask;
 
@@ -317,10 +323,10 @@ export function effectiveChannelPermissionsForMember(input: EffectiveChannelPerm
 
 /** Discord's two dependent-permission rules, mirroring the server's applyImplicitRoomRules:
  * no View Channel means no permission at all in the room; no Send Messages means no Attach
- * Files or Mention @everyone either. */
+ * Files, Embed Links or Mention @everyone either. */
 export function applyImplicitRoomRules(perms: number): number {
   if (!hasPerm(perms, PermViewChannel)) return 0;
-  if (!hasPerm(perms, PermSendMessages)) perms &= ~(PermAttachFiles | PermMentionEveryone);
+  if (!hasPerm(perms, PermSendMessages)) perms &= ~(PermAttachFiles | PermEmbedLinks | PermMentionEveryone);
   return perms;
 }
 

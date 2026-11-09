@@ -369,6 +369,14 @@ export default {
       threadRenamed: '{{actor}} renombró el hilo a {{name}}',
       default: 'Mensaje del sistema',
     },
+    embed: {
+      label: 'Contenido incrustado',
+      image: 'Imagen',
+      openImage: 'Abrir imagen',
+      externalImage: 'Imagen de {{host}}',
+      externalImageWarning: 'Cargarla muestra tu dirección IP a ese sitio.',
+      loadImage: 'Cargar imagen',
+    },
     preview: {
       role: 'rol',
       room: 'sala',
@@ -887,6 +895,7 @@ export default {
       viewRoom: { label: 'Ver salas', description: 'Ver las salas de forma predeterminada y leer sus nombres.' },
       sendMessages: { label: 'Enviar mensajes', description: 'Enviar mensajes en salas de texto.' },
       attachFiles: { label: 'Attach files', description: 'Upload files and images with messages in text rooms.' },
+      embedLinks: { label: 'Insertar enlaces', description: 'Publicar mensajes con contenido incrustado, las tarjetas que añaden los bots, en salas de texto.' },
       createPublicThreads: { label: 'Crear hilos públicos', description: 'Iniciar hilos que cualquiera en la sala puede ver y unirse.' },
       createPrivateThreads: { label: 'Crear hilos privados', description: 'Iniciar hilos solo por invitación.' },
       sendMessagesInThreads: { label: 'Enviar mensajes en hilos', description: 'Hablar en hilos. Enviar mensajes por sí solo no lo permite.' },
@@ -909,6 +918,7 @@ export default {
       viewRoom: { label: 'Ver sala', description: 'Ver esta sala en la lista de salas.' },
       sendMessages: { label: 'Enviar mensajes', description: 'Enviar mensajes en esta sala.' },
       attachFiles: { label: 'Attach files', description: 'Upload files and images in this room.' },
+      embedLinks: { label: 'Insertar enlaces', description: 'Publicar mensajes con contenido incrustado en esta sala.' },
       createPublicThreads: { label: 'Crear hilos públicos', description: 'Iniciar hilos públicos en esta sala.' },
       createPrivateThreads: { label: 'Crear hilos privados', description: 'Iniciar hilos privados en esta sala.' },
       sendMessagesInThreads: { label: 'Enviar mensajes en hilos', description: 'Hablar en los hilos de esta sala.' },
@@ -2374,6 +2384,9 @@ export default {
         linkPreviewsEncrypted: 'Vistas previas de enlaces en chats cifrados',
         linkPreviewsEncryptedDescription:
           'Muestra vistas previas de enlaces en mensajes privados, grupos y salas cifradas. Generarlas envía el enlace al servidor para obtenerlo; desactivado por defecto para mantener privados los chats cifrados.',
+        botEmbeds: 'Mostrar contenido incrustado de bots',
+        botEmbedsDescription:
+          'Muestra las tarjetas que los bots añaden a sus mensajes. Si lo desactivas, solo verás su texto y sus archivos.',
       },
       gif: {
         title: 'Proveedor de GIF',

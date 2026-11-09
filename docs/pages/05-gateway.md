@@ -182,8 +182,8 @@ Room events reach every subscriber of the room; space events reach every subscri
 
 | `t` | `d` |
 | --- | --- |
-| `MESSAGE_CREATE` | The [message](/docs/rest/#the-message-object), plus `space_id` when the room is in a space. System notices (joins, leaves) have `sender_id: "0"` and a `system_type` |
-| `MESSAGE_UPDATE` | The edited message, with `space_id` likewise |
+| `MESSAGE_CREATE` | The [message](/docs/rest/#the-message-object), plus `space_id` when the room is in a space. System notices (joins, leaves) have `sender_id: "0"` and a `system_type`. `embeds` is always there, an array (empty when the message has none) |
+| `MESSAGE_UPDATE` | The edited message, with `space_id` likewise. It carries the message's whole `embeds` list as it now stands - an edit that removed them sends `[]` |
 | `MESSAGE_DELETE` | `{"room_id", "space_id"?, "message_id"}` |
 | `MESSAGE_REACTION_ADD` | `{"room_id", "space_id"?, "message_id", "user_id", "emoji"}` - `emoji` is a unicode string or `"custom:<id>"` |
 | `MESSAGE_REACTION_REMOVE` | same |

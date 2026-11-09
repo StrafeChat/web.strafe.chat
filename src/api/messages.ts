@@ -17,6 +17,57 @@ export interface Attachment {
   encrypted?: boolean;
 }
 
+/** An embed's picture (`image`) or its small top-right one (`thumbnail`). `url` is the source
+ * the bot gave; `proxy_url` is where this instance serves it from (its own CDN, or its image
+ * proxy) and is the only one a client loads. No `proxy_url` means the instance could not
+ * proxy it, and loading `url` would show the viewer's IP address to that site. */
+export interface EmbedImage {
+  url: string;
+  proxy_url?: string;
+  width?: number;
+  height?: number;
+}
+
+export interface EmbedAuthor {
+  name: string;
+  url?: string;
+  icon_url?: string;
+  proxy_icon_url?: string;
+}
+
+export interface EmbedFooter {
+  text: string;
+  icon_url?: string;
+  proxy_icon_url?: string;
+}
+
+export interface EmbedField {
+  name: string;
+  value: string;
+  inline?: boolean;
+}
+
+/**
+ * A rich embed a bot attached to its message (Discord's embed object, `type: "rich"`). Only
+ * bots send them, and only in plain rooms - an end-to-end encrypted room never carries one.
+ * Every field is optional; the server refuses an embed with nothing to show.
+ */
+export interface Embed {
+  type?: 'rich';
+  title?: string;
+  description?: string;
+  url?: string;
+  /** RFC 3339; shown in the footer in the reader's own time zone. */
+  timestamp?: string;
+  /** 0xRRGGBB, the colour of the card's edge. */
+  color?: number;
+  footer?: EmbedFooter;
+  image?: EmbedImage;
+  thumbnail?: EmbedImage;
+  author?: EmbedAuthor;
+  fields?: EmbedField[];
+}
+
 /**
  * One emoji's aggregated state on a message. `emoji` is either a raw unicode emoji or
  * "custom:<id>" for a space's custom emoji - same key the add/remove endpoints take.
@@ -61,6 +112,8 @@ export interface Message {
   system_type?: string;
   system_payload?: string;
   attachments?: Attachment[];
+  /** A bot's rich embeds (plain rooms only; always an array, empty when there are none). */
+  embeds?: Embed[];
   /** Only present when non-empty - omitted (not populated on MESSAGE_CREATE/UPDATE events,
    * which can't yet/don't change reactions) rather than sent as an empty array. */
   reactions?: MessageReaction[];

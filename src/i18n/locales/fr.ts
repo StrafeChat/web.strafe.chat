@@ -369,6 +369,14 @@ export default {
       threadRenamed: '{{actor}} a renommé le fil en {{name}}',
       default: 'Message système',
     },
+    embed: {
+      label: 'Intégration',
+      image: 'Image',
+      openImage: "Ouvrir l'image",
+      externalImage: 'Image de {{host}}',
+      externalImageWarning: 'La charger montre votre adresse IP à ce site.',
+      loadImage: "Charger l'image",
+    },
     preview: {
       role: 'rôle',
       room: 'salon',
@@ -887,6 +895,7 @@ export default {
       viewRoom: { label: 'Voir les salons', description: 'Voir les salons par défaut et lire leurs noms.' },
       sendMessages: { label: 'Envoyer des messages', description: 'Envoyer des messages dans les salons textuels.' },
       attachFiles: { label: 'Attach files', description: 'Upload files and images with messages in text rooms.' },
+      embedLinks: { label: 'Intégrer des liens', description: 'Publier des messages avec des intégrations enrichies, les cartes que joignent les bots, dans les salons textuels.' },
       createPublicThreads: { label: 'Créer des fils publics', description: 'Lancer des fils que tout le monde dans le salon peut voir et rejoindre.' },
       createPrivateThreads: { label: 'Créer des fils privés', description: 'Lancer des fils sur invitation uniquement.' },
       sendMessagesInThreads: { label: 'Envoyer des messages dans les fils', description: "Parler dans les fils. Envoyer des messages seul ne le permet pas." },
@@ -909,6 +918,7 @@ export default {
       viewRoom: { label: 'Voir le salon', description: 'Voir ce salon dans la liste des salons.' },
       sendMessages: { label: 'Envoyer des messages', description: 'Envoyer des messages dans ce salon.' },
       attachFiles: { label: 'Attach files', description: 'Upload files and images in this room.' },
+      embedLinks: { label: 'Intégrer des liens', description: 'Publier des messages avec des intégrations enrichies dans ce salon.' },
       createPublicThreads: { label: 'Créer des fils publics', description: 'Lancer des fils publics dans ce salon.' },
       createPrivateThreads: { label: 'Créer des fils privés', description: 'Lancer des fils privés dans ce salon.' },
       sendMessagesInThreads: { label: 'Envoyer des messages dans les fils', description: 'Parler dans les fils de ce salon.' },
@@ -2375,6 +2385,9 @@ export default {
         linkPreviewsEncrypted: 'Aperçus de liens dans les discussions chiffrées',
         linkPreviewsEncryptedDescription:
           'Affiche des aperçus pour les liens dans les MP, groupes et salons chiffrés. En générer un envoie le lien au serveur pour le récupérer ; désactivé par défaut pour préserver la confidentialité des discussions chiffrées.',
+        botEmbeds: 'Afficher les intégrations des bots',
+        botEmbedsDescription:
+          'Affiche les cartes que les bots joignent à leurs messages. Désactivé, vous ne voyez que leur texte et leurs fichiers.',
       },
       gif: {
         title: 'Fournisseur de GIF',

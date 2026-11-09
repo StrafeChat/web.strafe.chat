@@ -14,6 +14,9 @@ export type SettingsData = {
    * server would otherwise never see in an encrypted room. Non-encrypted channels always
    * preview and ignore this. */
   linkPreviewsInEncrypted: boolean;
+  /** Show the rich embeds bots attach to their messages. On by default; off leaves the text
+   * (and every attachment) and drops the cards. */
+  botEmbeds: boolean;
 };
 
 const DEFAULTS: SettingsData = {
@@ -22,6 +25,7 @@ const DEFAULTS: SettingsData = {
   restoreLastVisited: false,
   spellcheck: true,
   linkPreviewsInEncrypted: false,
+  botEmbeds: true,
 };
 
 function loadSettings(): SettingsData {
@@ -35,6 +39,7 @@ function loadSettings(): SettingsData {
         restoreLastVisited: parsed.restoreLastVisited ?? DEFAULTS.restoreLastVisited,
         spellcheck: parsed.spellcheck ?? DEFAULTS.spellcheck,
         linkPreviewsInEncrypted: parsed.linkPreviewsInEncrypted ?? DEFAULTS.linkPreviewsInEncrypted,
+        botEmbeds: parsed.botEmbeds ?? DEFAULTS.botEmbeds,
       };
     }
   } catch {
@@ -79,4 +84,9 @@ export function setSpellcheck(on: boolean) {
 export function setLinkPreviewsInEncrypted(on: boolean) {
   setSettings('linkPreviewsInEncrypted', on);
   persistSettings({ linkPreviewsInEncrypted: on });
+}
+
+export function setBotEmbeds(on: boolean) {
+  setSettings('botEmbeds', on);
+  persistSettings({ botEmbeds: on });
 }

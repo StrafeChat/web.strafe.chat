@@ -1,5 +1,6 @@
 export {
   getMessageBodyText,
+  getMessagePreviewSource,
   isEdited,
   getSenderDisplay,
   augmentParticipants,

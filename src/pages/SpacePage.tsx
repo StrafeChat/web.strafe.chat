@@ -56,7 +56,7 @@ import {
   UnreadBanner,
 } from '../components/room';
 import { MobileRailsOpenButton } from '../components/layout/MobileRailsOpenButton';
-import { getMessageBodyText, getSenderDisplay, messagePreviewText } from '../components/messageList';
+import { getMessagePreviewSource, getSenderDisplay, messagePreviewText } from '../components/messageList';
 import { spaceMembers, loadSpaceMembers, ensureSpaceMembers } from '../stores/spaceMembers';
 import { lastSpaceRoom } from '../stores/lastSpaceRoom';
 import { pickLandingRoomId } from '../lib/spaceRoomsNav';
@@ -580,7 +580,7 @@ const SpacePage: Component = () => {
     const sender = target ? getSenderDisplay(target.sender_id, allSpaceMembers(), auth.user?.id) : null;
     return {
       name: sender?.name ?? t('room.replyFallback'),
-      preview: target ? messagePreviewText(getMessageBodyText(target), allSpaceMembers(), auth.user?.id, 120) : '',
+      preview: target ? messagePreviewText(getMessagePreviewSource(target), allSpaceMembers(), auth.user?.id, 120) : '',
       onJump: target ? () => scrollToMessage(id) : undefined,
       onCancel: () => setReplyToMessageId(null),
     };
@@ -653,7 +653,7 @@ const SpacePage: Component = () => {
   function handleCreateThread(msg: DecryptedMessage) {
     // The suggested name is the message as people read it - mentions and emoji resolved,
     // markdown stripped - never the wire form (`<#id>` would sit in the name verbatim).
-    const preview = messagePreviewText(getMessageBodyText(msg), allSpaceMembers(), auth.user?.id, MAX_THREAD_NAME_LENGTH);
+    const preview = messagePreviewText(getMessagePreviewSource(msg), allSpaceMembers(), auth.user?.id, MAX_THREAD_NAME_LENGTH);
     setCreateThreadFor({ starter: { id: msg.id, preview } });
   }
   function openThread(threadId: string) {
@@ -673,7 +673,7 @@ const SpacePage: Component = () => {
       try {
         const raw = (await getMessage(key.pid, key.mid)) as unknown as ApiMessage;
         const [m] = await decryptServerMessages([raw]);
-        return m ? messagePreviewText(getMessageBodyText(m), allSpaceMembers(), auth.user?.id, 300) : null;
+        return m ? messagePreviewText(getMessagePreviewSource(m), allSpaceMembers(), auth.user?.id, 300) : null;
       } catch {
         return null;
       }

@@ -168,6 +168,8 @@ function decryptedFromServer(m: Message): DecryptedMessage {
     plaintext: m.plaintext ?? '',
     notEncrypted: true,
     attachments: ((m.attachments ?? []) as Attachment[]).filter((a) => !a.encrypted).map(viewFromServerAttachment),
+    // Server search covers plain rooms only, so its hits are read in the clear.
+    embeds: m.embeds ?? [],
   };
 }
 

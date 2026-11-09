@@ -369,6 +369,14 @@ export default {
       threadRenamed: '{{actor}} renomeou o tópico para {{name}}',
       default: 'Mensagem do sistema',
     },
+    embed: {
+      label: 'Incorporação',
+      image: 'Imagem',
+      openImage: 'Abrir imagem',
+      externalImage: 'Imagem de {{host}}',
+      externalImageWarning: 'Carregá-la mostra seu endereço IP a esse site.',
+      loadImage: 'Carregar imagem',
+    },
     preview: {
       role: 'cargo',
       room: 'sala',
@@ -887,6 +895,7 @@ export default {
       viewRoom: { label: 'Ver salas', description: 'Ver salas por padrão e ler seus nomes.' },
       sendMessages: { label: 'Enviar mensagens', description: 'Enviar mensagens em salas de texto.' },
       attachFiles: { label: 'Attach files', description: 'Upload files and images with messages in text rooms.' },
+      embedLinks: { label: 'Inserir links', description: 'Enviar mensagens com conteúdo incorporado, os cartões que os bots anexam, em salas de texto.' },
       createPublicThreads: { label: 'Criar tópicos públicos', description: 'Iniciar tópicos que qualquer pessoa na sala pode ver e entrar.' },
       createPrivateThreads: { label: 'Criar tópicos privados', description: 'Iniciar tópicos apenas por convite.' },
       sendMessagesInThreads: { label: 'Enviar mensagens em tópicos', description: 'Conversar em tópicos. Enviar mensagens por si só não permite isso.' },
@@ -909,6 +918,7 @@ export default {
       viewRoom: { label: 'Ver sala', description: 'Ver esta sala na lista de salas.' },
       sendMessages: { label: 'Enviar mensagens', description: 'Enviar mensagens nesta sala.' },
       attachFiles: { label: 'Attach files', description: 'Upload files and images in this room.' },
+      embedLinks: { label: 'Inserir links', description: 'Enviar mensagens com conteúdo incorporado nesta sala.' },
       createPublicThreads: { label: 'Criar tópicos públicos', description: 'Iniciar tópicos públicos nesta sala.' },
       createPrivateThreads: { label: 'Criar tópicos privados', description: 'Iniciar tópicos privados nesta sala.' },
       sendMessagesInThreads: { label: 'Enviar mensagens em tópicos', description: 'Conversar nos tópicos desta sala.' },
@@ -2375,6 +2385,9 @@ export default {
         linkPreviewsEncrypted: 'Prévias de links em conversas criptografadas',
         linkPreviewsEncryptedDescription:
           'Mostra prévias de links em mensagens privadas, grupos e salas criptografadas. Gerar uma envia o link ao servidor para buscá-lo; desativado por padrão para manter conversas criptografadas privadas.',
+        botEmbeds: 'Mostrar incorporações de bots',
+        botEmbedsDescription:
+          'Mostra os cartões que os bots anexam às mensagens. Desativado, você vê só o texto e os arquivos.',
       },
       gif: {
         title: 'Provedor de GIF',

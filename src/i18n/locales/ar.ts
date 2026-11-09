@@ -396,6 +396,14 @@ export default {
       threadRenamed: '{{actor}} أعاد تسمية السلسلة إلى {{name}}',
       default: 'رسالة نظام',
     },
+    embed: {
+      label: 'تضمين',
+      image: 'صورة',
+      openImage: 'فتح الصورة',
+      externalImage: 'صورة من {{host}}',
+      externalImageWarning: 'تحميلها يكشف عنوان IP الخاص بك لذلك الموقع.',
+      loadImage: 'تحميل الصورة',
+    },
     preview: {
       role: 'دور',
       room: 'غرفة',
@@ -934,6 +942,7 @@ export default {
       viewRoom: { label: 'عرض الغرف', description: 'رؤية الغرف افتراضيًا وقراءة أسمائها.' },
       sendMessages: { label: 'إرسال الرسائل', description: 'إرسال الرسائل في الغرف النصية.' },
       attachFiles: { label: 'Attach files', description: 'Upload files and images with messages in text rooms.' },
+      embedLinks: { label: 'تضمين الروابط', description: 'نشر رسائل تحتوي على تضمينات منسّقة، وهي البطاقات التي تُرفقها البوتات، في الغرف النصية.' },
       createPublicThreads: { label: 'إنشاء سلاسل عامة', description: 'بدء سلاسل يمكن لأي شخص في الغرفة رؤيتها والانضمام إليها.' },
       createPrivateThreads: { label: 'إنشاء سلاسل خاصة', description: 'بدء سلاسل بالدعوة فقط.' },
       sendMessagesInThreads: { label: 'إرسال رسائل في السلاسل', description: 'التحدث في السلاسل. إذن إرسال الرسائل وحده لا يسمح بذلك.' },
@@ -956,6 +965,7 @@ export default {
       viewRoom: { label: 'عرض الغرفة', description: 'رؤية هذه الغرفة في قائمة الغرف.' },
       sendMessages: { label: 'إرسال الرسائل', description: 'إرسال الرسائل في هذه الغرفة.' },
       attachFiles: { label: 'Attach files', description: 'Upload files and images in this room.' },
+      embedLinks: { label: 'تضمين الروابط', description: 'نشر رسائل تحتوي على تضمينات منسّقة في هذه الغرفة.' },
       createPublicThreads: { label: 'إنشاء سلاسل عامة', description: 'بدء سلاسل عامة في هذه الغرفة.' },
       createPrivateThreads: { label: 'إنشاء سلاسل خاصة', description: 'بدء سلاسل خاصة في هذه الغرفة.' },
       sendMessagesInThreads: { label: 'إرسال رسائل في السلاسل', description: 'التحدث في سلاسل هذه الغرفة.' },
@@ -2461,6 +2471,9 @@ export default {
         linkPreviewsEncrypted: 'معاينات الروابط في المحادثات المشفّرة',
         linkPreviewsEncryptedDescription:
           'إظهار معاينات للروابط في الرسائل الخاصة والمجموعات والغرف المشفّرة. إنشاء المعاينة يُرسل الرابط إلى الخادم لجلبه؛ معطّل افتراضيًا للحفاظ على خصوصية المحادثات المشفّرة.',
+        botEmbeds: 'إظهار التضمينات من البوتات',
+        botEmbedsDescription:
+          'إظهار البطاقات التي تُرفقها البوتات برسائلها. عند إيقافه ترى نصوصها وملفاتها فقط.',
       },
       gif: {
         title: 'مزود GIF',

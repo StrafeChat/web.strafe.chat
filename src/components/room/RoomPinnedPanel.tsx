@@ -7,6 +7,9 @@ import { getMessageBodyText, getSenderDisplay } from '../messageList';
 import { MessageAvatar } from '../messageList/MessageAvatar';
 import { MessageBody } from '../messageList/MessageBody';
 import { MessageAttachments } from '../messageList/MessageAttachments';
+import { MessageEmbeds } from '../messageList/MessageEmbed';
+import { attachmentsBesideEmbeds } from '../../lib/embeds/messageEmbeds';
+import { settings } from '../../stores/settings';
 import { formatMessageTimestamp } from '../../lib/utils/datetime';
 import { auth } from '../../stores/auth';
 import { unpinMessage } from '../../stores/pinnedMessages';
@@ -30,6 +33,8 @@ export interface RoomPinnedPanelProps {
 }
 
 export const RoomPinnedPanel: Component<RoomPinnedPanelProps> = (props) => {
+  // A bot's embeds, while the reader keeps them on. Only a message read in the clear resolves any.
+  const embedsOf = (msg: DecryptedMessage) => (settings.botEmbeds !== false ? (msg.embeds ?? []) : []);
   const currentUserId = () => auth.user?.id;
 
   return (
@@ -99,8 +104,16 @@ export const RoomPinnedPanel: Component<RoomPinnedPanelProps> = (props) => {
                           onMentionClick={openMentionProfile}
                         />
                       </div>
-                      <Show when={msg.attachments?.length}>
-                        <MessageAttachments attachments={msg.attachments!} />
+                      <Show when={attachmentsBesideEmbeds(msg.attachments ?? [], embedsOf(msg)).length}>
+                        <MessageAttachments attachments={attachmentsBesideEmbeds(msg.attachments ?? [], embedsOf(msg))} />
+                      </Show>
+                      <Show when={embedsOf(msg).length}>
+                        <MessageEmbeds
+                          embeds={embedsOf(msg)}
+                          participants={props.participants}
+                          spaceRoles={props.spaceRoles}
+                          onMentionClick={openMentionProfile}
+                        />
                       </Show>
                     </div>
                     <Show when={props.roomId && props.canManage !== false}>

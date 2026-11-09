@@ -1,4 +1,4 @@
-import type { Component, JSX } from 'solid-js';
+import type { Component, JSX, ParentComponent } from 'solid-js';
 import { Show, createMemo, createSignal, onMount } from 'solid-js';
 import { ensureLinkPreview, linkPreviews } from '../../stores/linkPreviews';
 import type { LinkMetadata } from '../../api/unfurl';
@@ -51,6 +51,22 @@ const PreviewImage: Component<{ src: string; width?: number; height?: number }> 
     </Show>
   );
 };
+
+/**
+ * The card both a link preview and a bot's embed sit in, Discord's shape: a coloured edge on the
+ * start side (the site's theme colour, the embed's `color`), a quiet surface, rounded corners.
+ * `color` must already be a CSS colour the caller built (a hex from a number, or a token).
+ */
+export const EmbedShell: ParentComponent<{ color?: string; class?: string; label?: string }> = (props) => (
+  <div
+    class={`link-preview-in mt-1.5 overflow-hidden rounded-md border border-s-[3px] border-border/60 bg-card/40 ${props.class ?? 'w-fit max-w-md'}`}
+    style={{ 'border-inline-start-color': props.color || 'var(--color-primary)' }}
+    role={props.label ? 'article' : undefined}
+    aria-label={props.label}
+  >
+    {props.children}
+  </div>
+);
 
 /** Last path segment of a URL, a reasonable fallback name for a video with no title. */
 function mediaName(href: string): string {
@@ -208,10 +224,7 @@ const Card: Component<{ d: LinkMetadata; fallbackUrl: string }> = (props) => {
   };
 
   return (
-    <div
-      class="link-preview-in mt-1.5 w-fit max-w-md overflow-hidden rounded-md border border-s-[3px] border-border/60 bg-card/40"
-      style={{ 'border-inline-start-color': props.d.color || 'var(--color-primary)' }}
-    >
+    <EmbedShell color={props.d.color}>
       <Show
         when={thumbnail()}
         fallback={
@@ -240,6 +253,6 @@ const Card: Component<{ d: LinkMetadata; fallbackUrl: string }> = (props) => {
           </a>
         </div>
       </Show>
-    </div>
+    </EmbedShell>
   );
 };

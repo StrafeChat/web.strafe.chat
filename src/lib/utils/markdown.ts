@@ -153,9 +153,11 @@ function findClosing(text: string, marker: string, from: number): number {
 
 /**
  * Parse inline content: everything that can appear inside a line of a message.
- * Recursive - a styling marker re-enters with the text it wraps.
+ * Recursive - a styling marker re-enters with the text it wraps. `styleOnly` is the subset an
+ * embed's title and field names allow (Discord's): styling, inline code and emoji - no links,
+ * mentions or timestamps, which stay literal text.
  */
-function parseInline(text: string): MessageSegment[] {
+function parseInline(text: string, styleOnly = false): MessageSegment[] {
   const out: MessageSegment[] = [];
   let i = 0;
   const len = text.length;
@@ -187,7 +189,7 @@ function parseInline(text: string): MessageSegment[] {
     }
 
     // Markdown link: [text](url) or [text](<url>)
-    const mdLink = rest.match(/^\[([^\]]*)\]\(\s*(<[^>]+>|[^\s)]+)\s*\)/);
+    const mdLink = styleOnly ? null : rest.match(/^\[([^\]]*)\]\(\s*(<[^>]+>|[^\s)]+)\s*\)/);
     if (mdLink) {
       let href = mdLink[2]!.trim();
       if (href.startsWith('<') && href.endsWith('>')) href = href.slice(1, -1);
@@ -201,7 +203,7 @@ function parseInline(text: string): MessageSegment[] {
 
     // <https://example.com>: the author asking for no embed. The brackets are not shown;
     // everything that would normally unfurl this link checks the flag instead.
-    const wrapped = rest.match(/^<((?:https?:\/\/|www\.)[^\s<>]+)>/i);
+    const wrapped = styleOnly ? null : rest.match(/^<((?:https?:\/\/|www\.)[^\s<>]+)>/i);
     if (wrapped) {
       const safe = sanitizeHref(wrapped[1]!);
       if (safe) {
@@ -213,7 +215,7 @@ function parseInline(text: string): MessageSegment[] {
 
     // Dynamic timestamp: <t:unixSeconds[:style]> - an absolute instant, so every reader
     // renders it in their own timezone and locale.
-    const ts = rest.match(DYNAMIC_TIMESTAMP);
+    const ts = styleOnly ? null : rest.match(DYNAMIC_TIMESTAMP);
     if (ts) {
       out.push({ type: 'timestamp', unix: Number(ts[1]), style: timestampStyle(ts[2]) });
       i += ts[0]!.length;
@@ -221,21 +223,21 @@ function parseInline(text: string): MessageSegment[] {
     }
 
     // Role mention: <@&roleId> - must be checked before the user-mention pattern.
-    const roleM = rest.match(MENTION_ROLE_ID);
+    const roleM = styleOnly ? null : rest.match(MENTION_ROLE_ID);
     if (roleM) {
       out.push({ type: 'roleMention', roleId: roleM[1]! });
       i += roleM[0]!.length;
       continue;
     }
 
-    const userM = rest.match(MENTION_USER_ID);
+    const userM = styleOnly ? null : rest.match(MENTION_USER_ID);
     if (userM) {
       out.push({ type: 'mention', userId: userM[1]! });
       i += userM[0]!.length;
       continue;
     }
 
-    const chanM = rest.match(MENTION_CHANNEL_ID);
+    const chanM = styleOnly ? null : rest.match(MENTION_CHANNEL_ID);
     if (chanM) {
       out.push({ type: 'channelMention', roomId: chanM[1]! });
       i += chanM[0]!.length;
@@ -259,7 +261,7 @@ function parseInline(text: string): MessageSegment[] {
 
     // @everyone / @here - only at a word boundary on both sides ("bob@everyone" doesn't
     // count; the trailing boundary is in MENTION_EVERYONE's own lookahead).
-    if (text[i] === '@' && (i === 0 || !/\w/.test(text[i - 1]!))) {
+    if (!styleOnly && text[i] === '@' && (i === 0 || !/\w/.test(text[i - 1]!))) {
       const everyone = rest.match(MENTION_EVERYONE);
       if (everyone) {
         out.push({ type: 'everyone', text: everyone[0]! });
@@ -268,7 +270,7 @@ function parseInline(text: string): MessageSegment[] {
       }
     }
 
-    const url = rest.match(BARE_URL);
+    const url = styleOnly ? null : rest.match(BARE_URL);
     if (url) {
       const href = sanitizeHref(url[0]!);
       if (href) {
@@ -291,7 +293,7 @@ function parseInline(text: string): MessageSegment[] {
           !/\w/.test(text[close + delim.open.length] ?? ''));
       if (boundaryOk && close > i + delim.open.length) {
         const inner = text.slice(i + delim.open.length, close);
-        const children = parseInline(inner);
+        const children = parseInline(inner, styleOnly);
         // *** is bold *and* italic, which is two nodes deep rather than a type of its own.
         out.push(
           delim.open === '***'
@@ -326,6 +328,12 @@ function parseInline(text: string): MessageSegment[] {
   }
 
   return out;
+}
+
+/** One line's worth of styling and nothing else: an embed's title or a field's name. No blocks
+ * (a `#` stays a `#`), no links, no mentions. */
+export function parseStyleOnlyContent(text: string): MessageSegment[] {
+  return parseInline(text, true);
 }
 
 /** Everything in a fenced block is literal, so fences are pulled out before anything else. */

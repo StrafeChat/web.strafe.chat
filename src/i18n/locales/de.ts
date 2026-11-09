@@ -358,6 +358,14 @@ export default {
       threadRenamed: '{{actor}} hat den Thread in {{name}} umbenannt',
       default: 'Systemnachricht',
     },
+    embed: {
+      label: 'Einbettung',
+      image: 'Bild',
+      openImage: 'Bild öffnen',
+      externalImage: 'Bild von {{host}}',
+      externalImageWarning: 'Beim Laden sieht diese Website deine IP-Adresse.',
+      loadImage: 'Bild laden',
+    },
     preview: {
       role: 'Rolle',
       room: 'Raum',
@@ -870,6 +878,7 @@ export default {
       viewRoom: { label: 'Räume sehen', description: 'Räume standardmäßig sehen und ihre Namen lesen.' },
       sendMessages: { label: 'Nachrichten senden', description: 'Nachrichten in Texträumen senden.' },
       attachFiles: { label: 'Attach files', description: 'Upload files and images with messages in text rooms.' },
+      embedLinks: { label: 'Links einbetten', description: 'Nachrichten mit eingebetteten Inhalten, den Karten, die Bots anhängen, in Texträumen senden.' },
       createPublicThreads: { label: 'Öffentliche Threads erstellen', description: 'Threads starten, die jeder im Raum sehen und beitreten kann.' },
       createPrivateThreads: { label: 'Private Threads erstellen', description: 'Threads nur auf Einladung starten.' },
       sendMessagesInThreads: { label: 'Nachrichten in Threads senden', description: 'In Threads schreiben. „Nachrichten senden“ allein erlaubt das nicht.' },
@@ -892,6 +901,7 @@ export default {
       viewRoom: { label: 'Raum sehen', description: 'Diesen Raum in der Raumliste sehen.' },
       sendMessages: { label: 'Nachrichten senden', description: 'Nachrichten in diesem Raum senden.' },
       attachFiles: { label: 'Attach files', description: 'Upload files and images in this room.' },
+      embedLinks: { label: 'Links einbetten', description: 'Nachrichten mit eingebetteten Inhalten in diesem Raum senden.' },
       createPublicThreads: { label: 'Öffentliche Threads erstellen', description: 'Öffentliche Threads in diesem Raum starten.' },
       createPrivateThreads: { label: 'Private Threads erstellen', description: 'Private Threads in diesem Raum starten.' },
       sendMessagesInThreads: { label: 'Nachrichten in Threads senden', description: 'In den Threads dieses Raums schreiben.' },
@@ -2346,6 +2356,9 @@ export default {
         linkPreviewsEncrypted: 'Linkvorschauen in verschlüsselten Chats',
         linkPreviewsEncryptedDescription:
           'Vorschauen für Links in privaten Nachrichten, Gruppen und verschlüsselten Räumen anzeigen. Dafür wird der Link zum Abrufen an den Server gesendet – standardmäßig aus, damit verschlüsselte Chats privat bleiben.',
+        botEmbeds: 'Einbettungen von Bots anzeigen',
+        botEmbedsDescription:
+          'Zeigt die Karten, die Bots an ihre Nachrichten anhängen. Ausgeschaltet siehst du nur ihren Text und ihre Dateien.',
       },
       gif: {
         title: 'GIF-Anbieter',

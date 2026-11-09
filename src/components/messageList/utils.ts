@@ -5,6 +5,7 @@ import type { RoomParticipant } from '../../api/rooms';
 import { resolveProfile } from '../../lib/spaceProfile';
 import { birthdayIsToday } from '../../lib/utils/birthday';
 import { formatTimestamp, timestampStyle } from '../../lib/utils/messageTimestamp';
+import { embedPreviewText } from '../../lib/embeds/messageEmbeds';
 import { t } from '../../i18n';
 
 export const LOADING_PLACEHOLDER = '...';
@@ -53,6 +54,17 @@ export function getMessageBodyText(msg: DecryptedMessage): string {
   if (msg.decryptPending) return msg.sentBeforeJoin ? t('messages.sentBeforeJoin') : t('messages.waitingForKey');
   if (msg.plaintext != null) return msg.plaintext;
   return LOADING_PLACEHOLDER;
+}
+
+/**
+ * The text a one-line preview of a message is made from (reply strips, notifications, a
+ * thread's suggested name): its body, or - for a bot's message that is only embeds - the first
+ * embed's title or description. Embeds count only on a message this client read in the clear.
+ */
+export function getMessagePreviewSource(msg: DecryptedMessage): string {
+  const body = getMessageBodyText(msg);
+  if (body || !msg.notEncrypted) return body;
+  return embedPreviewText(msg.embeds);
 }
 
 export function isSystemMessage(msg: DecryptedMessage): msg is DecryptedMessage & { system_type: string; system_payload: string } {

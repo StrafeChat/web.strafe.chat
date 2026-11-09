@@ -10,6 +10,7 @@ import {
   addReaction as addReactionApi,
   removeReaction as removeReactionApi,
   type Attachment,
+  type Embed,
   type Message,
   type CreateMessageInput,
   type MessageReaction,
@@ -74,7 +75,7 @@ function newestRealId(list: DecryptedMessage[]): string | undefined {
 async function decryptPage(list: Message[], currentUserId: string): Promise<DecryptedMessage[]> {
   return Promise.all(
     list.map(async (m): Promise<DecryptedMessage> => {
-      if (m.system_type) return { ...m, plaintext: '', attachments: [] };
+      if (m.system_type) return { ...m, plaintext: '', attachments: [], embeds: [] };
       const resolved = await resolvePlaintext(currentUserId, m);
       return { ...m, ...resolved };
     })
@@ -188,6 +189,7 @@ function patchRow(row: DecryptedMessage, fresh: DecryptedMessage, live: LiveChan
     row.legacyUndecryptable = fresh.legacyUndecryptable;
     row.notEncrypted = fresh.notEncrypted;
     row.attachments = fresh.attachments;
+    row.embeds = fresh.embeds;
     row.mentions = fresh.mentions;
     row.mention_roles = fresh.mention_roles;
     row.mention_everyone = fresh.mention_everyone;
@@ -981,6 +983,8 @@ export async function sendMessage(
       sentBeforeJoin: false,
       legacyUndecryptable: false,
       attachments: sentAttachments,
+      // People never send embeds, so the answer has none to show; an encrypted room never does.
+      embeds: e2eeOff ? (msg.embeds ?? []) : [],
     };
     let didReplaceInPlace = false;
     setMessages('byRoom', roomId, (prev) => {
@@ -1076,6 +1080,7 @@ export async function addMessageFromEvent(payload: {
   system_type?: string;
   system_payload?: string;
   attachments?: Attachment[];
+  embeds?: Embed[];
   created_at: string;
   updated_at: string;
 }) {
@@ -1090,6 +1095,7 @@ export async function addMessageFromEvent(payload: {
       ...payload,
       plaintext: '',
       attachments: [],
+      embeds: [],
     };
     let didAppend = false;
     setMessages('byRoom', roomId, (prev) => {
@@ -1115,7 +1121,7 @@ export async function addMessageFromEvent(payload: {
   }
   const resolved: ResolvedFields = currentUserId
     ? await resolvePlaintext(currentUserId, payload)
-    : { plaintext: '', decryptError: true, attachments: [] };
+    : { plaintext: '', decryptError: true, attachments: [], embeds: [] };
 
   const msg: DecryptedMessage = { ...payload, ...resolved };
   let didReplaceInPlace = false;
@@ -1160,6 +1166,7 @@ export async function updateMessageFromEvent(payload: {
   plaintext?: string;
   reply_to_id?: string;
   attachments?: Attachment[];
+  embeds?: Embed[];
   created_at: string;
   updated_at: string;
 }) {
@@ -1361,6 +1368,7 @@ export async function editMessage(
       sentBeforeJoin: false,
       legacyUndecryptable: false,
       attachments: existing?.attachments ?? (msg.attachments ?? []).filter((a) => !a.encrypted).map(viewFromServerAttachment),
+      embeds: e2eeOff ? (msg.embeds ?? []) : [],
     };
     setMessages('byRoom', roomId, (prev) => {
       const list = prev ?? [];

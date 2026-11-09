@@ -1,6 +1,6 @@
 ---
 title: Bots
-description: From a bot token to a running bot - connecting to the gateway, answering messages, mentions, replies, reactions, attachments, encryption, and complete Node.js and Python examples.
+description: From a bot token to a running bot - connecting to the gateway, answering messages, mentions, replies, reactions, attachments, embeds, encryption, and complete Node.js and Python examples.
 ---
 
 # Bots
@@ -124,6 +124,7 @@ Both examples do the three things every bot must: authenticate with the `Bot` he
 | `mentions`, `mention_roles`, `mention_everyone` | Who the message pings (user ids, role ids) |
 | `reply_to_id` | The message it replies to, if any |
 | `attachments` | Uploaded files, each with `id`, `filename`, `url`, `content_type`, `size` and image dimensions |
+| `embeds` | A bot's rich embeds, always an array (empty when there are none) - see [Embeds](/docs/embeds/#receiving-embeds) |
 
 `MESSAGE_UPDATE` carries the edited message and `MESSAGE_DELETE` just `{room_id, space_id, message_id}`. Reactions arrive as `MESSAGE_REACTION_ADD` / `MESSAGE_REACTION_REMOVE` with `{room_id, space_id, message_id, user_id, emoji}` (`space_id`, as everywhere, only for a room in a space).
 
@@ -131,7 +132,7 @@ To know *which space* a message belongs to, read `space_id` - on the payload (`f
 
 ## Sending messages
 
-`POST /rooms/:id/messages` with a JSON body. The bot needs **View Room** and **Send Messages** in that room (see [Permissions](/docs/permissions/)).
+`POST /rooms/:id/messages` with a JSON body. The bot needs **View Room** and **Send Messages** in that room, and **Embed Links** to send embeds there (see [Permissions](/docs/permissions/)).
 
 ```json
 {
@@ -144,12 +145,13 @@ To know *which space* a message belongs to, read `space_id` - on the payload (`f
 
 | Field | |
 | --- | --- |
-| `plaintext` | The text. Markdown as the client renders it (bold, italic, code, links). Required unless attachments are sent |
+| `plaintext` | The text. Markdown as the client renders it (bold, italic, code, links). Required unless attachments or embeds are sent |
 | `reply_to_id` | Reply to a message in the same room |
 | `mentions` | User ids to notify. Mentions in the text (`<@id>`) are detected automatically; this list adds to them |
 | `mention_roles` | Role ids to notify; role mentions (`<@&id>`) in the text are detected too. Only mentionable roles ping |
 | `mention_everyone` | `true` to ping everyone - needs the **Mention @everyone** permission, otherwise it is silently ignored |
 | `attachments` | Ids returned by the upload endpoint (below), at most a handful per message |
+| `embeds` | Up to 10 rich embeds - cards with a title, description, fields, images and a footer. Bots only, plain rooms only; see [Embeds](/docs/embeds/) |
 
 The response is the created message (`201`). In a room with **slowmode**, sending too soon returns `429` with `{"error": "slowmode is on in this channel", "retry_after": 12}`.
 
@@ -174,11 +176,29 @@ curl -X POST <API>/rooms/ROOM_ID/attachments \
   -F "file=@chart.png" -F "width=1280" -F "height=720"
 ```
 
-The response is the attachment record; put its `id` in the message's `attachments`. An uploaded file must be used by a message from the same bot in the same room. `width`/`height` are optional hints for images so clients can reserve space before the image loads. Uploads are only possible when the instance has its object store configured (it is on a standard deployment).
+The response is the attachment record; put its `id` in the message's `attachments`. An uploaded file must be used by a message from the same bot in the same room. `width`/`height` are optional hints for images so clients can reserve space before the image loads. Uploads are only possible when the instance has its object store configured (it is on a standard deployment). An uploaded image can also be shown inside an embed, as `attachment://chart.png` ([Embeds › Images](/docs/embeds/#images)).
+
+### Embeds
+
+Add `embeds` to show cards under the message - a status board, a search result, a chart:
+
+```json
+{
+  "embeds": [{
+    "title": "All systems normal",
+    "color": 3066993,
+    "fields": [{ "name": "API", "value": "42 ms", "inline": true }, { "name": "Gateway", "value": "18 ms", "inline": true }],
+    "footer": { "text": "status bot" },
+    "timestamp": "2026-11-02T18:30:00Z"
+  }]
+}
+```
+
+The object, its limits, how images are served and examples are on the [Embeds](/docs/embeds/) page.
 
 ### Editing and deleting
 
-`PATCH /rooms/:id/messages/:msg_id` with `{"plaintext": "…"}` edits one of the bot's own messages. `DELETE /rooms/:id/messages/:msg_id` deletes it; with **Manage Messages** the bot can delete anyone's.
+`PATCH /rooms/:id/messages/:msg_id` with `{"plaintext": "…"}` edits one of the bot's own messages; `"embeds"` in the same body replaces its embeds (`[]` removes them, leaving the key out keeps them), and either may be sent alone. `DELETE /rooms/:id/messages/:msg_id` deletes it; with **Manage Messages** the bot can delete anyone's.
 
 ### Reactions and typing
 
@@ -201,6 +221,7 @@ What a bot usually asks for:
 | Bot does | Needs |
 | --- | --- |
 | Read and post | View Room, Send Messages, Read Message History (`1 + 2 + 4 = 7`) |
+| Post embeds | Embed Links (`1073741824`) |
 | React | Add Reactions (`8`), Use External Emojis (`16`) |
 | Moderate | Manage Messages (`64`), Kick Members (`512`), Ban Members (`1024`) |
 | Make invites | Create Invite (`8192`) |
@@ -235,7 +256,7 @@ A role at or above the bot's highest role is refused with `403` and `{"error": "
 
 Strafe is end-to-end encrypted where it matters: **private messages are E2EE by default**, and any space text room can be switched to E2EE by its admins. Encryption is done by the members' devices; the server - and therefore a bot - only ever sees ciphertext there.
 
-- In an encrypted room, `MESSAGE_CREATE` arrives with `ciphertext` and no `plaintext`, and `POST /rooms/:id/messages` requires `ciphertext` (which a bot has no keys to produce). Practically: **bots work in plain rooms only.**
+- In an encrypted room, `MESSAGE_CREATE` arrives with `ciphertext` and no `plaintext`, and `POST /rooms/:id/messages` requires `ciphertext` (which a bot has no keys to produce). Practically: **bots work in plain rooms only.** Embeds are refused there outright, since the server would be writing readable text into a room it must not read.
 - `GET /rooms/:id` and every room in `READY` carry `e2ee_enabled`. Check it before posting.
 - A person can message a bot privately only by turning encryption off for that PM.
 
