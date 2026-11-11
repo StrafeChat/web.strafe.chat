@@ -7,7 +7,6 @@ import { ProfileBirthday } from './ProfileBirthday';
 import { RolePill } from './RolePill';
 import { PresenceDot } from './PresenceDot';
 import { ProfileActivity } from './ActivityStatus';
-import { IconButton } from './ui/IconButton';
 import { ResponsiveDialog } from './ui/ResponsiveDialog';
 import { markdownAndHtmlToSanitizedBioHtml } from '../lib/profileRichText';
 import {
@@ -21,6 +20,25 @@ import { buildUserMenuItems } from '../lib/userContextMenu';
 import { appSectionLabel } from '../theme/appChrome';
 import { t } from '../i18n';
 import { formatHandle } from '../stores/instance';
+
+const BannerIconButton: Component<{
+  icon: string;
+  title: string;
+  onClick: (e: MouseEvent) => void;
+  expanded?: boolean;
+}> = (p) => (
+  <button
+    type="button"
+    title={p.title}
+    aria-label={p.title}
+    aria-haspopup="menu"
+    aria-expanded={p.expanded}
+    class="flex size-8 items-center justify-center rounded-full bg-black/45 text-white/90 backdrop-blur transition-colors hover:bg-black/65 hover:text-white"
+    onClick={(e) => p.onClick(e)}
+  >
+    <i class={`${p.icon} text-[13px]`} />
+  </button>
+);
 
 export const UserProfileFullModal: Component = () => {
   const subject = () => userProfileFullModal.subject;
@@ -84,18 +102,15 @@ export const UserProfileFullModal: Component = () => {
         onClose={closeUserProfileFullModal}
         labelledBy="user-profile-full-title"
         unpadded
-        panelClass="md:max-h-[min(88vh,680px)]"
+        panelClass="overflow-hidden md:max-h-[min(88vh,680px)]"
       >
         <div class="relative shrink-0">
-          <ProfileBanner banner={subject()?.banner} class="max-h-36 sm:max-h-44" fit="natural" />
-          <div class="absolute end-3 top-3 flex items-center gap-2">
-            <IconButton
-              size="lg"
-              tone="overlay"
+          <ProfileBanner banner={subject()?.banner} class="h-32 w-full" />
+          <div class="absolute end-2.5 top-2.5 z-10 flex items-center gap-1.5">
+            <BannerIconButton
               icon="fa-solid fa-ellipsis"
-              label={t('profile.moreActions')}
-              aria-haspopup="menu"
-              aria-expanded={contextMenuState().open}
+              title={t('profile.moreActions')}
+              expanded={contextMenuState().open}
               onClick={openActionsMenu}
             />
           </div>
@@ -104,7 +119,7 @@ export const UserProfileFullModal: Component = () => {
               <MessageAvatar
                 name={subject()!.displayName}
                 avatar={subject()!.avatar}
-                class="size-24 border-4 border-card bg-primary text-2xl font-semibold text-primary-foreground shadow-lg"
+                class="size-24 border-4 border-card bg-primary text-2xl font-semibold text-primary-foreground shadow-lg shadow-black/30"
               />
               <span class="absolute bottom-1 end-1">
                 <PresenceDot userId={subject()!.userId} class="size-5" borderClass="border-card" />
@@ -113,7 +128,7 @@ export const UserProfileFullModal: Component = () => {
           </div>
         </div>
 
-        <div class="px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-3 md:pb-6">
+        <div class="min-h-0 flex-1 overflow-y-auto px-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-3 md:pb-6">
           <div class="flex flex-col gap-4">
             <div>
               <ProfileIdentity

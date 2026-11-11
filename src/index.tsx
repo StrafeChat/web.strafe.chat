@@ -1,6 +1,7 @@
 /* @refresh reload */
 import './index.css';
 import '@fortawesome/fontawesome-free/css/all.min.css';
+import 'katex/dist/katex.min.css';
 import { render } from 'solid-js/web';
 import { TransProvider } from '@mbarzda/solid-i18next';
 import 'solid-devtools';

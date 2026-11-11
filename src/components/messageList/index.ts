@@ -12,6 +12,7 @@ export {
   LOADING_PLACEHOLDER,
 } from './utils';
 export { MessageAvatar } from './MessageAvatar';
+export { SystemMessageRow } from './SystemMessageRow';
 export { DeleteMessageModal } from './DeleteMessageModal';
 export { MessageListIntro } from './MessageListIntro';
 export { HistoryEdge } from './HistoryEdge';
