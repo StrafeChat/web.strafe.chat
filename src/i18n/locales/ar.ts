@@ -410,6 +410,10 @@ export default {
       unnamed: 'بلا اسم',
     },
   },
+  latex: {
+    preview: 'معاينة LaTeX',
+    error: 'تحتوي هذه الصيغة على خطأ في LaTeX',
+  },
   composer: {
     mentionEveryone: 'تنبيه الجميع في هذه الغرفة',
     slowmodeWait: 'الوضع البطيء مفعّل - انتظر {{seconds}} ثانية قبل الإرسال مجددًا',

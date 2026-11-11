@@ -27,6 +27,7 @@ import { ExpressionPicker, type ExpressionTab } from '../emoji/ExpressionPicker'
 import { VoiceMessagePlayer } from '../media';
 import { WAVEFORM_BARS } from '../media/waveform';
 import { VoiceRecordingBar } from './VoiceRecordingBar';
+import { LatexPreview } from './LatexPreview';
 import { isMdViewport } from '../../stores/mobileShellLayout';
 import { requestEditLastMessage } from '../../lib/chatShortcuts';
 import { TypingIndicator, type TypingPerson } from './TypingIndicator';
@@ -657,6 +658,9 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
               <i class="fa-solid fa-circle-exclamation" aria-hidden="true" />
               {voiceError()}
             </p>
+          </Show>
+          <Show when={!recording()}>
+            <LatexPreview text={props.draft} />
           </Show>
           <div class="relative flex items-end gap-2">
             <div class="relative min-w-0 flex-1">

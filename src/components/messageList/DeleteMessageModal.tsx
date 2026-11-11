@@ -3,7 +3,7 @@ import { Show } from 'solid-js';
 import type { DecryptedMessage } from '../../stores/messages';
 import type { RoomParticipant } from '../../api/rooms';
 import { formatMessageTimestamp } from '../../lib/utils/datetime';
-import { getMessageBodyText, getSenderDisplay } from './utils';
+import { getMessageBodyText, getSenderDisplay, formatSystemMessageText, isSystemMessage } from './utils';
 import { MessageAvatar } from './MessageAvatar';
 import { ResponsiveDialog } from '../ui/ResponsiveDialog';
 import { Button } from '../ui/Button';
@@ -23,6 +23,16 @@ export const DeleteMessageModal: Component<DeleteMessageModalProps> = (props) =>
     {(pd) => {
       const msg = () => pd().message;
       const sender = () => getSenderDisplay(msg().sender_id, props.participants, props.currentUserId);
+      const system = () => isSystemMessage(msg());
+      const senderName = () => (system() ? t('messages.system.default') : sender().name);
+      const preview = () =>
+        system()
+          ? formatSystemMessageText(
+              msg() as DecryptedMessage & { system_type: string; system_payload: string },
+              props.participants,
+              props.currentUserId,
+            )
+          : getMessageBodyText(msg());
       return (
         <ResponsiveDialog
           size="md"
@@ -34,16 +44,16 @@ export const DeleteMessageModal: Component<DeleteMessageModalProps> = (props) =>
         >
           <div class="mb-4 rounded-xl border border-border bg-card/50 p-3">
             <div class="flex gap-3">
-              <MessageAvatar name={sender().name} avatar={sender().avatar} />
+              <MessageAvatar name={senderName()} avatar={sender().avatar} />
               <div class="min-w-0 flex-1">
                 <div class="mb-0.5 flex flex-wrap items-baseline gap-2">
-                  <span class="truncate text-sm font-semibold text-foreground">{sender().name}</span>
+                  <span class="truncate text-sm font-semibold text-foreground">{senderName()}</span>
                   <span class="shrink-0 text-xs text-muted-foreground">
                     {formatMessageTimestamp(new Date(msg().created_at))}
                   </span>
                 </div>
                 <p class="line-clamp-6 whitespace-pre-wrap break-words text-sm text-muted-foreground">
-                  {getMessageBodyText(msg())}
+                  {preview()}
                 </p>
               </div>
             </div>

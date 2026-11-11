@@ -60,10 +60,10 @@ const FriendRow: Component<{
   onContextMenu?: (e: MouseEvent) => void;
 }> = (props) => (
   <div
-    class="flex items-center justify-between gap-3 rounded-lg px-3 py-2.5 transition-colors hover:bg-accent/40"
+    class="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-muted/20"
     onContextMenu={(e) => props.onContextMenu?.(e)}
   >
-    <div class="flex min-w-0 items-center gap-3">
+    <div class="flex min-w-0 flex-1 items-center gap-3">
       <div class={`relative shrink-0 ${props.muted ? 'opacity-70' : ''}`}>
         <MessageAvatar name={friendDisplayName(props.rel)} avatar={props.rel.user.avatar} class="size-10 text-sm" />
         <Show when={props.showPresence}>
@@ -338,6 +338,7 @@ const FriendsPage: Component = () => {
         <Show when={!relationships.loading && !hasAny()}>
           <EmptyState
             size="page"
+            align="start"
             icon="fa-solid fa-user-group"
             title={t('friends.empty.noneTitle')}
             body={t('friends.empty.noneBody')}
@@ -347,6 +348,7 @@ const FriendsPage: Component = () => {
         <Show when={!relationships.loading && hasAny() && showEmptyState()}>
           <EmptyState
             size="page"
+            align="start"
             icon={
               tab() === 'blocked'
                 ? 'fa-solid fa-ban'
@@ -360,11 +362,11 @@ const FriendsPage: Component = () => {
           />
         </Show>
         <Show when={!relationships.loading && hasAny() && !showEmptyState()}>
-          <div class="mx-auto w-full max-w-3xl space-y-6 p-4">
+          <div class="w-full space-y-5 pb-4">
             <Show when={tab() === 'online'}>
-              <section>
-                <h3 class={`mb-2 px-3 ${appSectionLabel}`}>{t('friends.sections.online', { count: onlineFriends().length })}</h3>
-                <div class="space-y-0.5">
+              <section class="w-full">
+                <h3 class={`border-b border-border/40 bg-muted/10 px-4 py-2 ${appSectionLabel}`}>{t('friends.sections.online', { count: onlineFriends().length })}</h3>
+                <div class="divide-y divide-border/40 border-b border-border/40">
                   <For each={onlineFriends()}>
                     {(rel) => (
                       <FriendRow rel={rel} showPresence actions={messageAction(rel)} onContextMenu={friendMenu(rel)} />
@@ -374,9 +376,9 @@ const FriendsPage: Component = () => {
               </section>
             </Show>
             <Show when={tab() === 'all' && friends().length > 0}>
-              <section>
-                <h3 class={`mb-2 px-3 ${appSectionLabel}`}>{t('friends.sections.all', { count: friends().length })}</h3>
-                <div class="space-y-0.5">
+              <section class="w-full">
+                <h3 class={`border-b border-border/40 bg-muted/10 px-4 py-2 ${appSectionLabel}`}>{t('friends.sections.all', { count: friends().length })}</h3>
+                <div class="divide-y divide-border/40 border-b border-border/40">
                   <For each={friends()}>
                     {(rel) => (
                       <FriendRow rel={rel} showPresence actions={messageAction(rel)} onContextMenu={friendMenu(rel)} />
@@ -386,11 +388,11 @@ const FriendsPage: Component = () => {
               </section>
             </Show>
             <Show when={tab() === 'pending' && (incoming().length > 0 || outgoing().length > 0)}>
-              <div class="space-y-6">
+              <div class="space-y-5">
                 <Show when={incoming().length > 0}>
-                  <section>
-                    <h3 class={`mb-2 px-3 ${appSectionLabel}`}>{t('friends.sections.incoming', { count: incoming().length })}</h3>
-                    <div class="space-y-0.5">
+                  <section class="w-full">
+                    <h3 class={`border-b border-border/40 bg-muted/10 px-4 py-2 ${appSectionLabel}`}>{t('friends.sections.incoming', { count: incoming().length })}</h3>
+                    <div class="divide-y divide-border/40 border-b border-border/40">
                       <For each={incoming()}>
                         {(rel) => (
                           <FriendRow
@@ -422,9 +424,9 @@ const FriendsPage: Component = () => {
                   </section>
                 </Show>
                 <Show when={outgoing().length > 0}>
-                  <section>
-                    <h3 class={`mb-2 px-3 ${appSectionLabel}`}>{t('friends.sections.sent', { count: outgoing().length })}</h3>
-                    <div class="space-y-0.5">
+                  <section class="w-full">
+                    <h3 class={`border-b border-border/40 bg-muted/10 px-4 py-2 ${appSectionLabel}`}>{t('friends.sections.sent', { count: outgoing().length })}</h3>
+                    <div class="divide-y divide-border/40 border-b border-border/40">
                       <For each={outgoing()}>
                         {(rel) => (
                           <FriendRow
@@ -450,9 +452,9 @@ const FriendsPage: Component = () => {
               </div>
             </Show>
             <Show when={tab() === 'blocked' && blocked().length > 0}>
-              <section>
-                <h3 class={`mb-2 px-3 ${appSectionLabel}`}>{t('friends.sections.blocked', { count: blocked().length })}</h3>
-                <div class="space-y-0.5">
+              <section class="w-full">
+                <h3 class={`border-b border-border/40 bg-muted/10 px-4 py-2 ${appSectionLabel}`}>{t('friends.sections.blocked', { count: blocked().length })}</h3>
+                <div class="divide-y divide-border/40 border-b border-border/40">
                   <For each={blocked()}>
                     {(rel) => (
                       <FriendRow

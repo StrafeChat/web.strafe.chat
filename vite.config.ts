@@ -90,6 +90,8 @@ export default defineConfig({
   // fallback above and gets served as text/html, which fails WebAssembly.compile with a
   // MIME-type error. Excluding it makes Vite load the package directly instead.
   optimizeDeps: {
-    exclude: ['@matrix-org/matrix-sdk-crypto-wasm'],
+    // latex.js dynamically requires its optional document classes/packages; esbuild's
+    // pre-bundler follows those into the package's .keep placeholders and fails.
+    exclude: ['@matrix-org/matrix-sdk-crypto-wasm', 'latex.js'],
   },
 });

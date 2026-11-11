@@ -383,6 +383,10 @@ export default {
       unnamed: 'sem nome',
     },
   },
+  latex: {
+    preview: 'Prévia do LaTeX',
+    error: 'Esta fórmula tem um erro de LaTeX',
+  },
   composer: {
     mentionEveryone: 'Notificar todos nesta sala',
     slowmodeWait: 'O modo lento está ativado: espere {{seconds}} s para enviar de novo',
