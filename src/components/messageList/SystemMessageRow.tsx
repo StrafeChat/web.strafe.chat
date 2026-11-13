@@ -157,7 +157,7 @@ export const SystemMessageRow: Component<SystemMessageRowProps> = (props) => {
         {(threadId) => (
           <div class="px-3 pt-2">
             <ReplyReference
-              replyToId={threadId()}
+              replyToIds={[threadId()]}
               roomId={props.roomId}
               messages={props.messages ?? []}
               participants={props.participants}

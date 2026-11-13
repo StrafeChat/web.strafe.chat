@@ -42,6 +42,7 @@ import { getMessagePreviewSource, getSenderDisplay, messagePreviewText } from '.
 import { buildMentionCatalog, serializeDraft } from '../lib/utils/mentions';
 import type { ReplyTarget, TypingPerson } from '../components/room';
 import { createRoomDrafts } from '../components/room/roomDrafts';
+import { addReplyTarget, removeReplyTarget } from '../lib/replies';
 import { createComposerAutoFocus } from '../lib/composerFocus';
 import { scrollToMessage } from '../lib/utils/messages';
 import { ensureRoomPins, pinnedMessages } from '../stores/pinnedMessages';
@@ -101,7 +102,7 @@ const RoomPage: Component = () => {
   /** Measured height of the floating composer; the list pads itself by this much. */
   const [composerHeight, setComposerHeight] = createSignal(0);
   const [renameModalOpen, setRenameModalOpen] = createSignal(false);
-  const [replyToMessageId, setReplyToMessageId] = createSignal<string | null>(null);
+  const [replyToMessageIds, setReplyToMessageIds] = createSignal<string[]>([]);
   // This page stays mounted from one PM to the next, so each room's unsent text, files and
   // reply are swapped out on the way out and back in on return.
   const roomDrafts = createRoomDrafts({
@@ -110,8 +111,8 @@ const RoomPage: Component = () => {
     setDraft,
     setCursorPos,
     attachments: attachmentDraft,
-    replyTo: replyToMessageId,
-    setReplyTo: setReplyToMessageId,
+    replyTo: replyToMessageIds,
+    setReplyTo: setReplyToMessageIds,
   });
   const viewportAck = createViewportAck(() => params.roomId);
   let lastTypingSent = 0;
@@ -177,18 +178,19 @@ const RoomPage: Component = () => {
   const mentionCatalog = createMemo(() =>
     buildMentionCatalog({ participants: room()?.participants, emojis: allCustomEmojis() })
   );
-  const replyTarget = createMemo((): ReplyTarget | null => {
-    const id = replyToMessageId();
-    if (!id) return null;
-    const target = roomMessages().find((m) => m.id === id);
-    const sender = target ? getSenderDisplay(target.sender_id, room()?.participants ?? [], auth.user?.id) : null;
-    return {
-      name: sender?.name ?? t('room.replyFallback'),
-      preview: target ? messagePreviewText(getMessagePreviewSource(target), room()?.participants, auth.user?.id, 120) : '',
-      onJump: target ? () => scrollToMessage(id) : undefined,
-      onCancel: () => setReplyToMessageId(null),
-    };
-  });
+  const replyTargets = createMemo((): ReplyTarget[] =>
+    replyToMessageIds().map((id) => {
+      const target = roomMessages().find((m) => m.id === id);
+      const sender = target ? getSenderDisplay(target.sender_id, room()?.participants ?? [], auth.user?.id) : null;
+      return {
+        id,
+        name: sender?.name ?? t('room.replyFallback'),
+        preview: target ? messagePreviewText(getMessagePreviewSource(target), room()?.participants, auth.user?.id, 120) : '',
+        onJump: target ? () => scrollToMessage(id) : undefined,
+        onCancel: () => setReplyToMessageIds((ids) => removeReplyTarget(ids, id)),
+      };
+    })
+  );
   const unreadBannerInfo = () => {
     if (newHeaderDismissed.byRoom[params.roomId]) return null;
     if (isNearBottom()) return null;
@@ -358,9 +360,9 @@ const RoomPage: Component = () => {
     // Sending ends this typing run; the next keystroke should announce immediately.
     lastTypingSent = 0;
     const files = attachmentDraft.take();
-    const replyTo = replyToMessageId() ?? undefined;
+    const replyTo = replyToMessageIds();
     setDraft('');
-    setReplyToMessageId(null);
+    setReplyToMessageIds([]);
     // Refocus synchronously, inside the send gesture, so the mobile on-screen keyboard doesn't
     // close and pop back: a focus() after `await sendMessage` lands outside the gesture (a
     // network round-trip later), which some mobile browsers answer by hiding then re-showing
@@ -375,7 +377,13 @@ const RoomPage: Component = () => {
       // (the server's reason: rate limited / slowmode / forbidden), the way SpacePage already does.
       // Without this a throttled DM just bounced back into the box with no explanation. It goes
       // back to the room it was written in, even if that is no longer the one on screen.
-      roomDrafts.restoreFailedSend(roomId, raw, files, translateCaughtApiError(err, t).join(' ') || t('room.sendFailed'));
+      roomDrafts.restoreFailedSend(
+        roomId,
+        raw,
+        files,
+        translateCaughtApiError(err, t).join(' ') || t('room.sendFailed'),
+        replyTo
+      );
     }
   }
 
@@ -426,7 +434,7 @@ const RoomPage: Component = () => {
   }
 
   function handleReplyToMessage(msg: DecryptedMessage) {
-    setReplyToMessageId(msg.id);
+    setReplyToMessageIds((ids) => addReplyTarget(ids, msg.id));
     queueMicrotask(() => inputRef()?.focus());
   }
 
@@ -588,7 +596,7 @@ const RoomPage: Component = () => {
               onInsertMention={onInsertMention}
               onCursorChange={setCursorPos}
               mentionCatalog={mentionCatalog()}
-              replyTo={replyTarget()}
+              replyTargets={replyTargets()}
               attachments={attachmentDraft.items()}
               onAddFiles={(files) => void roomDrafts.addFiles(files)}
               onRemoveAttachment={attachmentDraft.remove}

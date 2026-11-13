@@ -32,9 +32,11 @@ import { isMdViewport } from '../../stores/mobileShellLayout';
 import { requestEditLastMessage } from '../../lib/chatShortcuts';
 import { TypingIndicator, type TypingPerson } from './TypingIndicator';
 import { t } from '../../i18n';
+import { MAX_REPLY_TARGETS } from '../../lib/replies';
 import { BotTag } from '../BotTag';
 
 export interface ReplyTarget {
+  id: string;
   /** Author of the message being replied to. */
   name: string;
   /** One-line preview of that message ('' when unavailable). */
@@ -80,7 +82,7 @@ export interface RoomMessageInputProps {
   /** Resolves @names / #channels / :emoji: in the draft for the styled overlay. */
   mentionCatalog?: MentionCatalog;
   /** Shown as a strip attached to the top of the box while replying. */
-  replyTo?: ReplyTarget | null;
+  replyTargets?: ReplyTarget[];
   /** Files queued to go with the next message. */
   attachments?: PendingAttachment[];
   /** Enables the attach button, drag-and-drop and paste-to-attach. */
@@ -504,14 +506,14 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
     }
     // ↑ in an empty composer edits your last message (Discord). Only when empty, so it never
     // steals the arrow key from someone moving the caret in a draft.
-    if (e.key === 'ArrowUp' && props.draft === '' && !props.replyTo) {
+    if (e.key === 'ArrowUp' && props.draft === '' && !props.replyTargets?.length) {
       e.preventDefault();
       requestEditLastMessage();
       return;
     }
-    if (e.key === 'Escape' && props.replyTo) {
+    if (e.key === 'Escape' && props.replyTargets?.length) {
       e.preventDefault();
-      props.replyTo.onCancel();
+      props.replyTargets[props.replyTargets.length - 1]!.onCancel();
       return;
     }
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -601,7 +603,8 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
     }
   };
 
-  const hasTopStrip = () => hasAttachments() || !!props.replyTo;
+  const replyTargets = () => props.replyTargets ?? [];
+  const hasTopStrip = () => hasAttachments() || replyTargets().length > 0;
 
   return (
     <>
@@ -731,29 +734,51 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
                   </For>
                 </div>
               </Show>
-              <Show when={props.replyTo}>
-                {(reply) => (
-                  <div
-                    class={`flex items-center gap-2 border border-b-0 border-input bg-muted/40 py-1.5 pl-3 pr-1.5 text-xs ${
-                      hasAttachments() ? 'border-t-0' : 'rounded-t-lg'
-                    }`}
-                  >
+              <Show when={replyTargets().length > 0}>
+                <div
+                  class={`border border-b-0 border-input bg-muted/40 ${
+                    hasAttachments() ? 'border-t-0' : 'rounded-t-lg'
+                  }`}
+                >
+                  <div class="flex items-center gap-2 px-3 pb-1 pt-1.5 text-xs">
                     <i class="fa-solid fa-reply shrink-0 -scale-x-100 text-[11px] text-muted-foreground" aria-hidden="true" />
-                    <span class="shrink-0 text-muted-foreground">{t('composer.replyingTo')}</span>
-                    <span class="shrink-0 font-semibold text-foreground">{reply().name}</span>
-                    <span class="min-w-0 flex-1 truncate text-muted-foreground">{reply().preview}</span>
-                    <Show when={reply().onJump}>
-                      <button
-                        type="button"
-                        class="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-                        onClick={() => reply().onJump?.()}
-                      >
-                        {t('composer.jump')}
-                      </button>
-                    </Show>
-                    <IconButton size="sm" icon="fa-solid fa-xmark" label={t('composer.cancelReply')} onClick={() => reply().onCancel()} />
+                    <span class="flex min-w-0 items-baseline gap-1">
+                      <span class="shrink-0 text-muted-foreground">{t('composer.replyingTo')}</span>
+                      <Show when={replyTargets().length > 1}>
+                        <span class="shrink-0 tabular-nums text-muted-foreground/70">
+                          {replyTargets().length}/{MAX_REPLY_TARGETS}
+                        </span>
+                      </Show>
+                    </span>
                   </div>
-                )}
+                  <div class="pb-1">
+                    <For each={replyTargets()}>
+                      {(reply) => (
+                        <div class="flex min-w-0 items-center gap-2 px-3 py-1 text-xs" data-reply-id={reply.id}>
+                          <span class="shrink-0 font-semibold text-foreground">{reply.name}</span>
+                          <span class="min-w-0 flex-1 truncate text-muted-foreground">
+                            {reply.preview || <span class="italic">{t('messages.noText')}</span>}
+                          </span>
+                          <Show when={reply.onJump}>
+                            <button
+                              type="button"
+                              class="shrink-0 rounded px-1.5 py-0.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                              onClick={() => reply.onJump?.()}
+                            >
+                              {t('composer.jump')}
+                            </button>
+                          </Show>
+                          <IconButton
+                            size="sm"
+                            icon="fa-solid fa-xmark"
+                            label={`${t('composer.cancelReply')} ${reply.name}`}
+                            onClick={() => reply.onCancel()}
+                          />
+                        </div>
+                      )}
+                    </For>
+                  </div>
+                </div>
               </Show>
               <Show when={recording()}>
                 <VoiceRecordingBar
