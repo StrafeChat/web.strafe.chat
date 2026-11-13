@@ -96,6 +96,7 @@ export interface Message {
   /** Set when room has E2EE disabled (server-stored plaintext). */
   plaintext?: string;
   reply_to_id?: string;
+  reply_to_ids?: string[];
   /** Direct user mentions. Non-E2EE rooms: server-parsed and authoritative. E2EE rooms: as declared at send time. */
   mentions?: string[];
   mention_everyone?: boolean;

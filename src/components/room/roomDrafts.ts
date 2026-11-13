@@ -1,11 +1,12 @@
 import { createEffect, onCleanup, untrack, type Accessor } from 'solid-js';
 import type { AttachmentDraft, PendingAttachment } from '../../lib/attachments/draft';
+import { MAX_REPLY_TARGETS, mergeReplyTargets } from '../../lib/replies';
 
 /** What a room's composer held when you left it. */
 interface StashedDraft {
   text: string;
   files: PendingAttachment[];
-  replyTo: string | null;
+  replyTo: string[];
   error: string;
 }
 
@@ -16,8 +17,8 @@ export interface RoomDraftsOptions {
   setDraft: (text: string) => void;
   setCursorPos: (pos: number) => void;
   attachments: AttachmentDraft;
-  replyTo: Accessor<string | null>;
-  setReplyTo: (id: string | null) => void;
+  replyTo: Accessor<string[]>;
+  setReplyTo: (ids: string[]) => void;
 }
 
 /**
@@ -43,7 +44,7 @@ export function createRoomDrafts(opts: RoomDraftsOptions) {
     opts.attachments.clear();
     if (saved?.files.length) opts.attachments.restore(saved.files);
     opts.attachments.setError(saved?.error ?? '');
-    opts.setReplyTo(saved?.replyTo ?? null);
+    opts.setReplyTo((saved?.replyTo ?? []).slice(0, MAX_REPLY_TARGETS));
   }
 
   // Compared by hand rather than with on(..., { defer: true }): a deferred `on` never records
@@ -59,7 +60,7 @@ export function createRoomDrafts(opts: RoomDraftsOptions) {
         const files = opts.attachments.take();
         const text = opts.draft();
         const replyTo = opts.replyTo();
-        if (text || files.length || replyTo) stash.set(left, { text, files, replyTo, error });
+        if (text || files.length || replyTo.length) stash.set(left, { text, files, replyTo: [...replyTo], error });
         else stash.delete(left);
       }
       const saved = id ? stash.get(id) : undefined;
@@ -81,12 +82,19 @@ export function createRoomDrafts(opts: RoomDraftsOptions) {
    * or that room's stash if you have moved on while it was in flight - never the composer of
    * whatever room you are looking at now.
    */
-  function restoreFailedSend(roomId: string, text: string, files: PendingAttachment[], error: string) {
+  function restoreFailedSend(
+    roomId: string,
+    text: string,
+    files: PendingAttachment[],
+    error: string,
+    replyTo: string[] = []
+  ) {
     if (disposed) return;
     if (roomId === current) {
       opts.setDraft(text);
       opts.attachments.restore(files);
       opts.attachments.setError(error);
+      if (replyTo.length && opts.replyTo().length === 0) opts.setReplyTo([...replyTo]);
       return;
     }
     const saved = stash.get(roomId);
@@ -94,7 +102,7 @@ export function createRoomDrafts(opts: RoomDraftsOptions) {
       // Keep anything typed there since, after the message that bounced.
       text: [text, saved?.text].filter(Boolean).join('\n'),
       files: [...files, ...(saved?.files ?? [])],
-      replyTo: saved?.replyTo ?? null,
+      replyTo: mergeReplyTargets(replyTo, saved?.replyTo ?? []),
       error,
     });
   }
@@ -138,7 +146,7 @@ export function createRoomDrafts(opts: RoomDraftsOptions) {
     stash.set(startedIn, {
       text: saved?.text ?? '',
       files: [...(saved?.files ?? []), ...strays],
-      replyTo: saved?.replyTo ?? null,
+      replyTo: saved?.replyTo ?? [],
       error: problem || saved?.error || '',
     });
   }

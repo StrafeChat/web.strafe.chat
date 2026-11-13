@@ -83,6 +83,7 @@ import {
 import { buildMentionCatalog, serializeDraft } from '../lib/utils/mentions';
 import type { ReplyTarget, TypingPerson } from '../components/room';
 import { createRoomDrafts } from '../components/room/roomDrafts';
+import { addReplyTarget, removeReplyTarget } from '../lib/replies';
 import {
   canAttachFilesInChannel,
   canSendMessagesInChannel,
@@ -224,7 +225,7 @@ const SpacePage: Component = () => {
   }
 
   const [inputRef, setInputRef] = createSignal<HTMLTextAreaElement | undefined>();
-  const [replyToMessageId, setReplyToMessageId] = createSignal<string | null>(null);
+  const [replyToMessageIds, setReplyToMessageIds] = createSignal<string[]>([]);
   // This page stays mounted from one room to the next, and from one space to another, so each
   // room's unsent text, files and reply are swapped out on the way out and back in on return.
   const roomDrafts = createRoomDrafts({
@@ -233,8 +234,8 @@ const SpacePage: Component = () => {
     setDraft,
     setCursorPos,
     attachments: attachmentDraft,
-    replyTo: replyToMessageId,
-    setReplyTo: setReplyToMessageId,
+    replyTo: replyToMessageIds,
+    setReplyTo: setReplyToMessageIds,
   });
   const [maxMessageIdWhenEntered, setMaxMessageIdWhenEntered] = createSignal<string | null>(null);
   /** Read cursor as it stood the moment we entered - frozen for the whole visit so the NEW
@@ -385,9 +386,9 @@ const SpacePage: Component = () => {
     // rather than waiting out the ping interval from before the send.
     lastTypingSent = 0;
     const files = attachmentDraft.take();
-    const replyTo = replyToMessageId() ?? undefined;
+    const replyTo = replyToMessageIds();
     setDraft('');
-    setReplyToMessageId(null);
+    setReplyToMessageIds([]);
     // Refocus synchronously, inside the send gesture, so the mobile on-screen keyboard doesn't
     // close and pop back (a focus() after the send promise resolves lands outside the gesture,
     // which some mobile browsers answer by flashing the keyboard).
@@ -405,7 +406,13 @@ const SpacePage: Component = () => {
         // Give the user their message back to retry rather than silently losing it - and say
         // why in their language (slowmode, rate limit, automod, verification level). It goes
         // back to the room it was written in, even if that is no longer the one on screen.
-        roomDrafts.restoreFailedSend(id, raw, files, translateCaughtApiError(err, t).join(' ') || t('room.sendFailed'));
+        roomDrafts.restoreFailedSend(
+          id,
+          raw,
+          files,
+          translateCaughtApiError(err, t).join(' ') || t('room.sendFailed'),
+          replyTo
+        );
       });
   }
 
@@ -425,7 +432,7 @@ const SpacePage: Component = () => {
   }
 
   function handleReplyToMessage(msg: DecryptedMessage) {
-    setReplyToMessageId(msg.id);
+    setReplyToMessageIds((ids) => addReplyTarget(ids, msg.id));
     queueMicrotask(() => inputRef()?.focus());
   }
 
@@ -573,18 +580,19 @@ const SpacePage: Component = () => {
       emojis: allCustomEmojis(),
     })
   );
-  const replyTarget = createMemo((): ReplyTarget | null => {
-    const id = replyToMessageId();
-    if (!id) return null;
-    const target = roomMessages().find((m) => m.id === id);
-    const sender = target ? getSenderDisplay(target.sender_id, allSpaceMembers(), auth.user?.id) : null;
-    return {
-      name: sender?.name ?? t('room.replyFallback'),
-      preview: target ? messagePreviewText(getMessagePreviewSource(target), allSpaceMembers(), auth.user?.id, 120) : '',
-      onJump: target ? () => scrollToMessage(id) : undefined,
-      onCancel: () => setReplyToMessageId(null),
-    };
-  });
+  const replyTargets = createMemo((): ReplyTarget[] =>
+    replyToMessageIds().map((id) => {
+      const target = roomMessages().find((m) => m.id === id);
+      const sender = target ? getSenderDisplay(target.sender_id, allSpaceMembers(), auth.user?.id) : null;
+      return {
+        id,
+        name: sender?.name ?? t('room.replyFallback'),
+        preview: target ? messagePreviewText(getMessagePreviewSource(target), allSpaceMembers(), auth.user?.id, 120) : '',
+        onJump: target ? () => scrollToMessage(id) : undefined,
+        onCancel: () => setReplyToMessageIds((ids) => removeReplyTarget(ids, id)),
+      };
+    })
+  );
 
   /** This member's effective permission mask in the open text channel, or null while the
    * roles/overrides are still loading (null reads as permissive so nothing flickers off). */
@@ -831,7 +839,7 @@ const SpacePage: Component = () => {
   });
 
   createEffect(() => {
-    if (!canSendMessages()) setReplyToMessageId(null);
+    if (!canSendMessages()) setReplyToMessageIds([]);
   });
 
   const canManageRoles = createMemo(() => {
@@ -1280,7 +1288,7 @@ const SpacePage: Component = () => {
                 onInsertMention={onInsertMention}
                 onCursorChange={setCursorPos}
                 mentionCatalog={mentionCatalog()}
-                replyTo={canSendMessages() ? replyTarget() : null}
+                replyTargets={canSendMessages() ? replyTargets() : []}
                 attachments={attachmentDraft.items()}
                 onAddFiles={canAttachFiles() ? (files) => void roomDrafts.addFiles(files) : undefined}
                 onRemoveAttachment={attachmentDraft.remove}

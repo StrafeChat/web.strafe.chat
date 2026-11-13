@@ -841,13 +841,14 @@ function roomForMessage(roomId: string): Room {
 export async function sendMessage(
   roomId: string,
   plaintext: string,
-  replyToId?: string,
+  replyToIds: string[] = [],
   pendingAttachments: PendingAttachment[] = []
 ): Promise<Message | null> {
   const currentUserId = auth.user?.id;
   if (!currentUserId) return null;
   if (!plaintext && pendingAttachments.length === 0) return null;
   const room = roomForMessage(roomId);
+  const replyToId = replyToIds[0];
 
   const participants = room.participants ?? [];
   const otherParticipant = participants.find((p) => p.id !== currentUserId);
@@ -890,6 +891,7 @@ export async function sendMessage(
     plaintext,
     pending: true,
     reply_to_id: replyToId,
+    ...(replyToIds.length > 1 ? { reply_to_ids: [...replyToIds] } : {}),
     attachments: tempAttachments,
   };
 
@@ -976,6 +978,7 @@ export async function sendMessage(
     // not processed yet, say) is over.
     const confirmed: DecryptedMessage = {
       ...msg,
+      ...(replyToIds.length > 1 ? { reply_to_ids: [...replyToIds] } : {}),
       plaintext,
       notEncrypted: e2eeOff,
       decryptError: false,
@@ -1077,6 +1080,7 @@ export async function addMessageFromEvent(payload: {
   ciphertext: string;
   plaintext?: string;
   reply_to_id?: string;
+  reply_to_ids?: string[];
   system_type?: string;
   system_payload?: string;
   attachments?: Attachment[];
@@ -1142,7 +1146,10 @@ export async function addMessageFromEvent(payload: {
     if (tempIdx >= 0) {
       didReplaceInPlace = true;
       const merged = [...list];
-      merged[tempIdx] = msg;
+      const pending = merged[tempIdx]!;
+      merged[tempIdx] = pending.reply_to_ids?.length
+        ? { ...msg, reply_to_ids: pending.reply_to_ids }
+        : msg;
       return merged;
     }
     return sortWithPendingLast([...list, msg]);
@@ -1165,6 +1172,7 @@ export async function updateMessageFromEvent(payload: {
   ciphertext: string;
   plaintext?: string;
   reply_to_id?: string;
+  reply_to_ids?: string[];
   attachments?: Attachment[];
   embeds?: Embed[];
   created_at: string;

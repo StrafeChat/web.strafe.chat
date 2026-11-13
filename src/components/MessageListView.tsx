@@ -871,9 +871,14 @@ export const MessageList: Component<MessageListProps> = (props) => {
     });
   });
 
+  function replyIdsOf(msg: DecryptedMessage): string[] {
+    if (msg.reply_to_ids?.length) return msg.reply_to_ids;
+    return msg.reply_to_id ? [msg.reply_to_id] : [];
+  }
+
   function shouldShowHeader(msg: DecryptedMessage, prev: DecryptedMessage | undefined): boolean {
     // Replies always start a new visual block
-    if (msg.reply_to_id) return true;
+    if (replyIdsOf(msg).length > 0) return true;
     if (!prev) return true;
     if (prev.sender_id !== msg.sender_id) return true;
     const prevTime = new Date(prev.created_at).getTime();
@@ -998,6 +1003,8 @@ export const MessageList: Component<MessageListProps> = (props) => {
         <For each={visibleMessages()}>
           {(msg, i) => {
             const prev = () => visibleMessages()[i() - 1];
+            const replyIds = createMemo(() => replyIdsOf(msg));
+            const replyOffset = () => 24 + Math.max(0, replyIds().length - 1) * 22;
             const showHeader = () => shouldShowHeader(msg, prev());
             const needsDateHeader = () => shouldShowDateHeader(msg, prev());
             const sender = () =>
@@ -1196,11 +1203,28 @@ export const MessageList: Component<MessageListProps> = (props) => {
                 <Show when={!compact()}>
                   <div class="relative flex w-10 shrink-0 flex-col items-center">
                     {/* Reply spine: from the middle of the reply line, down into the avatar. */}
-                    <Show when={msg.reply_to_id}>
-                      <div
-                        class="pointer-events-none absolute left-1/2 top-[10px] h-[14px] w-[calc(50%+12px)] rounded-tl-lg border-l-2 border-t-2 border-border/70"
-                        aria-hidden="true"
-                      />
+                    <Show when={replyIds().length > 0}>
+                      <For each={replyIds()}>
+                        {(_, index) => (
+                          <div
+                            class={`pointer-events-none absolute left-1/2 w-[calc(50%+12px)] border-l-2 border-t-2 border-border/70 ${
+                              index() === replyIds().length - 1 && replyIds().length > 1
+                                ? 'rounded-tl-none'
+                                : 'rounded-tl-lg'
+                            }`}
+                            style={{
+                              top: `${10 + index() * 22}px`,
+                              height:
+                                index() === replyIds().length - 1
+                                  ? '14px'
+                                  : index() === replyIds().length - 2
+                                    ? '22px'
+                                    : '30px',
+                            }}
+                            aria-hidden="true"
+                          />
+                        )}
+                      </For>
                     </Show>
                     <Show
                       when={showHeader()}
@@ -1213,9 +1237,8 @@ export const MessageList: Component<MessageListProps> = (props) => {
                       <div
                         role="button"
                         tabIndex={0}
-                        class={`cursor-pointer rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background ${
-                          msg.reply_to_id ? 'mt-6' : ''
-                        }`}
+                        class="cursor-pointer rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                        style={replyIds().length > 0 ? { 'margin-top': `${replyOffset()}px` } : undefined}
                         onClick={(e) => {
                           e.stopPropagation();
                           openAuthorProfile(msg, e.currentTarget);
@@ -1247,18 +1270,16 @@ export const MessageList: Component<MessageListProps> = (props) => {
                     />
                   </Show>
                   <Show when={editingMessageId() !== msg.id}>
-                  <Show when={msg.reply_to_id}>
-                    {(replyToId) => (
-                      <ReplyReference
-                        replyToId={replyToId()}
-                        roomId={props.roomId}
-                        messages={props.messages}
-                        referenced={msg.referenced_message as DecryptedMessage | undefined}
-                        participants={resolvedParticipants()}
-                        currentUserId={currentUserId()}
-                        compact={compact()}
-                      />
-                    )}
+                  <Show when={replyIds().length > 0}>
+                    <ReplyReference
+                      replyToIds={replyIds()}
+                      roomId={props.roomId}
+                      messages={props.messages}
+                      referenced={msg.referenced_message as DecryptedMessage | undefined}
+                      participants={resolvedParticipants()}
+                      currentUserId={currentUserId()}
+                      compact={compact()}
+                    />
                   </Show>
                   <Show when={compact()}>
                     <div class="flex items-baseline gap-x-2 gap-y-0.5 flex-wrap">
