@@ -399,3 +399,172 @@ html.desktop-electron .desktop-no-drag {
   -webkit-app-region: no-drag;
   app-region: no-drag;
 }
+
+.katex {
+  font-size: 1.05em;
+}
+.katex-display {
+  margin: 0.4em 0;
+}
+.latex-inline .katex {
+  white-space: nowrap;
+}
+.latex-block {
+  max-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.latex-block .katex-display {
+  margin: 0;
+}
+.latex-error {
+  border-radius: 0.25rem;
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--color-destructive) 55%, transparent);
+}
+.latex-source {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.9em;
+  opacity: 0.75;
+}
+.latex-doc {
+  max-width: 100%;
+  margin: 0.4rem 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: 0.6rem 0.85rem;
+  background: color-mix(in srgb, var(--color-muted) 30%, transparent);
+  color: var(--color-foreground);
+  font-size: 0.9em;
+  line-height: 1.55;
+}
+.latex-doc .body > :first-child {
+  margin-top: 0;
+}
+.latex-doc .body > :last-child {
+  margin-bottom: 0;
+}
+.latex-doc p {
+  margin: 0.4em 0;
+}
+.latex-doc h2,
+.latex-doc h3,
+.latex-doc h4,
+.latex-doc h5 {
+  font-weight: 600;
+  line-height: 1.3;
+}
+.latex-doc h2 {
+  margin: 0.9em 0 0.4em;
+  font-size: 1.3em;
+}
+.latex-doc h3 {
+  margin: 0.8em 0 0.35em;
+  font-size: 1.15em;
+}
+.latex-doc h4 {
+  margin: 0.7em 0 0.3em;
+  font-size: 1em;
+}
+.latex-doc h5 {
+  margin: 0.6em 0 0.25em;
+  font-size: 0.95em;
+}
+.latex-doc .title {
+  font-size: 1.35em;
+  font-weight: 700;
+}
+.latex-doc .author,
+.latex-doc .date {
+  color: var(--color-muted-foreground);
+}
+.latex-doc .center {
+  text-align: center;
+}
+.latex-doc .flushleft {
+  text-align: left;
+}
+.latex-doc .flushright {
+  text-align: right;
+}
+.latex-doc .quote,
+.latex-doc .quotation {
+  margin: 0.45em 1.2em;
+}
+.latex-doc .bf {
+  font-weight: 700;
+}
+.latex-doc .it,
+.latex-doc .sl {
+  font-style: italic;
+}
+.latex-doc .sc {
+  font-variant: small-caps;
+}
+.latex-doc .tt {
+  font-family: var(--font-mono);
+}
+.latex-doc .sf {
+  font-family: var(--font-sans);
+}
+.latex-doc .underline {
+  text-decoration: underline;
+}
+.latex-doc .list {
+  margin: 0.35em 0;
+  padding: 0;
+  list-style: none;
+}
+.latex-doc .list li {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  column-gap: 0.5em;
+  align-items: baseline;
+}
+.latex-doc .itemlabel {
+  grid-column: 1;
+  text-align: end;
+  white-space: nowrap;
+}
+.latex-doc .list li > p {
+  grid-column: 2;
+  min-width: 0;
+  margin: 0;
+}
+.latex-doc .list li > .list {
+  grid-column: 1 / -1;
+  margin-inline-start: 1.1em;
+}
+.latex-doc dl.list {
+  display: block;
+}
+.latex-doc dt {
+  font-weight: 600;
+}
+.latex-doc dd {
+  margin: 0 0 0.3em 1.2em;
+}
+.latex-doc a {
+  color: var(--color-primary);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.latex-doc .katex-display {
+  margin: 0.5em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+.latex-doc table {
+  max-width: 100%;
+  border-collapse: collapse;
+}
+.latex-doc th,
+.latex-doc td {
+  border: 1px solid var(--color-border);
+  padding: 0.2em 0.45em;
+}
+.latex-doc pre,
+.latex-doc code {
+  font-family: var(--font-mono);
+}

@@ -37,8 +37,8 @@ import {
   getSenderDisplay,
   augmentParticipants,
   isSystemMessage,
-  formatSystemMessageText,
   MessageAvatar,
+  SystemMessageRow,
   MessageBody,
   DeleteMessageModal,
   MessageListIntro,
@@ -337,12 +337,15 @@ export const MessageList: Component<MessageListProps> = (props) => {
     openProfileForUser(msg.sender_id, anchor);
   }
 
-  /** Right-clicking a message author gives the same user menu as a member row. */
   function openAuthorMenu(msg: DecryptedMessage, e: MouseEvent) {
-    const s = getSenderDisplay(msg.sender_id, resolvedParticipants(), currentUserId());
-    const participant = resolvedParticipants()?.find((x) => x.id === msg.sender_id);
+    openUserMenu(msg.sender_id, e);
+  }
+
+  function openUserMenu(userId: string, e: MouseEvent) {
+    const s = getSenderDisplay(userId, resolvedParticipants(), currentUserId());
+    const participant = resolvedParticipants()?.find((x) => x.id === userId);
     const items = buildUserMenuItems({
-      userId: msg.sender_id,
+      userId,
       bot: s.bot,
       username: s.username || '',
       displayName: s.name,
@@ -352,10 +355,26 @@ export const MessageList: Component<MessageListProps> = (props) => {
       spaceId: props.spaceId,
       roomId: props.roomId,
       extraItems: buildSpaceModerationItems(
-        spaceModerationContext(msg.sender_id, (participant as { roles?: string[] } | undefined)?.roles),
+        spaceModerationContext(userId, (participant as { roles?: string[] } | undefined)?.roles),
       ),
     });
     if (items.length) showContextMenu(e, items);
+  }
+
+  function openSystemMenu(msg: DecryptedMessage, e: MouseEvent) {
+    const roomId = props.roomId;
+    if (!roomId || props.canManageMessages !== true) return;
+    showContextMenu(e, [
+      {
+        label: t('messages.actions.delete'),
+        icon: 'fa-trash',
+        danger: true,
+        onClick: (ev?: MouseEvent) => {
+          if (ev?.shiftKey) doDelete(roomId, msg.id);
+          else setPendingDelete({ roomId, msgId: msg.id, message: msg });
+        },
+      },
+    ]);
   }
 
   function spaceModerationContext(targetUserId: string, targetRoleIds?: string[]): SpaceModerationContext {
@@ -1542,15 +1561,16 @@ export const MessageList: Component<MessageListProps> = (props) => {
               </div>
                 )}
               >
-                <div class="flex justify-center py-2" data-msg-id={msg.id}>
-                  <span class="text-xs text-muted-foreground">
-                    {formatSystemMessageText(
-                      msg as DecryptedMessage & { system_type: string; system_payload: string },
-                      resolvedParticipants(),
-                      currentUserId()
-                    )}
-                  </span>
-                </div>
+                <SystemMessageRow
+                  msg={msg as DecryptedMessage & { system_type: string; system_payload: string }}
+                  participants={resolvedParticipants()}
+                  currentUserId={currentUserId()}
+                  messages={props.messages}
+                  roomId={props.roomId}
+                  onOpenProfile={openProfileForUser}
+                  onOpenMenu={openUserMenu}
+                  onContextMenu={(e) => openSystemMenu(msg, e)}
+                />
               </Show>
               </>
             );

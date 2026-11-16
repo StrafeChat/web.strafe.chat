@@ -3,6 +3,8 @@ import { For, Show, createMemo, createSignal, onCleanup, onMount, untrack } from
 import { useNavigate } from '@solidjs/router';
 import { parseMessageContent, parseStyleOnlyContent, walkSegments, type MessageSegment } from '../../lib/utils/markdown';
 import { CodeBlock } from './CodeBlock';
+import { LatexDocument } from './LatexDocument';
+import { LatexMath } from './LatexMath';
 import { Emoji } from '../emoji/Emoji';
 import { CustomEmoji } from '../emoji/CustomEmoji';
 import { extractSpaceInviteCodeFromUrl } from '../../lib/utils/spaceInviteLink';
@@ -355,6 +357,12 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
           </div>
         );
       }
+        if (seg.type === 'latexDocument') {
+          return <LatexDocument source={seg.source} />;
+        }
+        if (seg.type === 'latex') {
+          return <LatexMath tex={seg.tex} display={seg.display} />;
+        }
         if (seg.type === 'text') {
           return <span class="whitespace-pre-wrap">{seg.content}</span>;
         }

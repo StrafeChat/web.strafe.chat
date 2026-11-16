@@ -372,6 +372,10 @@ export default {
       unnamed: 'unnamed',
     },
   },
+  latex: {
+    preview: 'LaTeX preview',
+    error: 'This formula has a LaTeX error',
+  },
   composer: {
     mentionEveryone: 'Notify everyone in this room',
     slowmodeWait: 'Slowmode is on - wait {{seconds}}s before sending again',

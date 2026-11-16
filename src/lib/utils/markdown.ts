@@ -13,6 +13,7 @@
  * render one level and showed the inner markers as literal text.
  */
 import { emojiAt } from '../emoji/regex';
+import { isLatexDocument, matchBareLatex, matchLatex } from '../latex';
 import { timestampStyle, type TimestampStyle } from './messageTimestamp';
 
 /** Inline leaves and containers, plus the block nodes a message can start a line with. */
@@ -20,6 +21,8 @@ export type MessageSegment =
   | { type: 'text'; content: string }
   | { type: 'code'; content: string }
   | { type: 'codeBlock'; lang: string; content: string }
+  | { type: 'latex'; tex: string; display: boolean }
+  | { type: 'latexDocument'; source: string }
   /** `suppressed` is Discord's <https://example.com>: still a link, but no preview card,
    * no inline image or video, and no invite card either. */
   | { type: 'link'; href: string; text: string; suppressed?: boolean }
@@ -172,8 +175,17 @@ function parseInline(text: string, styleOnly = false): MessageSegment[] {
   while (i < len) {
     const rest = text.slice(i);
 
+    if (text[i] === '$' || text[i] === '\\') {
+      const math = matchLatex(text, i);
+      if (math) {
+        out.push({ type: 'latex', tex: math.tex, display: math.display });
+        i = math.end;
+        continue;
+      }
+    }
+
     // A backslash escapes the next character, so "\*not italic\*" reads literally.
-    if (text[i] === '\\' && i + 1 < len && /[*_~|`>#\\[\]()-]/.test(text[i + 1]!)) {
+    if (text[i] === '\\' && i + 1 < len && /[*_~|`>#\\[\]()$-]/.test(text[i + 1]!)) {
       pushText(text[i + 1]!);
       i += 2;
       continue;
@@ -311,7 +323,7 @@ function parseInline(text: string, styleOnly = false): MessageSegment[] {
       const c = text[j]!;
       if (
         c === '`' || c === '[' || c === '<' || c === '@' || c === '*' || c === '_' ||
-        c === '~' || c === '|' || c === '\\' ||
+        c === '~' || c === '|' || c === '\\' || c === '$' ||
         (c === 'h' && /^https?:\/\//i.test(text.slice(j))) ||
         (c === 'w' && /^www\./i.test(text.slice(j))) ||
         startsEmoji(text, j)
@@ -339,6 +351,42 @@ export function parseStyleOnlyContent(text: string): MessageSegment[] {
 /** Everything in a fenced block is literal, so fences are pulled out before anything else. */
 const FENCE = /^```([A-Za-z0-9+#._-]*)\n([\s\S]*?)```/;
 
+const BEGIN_DISPLAY_ENV = /^\\begin\{([A-Za-z]+\*?)\}/;
+
+function matchDisplayBlock(
+  lines: string[],
+  start: number
+): { tex: string; endLine: number; tail: string } | null {
+  const first = lines[start]!.trimStart();
+  const begin = first.match(BEGIN_DISPLAY_ENV);
+  const spec = first.startsWith('$$')
+    ? { open: '$$', close: '$$', keepOpen: false }
+    : first.startsWith('\\[')
+      ? { open: '\\[', close: '\\]', keepOpen: false }
+      : begin
+        ? { open: begin[0], close: `\\end{${begin[1]}}`, keepOpen: true }
+        : null;
+  if (!spec) return null;
+  const afterOpen = first.slice(spec.open.length);
+  // Closed on the opener's own line: inline content, not a block.
+  if (afterOpen.includes(spec.close)) return null;
+  const parts = [spec.keepOpen ? first : afterOpen];
+  for (let n = start + 1; n < lines.length; n++) {
+    const line = lines[n]!;
+    const at = line.indexOf(spec.close);
+    if (at === -1) {
+      parts.push(line);
+      continue;
+    }
+    parts.push(line.slice(0, at));
+    const body = parts.join('\n').trim();
+    if (!body) return null;
+    const tex = spec.keepOpen ? `${body}\n${spec.close}` : body;
+    return { tex, endLine: n, tail: line.slice(at + spec.close.length) };
+  }
+  return null;
+}
+
 /**
  * Parse message content into renderable segments.
  */
@@ -355,7 +403,15 @@ export function parseMessageContent(text: string): MessageSegment[] {
       break;
     }
     if (fenceAt > 0) out.push(...parseLines(rest.slice(0, fenceAt)));
-    out.push({ type: 'codeBlock', lang: fence[1]!.trim(), content: fence[2]!.replace(/\n$/, '') });
+    const lang = fence[1]!.trim();
+    const content = fence[2]!.replace(/\n$/, '');
+    if (/^(latex|tex)$/i.test(lang) && isLatexDocument(content)) {
+      out.push({ type: 'latexDocument', source: content });
+    } else if (/^(latex|tex|math)$/i.test(lang)) {
+      out.push({ type: 'latex', tex: content, display: true });
+    } else {
+      out.push({ type: 'codeBlock', lang, content });
+    }
     rest = rest.slice(fenceAt + fence[0]!.length);
   }
   return out;
@@ -372,6 +428,15 @@ function parseLines(text: string): MessageSegment[] {
     const newline = () => {
       if (!atEnd) out.push({ type: 'text', content: '\n' });
     };
+
+    const mathBlock = matchDisplayBlock(lines, n);
+    if (mathBlock) {
+      out.push({ type: 'latex', tex: mathBlock.tex, display: true });
+      n = mathBlock.endLine;
+      const tail = mathBlock.tail.trim();
+      if (tail) out.push({ type: 'text', content: ' ' }, ...parseInline(tail));
+      continue;
+    }
 
     // >>> quotes the whole rest of the message.
     if (QUOTE_BLOCK.test(line)) {
@@ -426,9 +491,23 @@ function parseLines(text: string): MessageSegment[] {
       continue;
     }
 
+    const bareMath = matchBareLatex(line);
+    if (bareMath) {
+      out.push({ type: 'latex', tex: bareMath, display: true });
+      continue;
+    }
+
     out.push(...parseInline(line));
     newline();
   }
 
+  return out;
+}
+
+export function collectLatexSegments(text: string): Array<{ tex: string; display: boolean }> {
+  const out: Array<{ tex: string; display: boolean }> = [];
+  walkSegments(parseMessageContent(text), (node) => {
+    if (node.type === 'latex') out.push({ tex: node.tex, display: node.display });
+  });
   return out;
 }

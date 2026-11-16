@@ -10,6 +10,7 @@ export interface EmptyStateProps {
   action?: JSX.Element;
   /** `page` fills a content column (big icon, heading); `inline` (default) is a compact dashed frame for lists. */
   size?: 'page' | 'inline';
+  align?: 'center' | 'start';
   class?: string;
 }
 
@@ -30,7 +31,11 @@ export const EmptyState: Component<EmptyStateProps> = (props) => (
       </div>
     }
   >
-    <div class={`flex flex-1 flex-col items-center justify-center p-8 text-center ${props.class ?? ''}`}>
+    <div
+      class={`flex flex-1 flex-col p-8 ${
+        props.align === 'start' ? 'items-start justify-start text-start' : 'items-center justify-center text-center'
+      } ${props.class ?? ''}`}
+    >
       <div class="mb-5 flex size-20 items-center justify-center rounded-full bg-muted/40 text-muted-foreground/70">
         <i class={`${props.icon} text-3xl`} aria-hidden="true" />
       </div>

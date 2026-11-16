@@ -372,6 +372,10 @@ export default {
       unnamed: 'unbenannt',
     },
   },
+  latex: {
+    preview: 'LaTeX-Vorschau',
+    error: 'Diese Formel enthält einen LaTeX-Fehler',
+  },
   composer: {
     mentionEveryone: 'Alle in diesem Raum benachrichtigen',
     slowmodeWait: 'Langsamer Modus ist an - warte {{seconds}} s bis zur nächsten Nachricht',
