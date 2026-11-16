@@ -46,6 +46,20 @@ const SERVER_MESSAGE_TO_KEY: Record<string, string> = {
   'please wait a minute before requesting another email': 'errors.api.emailCooldown',
   'that verification link is not valid or has expired': 'errors.api.emailTokenInvalid',
   'that password reset link is not valid or has expired': 'errors.api.resetTokenInvalid',
+  // Changing the account's email (auth/handler_email_change.go)
+  'that is already your email address': 'errors.api.emailUnchanged',
+  'a code from your authenticator app or a recovery code is required': 'errors.api.mfaRequired',
+  'too many failed attempts - try again in an hour': 'errors.api.reauthLocked',
+  'too many emails have been sent to that address - try again later': 'errors.api.emailTargetLimited',
+  'that email change link is not valid or has expired': 'errors.api.emailChangeTokenInvalid',
+  'this link is for a different account': 'errors.api.emailChangeWrongAccount',
+  'your email address changed after this link was sent': 'errors.api.emailChangeStale',
+  "another change to this account's email is in progress": 'errors.api.emailChangeBusy',
+  'there is no email change waiting to be confirmed': 'errors.api.noPendingEmailChange',
+  "only a signed-in person can change the account's email": 'errors.api.sessionRequired',
+  'email and password are required': 'errors.api.validationFailed',
+  'send code or recovery_code, not both': 'errors.api.validationFailed',
+  'token is required': 'auth.confirmEmail.missingToken',
   // Friend requests (relationships handler) and the handle lookup behind them
   'user not found': 'errors.api.userNotFound',
   'cannot send request to yourself': 'errors.api.friendRequestSelf',
@@ -175,6 +189,28 @@ const VERIFICATION_REQUIREMENT_KEY: Record<string, string> = {
   member_age: 'errors.api.verificationMemberAge',
 };
 
+/**
+ * Wire codes that mean one thing whatever the message says (the email change and its
+ * step-up). Looked up before the generic 429, since several of these are 429s that mean
+ * something the person can act on. `invalid_password` is sent only by step-ups (sign-in
+ * sends no code), so it can say "Incorrect password" rather than "Invalid email or password".
+ */
+const CODE_TO_KEY: Record<string, string> = {
+  invalid_password: 'errors.api.wrongPassword',
+  mfa_required: 'errors.api.mfaRequired',
+  reauth_locked: 'errors.api.reauthLocked',
+  email_target_limited: 'errors.api.emailTargetLimited',
+  email_unchanged: 'errors.api.emailUnchanged',
+  invalid_email: 'errors.validation.emailInvalid',
+  email_in_use: 'errors.api.emailInUse',
+  email_change_token_invalid: 'errors.api.emailChangeTokenInvalid',
+  email_change_wrong_account: 'errors.api.emailChangeWrongAccount',
+  email_change_stale: 'errors.api.emailChangeStale',
+  email_change_busy: 'errors.api.emailChangeBusy',
+  no_pending_email_change: 'errors.api.noPendingEmailChange',
+  session_required: 'errors.api.sessionRequired',
+};
+
 /** The server's one hierarchy refusal, worded for roles and members alike. */
 const ROLE_HIERARCHY_MESSAGE = 'cannot manage a role or member at or above your own highest role';
 
@@ -218,6 +254,9 @@ export function translateCaughtApiError(err: unknown, t: ErrorTranslateFn): stri
   // Likewise a 429 that means "one was just sent", not "slow down".
   if (isApiError(err) && err.code === 'email_cooldown') {
     return [t('errors.api.emailCooldown')];
+  }
+  if (isApiError(err) && err.code && Object.prototype.hasOwnProperty.call(CODE_TO_KEY, err.code)) {
+    return [t(CODE_TO_KEY[err.code])];
   }
   if (isApiError(err) && err.status === 429) {
     return [t('errors.api.rateLimited')];

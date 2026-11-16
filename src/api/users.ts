@@ -57,6 +57,58 @@ export function sendVerificationEmail() {
   return api<{ ok: true }>('/users/@me/email/verification', { method: 'POST' });
 }
 
+/** A change of address waiting for the link sent to the new one to be opened. */
+export interface PendingEmailChange {
+  /** The address that was asked for, in full (the person typed it). */
+  email: string;
+  /** RFC 3339, UTC. */
+  expires_at: string;
+}
+
+/**
+ * The account's address and any pending change, from `GET /users/@me/email` and every
+ * change route. Session only: bots and OAuth2 tokens are refused. The address never goes
+ * into AuthState.user - it stays out of the app-wide profile object.
+ */
+export interface EmailState {
+  email: string;
+  verified_email: boolean;
+  pending: PendingEmailChange | null;
+}
+
+export interface EmailChangeInput {
+  email: string;
+  /** The current password; every change re-authenticates. */
+  password: string;
+  /** An authenticator code, when the account has a second factor. */
+  code?: string;
+  /** Or a recovery code (consumed). Never both. */
+  recovery_code?: string;
+}
+
+export function getEmailState() {
+  return api<EmailState>('/users/@me/email');
+}
+
+/** 202 with `pending` set when the instance can send email (a link goes to the new address);
+ * 200 with the change already applied, unverified, when it cannot. */
+export function requestEmailChange(input: EmailChangeInput) {
+  return api<EmailState>('/users/@me/email', { method: 'POST', json: input });
+}
+
+export function resendEmailChange() {
+  return api<EmailState>('/users/@me/email/pending/resend', { method: 'POST' });
+}
+
+export function cancelEmailChange() {
+  return api<EmailState>('/users/@me/email/pending', { method: 'DELETE' });
+}
+
+/** Redeem the link's token. Needs the session of the account that asked for the change. */
+export function confirmEmailChange(token: string) {
+  return api<EmailState>('/users/@me/email/confirm', { method: 'POST', json: { token } });
+}
+
 export function patchMe(input: PatchMeInput) {
   return api<MeResponse>('/users/@me', { method: 'PATCH', json: input });
 }

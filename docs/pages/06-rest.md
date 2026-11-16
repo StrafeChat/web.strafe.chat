@@ -51,11 +51,65 @@ The authenticated account. `email` is present for sessions and bots (a bot's is 
 
 ### `PATCH` /users/@me
 
-Update the account's profile: `display_name`, `bio`, `about_me`, `pronouns` (free text, max 40 characters; `""` clears it), `birthday_opt_in` (`true` lets spaces celebrate the account's birthday - the server keeps the announcement index itself), `accent_color` (hex), `presence` (`{"status": "online" | "idle" | "dnd" | "invisible", "custom_status": "…"}` - `activities` is not set here but over the gateway). Avatar and banner are uploaded with `POST /users/@me/avatar` and `/users/@me/banner` (multipart `file`). The date of birth itself cannot be changed over the API.
+Update the account's profile: `display_name`, `bio`, `about_me`, `pronouns` (free text, max 40 characters; `""` clears it), `birthday_opt_in` (`true` lets spaces celebrate the account's birthday - the server keeps the announcement index itself), `accent_color` (hex), `presence` (`{"status": "online" | "idle" | "dnd" | "invisible", "custom_status": "…"}` - `activities` is not set here but over the gateway). Avatar and banner are uploaded with `POST /users/@me/avatar` and `/users/@me/banner` (multipart `file`). The date of birth itself cannot be changed over the API. The email address is not changed here; see [Email address](#email-address-session-only).
 
 ### `GET` /users/@me/spaces — *scope: spaces*
 
 The account's spaces with `owner` and its space-wide `permissions` there. See [OAuth2 › Listing the person's spaces](/docs/oauth2/#listing-the-persons-spaces).
+
+### Email address (session only)
+
+Reading and changing the account's own address. Only a person's session may call these: a bot token gets `403 session_required`, an OAuth2 token `403 insufficient_scope`. Every route answers the same object, with `Cache-Control: no-store`:
+
+```json
+{ "email": "jane@example.com", "verified_email": true, "pending": { "email": "jane@new.example", "expires_at": "2026-11-15T15:04:05Z" } }
+```
+
+`verified_email` means the same as on `GET /users/@me`. `pending` is `null` when no change is waiting; otherwise it is the address that was asked for, in full, and when the request lapses (RFC 3339, UTC).
+
+| Method and path | |
+| --- | --- |
+| `GET` /users/@me/email | The current state |
+| `POST` /users/@me/email `{"email", "password", "code"?, "recovery_code"?}` | Ask for a change. `202` with `pending` set on an instance that can send email; `200` with the change already applied (and `verified_email: false`) on one that cannot |
+| `POST` /users/@me/email/pending/resend | Send the confirmation again (`202`). The link that was sent before stops working |
+| `DELETE` /users/@me/email/pending | Cancel the pending change (`200`, `pending: null`). Answers `200` when nothing was pending, too |
+| `POST` /users/@me/email/confirm `{"token"}` | Redeem the token from the link (`200`, `pending: null`, `verified_email: true`). Confirming the same token again within the hour also answers `200` |
+
+How a change goes:
+
+- **With email on** (`features.email.enabled` on `GET /`), nothing changes until the link sent to the new address is opened while signed in to the same account (the link is `<instance>/confirm-email?token=…`; a client confirms with the token). The answer to the request is the same `202` whether or not the new address is free; if it belongs to another account, that address is told so and no link is issued.
+- An account has **at most one pending change**, and it lasts **1 hour**. A newer request replaces the older one, whose link stops working.
+- The old address is told that a change was asked for and, once confirmed, that it happened - with the new address masked (`j***@g***.com`), never in full.
+- **Without email**, the change applies as soon as the request is re-authenticated, and the new address is unverified. A taken address answers `409 email_in_use`.
+- **Re-authentication** on every request: `password`, plus either `code` (from the authenticator app) or `recovery_code` (consumed) when the account has two-factor authentication or a passkey. Passkeys cannot be used for this; an account with only passkeys sends a recovery code.
+- No session is signed out by a change.
+
+| Status | `code` | When |
+| --- | --- | --- |
+| 400 | `invalid_body` | `email` or `password` missing, both `code` and `recovery_code` sent, or no `token` |
+| 400 | `invalid_email` | Not a valid address |
+| 400 | `email_unchanged` | The new address is the current one |
+| 400 | `disposable_email` | The instance does not accept that domain |
+| 400 | `email_change_token_invalid` | The link is unknown, expired, replaced by a newer request, or cancelled |
+| 401 | `invalid_password` | Wrong password |
+| 401 | `invalid_code` | Wrong or reused authenticator code (or a code for an account without one) |
+| 401 | `invalid_recovery_code` | Unknown or used recovery code |
+| 403 | `mfa_required` | The account has a second factor and no code was sent |
+| 403 | `session_required` | Not a person's session (a bot token, the instance's own account) |
+| 403 | `email_change_wrong_account` | The link belongs to another account |
+| 403 | `insufficient_scope` | An OAuth2 token |
+| 404 | `no_pending_email_change` | Resend with nothing pending |
+| 409 | `email_in_use` | Without email: the address is taken. On confirm: it was claimed by someone else meanwhile |
+| 409 | `email_change_stale` | The account's address changed after the link was sent |
+| 409 | `email_change_busy` | Another change to the account's address is in progress; try again |
+| 429 | `email_cooldown` | One change mail a minute (request and resend share it) |
+| 429 | `email_target_limited` | Three change mails to one address an hour |
+| 429 | `reauth_locked` | Ten failed re-authentications in an hour |
+| 503 | `email_disabled` | Resend on an instance without email |
+
+Rate limits, per route (per IP / per account): `GET` 60 a minute / 30 a minute; request and resend 10 a minute / 5 per 15 minutes; cancel 30 a minute / 10 per 15 minutes; confirm 10 a minute / 10 per 15 minutes. Past one, the answer is `429` with `retry_after`.
+
+A change reaches the account's own sessions as [`USER_EMAIL_UPDATE`](/docs/gateway/#account).
 
 ## Spaces
 

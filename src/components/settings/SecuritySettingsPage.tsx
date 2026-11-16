@@ -1,5 +1,5 @@
 import type { Component } from 'solid-js';
-import { createSignal, onMount, For, Show, Switch, Match } from 'solid-js';
+import { createSignal, onCleanup, onMount, For, Show, Switch, Match } from 'solid-js';
 import QRCode from 'qrcode';
 import {
   getTwoFactorStatus,
@@ -13,21 +13,31 @@ import {
   type TwoFactorStatus,
 } from '../../api/twoFactor';
 import { createPasskey, webauthnSupported, isWebauthnCancellation, type PasskeyRegistrationResponse } from '../../lib/webauthn';
-import { getMe, sendVerificationEmail } from '../../api/users';
+import { sendVerificationEmail } from '../../api/users';
+import {
+  accountEmail,
+  cancelPendingEmailChange,
+  confirmPendingEmailChange,
+  currentAccountEmail,
+  loadAccountEmail,
+  resendPendingEmailChange,
+} from '../../stores/accountEmail';
+import { parseEmailChangeToken } from '../../lib/emailChange';
 import { instance, loadInstanceInfo } from '../../stores/instance';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { EmptyState } from '../ui/EmptyState';
 import { ResponsiveDialog } from '../ui/ResponsiveDialog';
 import { PasswordPromptDialog } from './PasswordPromptDialog';
+import { ChangeEmailDialog } from './ChangeEmailDialog';
 import { settingsRowShell, settingsRowIcon, settingsSectionTitle } from './settingsChrome';
 import { formatDate, t } from '../../i18n';
 import { translateCaughtApiError } from '../../lib/formatApiError';
 import { isDesktop } from '../../desktop/env';
 
 /**
- * Account → Security: TOTP authenticator app, passkeys/security keys, and the recovery
- * codes that back both up. Every mutation here is either a proof (a TOTP code, a passkey
+ * Account → Security: the account's email address (and changing it), TOTP authenticator
+ * app, passkeys/security keys, and the recovery codes that back both up. Every mutation here is either a proof (a TOTP code, a passkey
  * ceremony) or gated behind the account password, since this page changes what "prove you
  * are this account" means going forward.
  */
@@ -187,6 +197,73 @@ const PasskeyNameDialog: Component<{ onConfirm: (name: string) => void; onClose:
   );
 };
 
+/** "I have the link": the confirmation link pasted in, for a person whose link opened in
+ * another browser (or the desktop app's system browser). */
+const PasteEmailLinkDialog: Component<{ pendingEmail: string; onConfirmed: () => void; onClose: () => void }> = (props) => {
+  const [value, setValue] = createSignal('');
+  const [busy, setBusy] = createSignal(false);
+  const [error, setError] = createSignal('');
+
+  async function handleSubmit(e: Event) {
+    e.preventDefault();
+    setError('');
+    const token = parseEmailChangeToken(value());
+    if (!token) {
+      setError(t('settings.security.email.paste.invalid'));
+      return;
+    }
+    setBusy(true);
+    try {
+      await confirmPendingEmailChange(token);
+      setBusy(false);
+      props.onConfirmed();
+    } catch (err) {
+      setError(apiErrorText(err));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <ResponsiveDialog
+      size="sm"
+      onClose={props.onClose}
+      closeButton
+      dismissible={!busy()}
+      title={t('settings.security.email.paste.title')}
+      description={t('settings.security.email.paste.description', { email: props.pendingEmail })}
+      icon="fa-solid fa-link"
+    >
+      <form onSubmit={handleSubmit} class="space-y-3" novalidate>
+        <Input
+          type="url"
+          autocomplete="off"
+          label={t('settings.security.email.paste.label')}
+          placeholder={t('settings.security.email.paste.placeholder')}
+          value={value()}
+          onInput={(e) => {
+            setError('');
+            setValue(e.currentTarget.value);
+          }}
+          disabled={busy()}
+          autofocus
+        />
+        <Show when={error()}>
+          <p class="text-xs text-destructive">{error()}</p>
+        </Show>
+        <Button type="submit" class="w-full" loading={busy()}>
+          {t('settings.security.email.paste.submit')}
+        </Button>
+      </form>
+    </ResponsiveDialog>
+  );
+};
+
+/** Status lines for the email rows, after an action on this page. */
+type EmailNotice = '' | 'changed' | 'cancelled';
+
+/** Resend shares the server's one-a-minute cooldown with the request itself. */
+const RESEND_LOCK_MS = 60_000;
+
 type ActiveDialog =
   | { kind: 'totpSetup' }
   | { kind: 'disableTotp' }
@@ -194,6 +271,9 @@ type ActiveDialog =
   | { kind: 'regenerateCodes' }
   | { kind: 'recoveryCodes'; codes: string[] }
   | { kind: 'passkeyName'; credential: PasskeyRegistrationResponse }
+  | { kind: 'changeEmail' }
+  | { kind: 'changeEmailSent'; email: string }
+  | { kind: 'pasteEmailLink' }
   | null;
 
 export const SecuritySettingsPage: Component = () => {
@@ -204,22 +284,31 @@ export const SecuritySettingsPage: Component = () => {
   const [passkeyBusy, setPasskeyBusy] = createSignal(false);
   const [passkeyError, setPasskeyError] = createSignal('');
 
-  // The account's address and whether a link sent to it was ever opened. Shown only when
-  // the instance can send email at all - without that there is nothing to verify against.
-  const [emailInfo, setEmailInfo] = createSignal<{ email: string; verified: boolean } | null>(null);
+  // The account's address, whether a link sent to it was ever opened, and any change
+  // waiting for confirmation (stores/accountEmail; live through USER_EMAIL_UPDATE). The row
+  // shows whether or not the instance can send email - only verifying needs that.
+  const email = () => currentAccountEmail();
   const [sendState, setSendState] = createSignal<'idle' | 'sending' | 'sent'>('idle');
   const [sendError, setSendError] = createSignal('');
+  const [notice, setNotice] = createSignal<EmailNotice>('');
+  const [resendBusy, setResendBusy] = createSignal(false);
+  const [resendLocked, setResendLocked] = createSignal(false);
+  const [resendNotice, setResendNotice] = createSignal('');
+  const [resendError, setResendError] = createSignal(false);
+  const [cancelBusy, setCancelBusy] = createSignal(false);
+  let resendTimer: number | undefined;
+  onCleanup(() => window.clearTimeout(resendTimer));
 
-  async function loadEmail() {
-    void loadInstanceInfo();
-    try {
-      const me = await getMe();
-      if (me.email) setEmailInfo({ email: me.email, verified: me.verified_email === true });
-    } catch {
-      // The 2FA sections below do not depend on this; a failed load just hides the row.
-    }
+  function lockResend() {
+    window.clearTimeout(resendTimer);
+    setResendLocked(true);
+    resendTimer = window.setTimeout(() => setResendLocked(false), RESEND_LOCK_MS);
   }
-  onMount(() => void loadEmail());
+
+  onMount(() => {
+    void loadInstanceInfo();
+    void loadAccountEmail();
+  });
 
   async function handleSendVerification() {
     setSendError('');
@@ -231,6 +320,55 @@ export const SecuritySettingsPage: Component = () => {
       setSendError(apiErrorText(err));
       setSendState('idle');
     }
+  }
+
+  async function handleResend() {
+    setResendNotice('');
+    setResendError(false);
+    setResendBusy(true);
+    try {
+      await resendPendingEmailChange();
+      lockResend();
+      setResendNotice(t('settings.security.email.pending.resent'));
+    } catch (err) {
+      setResendError(true);
+      setResendNotice(apiErrorText(err));
+    } finally {
+      setResendBusy(false);
+    }
+  }
+
+  async function handleCancelChange() {
+    setResendNotice('');
+    setResendError(false);
+    setCancelBusy(true);
+    try {
+      await cancelPendingEmailChange();
+      setNotice('cancelled');
+    } catch (err) {
+      setResendError(true);
+      setResendNotice(apiErrorText(err));
+    } finally {
+      setCancelBusy(false);
+    }
+  }
+
+  /** The address moved (a direct change, or a pasted link): the old send state no longer
+   * describes it. */
+  function emailChanged() {
+    setSendState('idle');
+    setSendError('');
+    setResendNotice('');
+    setResendError(false);
+    setNotice('changed');
+  }
+
+  function emailHint(verified: boolean): string {
+    if (notice() === 'changed') return t('settings.security.email.change.changed');
+    if (notice() === 'cancelled') return t('settings.security.email.pending.cancelled');
+    if (!instance.email.enabled) return t('settings.security.email.noMailHint');
+    if (verified) return t('settings.security.email.verifiedHint');
+    return sendState() === 'sent' ? t('settings.security.email.sent') : t('settings.security.email.unverifiedHint');
   }
 
   async function refresh() {
@@ -273,48 +411,105 @@ export const SecuritySettingsPage: Component = () => {
 
   return (
     <div class="space-y-6">
-      <Show when={instance.email.enabled && emailInfo()}>
+      <Show when={email()?.email.includes('@') ? email() : null}>
         {(info) => (
           <section class="space-y-2">
             <h3 class={settingsSectionTitle}>{t('settings.security.email.sectionTitle')}</h3>
-            <div class={settingsRowShell}>
+            <div class={`${settingsRowShell} flex-wrap`}>
               <div class={settingsRowIcon}>
                 <i class="fa-solid fa-envelope" aria-hidden="true" />
               </div>
-              <div class="min-w-0 flex-1">
+              <div class="min-w-0 flex-1 basis-48">
                 {/* Wrap rather than truncate: the address is the one thing this row is about,
                     and beside the badge and button a narrow panel would cut it to "opt-17…". */}
                 <p class="flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-foreground">
                   <span class="break-all">{info().email}</span>
-                  <span
-                    class={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                      info().verified ? 'bg-emerald-500/15 text-emerald-500' : 'bg-amber-500/15 text-amber-500'
-                    }`}
-                  >
-                    {info().verified ? t('settings.security.email.verified') : t('settings.security.email.unverified')}
-                  </span>
+                  {/* Verification means something only where the instance can send the link. */}
+                  <Show when={instance.email.enabled}>
+                    <span
+                      class={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                        info().verified_email ? 'bg-emerald-500/15 text-emerald-500' : 'bg-amber-500/15 text-amber-500'
+                      }`}
+                    >
+                      {info().verified_email ? t('settings.security.email.verified') : t('settings.security.email.unverified')}
+                    </span>
+                  </Show>
                 </p>
                 <p class={`text-xs ${sendError() ? 'text-destructive' : 'text-muted-foreground'}`}>
-                  {sendError() ||
-                    (info().verified
-                      ? t('settings.security.email.verifiedHint')
-                      : sendState() === 'sent'
-                        ? t('settings.security.email.sent')
-                        : t('settings.security.email.unverifiedHint'))}
+                  {sendError() || emailHint(info().verified_email)}
                 </p>
               </div>
-              <Show when={!info().verified}>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  loading={sendState() === 'sending'}
-                  disabled={sendState() === 'sent'}
-                  onClick={() => void handleSendVerification()}
-                >
-                  {t('settings.security.email.send')}
-                </Button>
-              </Show>
+              <div class="flex flex-wrap items-center gap-2">
+                <Show when={instance.email.enabled && !info().verified_email && !info().pending}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    loading={sendState() === 'sending'}
+                    disabled={sendState() === 'sent'}
+                    onClick={() => void handleSendVerification()}
+                  >
+                    {t('settings.security.email.send')}
+                  </Button>
+                </Show>
+                <Show when={accountEmail.supported}>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={loading()}
+                    onClick={() => {
+                      setNotice('');
+                      setDialog({ kind: 'changeEmail' });
+                    }}
+                  >
+                    {t('settings.security.email.change.button')}
+                  </Button>
+                </Show>
+              </div>
             </div>
+            <Show when={info().pending}>
+              {(pending) => (
+                <div class={`${settingsRowShell} flex-wrap`}>
+                  <div class={settingsRowIcon}>
+                    <i class="fa-solid fa-clock" aria-hidden="true" />
+                  </div>
+                  <div class="min-w-0 flex-1 basis-48">
+                    <p class="text-sm font-medium text-foreground">{t('settings.security.email.pending.title')}</p>
+                    <p class="break-words text-xs text-muted-foreground">
+                      {t('settings.security.email.pending.body', {
+                        email: pending().email,
+                        time: formatDate(pending().expires_at, { timeStyle: 'short' }),
+                      })}
+                    </p>
+                    <Show when={resendNotice()}>
+                      <p class={`text-xs ${resendError() ? 'text-destructive' : 'text-muted-foreground'}`}>{resendNotice()}</p>
+                    </Show>
+                  </div>
+                  <div class="flex flex-wrap items-center gap-2">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      loading={resendBusy()}
+                      disabled={resendLocked() || cancelBusy()}
+                      onClick={() => void handleResend()}
+                    >
+                      {t('settings.security.email.pending.resend')}
+                    </Button>
+                    <Button size="sm" variant="outline" disabled={cancelBusy()} onClick={() => setDialog({ kind: 'pasteEmailLink' })}>
+                      {t('settings.security.email.pending.paste')}
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      class="text-destructive! hover:bg-destructive/10"
+                      loading={cancelBusy()}
+                      onClick={() => void handleCancelChange()}
+                    >
+                      {t('settings.security.email.pending.cancel')}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </Show>
           </section>
         )}
       </Show>
@@ -483,6 +678,57 @@ export const SecuritySettingsPage: Component = () => {
         </Match>
         <Match when={dialog()?.kind === 'recoveryCodes'}>
           <RecoveryCodesDialog codes={(dialog() as { kind: 'recoveryCodes'; codes: string[] }).codes} onClose={() => setDialog(null)} />
+        </Match>
+        <Match when={dialog()?.kind === 'changeEmail'}>
+          <ChangeEmailDialog
+            currentEmail={email()?.email ?? ''}
+            mailEnabled={instance.email.enabled}
+            totpEnabled={status()?.totp_enabled === true}
+            hasPasskeys={(status()?.webauthn_credentials.length ?? 0) > 0}
+            onDone={(state, sent) => {
+              if (sent && state.pending) {
+                // The request was a 202, which starts the same one-minute cooldown as a resend.
+                lockResend();
+                setResendNotice('');
+                setResendError(false);
+                setDialog({ kind: 'changeEmailSent', email: state.pending.email });
+              } else {
+                emailChanged();
+                setDialog(null);
+              }
+            }}
+            onClose={() => setDialog(null)}
+          />
+        </Match>
+        <Match when={dialog()?.kind === 'changeEmailSent'}>
+          <ResponsiveDialog
+            size="sm"
+            onClose={() => setDialog(null)}
+            closeButton
+            title={t('settings.security.email.change.sentTitle')}
+            icon="fa-solid fa-envelope-circle-check"
+          >
+            <div class="space-y-4">
+              <p class="break-words text-sm text-muted-foreground">
+                {t('settings.security.email.change.sentBody', {
+                  email: (dialog() as { kind: 'changeEmailSent'; email: string }).email,
+                })}
+              </p>
+              <Button type="button" class="w-full" onClick={() => setDialog(null)}>
+                {t('settings.security.email.change.done')}
+              </Button>
+            </div>
+          </ResponsiveDialog>
+        </Match>
+        <Match when={dialog()?.kind === 'pasteEmailLink'}>
+          <PasteEmailLinkDialog
+            pendingEmail={email()?.pending?.email ?? ''}
+            onConfirmed={() => {
+              emailChanged();
+              setDialog(null);
+            }}
+            onClose={() => setDialog(null)}
+          />
         </Match>
         <Match when={dialog()?.kind === 'passkeyName'}>
           {(() => {

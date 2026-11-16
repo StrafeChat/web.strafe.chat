@@ -10,6 +10,7 @@
     "lint": "eslint src",
     "typecheck": "tsc --noEmit",
     "docs:build": "node scripts/docs-plugin.mjs dist",
+    "check:i18n": "node scripts/check-i18n.mjs",
     "serve": "vite preview"
   },
   "license": "MIT",

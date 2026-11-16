@@ -123,6 +123,8 @@ A token can only reach the endpoints its scopes name. Every other endpoint answe
 | `spaces.join` | Lets a bot of yours add them to a space, without an invite | `PUT /spaces/:id/members/:user_id` (called by the bot) |
 | `bot` | Adds the application's bot to a space the person manages, with a chosen permission set | The consent page itself; see [Install links](/docs/applications/#install-links) |
 
+The address behind `email` can change: people change it from their settings, and administrators can too. Key the accounts you store on `id`, never on `email`, and read the address again from `GET /users/@me` when you need it.
+
 Any token may call `GET /oauth2/@me` to see what it is.
 
 > [!NOTE]

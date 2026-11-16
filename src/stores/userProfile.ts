@@ -1,9 +1,11 @@
 /**
  * USER_UPDATE — keep auth user, room participants, relationships, and space member lists in sync when profiles change.
+ * USER_EMAIL_UPDATE (self only) - the account's own address and its verification, via stores/accountEmail.
  */
 
 import { onStargateEvent } from '../services/stargate/client';
 import { auth, setAuthUser } from './auth';
+import { applyEmailUpdateEvent } from './accountEmail';
 import { setRelationships } from './relationships';
 import { setRooms } from './rooms';
 import { setSpaceMembers } from './spaceMembers';
@@ -26,6 +28,12 @@ function patchFromPayload(data: Record<string, unknown>): Partial<RoomParticipan
 
 export function initUserProfileHandler(): () => void {
   return onStargateEvent((event) => {
+    // Self-only (the account's own channel): the address moved or was verified. It is never
+    // inside USER_UPDATE, which fans out to friends, shared rooms and other instances.
+    if (event.t === 'USER_EMAIL_UPDATE') {
+      applyEmailUpdateEvent((event.d as { d?: unknown } | undefined)?.d ?? event.d);
+      return;
+    }
     if (event.t !== 'USER_UPDATE') return;
     const ep = event.d as { d?: Record<string, unknown> } | undefined;
     const data = ep?.d;

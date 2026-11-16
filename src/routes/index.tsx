@@ -17,6 +17,7 @@ import OAuthAuthorizePage from '../pages/OAuthAuthorizePage';
 import VerifyEmailPage from '../pages/VerifyEmailPage';
 import ForgotPasswordPage from '../pages/ForgotPasswordPage';
 import ResetPasswordPage from '../pages/ResetPasswordPage';
+import ConfirmEmailPage from '../pages/ConfirmEmailPage';
 import { StargateProvider } from '../components/StargateProvider';
 import { ConnectionStatusBanner } from '../components/ConnectionStatusBanner';
 import { UpdateAvailableBanner } from '../components/UpdateAvailableBanner';
@@ -118,6 +119,8 @@ export function AppRouter() {
       <Route path="/verify-email" component={VerifyEmailPage} />
       <Route path="/forgot-password" component={ForgotPasswordPage} />
       <Route path="/reset-password" component={ResetPasswordPage} />
+      {/* The link sent to a new address; it asks the visitor to sign in first if needed. */}
+      <Route path="/confirm-email" component={ConfirmEmailPage} />
       <Route path="/" component={Home}>
         <Route path="/" component={HomePage} />
         <Route path="/friends" component={FriendsPage} />
