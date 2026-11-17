@@ -39,7 +39,10 @@ import {
   setFederationPolicy,
   removeFederationPolicy,
   type PeerPolicyRow,
+  type AccountDeletionResult,
 } from '../api/instance';
+import { DeleteAccountDialog } from '../components/admin/DeleteAccountDialog';
+import { auth } from '../stores/auth';
 import { ProtectedRoute } from '../components/ProtectedRoute';
 import { DiscoverQueue } from '../components/admin/DiscoverQueue';
 import { AdminTabs, AdminFilterTabs } from '../components/admin/AdminTabs';
@@ -89,6 +92,8 @@ const chipOff = 'bg-muted/40 text-muted-foreground hover:bg-accent hover:text-fo
 const when = (iso?: string) => (iso ? formatDate(iso, { dateStyle: 'medium', timeStyle: 'short' }) || iso : '');
 const tag = (u: AdminUser | null | undefined) => (u ? formatHandle(u) : t('common.unknown'));
 const nameOf = (u: AdminUser | null | undefined) => u?.display_name || u?.username || t('common.unknown');
+/** A report's reporter or target that no longer resolves: its account was deleted. */
+const reportNameOf = (u: AdminUser | null | undefined) => (u ? nameOf(u) : t('admin.users.deletedAccount'));
 
 /**
  * The instance administrator's desk: find an account, see what it is doing here, keep it
@@ -333,6 +338,8 @@ const Users: Component<{ focusUser: string | null; onOpenReport: (id: string) =>
   const [searching, setSearching] = createSignal(false);
   const [searchError, setSearchError] = createSignal('');
   const [selected, setSelected] = createSignal<string | null>(props.focusUser);
+  /** The account just deleted from the panel: shown as a result card until another is picked. */
+  const [deletedResult, setDeletedResult] = createSignal<AccountDeletionResult | null>(null);
   // Follow the prop, not just seed from it: this panel is mounted under a plain <Show> on
   // the tab, so "open user" from a report while already on the Users tab changes
   // focusUser without remounting - and the one-shot seed above left the old user selected.
@@ -408,14 +415,68 @@ const Users: Component<{ focusUser: string | null; onOpenReport: (id: string) =>
       </div>
       <div>
         <Show when={selected()} fallback={<EmptyState icon="fa-users-viewfinder" title={t('admin.users.pickOne')} size="inline" />}>
-          {(id) => <UserPanel userId={id()} onOpenReport={props.onOpenReport} onOpenSpace={props.onOpenSpace} />}
+          {(id) => (
+            <Show
+              when={deletedResult()?.user_id === id() ? deletedResult() : null}
+              fallback={
+                <UserPanel
+                  userId={id()}
+                  onOpenReport={props.onOpenReport}
+                  onOpenSpace={props.onOpenSpace}
+                  onDeleted={(r) => {
+                    setDeletedResult(r);
+                    // The row would lead to a 404 now.
+                    setResults((list) => list.filter((u) => u.id !== r.user_id));
+                  }}
+                />
+              }
+            >
+              {(r) => <DeletedAccountCard result={r()} />}
+            </Show>
+          )}
         </Show>
       </div>
     </div>
   );
 };
 
-const UserPanel: Component<{ userId: string; onOpenReport: (id: string) => void; onOpenSpace: (id: string) => void }> = (props) => {
+/** What is left of an account after the panel deleted it: what went, and what did not go cleanly. */
+const DeletedAccountCard: Component<{ result: AccountDeletionResult }> = (props) => (
+  <div class={`${settingsGroupFrame} space-y-3`}>
+    <div class="flex items-center gap-2 text-sm font-medium text-primary">
+      <i class="fa-solid fa-circle-check" aria-hidden="true" />
+      {t(props.result.kind === 'bot' ? 'admin.users.delete.doneBot' : 'admin.users.delete.done', { username: props.result.username })}
+    </div>
+    <p class="text-xs text-muted-foreground">{t('admin.users.delete.doneHint')}</p>
+    <Show when={props.result.spaces_taken_down.length > 0}>
+      <div class="text-sm">
+        <span class="text-muted-foreground">{t('admin.users.delete.spacesTakenDown')}</span>{' '}
+        {props.result.spaces_taken_down.map((sp) => sp.name).join(', ')}
+      </div>
+    </Show>
+    <Show when={props.result.applications_deleted.length > 0}>
+      <div class="text-sm">
+        <span class="text-muted-foreground">{t('admin.users.delete.applicationsDeleted')}</span>{' '}
+        {props.result.applications_deleted.map((a) => a.name).join(', ')}
+      </div>
+    </Show>
+    <Show when={props.result.warnings.length > 0}>
+      <div class="space-y-1">
+        <div class="text-xs font-medium text-muted-foreground">{t('admin.users.delete.warnings')}</div>
+        <ul class="list-disc space-y-0.5 ps-5 text-xs text-muted-foreground">
+          <For each={props.result.warnings}>{(w) => <li>{w}</li>}</For>
+        </ul>
+      </div>
+    </Show>
+  </div>
+);
+
+const UserPanel: Component<{
+  userId: string;
+  onOpenReport: (id: string) => void;
+  onOpenSpace: (id: string) => void;
+  onDeleted: (result: AccountDeletionResult) => void;
+}> = (props) => {
   const [detailRes, { refetch }] = createResource(() => props.userId, (id) => getUserDetail(id));
   const detail = () => settledValue(detailRes);
   const [banOpen, setBanOpen] = createSignal(false);
@@ -431,6 +492,7 @@ const UserPanel: Component<{ userId: string; onOpenReport: (id: string) => void;
   const [noticeBusy, setNoticeBusy] = createSignal(false);
   const [noticeError, setNoticeError] = createSignal('');
   const [noticeSent, setNoticeSent] = createSignal(false);
+  const [deleteOpen, setDeleteOpen] = createSignal(false);
 
   createEffect(() => {
     const d = detail();
@@ -746,6 +808,40 @@ const UserPanel: Component<{ userId: string; onOpenReport: (id: string) => void;
             </Show>
           </section>
 
+          <Show when={!d().user.home_domain}>
+            <section class="space-y-2">
+              <div class={`${settingsSectionTitle} text-destructive`}>{t('admin.users.dangerZone')}</div>
+              <div class={`${settingsGroupFrame} flex flex-wrap items-center justify-between gap-3 border-destructive/40`}>
+                <Show
+                  when={localDeleteRefusal(d())}
+                  fallback={
+                    <>
+                      <p class="min-w-0 flex-1 text-xs text-muted-foreground">
+                        {t(d().user.bot ? 'admin.users.deleteBotHint' : 'admin.users.deleteAccountHint')}
+                      </p>
+                      <Button variant="destructive" size="sm" onClick={() => setDeleteOpen(true)}>
+                        <i class={`fa-solid ${d().user.bot ? 'fa-robot' : 'fa-user-xmark'} text-xs`} aria-hidden="true" />{' '}
+                        {t(d().user.bot ? 'admin.users.deleteBot' : 'admin.users.deleteAccount')}
+                      </Button>
+                    </>
+                  }
+                >
+                  {(why) => <p class="text-xs text-muted-foreground">{t(`admin.users.deleteRefused.${why()}`)}</p>}
+                </Show>
+              </div>
+            </section>
+          </Show>
+
+          <DeleteAccountDialog
+            user={deleteOpen() ? d().user : null}
+            banned={!!d().ban}
+            onClose={() => setDeleteOpen(false)}
+            onDeleted={(r) => {
+              setDeleteOpen(false);
+              props.onDeleted(r);
+            }}
+            onOpenSpace={props.onOpenSpace}
+          />
           <BanDialog
             user={banOpen() ? d().user : null}
             sessionCount={d().sessions.length}
@@ -768,6 +864,15 @@ const UserPanel: Component<{ userId: string; onOpenReport: (id: string) => void;
     </Show>
   );
 };
+
+/** The refusals the panel can tell without asking (the dialog's preview has the server's word,
+ * including the official account): yourself, and another administrator - who must first be
+ * demoted, which today means INSTANCE_ADMINS or the database. */
+function localDeleteRefusal(d: UserDetail): 'self' | 'admin' | null {
+  if (d.user.id === auth.user?.id) return 'self';
+  if (d.instance_admin) return 'admin';
+  return null;
+}
 
 const BanDialog: Component<{ user: AdminUser | null; sessionCount: number; onClose: () => void; onBanned: () => void }> = (props) => {
   const [reason, setReason] = createSignal('');
@@ -928,7 +1033,7 @@ const Reports: Component<{ focusReport: string | null; onOpenUser: (id: string) 
   });
 
   const targetLabel = (r: ReportRow) =>
-    r.report.target_type === 'user' ? nameOf(r.target_user) : r.target_space?.name || t('admin.space.gone');
+    r.report.target_type === 'user' ? reportNameOf(r.target_user) : r.target_space?.name || t('admin.space.gone');
 
   return (
     <div class="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
@@ -968,7 +1073,7 @@ const Reports: Component<{ focusReport: string | null; onOpenUser: (id: string) 
                           <span class="truncate text-sm font-medium">{targetLabel(r)}</span>
                         </div>
                         <div class="truncate text-xs text-muted-foreground">
-                          {t('admin.reports.by', { name: nameOf(r.reporter) })} · {when(r.report.created_at)}
+                          {t('admin.reports.by', { name: reportNameOf(r.reporter) })} · {when(r.report.created_at)}
                         </div>
                       </div>
                       <Show when={selected() === r.report.id}>
@@ -1046,7 +1151,7 @@ const ReportPanel: Component<{ reportId: string; onOpenUser: (id: string) => voi
                 <dt class="text-muted-foreground">{t('admin.reports.reporter')}:</dt>
                 <dd>
                   <button type="button" class="text-primary hover:underline" onClick={() => d().reporter && props.onOpenUser(d().reporter!.id)}>
-                    {nameOf(d().reporter)} <span class="text-muted-foreground">{tag(d().reporter)}</span>
+                    {reportNameOf(d().reporter)} <Show when={d().reporter}><span class="text-muted-foreground">{tag(d().reporter)}</span></Show>
                   </button>
                 </dd>
               </div>
@@ -1062,7 +1167,7 @@ const ReportPanel: Component<{ reportId: string; onOpenUser: (id: string) => voi
                     }
                   >
                     <button type="button" class="text-primary hover:underline" onClick={() => props.onOpenUser(d().report.target_id)}>
-                      {nameOf(d().target_user)} <span class="text-muted-foreground">{tag(d().target_user)}</span>
+                      {reportNameOf(d().target_user)} <Show when={d().target_user}><span class="text-muted-foreground">{tag(d().target_user)}</span></Show>
                     </button>
                   </Show>
                 </dd>
@@ -1332,6 +1437,9 @@ const AUDIT_ICON: Record<string, string> = {
   discover_approve: 'fa-compass',
   discover_deny: 'fa-compass',
   discover_remove: 'fa-compass',
+  user_delete: 'fa-user-xmark',
+  bot_delete: 'fa-robot',
+  application_delete: 'fa-cube',
 };
 
 const Audit: Component<{ onOpenUser: (id: string) => void }> = (props) => {
@@ -1360,7 +1468,7 @@ const Audit: Component<{ onOpenUser: (id: string) => void }> = (props) => {
                   <div class={`${settingsRowShell} min-w-0 flex-1`}>
                     <div class="min-w-0 flex-1">
                       <div class="truncate text-sm">
-                        <button type="button" class="font-medium hover:underline" onClick={() => props.onOpenUser(row.entry.actor_id)}>{nameOf(row.actor)}</button>{' '}
+                        <button type="button" class="font-medium hover:underline" onClick={() => props.onOpenUser(row.entry.actor_id)}>{reportNameOf(row.actor)}</button>{' '}
                         {t(`admin.audit.actions.${row.entry.action}`, { defaultValue: row.entry.action })}
                         <Show when={row.entry.target_type === 'user' && row.entry.target_id !== '0'}>
                           {' '}<button type="button" class="font-mono text-xs text-primary hover:underline" onClick={() => props.onOpenUser(row.entry.target_id)}>{row.entry.target_id}</button>

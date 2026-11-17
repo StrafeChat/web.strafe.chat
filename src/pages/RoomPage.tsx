@@ -124,6 +124,9 @@ const RoomPage: Component = () => {
   const pmOtherUserId = createMemo(() => pmOther()?.id);
   /** A 1:1 DM with the instance's official account is one-way: no replying. */
   const isOfficialDM = createMemo(() => room()?.type === 1 && pmOther()?.system === true);
+  /** A 1:1 PM whose other account was deleted: history stays readable, nothing new goes in
+   * (the server refuses sends and calls there too). */
+  const isDeletedPartnerPM = createMemo(() => room()?.type === 1 && pmOther()?.deleted === true);
   const name = () => {
     const r = room();
     return r && auth.user?.id ? roomDisplayName(r, auth.user.id) : t('room.conversation');
@@ -155,7 +158,8 @@ const RoomPage: Component = () => {
       (r.type === 1 || r.type === 2) &&
       !!auth.user?.id &&
       !isNotesRoom(r, auth.user.id) &&
-      !isOfficialDM()
+      !isOfficialDM() &&
+      !isDeletedPartnerPM()
     );
   };
   const callActive = () => !!voice.calls[params.roomId] || voiceStatesForRoom(params.roomId).length > 0;
@@ -465,7 +469,7 @@ const RoomPage: Component = () => {
         name={name()}
         bot={room()?.type === 1 && pmOther()?.bot === true}
         system={isOfficialDM()}
-        pmOtherUserId={pmOtherUserId()}
+        pmOtherUserId={isDeletedPartnerPM() ? undefined : pmOtherUserId()}
         e2ee={room()?.type === 1 || (room()?.type === 2 && room()?.e2ee_enabled !== false)}
         isGroup={room()?.type === 2}
         messageCompact={!!settings.messageCompact}
@@ -576,8 +580,10 @@ const RoomPage: Component = () => {
               draft={draft()}
               onInput={onInput}
               onSubmit={handleSubmit}
-              placeholder={isOfficialDM() ? t('room.officialReadOnly') : inputPlaceholder()}
-              disabled={isOfficialDM()}
+              placeholder={
+                isDeletedPartnerPM() ? t('room.recipientDeleted') : isOfficialDM() ? t('room.officialReadOnly') : inputPlaceholder()
+              }
+              disabled={isOfficialDM() || isDeletedPartnerPM()}
               sending={isSending()}
               inputRef={setInputRef}
               typingUsers={typingUsers()}

@@ -375,6 +375,7 @@ const MemberRow: Component<{
         const extraItems = buildSpaceModerationItems(moderationContext());
         const items = buildUserMenuItems({
           userId: props.p.id,
+          deleted: props.p.deleted,
           bot: props.p.bot,
           username: props.p.username,
           displayName: displayName(),

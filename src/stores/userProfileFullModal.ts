@@ -30,6 +30,8 @@ export type UserProfileFullSubject = {
   publicFlags?: number;
   bot?: boolean;
   system?: boolean;
+  /** A deleted account (only Copy ID is offered). */
+  deleted?: boolean;
 };
 
 type State = {

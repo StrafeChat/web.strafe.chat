@@ -29,6 +29,8 @@ export interface ProfileBase {
   about_me?: string | null;
   bio?: string | null;
   pronouns?: string | null;
+  /** A deleted account's placeholder: shown as "Deleted User", with no picture or profile. */
+  deleted?: boolean;
 }
 
 export interface ResolvedProfile {
@@ -46,6 +48,8 @@ export interface ResolvedProfile {
   pronouns?: string;
   /** Some space field (nick or space_*) overrode the global profile. */
   hasSpaceProfile: boolean;
+  /** The account was deleted: `name` is "Deleted User" and nothing else is set. */
+  deleted?: boolean;
 }
 
 /** The overlay argument. Typed as `SpaceProfileFields & ProfileBase` rather than the bare
@@ -68,6 +72,13 @@ export function resolveProfile(
   space?: SpaceOverlay | null,
   fallback?: string
 ): ResolvedProfile {
+  // A deleted account has no name, picture or space profile left - a stale member row's
+  // nickname must not outlive it either. Its username is empty on the wire, so nothing can
+  // tokenize a mention to it or confuse it with whoever registers the name next.
+  if (base?.deleted) {
+    const name = t('common.deletedUser');
+    return { name, globalName: name, username: '', hasSpaceProfile: false, deleted: true };
+  }
   const fb = fallback ?? t('common.unknown');
   const nick = present(space?.nick);
   const globalName = present(base?.display_name) ?? present(base?.username) ?? fb;

@@ -77,6 +77,8 @@ export type UserProfilePopoverSubject = {
   publicFlags?: number;
   bot?: boolean;
   system?: boolean;
+  /** A deleted account: the card shows "Deleted User" and offers only Copy ID. */
+  deleted?: boolean;
 };
 
 const POPOVER_WIDTH = 320;
@@ -194,6 +196,8 @@ export function openUserProfilePopover(opts: {
   const rect = toAnchorRect(opts.anchor.getBoundingClientRect());
   const left = computeHorizontal(rect);
   const top = computeVertical(rect, FALLBACK_HEIGHT);
+  // Nothing can be done to a deleted account - no message, roles, nickname or moderation.
+  const deleted = opts.subject.deleted === true;
   setUserProfilePopover({
     open: true,
     subject: opts.subject,
@@ -201,9 +205,9 @@ export function openUserProfilePopover(opts: {
     top,
     anchor: rect,
     currentUserId: opts.currentUserId,
-    onMessageUser: opts.onMessageUser,
-    spaceRoleContext: opts.spaceRoleContext ?? null,
-    spaceModerationContext: opts.spaceModerationContext ?? null,
+    onMessageUser: deleted ? undefined : opts.onMessageUser,
+    spaceRoleContext: deleted ? null : (opts.spaceRoleContext ?? null),
+    spaceModerationContext: deleted ? null : (opts.spaceModerationContext ?? null),
   });
 }
 

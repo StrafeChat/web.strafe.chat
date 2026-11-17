@@ -213,6 +213,7 @@ function roomFromPayload(payload: unknown): Room | null {
         ...(p.system === true ? { system: true } : {}),
         ...(typeof p.home_domain === 'string' ? { home_domain: p.home_domain } : {}),
         ...(p.origin_id != null ? { origin_id: String(p.origin_id) } : {}),
+        ...(p.deleted === true ? { deleted: true } : {}),
       }))
     : undefined;
   const fed = d.federation as { origin_domain?: unknown; origin_id?: unknown } | undefined;
@@ -258,12 +259,30 @@ export function initRoomHandlers(): () => void {
   });
 }
 
-/** True if room is a notes room (self-PM, single participant). */
+/** True if room is a notes room (self-PM, single participant). The type and recipient checks
+ * are defence in depth: a 1:1 PM whose partner was deleted keeps both participants (the
+ * partner as a "Deleted User" placeholder), but were that placeholder ever missing the PM
+ * would otherwise turn into the survivor's Notes - wrong title, and sends down the notes path. */
 export function isNotesRoom(room: Room, currentUserId: string): boolean {
   return (
+    room.type === 1 &&
+    (room.recipients?.length ?? 0) <= 1 &&
     room.participants?.length === 1 &&
     room.participants[0]?.id === currentUserId
   );
+}
+
+/** A 1:1 PM whose other participant's account was deleted: read-only, no calls. */
+export function isPmWithDeletedUser(room: Room | undefined, currentUserId: string | undefined): boolean {
+  if (!room || room.type !== 1 || !currentUserId) return false;
+  return !!room.participants?.some((p) => p.id !== currentUserId && p.deleted);
+}
+
+/** A participant's name outside a space: "Deleted User" for a deleted account, else display
+ * name, else username. */
+function participantLabel(p: RoomParticipant): string {
+  if (p.deleted) return t('common.deletedUser');
+  return p.display_name || p.username || t('common.unknown');
 }
 
 /** Display name: room name, or for groups with no name the list of other members, or for PM the other user, or "Notes" for self-PM */
@@ -272,10 +291,10 @@ export function roomDisplayName(room: Room, currentUserId: string): string {
   if (room.participants?.length) {
     const others = room.participants.filter((p) => p.id !== currentUserId);
     if (others.length > 1) {
-      return others.map((p) => p.display_name || p.username || t('common.unknown')).join(', ');
+      return others.map(participantLabel).join(', ');
     }
     if (others.length === 1) {
-      return others[0]!.display_name || others[0]!.username || t('common.unknown');
+      return participantLabel(others[0]!);
     }
     if (room.participants.length === 1 && room.participants[0]!.id === currentUserId) {
       return t('nav.notes');

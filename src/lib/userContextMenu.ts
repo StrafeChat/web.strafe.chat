@@ -29,6 +29,9 @@ export interface UserMenuContext {
   roomId?: string;
   /** Context-specific actions (kick / ban / remove from group) appended after the universal ones. */
   extraItems?: ContextMenuItem[];
+  /** A deleted account: only its id is left to copy - no message, friend, block, report or
+   * moderation, and no username (it is empty, and the name may belong to someone new). */
+  deleted?: boolean;
 }
 
 /**
@@ -40,6 +43,15 @@ export interface UserMenuContext {
  */
 export function buildUserMenuItems(ctx: UserMenuContext): ContextMenuItem[] {
   const isSelf = !!ctx.currentUserId && ctx.userId === ctx.currentUserId;
+  if (ctx.deleted && !isSelf) {
+    return [
+      {
+        label: t('userArea.copyUserId'),
+        icon: 'fa-id-card',
+        onClick: () => void navigator.clipboard?.writeText(ctx.userId),
+      },
+    ];
+  }
   const rel = relationshipType(ctx.userId);
   const items: ContextMenuItem[] = [];
 

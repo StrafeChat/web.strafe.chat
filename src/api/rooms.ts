@@ -27,6 +27,11 @@ export interface RoomParticipant {
    * instance federates; equals this instance/`id` for local users). */
   home_domain?: string;
   origin_id?: string;
+  /** The account was deleted by an instance administrator. The server sends a placeholder
+   * (`{id, deleted: true}` with an empty username, display name and avatar) for message
+   * authors, mentions and PM participants, so it renders as "Deleted User" and can never
+   * resolve to a new account that took the name. */
+  deleted?: boolean;
 }
 
 /** A room's global identity across instances (set on rooms that span instances). */

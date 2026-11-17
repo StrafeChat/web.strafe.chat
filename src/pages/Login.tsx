@@ -38,7 +38,7 @@ import { redirectQuery, safeRedirectPath } from '../components/auth/authRedirect
 export default function Login() {
   const [t] = useReactiveTranslate();
   const navigate = useNavigate();
-  // ?reason=banned|revoked: set by the gateway handler that signed us out. Read once;
+  // ?reason=banned|revoked|deleted: set by the gateway handler that signed us out. Read once;
   // it is a one-line explanation, not state.
   // ?redirect=<path>: where the person was going when a page sent them here to sign in (an
   // invite, the OAuth consent page). Same-site paths only; see safeRedirectPath.
@@ -53,7 +53,9 @@ export default function Login() {
       ? t('auth.login.bannedNotice')
       : params.reason === 'revoked'
         ? t('auth.login.revokedNotice')
-        : '';
+        : params.reason === 'deleted'
+          ? t('auth.login.deletedNotice')
+          : '';
   const [email, setEmail] = createSignal('');
   const [password, setPassword] = createSignal('');
   const [errorLines, setErrorLines] = createSignal<string[]>([]);

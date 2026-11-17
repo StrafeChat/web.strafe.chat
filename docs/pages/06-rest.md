@@ -37,6 +37,16 @@ The authenticated account. `email` is present for sessions and bots (a bot's is 
 
 `pronouns` is free text (max 40 characters) and is public, like the bio - it rides along on every user object (message authors, `mention_users`, space members, relationships). `birthday` is `"MM-DD"` with no year, derived from the date of birth given at registration, and `birthday_opt_in` says whether the account wants it announced in spaces. The owner's own `birthday` is returned whether or not they opted in so their settings can show it; on other people's user objects both `birthday` and `is_birthday` appear only after they opt in.
 
+### Deleted accounts
+
+An instance administrator can delete an account or a bot for good. Its username and email address are free again at once, but what it wrote stays: its messages, reactions and pins keep their `sender_id`, and wherever a user object for it is still embedded - a message's `author`, `mention_users`, a `referenced_message`'s author, a PM's `participants` - the server sends a placeholder instead:
+
+```json
+{ "id": "…", "username": "", "display_name": "", "avatar": "", "bot": false, "system": false, "deleted": true }
+```
+
+`deleted` is present (and `true`) only on that placeholder. Show it as "Deleted User", and never resolve it to an account by name: the username is empty on purpose, because someone else may register the old one and get a new id. Ids are never reused. A deleted account is no longer in any member list, friend list or group PM. A 1:1 PM with it stays readable, but sending (or calling) there answers `403` `this account no longer exists` (`code: "recipient_deleted"`). On another instance the account's copy is kept as a blank placeholder in the same way.
+
 ### The presence object
 
 ```json
@@ -303,6 +313,8 @@ Any room the account can see, space rooms included - a space room is listed only
 
 Open a PM: `{"recipient_id": "…"}` (or `recipient_handle: "name"`), or a group: `{"name", "recipient_ids": [...]}`. Returns the room. PMs are end-to-end encrypted by default, so a bot can open one but cannot read it until the person turns encryption off for that PM.
 
+A PM whose other account was [deleted](#deleted-accounts) keeps both participants - the other one as the `deleted` placeholder - so it never turns into a one-person room. It is read-only: messages answer `403` with `"code": "recipient_deleted"`.
+
 ### `POST` /rooms/:id/typing
 
 Broadcast a typing indicator (rate limited to one per 5 s per room).
@@ -374,7 +386,7 @@ In a space hosted on another instance, that instance answers this, `GET /rooms/:
 
 ### `POST` /rooms/:id/messages — *Send Messages*
 
-See [Bots › Sending messages](/docs/bots/#sending-messages). `201` with the message. `embeds` (bots only, plain rooms only) also needs **Embed Links** in a space room; the object and its errors are on the [Embeds](/docs/embeds/) page.
+See [Bots › Sending messages](/docs/bots/#sending-messages). `201` with the message. `embeds` (bots only, plain rooms only) also needs **Embed Links** in a space room; the object and its errors are on the [Embeds](/docs/embeds/) page. In a PM whose other account was deleted: `403` `this account no longer exists` (`code: "recipient_deleted"`).
 
 ### `PATCH` /rooms/:id/messages/:msg_id
 
@@ -489,7 +501,7 @@ The end-to-end encryption key backup (`m.megolm_backup.v1.curve25519-aes-sha2`, 
 | --- | --- |
 | `400` | Invalid JSON, a missing or invalid field, an id that is not a snowflake; OAuth2 `invalid_*` errors. A refused embed adds `"code": "invalid_embed"` and the `path` of the field, e.g. `"embeds[0].fields[3].value"` ([Embeds › Errors](/docs/embeds/#errors)) |
 | `401` | No credential, or an invalid / expired / reset one |
-| `403` | Not a member, missing permission, role hierarchy, banned, or an OAuth2 token without the needed scope (`insufficient_scope`) |
+| `403` | Not a member, missing permission, role hierarchy, banned, an OAuth2 token without the needed scope (`insufficient_scope`), or a PM whose other account was deleted (`recipient_deleted`) |
 | `404` | No such space / room / message / role, or one you cannot see |
 | `409` | A conflict (an application that already has a bot, the application limit) |
 | `429` | Rate limited or slowmode; see below |

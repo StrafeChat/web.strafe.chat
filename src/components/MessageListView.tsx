@@ -346,6 +346,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
     const participant = resolvedParticipants()?.find((x) => x.id === userId);
     const items = buildUserMenuItems({
       userId,
+      deleted: s.deleted,
       bot: s.bot,
       username: s.username || '',
       displayName: s.name,

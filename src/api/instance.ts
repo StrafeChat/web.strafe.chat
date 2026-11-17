@@ -148,7 +148,7 @@ export interface Report {
   created_at: string;
   resolved_by?: string;
   resolved_at?: string;
-  resolution?: 'none' | 'banned' | 'space_removed';
+  resolution?: 'none' | 'banned' | 'space_removed' | 'account_deleted';
   resolution_note?: string;
 }
 
@@ -255,6 +255,95 @@ export function setUserBadges(userId: string, flags: number) {
     method: 'PATCH',
     json: { flags },
   });
+}
+
+// ---- account deletion ------------------------------------------------------------------
+
+/** Why an account cannot be deleted at all; the dashboard shows the reason instead of a button. */
+export type DeletionRefusal = 'self' | 'system' | 'admin' | 'remote';
+
+export interface DeletionOwnedSpace {
+  id: string;
+  name: string;
+  member_count: number;
+  /** null for a space hosted here (can be taken down with the deletion); another instance's
+   * domain for one hosted there, which blocks the deletion until it is transferred. */
+  hosted_on: string | null;
+}
+
+export interface DeletionOwnedApplication {
+  id: string;
+  name: string;
+  /** Absent when the application has no bot. */
+  bot_user_id?: string | null;
+  bot_username?: string | null;
+  /** How many spaces its bot is installed in. */
+  bot_space_count?: number;
+}
+
+export interface DeletionBlockers {
+  owned_spaces: DeletionOwnedSpace[];
+  owned_applications: DeletionOwnedApplication[];
+}
+
+/** What a deletion removes (preview) or removed (result). Messages are not counted: they stay. */
+export interface DeletionCounts {
+  sessions: number;
+  devices: number;
+  spaces: number;
+  friends: number;
+  pending_requests: number;
+  group_pms: number;
+  pms: number;
+  authorized_apps: number;
+  push_subscriptions: number;
+  open_reports_about: number;
+  remote_instances: number;
+}
+
+export interface AccountDeletionPreview {
+  user: AdminUser;
+  kind: 'user' | 'bot';
+  refusal: DeletionRefusal | null;
+  blockers: DeletionBlockers;
+  /** For a bot: its application, or `orphan: true` when the application is already gone. */
+  application: { id: string | null; name: string | null; owner: AdminUser | null; orphan: boolean } | null;
+  counts: Partial<DeletionCounts>;
+}
+
+export interface AccountDeletionInput {
+  /** Must equal the account's username exactly (case-sensitive); the server checks too. */
+  confirm_username: string;
+  /** Take down the spaces it owns here (otherwise they block the deletion). */
+  take_down_spaces: boolean;
+  /** Delete the applications it owns, and their bots (otherwise they block the deletion). */
+  delete_applications: boolean;
+}
+
+export interface AccountDeletionResult {
+  deleted: true;
+  user_id: string;
+  username: string;
+  kind: 'user' | 'bot';
+  counts: Partial<DeletionCounts>;
+  spaces_taken_down: { id: string; name: string }[];
+  applications_deleted: { id: string; name: string; bot_user_id?: string | null }[];
+  /** Steps that did not complete cleanly (a peer unreachable, ...); the deletion stands. */
+  warnings: string[];
+}
+
+/** Admin: what deleting this account would remove, and what stands in the way. */
+export function getAccountDeletionPreview(userId: string) {
+  return api<AccountDeletionPreview>(`/instance/users/${encodeURIComponent(userId)}/deletion-preview`);
+}
+
+/**
+ * Admin: delete a local account or bot for good - its username and email are free again the
+ * moment this returns. Its messages stay and show as "Deleted User". A 409 with code
+ * `blocked` carries fresh `blockers` in the error body.
+ */
+export function deleteAccount(userId: string, input: AccountDeletionInput) {
+  return api<AccountDeletionResult>(`/instance/users/${encodeURIComponent(userId)}`, { method: 'DELETE', json: input });
 }
 
 export function listBans() {

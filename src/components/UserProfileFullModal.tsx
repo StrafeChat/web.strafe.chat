@@ -76,6 +76,7 @@ export const UserProfileFullModal: Component = () => {
       e,
       buildUserMenuItems({
         userId: s.userId,
+        deleted: s.deleted,
         username: s.username,
         displayName: s.displayName,
         homeDomain: s.homeDomain,

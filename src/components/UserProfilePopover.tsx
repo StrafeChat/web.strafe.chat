@@ -353,7 +353,7 @@ export const UserProfilePopover: Component = () => {
     const extraItems: ContextMenuItem[] = [];
     const moderation = userProfilePopover.spaceModerationContext;
     if (moderation) extraItems.push(...buildSpaceModerationItems(moderation));
-    if (!isSelf()) {
+    if (!isSelf() && !s.deleted) {
       extraItems.push({
         label: t('safety.title'),
         icon: 'fa-shield-halved',
@@ -363,6 +363,7 @@ export const UserProfilePopover: Component = () => {
     const onMessageUser = userProfilePopover.onMessageUser;
     const items = buildUserMenuItems({
       userId: s.userId,
+      deleted: s.deleted,
       username: s.username,
       displayName: s.displayName,
       homeDomain: s.homeDomain,
@@ -419,7 +420,8 @@ export const UserProfilePopover: Component = () => {
 
   function viewFullProfile() {
     const s = subject();
-    if (!s) return;
+    // A deleted account has no profile left to open.
+    if (!s || s.deleted) return;
     openUserProfileFullModal(
       {
         userId: s.userId,
@@ -530,8 +532,9 @@ export const UserProfilePopover: Component = () => {
                 <button
                   type="button"
                   onClick={viewFullProfile}
-                  aria-label={t('profile.viewFull')}
-                  data-tooltip={t('profile.viewFull')}
+                  disabled={subject()?.deleted === true}
+                  aria-label={subject()?.deleted ? subject()!.displayName : t('profile.viewFull')}
+                  data-tooltip={subject()?.deleted ? undefined : t('profile.viewFull')}
                   class="group/avatar relative inline-block rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <MessageAvatar
@@ -561,7 +564,7 @@ export const UserProfilePopover: Component = () => {
                   pronouns={subject()!.pronouns}
                   isBirthday={subject()!.birthdayToday}
                   nameColor={subject()!.nameColor}
-                  onOpenProfile={viewFullProfile}
+                  onOpenProfile={subject()?.deleted ? undefined : viewFullProfile}
                   openProfileLabel={t('profile.viewFull')}
                 />
               </div>

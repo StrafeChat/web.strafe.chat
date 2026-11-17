@@ -342,7 +342,11 @@ export const DevelopersSettingsPage: Component = () => {
     if (!app) return;
     const ok = await confirmDialog({
       title: t('settings.developers.deleteApp'),
-      body: t('settings.developers.deleteConfirm', { name: app.name }),
+      // Deleting an application deletes its bot account with it: it leaves every space and its
+      // username is free for anyone again - say so before it happens.
+      body: app.has_bot
+        ? t('settings.developers.deleteConfirmBot', { name: app.name, bot: app.bot?.username || app.name })
+        : t('settings.developers.deleteConfirm', { name: app.name }),
       confirmLabel: t('settings.developers.deleteApp'),
       tone: 'danger',
     });

@@ -100,6 +100,7 @@ export function popoverSubjectFromParticipant(
     publicFlags: p.public_flags,
     bot: p.bot,
     system: p.system,
+    ...(r.deleted ? { deleted: true } : {}),
   };
 }
 
@@ -121,7 +122,7 @@ export function popoverSubjectFromSender(
     displayName: s.name,
     ...(s.globalName && s.globalName !== s.name ? { globalName: s.globalName } : {}),
     ...(opts?.spaceId ? { spaceId: opts.spaceId } : {}),
-    username: s.username || t('common.unknown').toLowerCase(),
+    username: s.deleted ? '' : s.username || t('common.unknown').toLowerCase(),
     homeDomain: s.homeDomain ?? p?.home_domain,
     avatar: s.avatar,
     banner: s.banner,
@@ -136,5 +137,6 @@ export function popoverSubjectFromSender(
     publicFlags: s.publicFlags,
     bot: s.bot,
     system: s.system,
+    ...(s.deleted ? { deleted: true } : {}),
   };
 }

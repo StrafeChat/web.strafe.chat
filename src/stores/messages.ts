@@ -15,7 +15,7 @@ import {
   type CreateMessageInput,
   type MessageReaction,
 } from '../api/messages';
-import type { Room } from '../api/rooms';
+import type { Room, RoomParticipant } from '../api/rooms';
 import { ensureDevice, encryptMessage } from '../lib/e2ee';
 import { getCurrentDeviceId } from '../lib/e2ee/machine';
 import { encryptAttachment } from '../lib/attachments/crypto';
@@ -851,11 +851,15 @@ export async function sendMessage(
 
   const participants = room.participants ?? [];
   const otherParticipant = participants.find((p) => p.id !== currentUserId);
-  const isNotesRoom = !otherParticipant && participants.length === 1;
+  // Type and recipients too, so a PM whose partner's placeholder went missing can never be
+  // mistaken for the notes room (see isNotesRoom in stores/rooms).
+  const isNotesRoom = room.type === 1 && !otherParticipant && participants.length === 1 && (room.recipients?.length ?? 0) <= 1;
   const isGroupRoom = room.type === 2 && participants.length >= 2;
   // Threads (6) take their channel's E2EE setting and are plaintext rooms otherwise.
   const isSpaceTextRoom = room.type === 3 || room.type === 6;
   if (!otherParticipant && !isNotesRoom && !isGroupRoom && !isSpaceTextRoom) throw new Error(t('messages.roomUnavailable'));
+  // The other account was deleted: the server refuses too (403 recipient_deleted).
+  if (room.type === 1 && otherParticipant?.deleted) throw new Error(t('room.recipientDeleted'));
 
   // Sending while reading older history jumps back to the live tail first (Discord's behaviour),
   // so the optimistic message lands at the present and its server echo - gated on hasMoreNewer -
@@ -1219,6 +1223,42 @@ export function setMessagePinned(roomId: string, messageId: string, pinned: bool
   );
 }
 
+/** The placeholder the server embeds for a deleted account (see RoomParticipant.deleted). */
+export function deletedUserPlaceholder(userId: string): RoomParticipant {
+  return { id: userId, username: '', display_name: '', avatar: '', deleted: true };
+}
+
+/**
+ * An account was deleted (USER_UPDATE with `deleted: true`): swap its embedded author and
+ * mention objects in every loaded message for the placeholder, so open rooms re-render it as
+ * "Deleted User" without a reload. In place, like the pin flag - rows are keyed by identity.
+ */
+export function markUserDeletedInMessages(userId: string): void {
+  const placeholder = () => deletedUserPlaceholder(userId);
+  const touches = (m: DecryptedMessage) =>
+    m.sender_id === userId ||
+    m.author?.id === userId ||
+    !!m.mention_users?.some((u) => u.id === userId) ||
+    m.referenced_message?.author?.id === userId;
+  for (const roomId of Object.keys(messages.byRoom)) {
+    if (!(messages.byRoom[roomId] ?? []).some(touches)) continue;
+    setMessages(
+      'byRoom',
+      roomId,
+      produce((prev) => {
+        for (const m of prev ?? []) {
+          if (!touches(m)) continue;
+          if (m.sender_id === userId || m.author?.id === userId) m.author = placeholder();
+          if (m.mention_users?.some((u) => u.id === userId)) {
+            m.mention_users = m.mention_users.map((u) => (u.id === userId ? placeholder() : u));
+          }
+          if (m.referenced_message?.author?.id === userId) m.referenced_message.author = placeholder();
+        }
+      })
+    );
+  }
+}
+
 /** Point a loaded message at the thread started from it (THREAD_CREATE), or clear it
  * (THREAD_DELETE); the footer under the message reads this. In place, like the pin flag. */
 export function setMessageThreadId(roomId: string, messageId: string, threadId: string | undefined) {
@@ -1330,11 +1370,15 @@ export async function editMessage(
 
   const participants = room.participants ?? [];
   const otherParticipant = participants.find((p) => p.id !== currentUserId);
-  const isNotesRoom = !otherParticipant && participants.length === 1;
+  // Type and recipients too, so a PM whose partner's placeholder went missing can never be
+  // mistaken for the notes room (see isNotesRoom in stores/rooms).
+  const isNotesRoom = room.type === 1 && !otherParticipant && participants.length === 1 && (room.recipients?.length ?? 0) <= 1;
   const isGroupRoom = room.type === 2 && participants.length >= 2;
   // Threads (6) take their channel's E2EE setting and are plaintext rooms otherwise.
   const isSpaceTextRoom = room.type === 3 || room.type === 6;
   if (!otherParticipant && !isNotesRoom && !isGroupRoom && !isSpaceTextRoom) throw new Error(t('messages.roomUnavailable'));
+  // The other account was deleted: the server refuses too (403 recipient_deleted).
+  if (room.type === 1 && otherParticipant?.deleted) throw new Error(t('room.recipientDeleted'));
 
   try {
     await ensureDevice(currentUserId);

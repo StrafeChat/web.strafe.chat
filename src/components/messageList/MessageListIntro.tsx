@@ -32,7 +32,7 @@ export const MessageListIntro: Component<MessageListIntroProps> = (props) => (
   <>
     <Show when={props.roomType === 1 && props.pmOther}>
       {(other) => {
-        const username = () => other().username || t('common.unknown');
+        const username = () => (other().deleted ? t('common.deletedUser') : other().username || t('common.unknown'));
         return (
           <div class="flex flex-col items-center text-center pb-6 shrink-0">
             <div class="relative shrink-0 mb-3">
@@ -46,7 +46,7 @@ export const MessageListIntro: Component<MessageListIntroProps> = (props) => (
               <OfficialTag system={other().system} size="sm" />
             </p>
             <p class="text-xs text-muted-foreground/90 mt-3 max-w-[280px]">
-              {other().system ? t('intro.pmOfficial') : t('intro.pmEncrypted')}
+              {other().deleted ? t('room.recipientDeleted') : other().system ? t('intro.pmOfficial') : t('intro.pmEncrypted')}
             </p>
           </div>
         );

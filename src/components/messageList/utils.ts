@@ -211,6 +211,8 @@ export interface SenderDisplay {
   system?: boolean;
   /** Federation: the user's home instance, shown after the tag when it isn't this one. */
   homeDomain?: string;
+  /** The account was deleted: `name` is "Deleted User"; menus and cards offer only Copy ID. */
+  deleted?: boolean;
 }
 
 /**
@@ -266,5 +268,6 @@ export function getSenderDisplay(
     bot: p?.bot,
     system: p?.system,
     homeDomain: p?.home_domain,
+    ...(r.deleted ? { deleted: true } : {}),
   };
 }

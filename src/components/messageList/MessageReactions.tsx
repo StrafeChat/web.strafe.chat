@@ -11,8 +11,10 @@ const CUSTOM_PREFIX = 'custom:';
 
 /** The server sends reactors with their global profile; in a space room each name is
  * overlaid with that member's nickname from the member list, as the author rows are. */
-function reactorLabel(users: Reactor[], spaceId?: string): string {
-  const names = users.map((u) => resolveSpaceUser(spaceId, u.id, u, u.username).name);
+function reactorLabel(users: (Reactor | null)[], spaceId?: string): string {
+  // A deleted reactor arrives as a `deleted` placeholder (resolved to "Deleted User"); an older
+  // server sent null for it, which must not take the tooltip down.
+  const names = users.filter((u): u is Reactor => !!u).map((u) => resolveSpaceUser(spaceId, u.id, u, u.username).name);
   if (names.length <= 3) return names.join(', ');
   return t('messages.reactions.andOthers', { names: names.slice(0, 3).join(', '), count: names.length - 3 });
 }

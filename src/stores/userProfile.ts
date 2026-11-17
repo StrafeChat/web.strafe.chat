@@ -9,6 +9,7 @@ import { applyEmailUpdateEvent } from './accountEmail';
 import { setRelationships } from './relationships';
 import { setRooms } from './rooms';
 import { setSpaceMembers } from './spaceMembers';
+import { markUserDeletedInMessages } from './messages';
 import type { Relationship } from '../api/relationships';
 import type { RoomParticipant } from '../api/rooms';
 
@@ -40,6 +41,16 @@ export function initUserProfileHandler(): () => void {
     if (!data || typeof data !== 'object') return;
     const userId = typeof data.user_id === 'string' ? data.user_id : null;
     if (!userId) return;
+
+    // An administrator deleted the account. Every surface that still holds it shows the
+    // placeholder from now on: PM participants and member rows are blanked and flagged,
+    // loaded messages get the placeholder author, and the friend list drops it (the server
+    // already has). Never applied to ourselves - our own deletion arrives as SESSION_REVOKED.
+    if (data.deleted === true) {
+      if (auth.user?.id === userId) return;
+      applyUserDeleted(userId);
+      return;
+    }
 
     const patch = patchFromPayload(data as Record<string, unknown>);
 
@@ -126,4 +137,44 @@ export function initUserProfileHandler(): () => void {
       return next;
     });
   });
+}
+
+/** The blank profile a deleted account keeps wherever it is still listed. */
+const DELETED_PROFILE = {
+  username: '',
+  display_name: '',
+  avatar: '',
+  banner: '',
+  bio: '',
+  about_me: '',
+  pronouns: '',
+  deleted: true,
+} as const;
+
+function applyUserDeleted(userId: string): void {
+  setRelationships('relationships', (rels: Relationship[]) => rels.filter((r) => r.user.id !== userId));
+  setRooms('rooms', (list) =>
+    list.map((room) =>
+      room.participants?.some((p) => p.id === userId)
+        ? {
+            ...room,
+            participants: room.participants.map((p) =>
+              p.id === userId
+                ? { ...p, ...DELETED_PROFILE, bot: false, system: false, birthday: undefined, is_birthday: false, public_flags: 0 }
+                : p,
+            ),
+          }
+        : room,
+    ),
+  );
+  setSpaceMembers('bySpaceId', (prev) => {
+    const next: typeof prev = { ...prev };
+    for (const sid of Object.keys(next)) {
+      const list = next[sid];
+      if (!list?.some((m) => m.id === userId)) continue;
+      next[sid] = list.map((m) => (m.id === userId ? { ...m, ...DELETED_PROFILE, nick: undefined } : m));
+    }
+    return next;
+  });
+  markUserDeletedInMessages(userId);
 }

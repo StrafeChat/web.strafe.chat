@@ -2,7 +2,7 @@ import { createStore } from 'solid-js/store';
 import { api } from '../api/client';
 import { getInstanceCapabilities } from '../api/instance';
 import { disconnectStargate, onStargateEvent } from '../services/stargate/client';
-import { logout } from './auth';
+import { auth, logout } from './auth';
 import type { GifProviderId } from '../lib/gif/providers';
 
 /**
@@ -208,9 +208,32 @@ export function initInstanceHandlers(): () => void {
   return onStargateEvent((event) => {
     if (event.t !== 'SESSION_REVOKED') return;
     const d = ((event.d as { d?: unknown })?.d ?? event.d) as { reason?: string } | undefined;
+    if (d?.reason === 'deleted') {
+      void signOutDeletedAccount(auth.user?.id);
+      return;
+    }
     logout();
     disconnectStargate();
     const why = d?.reason === 'banned' ? 'banned' : 'revoked';
     window.location.assign(`/login?reason=${why}`);
   });
+}
+
+/**
+ * An administrator deleted this account. Its encryption store on this device is useless now
+ * (every key belonged to an id that will never exist again) and the device may be shared, so
+ * it is wiped before signing out. Only this account's store and device id: other accounts
+ * signed in on this origin (the desktop switcher) keep theirs. Bounded, so a slow IndexedDB
+ * can never leave the person on a dead session.
+ */
+async function signOutDeletedAccount(userId: string | undefined): Promise<void> {
+  disconnectStargate();
+  if (userId) {
+    const wipe = import('../lib/e2ee/machine')
+      .then((m) => m.resetLocalE2eeStore(userId))
+      .catch((err) => console.warn('[e2ee] could not wipe the deleted account\'s local store', err));
+    await Promise.race([wipe, new Promise((resolve) => setTimeout(resolve, 4000))]);
+  }
+  logout();
+  window.location.assign('/login?reason=deleted');
 }

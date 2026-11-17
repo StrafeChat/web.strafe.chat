@@ -112,6 +112,13 @@ const SERVER_MESSAGE_TO_KEY: Record<string, string> = {
   'invalid file size': 'settings.profile.imageSizeError',
   'could not read file': 'settings.profile.uploadFailed',
   'could not store image': 'settings.profile.uploadFailed',
+  // A 1:1 PM (send or call) whose other account an administrator deleted.
+  'this account no longer exists': 'errors.api.recipientDeleted',
+  // Admin account deletion (instance/account_delete_handler.go); the codes below say the same.
+  "type the account's username exactly to confirm": 'errors.api.deleteConfirmMismatch',
+  'this account is already being deleted': 'errors.api.deleteInProgress',
+  'this account owns spaces or applications': 'errors.api.deleteBlocked',
+  'that account lives on another instance': 'admin.users.deleteRefused.remote',
   // Zog login
   'email must be valid': 'errors.validation.emailInvalid',
   'email is required': 'errors.validation.emailRequired',
@@ -209,7 +216,40 @@ const CODE_TO_KEY: Record<string, string> = {
   email_change_busy: 'errors.api.emailChangeBusy',
   no_pending_email_change: 'errors.api.noPendingEmailChange',
   session_required: 'errors.api.sessionRequired',
+  // A 1:1 PM whose other account was deleted refuses sends and calls.
+  recipient_deleted: 'errors.api.recipientDeleted',
+  confirm_mismatch: 'errors.api.deleteConfirmMismatch',
 };
+
+/**
+ * The account-deletion endpoints' codes. Kept out of CODE_TO_KEY because several are plain
+ * words (`self`, `admin`, `remote`, `blocked`) another endpoint could one day send with a
+ * different meaning; only the deletion dialog reads them, through translateAccountDeletionError.
+ */
+const ACCOUNT_DELETION_CODE_TO_KEY: Record<string, string> = {
+  self: 'admin.users.deleteRefused.self',
+  system: 'admin.users.deleteRefused.system',
+  admin: 'admin.users.deleteRefused.admin',
+  remote: 'admin.users.deleteRefused.remote',
+  confirm_mismatch: 'errors.api.deleteConfirmMismatch',
+  blocked: 'errors.api.deleteBlocked',
+  in_progress: 'errors.api.deleteInProgress',
+};
+
+/**
+ * translateCaughtApiError for GET .../deletion-preview and DELETE /instance/users/:id. A 500
+ * that names a `stage` means a must-succeed step failed part-way; every step is idempotent,
+ * so it is worded as "try again" rather than as an internal error.
+ */
+export function translateAccountDeletionError(err: unknown, t: ErrorTranslateFn): string[] {
+  if (isApiError(err)) {
+    if (err.code && Object.prototype.hasOwnProperty.call(ACCOUNT_DELETION_CODE_TO_KEY, err.code)) {
+      return [t(ACCOUNT_DELETION_CODE_TO_KEY[err.code])];
+    }
+    if (err.status >= 500 && typeof err.body?.stage === 'string') return [t('admin.users.delete.failed')];
+  }
+  return translateCaughtApiError(err, t);
+}
 
 /** The server's one hierarchy refusal, worded for roles and members alike. */
 const ROLE_HIERARCHY_MESSAGE = 'cannot manage a role or member at or above your own highest role';

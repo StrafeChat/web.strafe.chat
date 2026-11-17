@@ -85,6 +85,8 @@ export interface Reactor {
   username: string;
   display_name: string;
   avatar?: string;
+  /** The reactor's account was deleted: every name is empty; shown as "Deleted User". */
+  deleted?: boolean;
 }
 
 export interface Message {
