@@ -561,7 +561,7 @@ const SpacePage: Component = () => {
     if (!id) return [];
     return getTypingUserIds(id, auth.user?.id).map((uid) => {
       const s = getSenderDisplay(uid, visibleMembers(), auth.user?.id);
-      return { id: uid, name: s.name, avatar: s.avatar };
+      return { id: uid, origin_id: s.originId, name: s.name, avatar: s.avatar };
     });
   });
 

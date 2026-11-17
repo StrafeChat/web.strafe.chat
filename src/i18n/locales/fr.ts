@@ -2395,6 +2395,7 @@ export default {
       changeBanner: 'Cliquez pour changer la bannière',
       changeBannerAria: 'Changer la bannière — choisissez une image sur votre appareil',
       changeAvatar: "Cliquez pour changer l'avatar",
+      removeAvatar: "Supprimer l'avatar",
       changeAvatarAria: "Changer l'avatar — choisissez une image sur votre appareil",
       mediaHint: "Survolez la bannière ou l'avatar pour une astuce · JPEG, PNG, GIF ou WebP · 8 Mo max. chacun",
       imageTypeError: 'Choisissez un fichier image (JPEG, PNG, GIF ou WebP).',

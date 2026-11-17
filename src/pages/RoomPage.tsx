@@ -219,7 +219,7 @@ const RoomPage: Component = () => {
   const typingUsers = createMemo((): TypingPerson[] =>
     getTypingUserIds(params.roomId, auth.user?.id).map((uid) => {
       const s = getSenderDisplay(uid, room()?.participants, auth.user?.id);
-      return { id: uid, name: s.name, avatar: s.avatar };
+      return { id: uid, origin_id: s.originId, name: s.name, avatar: s.avatar };
     })
   );
 

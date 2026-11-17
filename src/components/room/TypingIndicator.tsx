@@ -5,6 +5,8 @@ import { t } from '../../i18n';
 
 export interface TypingPerson {
   id: string;
+  /** Federation: their home instance's id for them, which picks their default avatar. */
+  origin_id?: string;
   name: string;
   avatar?: string | null;
 }
@@ -40,7 +42,7 @@ export const TypingFaces: Component<{ people: TypingPerson[] }> = (props) => {
             class={`relative rounded-full ring-2 ring-background ${i() > 0 ? '-ms-1.5' : ''}`}
             style={{ 'z-index': MAX_FACES + 1 - i() }}
           >
-            <MessageAvatar name={person.name} avatar={person.avatar ?? undefined} class="size-4.5 text-[8px]" />
+            <MessageAvatar name={person.name} avatar={person.avatar} user={person} class="size-4.5 text-[8px]" />
           </span>
         )}
       </For>

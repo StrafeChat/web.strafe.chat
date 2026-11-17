@@ -100,7 +100,7 @@ export const CreateGroupModal: Component<CreateGroupModalProps> = (props) => {
                             onChange={() => toggleFriend(rel.user.id)}
                             class="size-4 shrink-0 cursor-pointer rounded accent-primary"
                           />
-                          <MessageAvatar name={friendDisplayName(rel)} avatar={rel.user.avatar} class="size-8 text-[13px]" />
+                          <MessageAvatar name={friendDisplayName(rel)} avatar={rel.user.avatar} user={rel.user} class="size-8 text-[13px]" />
                           <span class="min-w-0 flex-1">
                             <span class="block truncate text-sm text-foreground">{friendDisplayName(rel)}</span>
                             <span class="block truncate text-xs text-muted-foreground">@{rel.user.username}</span>

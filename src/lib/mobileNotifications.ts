@@ -15,6 +15,7 @@ import { rooms, roomDisplayName, isNotesRoom } from '../stores/rooms';
 import { spaces } from '../stores/spaces';
 import { isRoomMuted } from './roomNotify';
 import type { Relationship } from '../api/relationships';
+import type { AvatarUser } from './userAvatar';
 
 const ROOM_TYPE_TEXT = 3;
 const ROOM_TYPE_THREAD = 6;
@@ -31,7 +32,11 @@ export interface NotificationItem {
   count: number;
   /** Avatar for a PM, null for a channel (which uses a # glyph). */
   avatar: string | null;
+  /** Whose default avatar a 1:1 PM shows without one (the other person; you, in Notes). */
+  avatarUser: AvatarUser;
   isChannel: boolean;
+  /** A group PM, which has no picture of its own: it shows the group glyph, as in the PM list. */
+  isGroup: boolean;
   /** Newest known message, so a row can be marked read in place. */
   lastMessageId: string | null;
 }
@@ -65,7 +70,9 @@ export function notificationItems(): NotificationItem[] {
       mention: mentions > 0,
       count: mentions > 0 ? mentions : unread,
       avatar: room.type === 2 ? null : other?.avatar ?? null,
+      avatarUser: room.type === 2 ? null : other ?? uid,
       isChannel: false,
+      isGroup: room.type === 2,
       lastMessageId: latestMessageId(room.id, room.last_message_id),
     });
   }
@@ -88,7 +95,9 @@ export function notificationItems(): NotificationItem[] {
         mention: true,
         count: mentions,
         avatar: null,
+        avatarUser: null,
         isChannel: true,
+        isGroup: false,
         lastMessageId: latestMessageId(room.id, room.last_message_id),
       });
     }

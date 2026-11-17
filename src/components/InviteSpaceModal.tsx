@@ -416,7 +416,7 @@ export const InviteSpaceModal: Component<InviteSpaceModalProps> = (props) => {
                             checked={selected().includes(rel.user.id)}
                             onChange={(e) => toggleFriend(rel.user.id, e.currentTarget.checked)}
                           />
-                          <MessageAvatar name={friendDisplayName(rel)} avatar={rel.user.avatar} class="size-8 text-xs" />
+                          <MessageAvatar name={friendDisplayName(rel)} avatar={rel.user.avatar} user={rel.user} class="size-8 text-xs" />
                           <span class="min-w-0 flex-1">
                             <span class="block truncate text-sm text-foreground">{friendDisplayName(rel)}</span>
                             <span class="block truncate text-xs text-muted-foreground">{handleLabel(rel)}</span>

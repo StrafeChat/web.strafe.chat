@@ -33,6 +33,7 @@ import { IconButton } from '../ui/IconButton';
 import { t } from '../../i18n';
 import { BotTag } from '../BotTag';
 import { OfficialTag } from '../OfficialTag';
+import type { AvatarUser } from '../../lib/userAvatar';
 
 interface PaneButtonProps {
   href: string;
@@ -93,6 +94,8 @@ interface ConvItemProps {
   presenceUserId?: string;
   /** Avatar URL for 1:1 PMs */
   avatar?: string | null;
+  /** Whose default avatar shows when a 1:1 PM's person has none (the other person, or you in Notes). */
+  avatarUser?: AvatarUser;
   /** Group DM: show group icon instead of avatar */
   isGroup?: boolean;
   /** Unread count (0 = no badge) */
@@ -109,7 +112,7 @@ const ConvItem: Component<ConvItemProps> = (props) => {
       <div class="relative shrink-0">
         <Show
           when={props.isGroup}
-          fallback={<MessageAvatar name={props.name} avatar={props.avatar ?? undefined} class="size-8 text-[13px]" />}
+          fallback={<MessageAvatar name={props.name} avatar={props.avatar} user={props.avatarUser} class="size-8 text-[13px]" />}
         >
           <div class="flex size-8 items-center justify-center rounded-full bg-muted">
             <i class="fa-solid fa-user-group text-sm text-muted-foreground" aria-hidden="true" />
@@ -291,6 +294,7 @@ export const RoomsBar: Component = () => {
                     roomId={room.id}
                     presenceUserId={isGroup() ? undefined : otherParticipant()?.id}
                     avatar={avatar()}
+                    avatarUser={otherParticipant() ?? currentUserId()}
                     isGroup={isGroup()}
                     unreadCount={unreadCount()}
                     muted={isRoomMuted(room)}

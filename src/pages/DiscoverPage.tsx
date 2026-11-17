@@ -213,7 +213,7 @@ const BotCard: Component<{ entry: DiscoverEntry; onAdd: () => void }> = (props) 
   return (
     <article class="flex flex-col gap-3 rounded-xl border border-border bg-card/60 p-4" data-discover-card={bot().application_id}>
       <div class="flex items-center gap-3">
-        <MessageAvatar name={bot().bot?.display_name || bot().name} avatar={bot().bot?.avatar || bot().icon} class="size-12 rounded-xl text-base" />
+        <MessageAvatar name={bot().bot?.display_name || bot().name} avatar={bot().bot?.avatar || bot().icon} user={bot().bot ?? bot().application_id} class="size-12 rounded-xl text-base" />
         <div class="min-w-0">
           <h2 class="truncate text-sm font-semibold text-foreground">{bot().bot?.display_name || bot().name}</h2>
           <Show when={bot().bot}>{(u) => <p class="truncate text-xs text-muted-foreground">@{u().username}</p>}</Show>

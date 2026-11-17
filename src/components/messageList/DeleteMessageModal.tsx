@@ -44,7 +44,7 @@ export const DeleteMessageModal: Component<DeleteMessageModalProps> = (props) =>
         >
           <div class="mb-4 rounded-xl border border-border bg-card/50 p-3">
             <div class="flex gap-3">
-              <MessageAvatar name={senderName()} avatar={sender().avatar} />
+              <MessageAvatar name={senderName()} avatar={sender().avatar} user={sender()} />
               <div class="min-w-0 flex-1">
                 <div class="mb-0.5 flex flex-wrap items-baseline gap-2">
                   <span class="truncate text-sm font-semibold text-foreground">{senderName()}</span>

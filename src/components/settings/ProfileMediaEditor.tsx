@@ -9,9 +9,8 @@ import { t } from '../../i18n';
 export const PROFILE_IMAGE_MAX_BYTES = 8 * 1024 * 1024;
 
 export interface ProfileMediaEditorProps {
-  /** Its first letter stands in for a missing avatar. */
   name: string;
-  /** Whose presence dot sits on the avatar. */
+  /** Whose presence dot sits on the avatar, and whose default avatar shows when none is set. */
   userId: string;
   avatar?: string;
   banner?: string;
@@ -119,6 +118,7 @@ export const ProfileMediaEditor: Component<ProfileMediaEditorProps> = (props) =>
             <MessageAvatar
               name={props.name}
               avatar={props.avatar}
+              user={props.userId}
               class="pointer-events-none size-20 border-[3px] border-card bg-primary text-xl text-primary-foreground shadow-md sm:size-[5.25rem] sm:text-2xl"
             />
             <span class="pointer-events-none absolute inset-0 rounded-full bg-black/0 transition-colors group-hover/avatar:bg-black/55 group-focus-visible/avatar:bg-black/50" />

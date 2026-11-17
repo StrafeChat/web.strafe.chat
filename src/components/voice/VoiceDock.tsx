@@ -187,7 +187,7 @@ export const VoiceDock: Component<VoiceDockProps> = (props) => {
                     })
                   }
                 >
-                  <MessageAvatar name={nameOf(st)} avatar={avatarOf(st)} class="size-6 text-[10px]" />
+                  <MessageAvatar name={nameOf(st)} avatar={avatarOf(st)} user={st.user ?? st.user_id} class="size-6 text-[10px]" />
                 </span>
               )}
             </For>

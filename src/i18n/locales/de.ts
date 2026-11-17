@@ -2351,6 +2351,7 @@ export default {
       changeBanner: 'Klicken, um das Banner zu ändern',
       changeBannerAria: 'Banner ändern — ein Bild von deinem Gerät auswählen',
       changeAvatar: 'Klicken, um den Avatar zu ändern',
+      removeAvatar: 'Avatar entfernen',
       changeAvatarAria: 'Avatar ändern — ein Bild von deinem Gerät auswählen',
       mediaHint: 'Fahre über Banner oder Avatar für einen Hinweis · JPEG, PNG, GIF oder WebP · max. 8 MB pro Bild',
       imageTypeError: 'Wähle eine Bilddatei (JPEG, PNG, GIF oder WebP).',

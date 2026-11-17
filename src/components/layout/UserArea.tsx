@@ -197,7 +197,7 @@ export const UserArea: Component = () => {
           onKeyDown={(e) => e.key === 'Enter' && setPopoverOpen((o) => !o)}
         >
           <div class="relative shrink-0">
-            <MessageAvatar name={displayName()} avatar={auth.user?.avatar} class="size-8 text-[13px]" />
+            <MessageAvatar name={displayName()} avatar={auth.user?.avatar} user={auth.user?.id} class="size-8 text-[13px]" />
             <span class="absolute -bottom-px -right-px">
               <PresenceDot userId={userId()} class="size-3.25" />
             </span>
@@ -268,6 +268,7 @@ export const UserArea: Component = () => {
                   <MessageAvatar
                     name={displayName()}
                     avatar={auth.user?.avatar}
+                    user={auth.user?.id}
                     class="size-20 border-4 border-popover bg-primary text-2xl font-semibold text-primary-foreground shadow-lg shadow-black/30"
                   />
                   <span class="absolute bottom-0.5 right-0.5">

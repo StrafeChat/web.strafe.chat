@@ -64,7 +64,7 @@ export const AddPeopleModal: Component<AddPeopleModalProps> = (props) => {
                   {(rel) => (
                     <div class="flex items-center justify-between gap-3 rounded-lg px-2 py-1.5 transition-colors hover:bg-accent/50">
                       <div class="flex min-w-0 items-center gap-3">
-                        <MessageAvatar name={friendDisplayName(rel)} avatar={rel.user.avatar} class="size-8 text-[13px]" />
+                        <MessageAvatar name={friendDisplayName(rel)} avatar={rel.user.avatar} user={rel.user} class="size-8 text-[13px]" />
                         <span class="min-w-0">
                           <span class="block truncate text-sm text-foreground">{friendDisplayName(rel)}</span>
                           <span class="block truncate text-xs text-muted-foreground">@{rel.user.username}</span>

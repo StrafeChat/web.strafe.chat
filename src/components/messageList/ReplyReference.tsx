@@ -71,7 +71,7 @@ export const ReplyReference: Component<ReplyReferenceProps> = (props) => {
             if (props.roomId) void jumpToMessage(props.roomId, props.replyToId);
           }}
         >
-          <MessageAvatar name={sender()!.name} avatar={sender()!.avatar} class="size-4 text-[9px] ring-0" />
+          <MessageAvatar name={sender()!.name} avatar={sender()!.avatar} user={sender()} class="size-4 text-[9px] ring-0" />
           <span class="shrink-0 font-semibold text-foreground/90 group-hover/reply:underline">{sender()!.name}</span>
           <BotTag bot={sender()!.bot} size="xs" class="ms-0" />
           <span class="min-w-0 truncate text-muted-foreground group-hover/reply:text-foreground/80">

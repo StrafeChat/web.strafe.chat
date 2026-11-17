@@ -71,7 +71,7 @@ export const MobileYouPanel: Component = () => {
       <div class="min-h-0 flex-1 overflow-y-auto px-4 py-4">
         <div class="flex items-center gap-3">
           <div class="relative shrink-0">
-            <MessageAvatar name={displayName()} avatar={auth.user?.avatar} class="size-16 text-xl" />
+            <MessageAvatar name={displayName()} avatar={auth.user?.avatar} user={auth.user?.id} class="size-16 text-xl" />
             <span class="absolute -bottom-0.5 -right-0.5">
               <PresenceDot userId={userId()} class="size-4" />
             </span>

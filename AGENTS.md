@@ -126,6 +126,13 @@ new i18n keys.
   `ResponsiveDialog`, `Tooltip`, `IconButton`, `UserCell`, the settings modal shells
   (`SettingsShell`/`SettingsNav`/`SettingsPanel`). Check `src/components/` for something
   close before writing a new component from scratch.
+- **Avatars**: every round avatar is `MessageAvatar`, and it must be told what it pictures -
+  `user` (a person or bot: object or id) or `initial` (a space or application). A person
+  without an avatar, or whose avatar fails to load, gets their default avatar
+  (`src/lib/defaultAvatar.ts`, images in `public/avatars/default/`): `(homeId >> 22) % 8`,
+  where `homeId` is `origin_id` for someone from another instance, so they look the same
+  everywhere. Never show a person as a letter, and never reorder the eight images - other
+  clients and the docs compute the same index.
 - **Developer platform & profile badges (client)**: the **Developers** settings section
   (`src/components/settings/DevelopersSettingsPage.tsx`) manages a person's OAuth2
   applications and bots - name/description/redirect URIs, the bot card with its **Public

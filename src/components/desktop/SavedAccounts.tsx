@@ -34,7 +34,7 @@ export const DesktopSavedAccounts: Component = () => {
             {(acc) => (
               <li class="flex items-center gap-1">
                 <button type="button" class={`${appListRow} ${appListRowIdle} flex-1`} onClick={() => void switchDesktopAccount(acc.id)}>
-                  <MessageAvatar name={acc.displayName} avatar={acc.avatar} class="size-8 text-[13px]" />
+                  <MessageAvatar name={acc.displayName} avatar={acc.avatar} user={{ id: acc.userId, origin_id: acc.userId }} class="size-8 text-[13px]" />
                   <span class="min-w-0 flex-1">
                     <span class="block truncate text-sm font-medium">{acc.displayName}</span>
                     <span class="block truncate text-xs text-muted-foreground" dir="ltr">

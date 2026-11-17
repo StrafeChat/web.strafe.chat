@@ -540,6 +540,7 @@ export const UserProfilePopover: Component = () => {
                   <MessageAvatar
                     name={subject()!.displayName}
                     avatar={subject()!.avatar}
+                    user={subject()}
                     class="size-20 border-4 border-popover bg-primary text-2xl font-semibold text-primary-foreground shadow-lg shadow-black/30 transition-opacity group-hover/avatar:opacity-90"
                   />
                   <span class="absolute bottom-0.5 end-0.5">

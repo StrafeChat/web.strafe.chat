@@ -438,6 +438,7 @@ export const SpaceProfilesSettingsPage: Component<SpaceProfilesSettingsPageProps
                     <MessageAvatar
                       name={preview().name}
                       avatar={preview().avatar}
+                      user={myId()}
                       class="size-20 border-4 border-popover bg-primary text-2xl font-semibold text-primary-foreground shadow-lg shadow-black/30"
                     />
                   </div>

@@ -173,6 +173,7 @@ export const SpaceInvitesPage: Component<Props> = (props) => {
                             name={inv.inviter?.display_name || inv.inviter?.username || t('common.someone')}
                             username={inv.inviter?.username}
                             avatar={inv.inviter?.avatar}
+                            user={inv.inviter ?? inv.inviter_id}
                           />
                         </td>
                         <td class={`${appTableCell} font-mono text-xs`} dir="ltr">

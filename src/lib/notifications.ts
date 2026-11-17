@@ -14,6 +14,7 @@ import { notificationsSuppressedByStatus } from '../stores/presence';
 import { getMessageBodyText, getMessagePreviewSource, isSystemMessage, messagePreviewText } from '../components/messageList/utils';
 import { isRoomMuted, NotifyModeAll, NotifyModeMentions, NotifyModeNone } from './roomNotify';
 import { resolveProfile, resolveSpaceUser, type ProfileBase } from './spaceProfile';
+import { absoluteUrl, userAvatarUrl } from './userAvatar';
 import { t } from '../i18n';
 
 const NAVIGATE_EVENT = 'strafe:navigate';
@@ -99,7 +100,8 @@ function roomSpaceId(roomId: string): string | undefined {
   return undefined;
 }
 
-function senderName(roomId: string, senderId: string, spaceId: string | undefined): string {
+/** The sender as the notification shows them: name and picture (their default without one). */
+function senderProfile(roomId: string, senderId: string, spaceId: string | undefined): { name: string; icon: string } {
   const pm = rooms.rooms.find((r) => r.id === roomId);
   let base: ProfileBase | undefined = pm?.participants?.find((x) => x.id === senderId);
   if (!base) {
@@ -111,8 +113,9 @@ function senderName(roomId: string, senderId: string, spaceId: string | undefine
   // The global name may come from any list the sender is in, but a nickname only from the
   // room's own space: the first list that happened to contain them could be another space,
   // with another nickname.
-  if (spaceId) return resolveSpaceUser(spaceId, senderId, base, t('common.someone')).name;
-  return resolveProfile(base, undefined, t('common.someone')).name;
+  const r = spaceId ? resolveSpaceUser(spaceId, senderId, base, t('common.someone')) : resolveProfile(base, undefined, t('common.someone'));
+  // The system shows the icon outside the page, so a root-relative default needs the origin.
+  return { name: r.name, icon: absoluteUrl(userAvatarUrl(r.avatar, base ?? senderId)) };
 }
 
 function mentionsMe(roomId: string, content: string): boolean {
@@ -145,8 +148,8 @@ export function maybeNotifyMessage(roomId: string, messageId: string): void {
   if (focusedHere && !prefs.whileFocused) return;
 
   const spaceId = roomSpaceId(roomId);
-  const sender = senderName(roomId, msg.sender_id, spaceId);
-  const ctx = roomContext(roomId, sender);
+  const sender = senderProfile(roomId, msg.sender_id, spaceId);
+  const ctx = roomContext(roomId, sender.name);
   if (!ctx) return;
   if (ctx.muted) return;
 
@@ -182,6 +185,7 @@ export function maybeNotifyMessage(roomId: string, messageId: string): void {
     showDesktopNotification({
       title: ctx.title,
       body: preview,
+      icon: sender.icon,
       tag: `room:${roomId}`,
       onClick: () => requestNavigate(ctx.path),
     });

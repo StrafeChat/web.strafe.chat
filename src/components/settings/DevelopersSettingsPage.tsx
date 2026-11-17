@@ -453,7 +453,7 @@ export const DevelopersSettingsPage: Component = () => {
                 <For each={apps()}>
                   {(app) => (
                     <button type="button" class={`${settingsRowShell} w-full text-start`} onClick={() => openDetail(app)}>
-                      <MessageAvatar name={app.name} avatar={app.icon} class="size-10 text-sm" />
+                      <MessageAvatar name={app.name} avatar={app.icon} initial class="size-10 text-sm" />
                       <div class="min-w-0 flex-1">
                         <div class="truncate text-sm font-medium text-foreground">{app.name}</div>
                         <div class="truncate text-xs text-muted-foreground">
@@ -533,7 +533,7 @@ export const DevelopersSettingsPage: Component = () => {
           </div>
 
           <div class="flex items-center gap-3">
-            <MessageAvatar name={app().name} avatar={app().icon} class="size-12 text-lg" />
+            <MessageAvatar name={app().name} avatar={app().icon} initial class="size-12 text-lg" />
             <div class="min-w-0">
               <div class="truncate text-lg font-bold text-foreground">{app().name}</div>
               <div class="truncate text-xs text-muted-foreground">
@@ -615,7 +615,7 @@ export const DevelopersSettingsPage: Component = () => {
             >
               <div class="flex items-center gap-3">
                 <Show when={app().bot} fallback={<div class={settingsRowIcon}><i class="fa-solid fa-robot" aria-hidden="true" /></div>}>
-                  {(bot) => <MessageAvatar name={bot().display_name || bot().username} avatar={bot().avatar} class="size-10 text-sm" />}
+                  {(bot) => <MessageAvatar name={bot().display_name || bot().username} avatar={bot().avatar} user={bot()} class="size-10 text-sm" />}
                 </Show>
                 <div class="min-w-0 flex-1">
                   <div class="flex items-center text-sm font-medium text-foreground">
@@ -733,6 +733,7 @@ export const DevelopersSettingsPage: Component = () => {
                           <MessageAvatar
                             name={bName() || bot().display_name || bot().username}
                             avatar={bot().avatar}
+                            user={bot()}
                             class="pointer-events-none size-16 border-[3px] border-card bg-primary text-lg text-primary-foreground shadow-md"
                           />
                           <span class="pointer-events-none absolute inset-0 rounded-full bg-black/0 transition-colors group-hover/avatar:bg-black/55 group-focus-visible/avatar:bg-black/50" />

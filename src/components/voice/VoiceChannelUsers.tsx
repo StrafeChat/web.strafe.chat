@@ -63,7 +63,7 @@ export const VoiceChannelUsers: Component<VoiceChannelUsersProps> = (props) => {
                 title={name(st)}
               >
                 <span class={`shrink-0 rounded-full ring-2 transition-[ring-color] ${speaking() ? 'ring-emerald-400' : 'ring-transparent'}`}>
-                  <MessageAvatar name={name(st)} avatar={avatar(st)} class="size-6 text-[11px]" />
+                  <MessageAvatar name={name(st)} avatar={avatar(st)} user={st.user ?? st.user_id} class="size-6 text-[11px]" />
                 </span>
                 <span class="min-w-0 flex-1 truncate">{name(st)}</span>
                 <span class="flex shrink-0 items-center gap-1 text-[10px]">

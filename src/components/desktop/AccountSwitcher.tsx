@@ -73,7 +73,7 @@ export const DesktopAccountSection: Component<{ onClose: () => void }> = (props)
                     aria-current={active() ? 'true' : undefined}
                     onClick={() => void switchDesktopAccount(acc.id)}
                   >
-                    <MessageAvatar name={acc.displayName} avatar={acc.avatar} class="size-7 text-xs" />
+                    <MessageAvatar name={acc.displayName} avatar={acc.avatar} user={{ id: acc.userId, origin_id: acc.userId }} class="size-7 text-xs" />
                     <span class="min-w-0 flex-1">
                       <span class="block truncate font-medium">{acc.displayName}</span>
                       <span class="block truncate text-[11px] text-muted-foreground" dir="ltr">

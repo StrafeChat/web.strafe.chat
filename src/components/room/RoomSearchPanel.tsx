@@ -208,6 +208,7 @@ export const RoomSearchPanel: Component<RoomSearchPanelProps> = (props) => {
                           <MessageAvatar
                             name={sender().name}
                             avatar={sender().avatar}
+                            user={sender()}
                             class="size-8 shrink-0 text-[11px]"
                           />
                           <div class="min-w-0 flex-1">

@@ -1230,7 +1230,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                           }
                         }}
                       >
-                        <MessageAvatar name={sender().name} avatar={sender().avatar} />
+                        <MessageAvatar name={sender().name} avatar={sender().avatar} user={sender()} />
                       </div>
                     </Show>
                   </div>

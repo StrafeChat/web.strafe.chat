@@ -394,7 +394,7 @@ const Users: Component<{ focusUser: string | null; onOpenReport: (id: string) =>
                 }`}
                 onClick={() => setSelected(u.id)}
               >
-                <MessageAvatar name={nameOf(u)} avatar={u.avatar} class="size-9 text-sm" />
+                <MessageAvatar name={nameOf(u)} avatar={u.avatar} user={u} class="size-9 text-sm" />
                 <div class="min-w-0 flex-1">
                   <div class="truncate text-sm font-medium">{nameOf(u)}</div>
                   <div class="truncate text-xs text-muted-foreground">
@@ -591,7 +591,7 @@ const UserPanel: Component<{
               aria-hidden="true"
             />
             <div class="-mt-8 flex items-start gap-4 px-4 pb-4">
-              <MessageAvatar name={nameOf(d().user)} avatar={d().user.avatar} class="size-16 text-lg ring-4 ring-card" />
+              <MessageAvatar name={nameOf(d().user)} avatar={d().user.avatar} user={d().user} class="size-16 text-lg ring-4 ring-card" />
               <div class="min-w-0 flex-1 space-y-1.5 pt-9">
                 <div class="flex flex-wrap items-center gap-2">
                   <span class="text-base font-semibold">{nameOf(d().user)}</span>
@@ -1405,7 +1405,7 @@ const AccountBans: Component<{ onOpenUser: (id: string) => void }> = (props) => 
             <For each={list()}>
               {(row, i) => (
                 <div style={{ 'animation-delay': `${Math.min(i() * 30, 300)}ms` }} class={`admin-row-in ${settingsRowShell}`}>
-                  <MessageAvatar name={nameOf(row.user)} avatar={row.user?.avatar} class="size-9 text-sm" />
+                  <MessageAvatar name={nameOf(row.user)} avatar={row.user?.avatar} user={row.user ?? row.ban.user_id} class="size-9 text-sm" />
                   <div class="min-w-0 flex-1">
                     <button type="button" class="truncate text-sm font-medium hover:underline" onClick={() => props.onOpenUser(row.ban.user_id)}>
                       {nameOf(row.user)} <span class="font-normal text-muted-foreground">{tag(row.user)}</span>

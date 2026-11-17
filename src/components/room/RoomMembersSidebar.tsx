@@ -398,6 +398,7 @@ const MemberRow: Component<{
           <MessageAvatar
             name={displayName()}
             avatar={profile().avatar}
+            user={props.p}
             class={`size-8 text-[13px] ${props.dim ? 'opacity-60 transition-opacity group-hover/member:opacity-100' : ''}`}
           />
           <span class="absolute -bottom-px -end-px">

@@ -69,6 +69,7 @@ export const MobileTabBar: Component<MobileTabBarProps> = (props) => {
                     <MessageAvatar
                       name={displayName()}
                       avatar={auth.user?.avatar}
+                      user={auth.user?.id}
                       class={`size-6 text-[9px] ${active() ? 'ring-2 ring-primary' : ''}`}
                     />
                     <span class="absolute -bottom-0.5 -right-0.5">

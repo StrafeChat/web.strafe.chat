@@ -40,6 +40,7 @@ export const ProfileSettingsPage: Component<ProfileSettingsPageProps> = (props) 
   const [profileError, setProfileError] = createSignal('');
   const [avatarUploading, setAvatarUploading] = createSignal(false);
   const [avatarError, setAvatarError] = createSignal('');
+  const [removingAvatar, setRemovingAvatar] = createSignal(false);
   const [bannerUploading, setBannerUploading] = createSignal(false);
   const [bannerError, setBannerError] = createSignal('');
   // The birthday opt-in is its own switch that saves the moment it flips, so it is kept out
@@ -166,6 +167,23 @@ export const ProfileSettingsPage: Component<ProfileSettingsPageProps> = (props) 
     }
   }
 
+  // Clearing the avatar puts the default one back (lib/defaultAvatar.ts); nothing is uploaded.
+  async function removeAvatar() {
+    if (removingAvatar() || avatarUploading()) return;
+    setAvatarError('');
+    setRemovingAvatar(true);
+    try {
+      const me = await patchMe({ avatar: '' });
+      const u = auth.user;
+      // toAuthUser leaves an empty avatar out, and the store merges: say undefined outright.
+      if (u) setAuthUser({ ...u, ...toAuthUser(me), avatar: me.avatar || undefined });
+    } catch (err) {
+      setAvatarError(err instanceof Error ? err.message : t('settings.profile.saveFailed'));
+    } finally {
+      setRemovingAvatar(false);
+    }
+  }
+
   async function onBannerFile(file: File) {
     setBannerError('');
     setBannerUploading(true);
@@ -214,6 +232,21 @@ export const ProfileSettingsPage: Component<ProfileSettingsPageProps> = (props) 
               onBannerFile={(file) => void onBannerFile(file)}
               onInvalidFile={(kind, message) => (kind === 'avatar' ? setAvatarError(message) : setBannerError(message))}
               error={avatarError() || bannerError() || undefined}
+              actions={
+                <Show when={auth.user?.avatar}>
+                  <div class="flex flex-wrap gap-2 pt-1 sm:justify-end">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      loading={removingAvatar()}
+                      disabled={removingAvatar() || avatarUploading()}
+                      onClick={() => void removeAvatar()}
+                    >
+                      {t('settings.profile.removeAvatar')}
+                    </Button>
+                  </div>
+                </Show>
+              }
             />
           </section>
 

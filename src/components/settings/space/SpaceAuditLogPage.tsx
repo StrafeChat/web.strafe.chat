@@ -224,7 +224,7 @@ export const SpaceAuditLogPage: Component<Props> = (props) => {
                 <li>
                   <div class="flex items-start gap-3 px-3 py-2.5">
                     <div class="relative shrink-0">
-                      <MessageAvatar name={userName(e.user_id)} avatar={actor()?.avatar} class="size-9 text-[13px]" />
+                      <MessageAvatar name={userName(e.user_id)} avatar={actor()?.avatar} user={actor() ?? e.user_id} class="size-9 text-[13px]" />
                       <span
                         class={`absolute -bottom-1 -end-1 flex size-5 items-center justify-center rounded-full border border-background text-[9px] ${
                           DESTRUCTIVE.has(e.action_type) ? 'bg-destructive text-white' : 'bg-muted text-foreground'

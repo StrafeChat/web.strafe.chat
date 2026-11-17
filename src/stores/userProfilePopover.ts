@@ -47,6 +47,8 @@ export type UserProfilePopoverSubject = {
   username: string;
   /** Federation: the user's home instance (shown after the tag when it isn't this one). */
   homeDomain?: string;
+  /** Federation: the id their home instance knows them by (picks their default avatar). */
+  originId?: string;
   avatar?: string;
   banner?: string;
   /** Short snippet; basic markdown only. Shown on this popover. */

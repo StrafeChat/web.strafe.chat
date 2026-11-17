@@ -35,6 +35,14 @@ export function registerRoomIdentity(r: { id?: string; federation?: { origin_dom
   if (f?.origin_domain && f.origin_id) rooms.set(r.id, { originId: f.origin_id, domain: f.origin_domain });
 }
 
+/**
+ * The id a user's home instance knows them by (their `origin_id`), when this client has seen
+ * it for that local id; undefined for this instance's own users and anyone not yet seen.
+ */
+export function homeUserId(localUserId: string): string | undefined {
+  return users.get(localUserId)?.originId;
+}
+
 /** @origin:domain for a local user id (falls back to this instance's own naming). */
 export function userFederatedId(localUserId: string): string {
   const known = users.get(localUserId);

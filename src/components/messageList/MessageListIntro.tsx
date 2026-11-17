@@ -36,7 +36,7 @@ export const MessageListIntro: Component<MessageListIntroProps> = (props) => (
         return (
           <div class="flex flex-col items-center text-center pb-6 shrink-0">
             <div class="relative shrink-0 mb-3">
-              <MessageAvatar name={username()} avatar={other().avatar} class="size-16" />
+              <MessageAvatar name={username()} avatar={other().avatar} user={other()} class="size-16" />
               <span class="absolute bottom-0 end-0">
                 <PresenceDot userId={other().id} class="size-4" />
               </span>

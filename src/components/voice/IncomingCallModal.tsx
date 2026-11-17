@@ -38,7 +38,7 @@ export const IncomingCallModal: Component = () => {
         <div class="flex flex-col items-center gap-4 text-center" data-incoming-call>
           <span class="relative">
             <span class="absolute inset-0 animate-ping rounded-full bg-primary/30" aria-hidden="true" />
-            <MessageAvatar name={callerName()} avatar={caller()?.avatar} class="relative size-20 text-2xl" />
+            <MessageAvatar name={callerName()} avatar={caller()?.avatar} user={caller() ?? inc()?.startedBy} class="relative size-20 text-2xl" />
           </span>
           <div>
             <h2 id="incoming-call-title" class="text-lg font-semibold text-foreground">

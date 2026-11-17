@@ -278,6 +278,7 @@ export const SpaceMembersPage: Component<Props> = (props) => {
                             bot={m.bot}
                             username={m.username}
                             avatar={profile().avatar}
+                            user={m}
                             subline={globalHint()}
                           />
                           <Show when={isOwner(m.id)}>

@@ -17,10 +17,15 @@ import { confirmDialog } from '../../stores/confirmDialog';
 import { settingsRowShell } from '../settings/settingsChrome';
 import { appDialogActions, zLayer } from '../../theme/appChrome';
 import { formatDate, t } from '../../i18n';
+import type { AvatarUser } from '../../lib/userAvatar';
 
 const when = (iso?: string) => (iso ? formatDate(iso, { dateStyle: 'medium', timeStyle: 'short' }) || iso : '');
 const nameOf = (e: DiscoverEntry) => e.space?.name ?? e.bot?.name ?? e.id;
 const avatarOf = (e: DiscoverEntry) => e.space?.icon ?? e.bot?.bot?.avatar ?? e.bot?.icon;
+// A bot listing pictures its bot user (default avatar from its id, which is the client id); a
+// space keeps its initials.
+const avatarIdentity = (e: DiscoverEntry): { user: AvatarUser } | { initial: true } =>
+  e.bot ? { user: e.bot.bot ?? e.bot.application_id } : { initial: true };
 
 /**
  * Admin → Discover: the listings waiting for review, the ones on the page, and the ones
@@ -97,7 +102,7 @@ export const DiscoverQueue: Component<{ onOpenUser: (id: string) => void; onOpen
                     class={`admin-row-in ${settingsRowShell}`}
                     data-discover-row={`${e.kind}:${e.id}`}
                   >
-                    <MessageAvatar name={nameOf(e)} avatar={avatarOf(e)} class="size-10 text-sm" />
+                    <MessageAvatar name={nameOf(e)} avatar={avatarOf(e)} {...avatarIdentity(e)} class="size-10 text-sm" />
                     <div class="min-w-0 flex-1">
                       <div class="flex flex-wrap items-center gap-2 text-sm font-medium">
                         <Show when={e.kind === 'space'} fallback={<span class="truncate">{nameOf(e)}</span>}>

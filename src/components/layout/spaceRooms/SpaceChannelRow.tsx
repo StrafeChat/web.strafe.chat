@@ -61,7 +61,7 @@ export const SpaceChannelRow: Component<SpaceChannelRowProps> = (props) => {
     const members = spaceMembers.bySpaceId[props.spaceId] ?? [];
     return getTypingUserIds(props.room.id, me).map((id) => {
       const sender = getSenderDisplay(id, members, me);
-      return { id, name: sender.name, avatar: sender.avatar };
+      return { id, origin_id: sender.originId, name: sender.name, avatar: sender.avatar };
     });
   });
   /** Server-authoritative count (room_mention_counts) - real for every room, not just loaded ones. */

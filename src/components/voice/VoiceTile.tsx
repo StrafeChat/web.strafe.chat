@@ -96,6 +96,7 @@ export const VoiceTile: Component<VoiceTileProps> = (props) => {
           <MessageAvatar
             name={props.name}
             avatar={props.avatar}
+            user={props.state.user ?? props.state.user_id}
             class={`${props.compact ? 'size-12 text-lg' : props.focused ? 'size-32 text-4xl' : 'size-20 text-2xl'} ring-0`}
           />
         </Show>

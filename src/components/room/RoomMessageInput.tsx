@@ -959,6 +959,7 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
                           <MessageAvatar
                             name={c.label}
                             avatar={(c as { avatar?: string }).avatar}
+                            user={(c as { participant: RoomParticipant }).participant}
                             class="size-6 text-[11px]"
                           />
                           <span class="truncate">{c.label}</span>

@@ -263,11 +263,19 @@ const OAuthAuthorizePage: Component = () => {
                   >
                     <CardHeader class={authCardHeaderClass}>
                       <div class="mb-3 flex justify-center">
-                        <MessageAvatar
-                          name={wantsBot() ? botName(d()) : appName(d())}
-                          avatar={wantsBot() ? d().bot?.avatar || d().application.icon : d().application.icon}
-                          class="size-16 text-xl"
-                        />
+                        {/* A bot is a user (its default avatar from its id, the client id); a plain
+                            application keeps its initial. */}
+                        <Show
+                          when={wantsBot()}
+                          fallback={<MessageAvatar name={appName(d())} avatar={d().application.icon} initial class="size-16 text-xl" />}
+                        >
+                          <MessageAvatar
+                            name={botName(d())}
+                            avatar={d().bot?.avatar || d().application.icon}
+                            user={d().bot ?? d().application.id}
+                            class="size-16 text-xl"
+                          />
+                        </Show>
                       </div>
                       <CardTitle class="text-center text-xl font-bold text-foreground">
                         {wantsBot() ? t('oauth.botTitle', { bot: botName(d()) }) : t('oauth.title', { app: appName(d()) })}
@@ -291,7 +299,7 @@ const OAuthAuthorizePage: Component = () => {
                               when={!spaceLocked()}
                               fallback={
                                 <div class="flex items-center gap-3 rounded-lg border border-border bg-muted/30 px-3 py-2.5">
-                                  <MessageAvatar name={selectedTarget()?.name ?? ''} avatar={selectedTarget()?.icon} class="size-8 text-xs" />
+                                  <MessageAvatar name={selectedTarget()?.name ?? ''} avatar={selectedTarget()?.icon} initial class="size-8 text-xs" />
                                   <div class="min-w-0">
                                     <div class="text-xs text-muted-foreground">{t('oauth.addToSpace')}</div>
                                     <div class="truncate text-sm font-medium text-foreground">{selectedTarget()?.name}</div>

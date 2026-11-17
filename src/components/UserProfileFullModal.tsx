@@ -120,6 +120,7 @@ export const UserProfileFullModal: Component = () => {
               <MessageAvatar
                 name={subject()!.displayName}
                 avatar={subject()!.avatar}
+                user={subject()}
                 class="size-24 border-4 border-card bg-primary text-2xl font-semibold text-primary-foreground shadow-lg shadow-black/30"
               />
               <span class="absolute bottom-1 end-1">

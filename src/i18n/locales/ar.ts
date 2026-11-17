@@ -2526,6 +2526,7 @@ export default {
       changeBanner: 'انقر لتغيير الشعار',
       changeBannerAria: 'تغيير الشعار — اختر صورة من جهازك',
       changeAvatar: 'انقر لتغيير الصورة الرمزية',
+      removeAvatar: 'إزالة الصورة الرمزية',
       changeAvatarAria: 'تغيير الصورة الرمزية — اختر صورة من جهازك',
       mediaHint: 'حوّم على الشعار أو الصورة الرمزية لرؤية تلميح · JPEG أو PNG أو GIF أو WebP · بحد أقصى 8 ميغابايت لكل منهما',
       imageTypeError: 'اختر ملف صورة (JPEG أو PNG أو GIF أو WebP).',

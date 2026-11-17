@@ -176,7 +176,7 @@ export const SystemMessageRow: Component<SystemMessageRowProps> = (props) => {
           }
         >
           <span class="relative shrink-0">
-            <MessageAvatar name={person()?.name ?? '?'} avatar={person()?.avatar} class="size-8 text-xs" />
+            <MessageAvatar name={person()?.name ?? '?'} avatar={person()?.avatar} user={person()} class="size-8 text-xs" />
             <Show when={personId()}>
               <button
                 type="button"

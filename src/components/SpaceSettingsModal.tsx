@@ -74,7 +74,7 @@ const EVERYONE = '@everyone';
 /** A member as this space shows them - nickname and space avatar when set - with the handle. */
 const MemberCell: Component<{ m: SpaceMember }> = (props) => {
   const r = () => resolveProfile(props.m, props.m, props.m.username);
-  return <UserCell size="sm" name={r().name} bot={props.m.bot} username={props.m.username} avatar={r().avatar} />;
+  return <UserCell size="sm" name={r().name} bot={props.m.bot} username={props.m.username} avatar={r().avatar} user={props.m} />;
 };
 
 /** Role color (24-bit RGB). */

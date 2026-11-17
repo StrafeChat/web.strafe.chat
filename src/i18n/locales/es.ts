@@ -2394,6 +2394,7 @@ export default {
       changeBanner: 'Haz clic para cambiar el banner',
       changeBannerAria: 'Cambiar banner — elige una imagen de tu dispositivo',
       changeAvatar: 'Haz clic para cambiar el avatar',
+      removeAvatar: 'Quitar avatar',
       changeAvatarAria: 'Cambiar avatar — elige una imagen de tu dispositivo',
       mediaHint: 'Pasa el ratón por el banner o el avatar para ver una pista · JPEG, PNG, GIF o WebP · máx. 8 MB cada uno',
       imageTypeError: 'Elige un archivo de imagen (JPEG, PNG, GIF o WebP).',

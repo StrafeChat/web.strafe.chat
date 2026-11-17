@@ -61,7 +61,23 @@ An instance administrator can delete an account or a bot for good. Its username 
 
 ### `PATCH` /users/@me
 
-Update the account's profile: `display_name`, `bio`, `about_me`, `pronouns` (free text, max 40 characters; `""` clears it), `birthday_opt_in` (`true` lets spaces celebrate the account's birthday - the server keeps the announcement index itself), `accent_color` (hex), `presence` (`{"status": "online" | "idle" | "dnd" | "invisible", "custom_status": "…"}` - `activities` is not set here but over the gateway). Avatar and banner are uploaded with `POST /users/@me/avatar` and `/users/@me/banner` (multipart `file`). The date of birth itself cannot be changed over the API. The email address is not changed here; see [Email address](#email-address-session-only).
+Update the account's profile: `display_name`, `bio`, `about_me`, `pronouns` (free text, max 40 characters; `""` clears it), `birthday_opt_in` (`true` lets spaces celebrate the account's birthday - the server keeps the announcement index itself), `accent_color` (hex), `presence` (`{"status": "online" | "idle" | "dnd" | "invisible", "custom_status": "…"}` - `activities` is not set here but over the gateway). Avatar and banner are uploaded with `POST /users/@me/avatar` and `/users/@me/banner` (multipart `file`); `PATCH` only clears them (`"avatar": ""`, `"banner": ""`), after which the account shows its [default avatar](#default-avatars). The date of birth itself cannot be changed over the API. The email address is not changed here; see [Email address](#email-address-session-only).
+
+### Default avatars
+
+A user whose `avatar` is empty (`""`, absent or `null`) - and a deleted account's placeholder, which still carries its `id` - is shown with one of eight default avatars, the same way Discord picks a "Default User Avatar". Every instance serves them from its web client, as fixed-size 256x256 PNGs:
+
+```
+https://<web client origin>/avatars/default/<index>.png
+```
+
+```js
+index = (BigInt(homeId) >> 22n) % 8n
+```
+
+`homeId` is the id the user's **home** instance knows them by, so a person has the same default everywhere. For someone from another instance that is the `origin_id` their user objects carry (beside `home_domain`; the `id` is only this instance's copy of them). For a local account, `origin_id` - when present - equals `id`; use `id` when there is no `origin_id`. An id that is missing or not a snowflake gets index `0`. Bots follow the same rule with their user id, which is their application's client id.
+
+The order is part of the contract and never changes: `0` green, `1` teal, `2` blue, `3` violet, `4` pink, `5` red, `6` orange, `7` slate. The same image applies inside a space when the member has no `space_avatar` and no global `avatar`, and wherever an avatar URL fails to load.
 
 ### `GET` /users/@me/spaces — *scope: spaces*
 

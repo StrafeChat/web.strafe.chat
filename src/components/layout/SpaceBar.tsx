@@ -201,7 +201,7 @@ const DmRailIcon: Component<DmRailIconProps> = (props) => {
       >
         <Show
           when={isGroup()}
-          fallback={<MessageAvatar name={name()} avatar={other()?.avatar ?? undefined} class="size-12 text-base" />}
+          fallback={<MessageAvatar name={name()} avatar={other()?.avatar} user={other() ?? uid()} class="size-12 text-base" />}
         >
           <div class="flex size-12 items-center justify-center rounded-full bg-muted ring-1 ring-border/50">
             <i class="fa-solid fa-user-group text-base text-muted-foreground" aria-hidden="true" />

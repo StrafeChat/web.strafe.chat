@@ -65,7 +65,7 @@ const FriendRow: Component<{
   >
     <div class="flex min-w-0 flex-1 items-center gap-3">
       <div class={`relative shrink-0 ${props.muted ? 'opacity-70' : ''}`}>
-        <MessageAvatar name={friendDisplayName(props.rel)} avatar={props.rel.user.avatar} class="size-10 text-sm" />
+        <MessageAvatar name={friendDisplayName(props.rel)} avatar={props.rel.user.avatar} user={props.rel.user} class="size-10 text-sm" />
         <Show when={props.showPresence}>
           <span class="absolute -bottom-px -end-px">
             <PresenceDot userId={props.rel.user.id} class="size-4" />

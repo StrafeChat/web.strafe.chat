@@ -65,7 +65,7 @@ export const MobileNotificationsPanel: Component = () => {
               <For each={requests()}>
                 {(rel) => (
                   <li class="flex items-center gap-3 rounded-xl border border-border/70 bg-card/40 px-3 py-2.5">
-                    <MessageAvatar name={friendDisplayName(rel)} avatar={rel.user.avatar} class="size-9 shrink-0 text-xs" />
+                    <MessageAvatar name={friendDisplayName(rel)} avatar={rel.user.avatar} user={rel.user} class="size-9 shrink-0 text-xs" />
                     <div class="min-w-0 flex-1">
                       <p class="truncate text-sm font-medium text-foreground">{friendDisplayName(rel)}</p>
                       <p class="truncate text-xs text-muted-foreground">{t('mobile.notifications.wantsToBeFriends')}</p>
@@ -103,7 +103,14 @@ export const MobileNotificationsPanel: Component = () => {
                       <Show
                         when={item.isChannel}
                         fallback={
-                          <MessageAvatar name={item.name} avatar={item.avatar ?? undefined} class="size-9 shrink-0 text-xs" />
+                          <Show
+                            when={item.isGroup}
+                            fallback={<MessageAvatar name={item.name} avatar={item.avatar} user={item.avatarUser} class="size-9 shrink-0 text-xs" />}
+                          >
+                            <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted/40 text-muted-foreground">
+                              <i class="fa-solid fa-user-group text-xs" aria-hidden="true" />
+                            </span>
+                          </Show>
                         }
                       >
                         <span class="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted/40 text-muted-foreground">

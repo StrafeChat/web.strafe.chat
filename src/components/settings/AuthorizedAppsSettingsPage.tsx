@@ -68,7 +68,7 @@ export const AuthorizedAppsSettingsPage: Component = () => {
             <For each={grants()}>
               {(g) => (
                 <div class={`${settingsRowShell} items-start`}>
-                  <MessageAvatar name={appName(g)} avatar={g.application?.icon} class="size-10 text-sm" />
+                  <MessageAvatar name={appName(g)} avatar={g.application?.icon} initial class="size-10 text-sm" />
                   <div class="min-w-0 flex-1 space-y-1.5">
                     <div class="flex flex-wrap items-baseline gap-x-2">
                       <span class="truncate text-sm font-medium text-foreground">{appName(g)}</span>
