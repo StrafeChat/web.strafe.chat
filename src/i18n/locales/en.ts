@@ -847,6 +847,23 @@ export default {
     noRolesAssigned: 'No roles assigned.',
     searchRoles: 'Search roles',
     noRolesMatch: 'No roles match.',
+    tabs: {
+      aria: 'Profile sections',
+      profile: 'Profile',
+      mutualFriends: 'Mutual Friends',
+      mutualSpaces: 'Mutual Spaces',
+    },
+    mutual: {
+      loading: 'Looking for shared spaces…',
+      loadFailed: "Some spaces couldn't be checked.",
+      retry: 'Try again',
+      friendsEmptyTitle: 'No mutual friends',
+      friendsEmptyBody: 'None of your friends share a space with {{name}} yet.',
+      spacesEmptyTitle: 'No mutual spaces',
+      spacesEmptyBody: "You and {{name}} aren't in any of the same spaces yet.",
+      openSpace: 'Open {{name}}',
+      sharedSpace: 'Shared space',
+    },
   },
   spaceProfile: {
     edit: 'Edit Space Profile',

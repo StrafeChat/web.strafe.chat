@@ -861,6 +861,23 @@ export default {
     noRolesAssigned: 'Sin roles asignados.',
     searchRoles: 'Buscar roles',
     noRolesMatch: 'Ningún rol coincide.',
+    tabs: {
+      aria: 'Secciones del perfil',
+      profile: 'Perfil',
+      mutualFriends: 'Amigos mutuos',
+      mutualSpaces: 'Espacios mutuos',
+    },
+    mutual: {
+      loading: 'Buscando espacios compartidos…',
+      loadFailed: 'No se pudieron comprobar algunos espacios.',
+      retry: 'Reintentar',
+      friendsEmptyTitle: 'Sin amigos mutuos',
+      friendsEmptyBody: 'Ninguno de tus amigos comparte un espacio con {{name}} todavía.',
+      spacesEmptyTitle: 'Sin espacios mutuos',
+      spacesEmptyBody: 'Todavía no compartes ningún espacio con {{name}}.',
+      openSpace: 'Abrir {{name}}',
+      sharedSpace: 'Espacio compartido',
+    },
   },
   spaceProfile: {
     edit: 'Editar perfil del espacio',

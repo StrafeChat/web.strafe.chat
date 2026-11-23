@@ -861,6 +861,23 @@ export default {
     noRolesAssigned: 'Nenhum cargo atribuído.',
     searchRoles: 'Buscar cargos',
     noRolesMatch: 'Nenhum cargo corresponde.',
+    tabs: {
+      aria: 'Seções do perfil',
+      profile: 'Perfil',
+      mutualFriends: 'Amigos em comum',
+      mutualSpaces: 'Espaços em comum',
+    },
+    mutual: {
+      loading: 'Procurando espaços em comum…',
+      loadFailed: 'Não foi possível verificar alguns espaços.',
+      retry: 'Tentar novamente',
+      friendsEmptyTitle: 'Nenhum amigo em comum',
+      friendsEmptyBody: 'Nenhum dos seus amigos compartilha um espaço com {{name}} ainda.',
+      spacesEmptyTitle: 'Nenhum espaço em comum',
+      spacesEmptyBody: 'Você e {{name}} ainda não compartilham nenhum espaço.',
+      openSpace: 'Abrir {{name}}',
+      sharedSpace: 'Espaço compartilhado',
+    },
   },
   spaceProfile: {
     edit: 'Editar perfil do espaço',
