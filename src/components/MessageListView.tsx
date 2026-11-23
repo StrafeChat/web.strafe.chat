@@ -1256,6 +1256,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                         messages={props.messages}
                         referenced={msg.referenced_message as DecryptedMessage | undefined}
                         participants={resolvedParticipants()}
+                        spaceRoles={props.spaceRoles}
                         currentUserId={currentUserId()}
                         compact={compact()}
                       />
@@ -1565,6 +1566,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                 <SystemMessageRow
                   msg={msg as DecryptedMessage & { system_type: string; system_payload: string }}
                   participants={resolvedParticipants()}
+                  spaceRoles={props.spaceRoles}
                   currentUserId={currentUserId()}
                   messages={props.messages}
                   roomId={props.roomId}

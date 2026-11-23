@@ -37,6 +37,7 @@ import { BotTag } from '../BotTag';
 export interface ReplyTarget {
   /** Author of the message being replied to. */
   name: string;
+  colorHex?: string;
   /** One-line preview of that message ('' when unavailable). */
   preview: string;
   onJump?: () => void;
@@ -740,7 +741,12 @@ export const RoomMessageInput: Component<RoomMessageInputProps> = (props) => {
                   >
                     <i class="fa-solid fa-reply shrink-0 -scale-x-100 text-[11px] text-muted-foreground" aria-hidden="true" />
                     <span class="shrink-0 text-muted-foreground">{t('composer.replyingTo')}</span>
-                    <span class="shrink-0 font-semibold text-foreground">{reply().name}</span>
+                    <span
+                      class={`shrink-0 font-semibold ${reply().colorHex ? '' : 'text-foreground'}`}
+                      style={reply().colorHex ? { color: reply().colorHex } : undefined}
+                    >
+                      {reply().name}
+                    </span>
                     <span class="min-w-0 flex-1 truncate text-muted-foreground">{reply().preview}</span>
                     <Show when={reply().onJump}>
                       <button
