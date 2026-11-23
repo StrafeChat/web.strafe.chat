@@ -861,6 +861,23 @@ export default {
     noRolesAssigned: 'Aucun rôle attribué.',
     searchRoles: 'Rechercher des rôles',
     noRolesMatch: 'Aucun rôle ne correspond.',
+    tabs: {
+      aria: 'Sections du profil',
+      profile: 'Profil',
+      mutualFriends: 'Amis en commun',
+      mutualSpaces: 'Espaces en commun',
+    },
+    mutual: {
+      loading: 'Recherche des espaces en commun…',
+      loadFailed: "Certains espaces n'ont pas pu être vérifiés.",
+      retry: 'Réessayer',
+      friendsEmptyTitle: 'Aucun ami en commun',
+      friendsEmptyBody: "Aucun de vos amis ne partage encore un espace avec {{name}}.",
+      spacesEmptyTitle: 'Aucun espace en commun',
+      spacesEmptyBody: "Vous ne partagez encore aucun espace avec {{name}}.",
+      openSpace: 'Ouvrir {{name}}',
+      sharedSpace: 'Espace partagé',
+    },
   },
   spaceProfile: {
     edit: "Modifier le profil d'espace",

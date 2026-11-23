@@ -89,7 +89,7 @@ const CUSTOM_EMOJI = /^<(a?):([A-Za-z0-9_]{2,32}):(\d+)>/;
  *  Seconds are bounded to 11 digits (year 5138) so the value can never overflow into an
  *  Invalid Date; anything longer simply fails to match here and is rendered as the literal
  *  text it is. A leading `-` allows pre-1970 instants. */
-const DYNAMIC_TIMESTAMP = /^<t:(-?\d{1,11})(?::([tTdDfFR]))?>/;
+const DYNAMIC_TIMESTAMP = /^<t:(-?\d{1,11})(?::([tTdDfFRsS]))?>/;
 
 /** Block openers, all anchored at the start of a line. */
 const HEADING = /^(#{1,3})\s+(.*)$/;

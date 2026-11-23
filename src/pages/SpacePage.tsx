@@ -95,6 +95,7 @@ import {
   memberCanManageNicknames,
   memberCanManageRoles,
   memberHighestRolePosition,
+  memberNameColorHex,
   PermAddReactions,
   PermManageMessages,
   PermManageRooms,
@@ -578,8 +579,10 @@ const SpacePage: Component = () => {
     if (!id) return null;
     const target = roomMessages().find((m) => m.id === id);
     const sender = target ? getSenderDisplay(target.sender_id, allSpaceMembers(), auth.user?.id) : null;
+    const member = target ? allSpaceMembers().find((m) => m.id === target.sender_id) : undefined;
     return {
       name: sender?.name ?? t('room.replyFallback'),
+      colorHex: memberNameColorHex(member?.roles, spaceRolesRes()),
       preview: target ? messagePreviewText(getMessagePreviewSource(target), allSpaceMembers(), auth.user?.id, 120) : '',
       onJump: target ? () => scrollToMessage(id) : undefined,
       onCancel: () => setReplyToMessageId(null),

@@ -86,7 +86,7 @@ export const SpaceInviteLinkEmbed: Component<SpaceInviteLinkEmbedProps> = (props
                   aria-label=""
                 />
               </Show>
-              <div class={`px-4 pb-3 ${banner ? '-mt-8 pt-0' : 'pt-4'}`}>
+              <div class="px-4 pb-3 pt-4">
                 <div class="flex gap-3 items-start">
                   <div
                     class={`size-16 shrink-0 self-start rounded-xl border-2 border-card bg-muted overflow-hidden flex items-center justify-center text-xl font-bold text-primary ${

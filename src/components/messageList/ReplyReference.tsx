@@ -2,6 +2,8 @@ import type { Component } from 'solid-js';
 import { Show, createMemo } from 'solid-js';
 import type { DecryptedMessage } from '../../stores/messages';
 import type { RoomParticipant } from '../../api/rooms';
+import type { SpaceRole } from '../../api/spaces';
+import { memberNameColorHex } from '../../lib/spacePermissions';
 import { getMessagePreviewSource, getSenderDisplay, messagePreviewText } from './utils';
 import { MessageAvatar } from './MessageAvatar';
 import { jumpToMessage } from '../../stores/messages';
@@ -20,6 +22,7 @@ export interface ReplyReferenceProps {
    * back to the loading placeholder; the author still resolves. */
   referenced?: DecryptedMessage;
   participants?: RoomParticipant[];
+  spaceRoles?: SpaceRole[];
   currentUserId?: string;
   /** Compact mode has no avatar gutter, so show a reply glyph instead of relying on the spine. */
   compact?: boolean;
@@ -45,6 +48,16 @@ export const ReplyReference: Component<ReplyReferenceProps> = (props) => {
     // embeds (if any) are not used.
     return messagePreviewText(getMessagePreviewSource(r), props.participants, props.currentUserId, PREVIEW_MAX);
   });
+  const senderNameColor = createMemo(() => {
+    const r = replied();
+    if (!r) return undefined;
+    const p = props.participants?.find((x) => x.id === r.sender_id);
+    return memberNameColorHex((p as { roles?: string[] } | undefined)?.roles, props.spaceRoles);
+  });
+  const senderNameStyle = () => {
+    const color = senderNameColor();
+    return color ? { color } : undefined;
+  };
 
   return (
     <div class="mb-1 flex h-5 min-w-0 items-center gap-1.5 text-xs">
@@ -72,7 +85,12 @@ export const ReplyReference: Component<ReplyReferenceProps> = (props) => {
           }}
         >
           <MessageAvatar name={sender()!.name} avatar={sender()!.avatar} user={sender()} class="size-4 text-[9px] ring-0" />
-          <span class="shrink-0 font-semibold text-foreground/90 group-hover/reply:underline">{sender()!.name}</span>
+          <span
+            class={`shrink-0 font-semibold group-hover/reply:underline ${senderNameColor() ? '' : 'text-foreground/90'}`}
+            style={senderNameStyle()}
+          >
+            {sender()!.name}
+          </span>
           <BotTag bot={sender()!.bot} size="xs" class="ms-0" />
           <span class="min-w-0 truncate text-muted-foreground group-hover/reply:text-foreground/80">
             {preview() || <span class="italic">{t('messages.noText')}</span>}

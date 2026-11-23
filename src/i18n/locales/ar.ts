@@ -908,6 +908,23 @@ export default {
     noRolesAssigned: 'لم تُسند أي أدوار.',
     searchRoles: 'البحث عن الأدوار',
     noRolesMatch: 'لا توجد أدوار مطابقة.',
+    tabs: {
+      aria: 'أقسام الملف الشخصي',
+      profile: 'الملف الشخصي',
+      mutualFriends: 'الأصدقاء المشتركون',
+      mutualSpaces: 'المساحات المشتركة',
+    },
+    mutual: {
+      loading: 'جارٍ البحث عن المساحات المشتركة…',
+      loadFailed: 'تعذّر التحقق من بعض المساحات.',
+      retry: 'إعادة المحاولة',
+      friendsEmptyTitle: 'لا أصدقاء مشتركون',
+      friendsEmptyBody: 'لا يتشارك أي من أصدقائك مساحة مع {{name}} بعد.',
+      spacesEmptyTitle: 'لا مساحات مشتركة',
+      spacesEmptyBody: 'لم تتشارك أنت و{{name}} أي مساحة بعد.',
+      openSpace: 'فتح {{name}}',
+      sharedSpace: 'مساحة مشتركة',
+    },
   },
   spaceProfile: {
     edit: 'تعديل الملف الشخصي في المساحة',

@@ -149,6 +149,14 @@ type PopoverState = {
   spaceModerationContext: SpaceModerationContext | null;
 };
 
+/** The element that opened the current card, kept outside the store so Solid never wraps a DOM node in its proxy. */
+let openAnchorEl: HTMLElement | null = null;
+
+/** Whether a mousedown on `target` landed on the trigger that opened the open card. */
+export function isUserProfilePopoverAnchor(target: Node): boolean {
+  return !!openAnchorEl && openAnchorEl.contains(target);
+}
+
 export const [userProfilePopover, setUserProfilePopover] = createStore<PopoverState>({
   open: false,
   subject: null,
@@ -162,6 +170,7 @@ export const [userProfilePopover, setUserProfilePopover] = createStore<PopoverSt
 });
 
 export function closeUserProfilePopover(): void {
+  openAnchorEl = null;
   setUserProfilePopover({
     open: false,
     subject: null,
@@ -195,6 +204,19 @@ export function openUserProfilePopover(opts: {
   spaceRoleContext?: SpaceMemberRoleEditContext | null;
   spaceModerationContext?: SpaceModerationContext | null;
 }): void {
+  // A second activation of the same trigger closes the card. The outside-mousedown handler
+  // leaves presses on the open trigger alone, so this sees the still-open card instead of
+  // closing on mousedown and immediately reopening on click.
+  if (
+    userProfilePopover.open &&
+    openAnchorEl === opts.anchor &&
+    userProfilePopover.subject?.userId === opts.subject.userId
+  ) {
+    closeUserProfilePopover();
+    return;
+  }
+
+  openAnchorEl = opts.anchor;
   const rect = toAnchorRect(opts.anchor.getBoundingClientRect());
   const left = computeHorizontal(rect);
   const top = computeVertical(rect, FALLBACK_HEIGHT);
