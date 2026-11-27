@@ -2,9 +2,11 @@ import type { Component } from 'solid-js';
 import { createEffect, createMemo, createSignal, For, Match, onCleanup, onMount, Show, Switch } from 'solid-js';
 import { useNavigate } from '@solidjs/router';
 import { MessageAvatar } from './messageList/MessageAvatar';
+import { getUserMutuals } from '../api/users';
 import { ProfileBanner } from './ProfileBanner';
 import { ProfileIdentity } from './ProfileIdentity';
 import { ProfileBirthday } from './ProfileBirthday';
+import { ProfileConnections } from './ProfileConnections';
 import { RolePill } from './RolePill';
 import { MemberRolesEditor } from './MemberRolesEditor';
 import { PresenceDot } from './PresenceDot';
@@ -25,7 +27,6 @@ import { openSafetyNumberModal } from '../stores/safetyNumberModal';
 import { contextMenuState, showContextMenu } from '../stores/contextMenu';
 import type { ContextMenuItem } from '../stores/contextMenu';
 import { buildUserMenuItems } from '../lib/userContextMenu';
-import { spaceMembers, ensureSpaceMembers } from '../stores/spaceMembers';
 import { spaces } from '../stores/spaces';
 import { friendDisplayName, relationships, RelType } from '../stores/relationships';
 import { appSectionLabel } from '../theme/appChrome';
@@ -213,6 +214,8 @@ export const UserProfileFullModal: Component = () => {
   const [mutualLoading, setMutualLoading] = createSignal(false);
   const [mutualLoadedFor, setMutualLoadedFor] = createSignal<string | null>(null);
   const [mutualFailures, setMutualFailures] = createSignal(0);
+  /** The server's answer for the subject: friends of both, spaces both are in (ids). */
+  const [mutualIds, setMutualIds] = createSignal<{ friends: Set<string>; spaces: Set<string> }>({ friends: new Set(), spaces: new Set() });
   let mutualLoadToken = 0;
 
   const canEditMemberRoles = createMemo(() => {
@@ -229,35 +232,16 @@ export const UserProfileFullModal: Component = () => {
     () => !!roleEditCtx() || !!subject()?.spaceRoles?.length,
   );
 
+  // The server knows both accounts' friends and spaces (GET /users/:id/mutuals); the client
+  // only names them, from its own friend list and spaces.
   const sharedSpaces = createMemo(() => {
-    const targetId = subject()?.userId;
-    if (!targetId) return [];
-    return spaces.spaces.filter((space) =>
-      (spaceMembers.bySpaceId[space.id] ?? []).some((member) => member.id === targetId),
-    );
+    const ids = mutualIds().spaces;
+    return spaces.spaces.filter((space) => ids.has(space.id));
   });
 
   const mutualFriends = createMemo(() => {
-    const targetId = subject()?.userId;
-    const shared = sharedSpaces();
-    if (!targetId || shared.length === 0) return [];
-
-    const friendIds = new Set(
-      relationships.relationships
-        .filter((rel) => rel.type === RelType.Friend && rel.user.id !== targetId)
-        .map((rel) => rel.user.id),
-    );
-    if (friendIds.size === 0) return [];
-
-    const sharedFriendIds = new Set<string>();
-    for (const space of shared) {
-      for (const member of spaceMembers.bySpaceId[space.id] ?? []) {
-        if (friendIds.has(member.id)) sharedFriendIds.add(member.id);
-      }
-    }
-    return relationships.relationships.filter(
-      (rel) => rel.type === RelType.Friend && sharedFriendIds.has(rel.user.id),
-    );
+    const ids = mutualIds().friends;
+    return relationships.relationships.filter((rel) => rel.type === RelType.Friend && ids.has(rel.user.id));
   });
 
   const tabItems = (): { id: ProfileTab; label: string }[] => {
@@ -290,10 +274,10 @@ export const UserProfileFullModal: Component = () => {
     setMutualLoadedFor(null);
     setMutualFailures(0);
     setMutualLoading(false);
+    setMutualIds({ friends: new Set(), spaces: new Set() });
   });
 
-  // Member lists are the only user-space source the API has. Fetch them when another
-  // profile opens so the tab counts can appear; ensureSpaceMembers reuses loaded lists.
+  // Asked of the server when another profile opens, so the tab counts can appear.
   createEffect(() => {
     const current = subject();
     if (!userProfileFullModal.open || !current || isSelf()) return;
@@ -305,9 +289,14 @@ export const UserProfileFullModal: Component = () => {
     const token = ++mutualLoadToken;
     setMutualLoading(true);
     setMutualFailures(0);
-    const results = await Promise.allSettled(spaces.spaces.map((space) => ensureSpaceMembers(space.id)));
-    if (token !== mutualLoadToken) return;
-    setMutualFailures(results.filter((result) => result.status === 'rejected').length);
+    try {
+      const m = await getUserMutuals(userId);
+      if (token !== mutualLoadToken) return;
+      setMutualIds({ friends: new Set(m.friends ?? []), spaces: new Set(m.spaces ?? []) });
+    } catch {
+      if (token !== mutualLoadToken) return;
+      setMutualFailures(1);
+    }
     setMutualLoadedFor(userId);
     setMutualLoading(false);
   }
@@ -491,6 +480,8 @@ export const UserProfileFullModal: Component = () => {
                       <p class="text-sm text-muted-foreground">{t('profile.noBio')}</p>
                     </div>
                   </Show>
+
+                  <ProfileConnections userId={subject()?.userId} class="border-t border-border pt-4" />
 
                   <Show when={showRolesSection()}>
                     <div class="border-t border-border pt-4">

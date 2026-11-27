@@ -192,3 +192,15 @@ export async function uploadBanner(file: File): Promise<MeResponse> {
 function getToken(): string | null {
   return localStorage.getItem('session_token');
 }
+
+/** What the signed-in account and another have in common, as ids: friends of both, and the
+ * spaces both are in. Both lists are already the caller's own (friends, spaces), so the
+ * client names them from its stores. Empty for oneself and across a block. */
+export interface UserMutuals {
+  friends: string[];
+  spaces: string[];
+}
+
+export function getUserMutuals(userId: string) {
+  return api<UserMutuals>(`/users/${userId}/mutuals`);
+}
