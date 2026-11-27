@@ -6,6 +6,7 @@ export type UserSettingsSection =
   | 'account'
   | 'spaceProfiles'
   | 'security'
+  | 'privacy'
   | 'devices'
   | 'authorizedApps'
   | 'appearance'

@@ -16,6 +16,9 @@ import { isRoomMuted, NotifyModeAll, NotifyModeMentions, NotifyModeNone } from '
 import { resolveProfile, resolveSpaceUser, type ProfileBase } from './spaceProfile';
 import { absoluteUrl, userAvatarUrl } from './userAvatar';
 import { t } from '../i18n';
+import { webhookAuthorOf } from './webhookMessages';
+import { bridgePlatformLabel } from './bridgePlatforms';
+import { appearance } from '../stores/appearance';
 
 const NAVIGATE_EVENT = 'strafe:navigate';
 
@@ -118,12 +121,34 @@ function senderProfile(roomId: string, senderId: string, spaceId: string | undef
   return { name: r.name, icon: absoluteUrl(userAvatarUrl(r.avatar, base ?? senderId)) };
 }
 
-function mentionsMe(roomId: string, content: string): boolean {
+/**
+ * A webhook message's sender as a notification names it: "CI (webhook)", with the webhook's
+ * avatar or its default (picked from the webhook id, like a person's from theirs).
+ */
+function webhookSenderProfile(msg: Parameters<typeof webhookAuthorOf>[0]): { name: string; icon: string } | null {
+  const w = webhookAuthorOf(msg, t('webhooks.defaultName'));
+  if (!w) return null;
+  // "Alice (Discord)" for a bridged person, "CI (webhook)" for a webhook: never a bare name
+  // that could pass for a member.
+  const name = w.bridge
+    ? t('bridges.notificationName', { name: w.name, platform: bridgePlatformLabel(w.bridge.platform, w.bridge.platformName) })
+    : t('webhooks.notificationName', { name: w.name });
+  const avatar = appearance.externalAvatars ? w.avatar : undefined;
+  return { name, icon: absoluteUrl(userAvatarUrl(avatar, w.puppetId ?? w.webhookId)) };
+}
+
+function mentionsMe(
+  roomId: string,
+  content: string,
+  /** The server's verdict, used instead of the text for a webhook message: its @everyone and
+   * role pings notify only when the webhook was allowed them (the text stays either way). */
+  serverFlags?: { mention_everyone?: boolean; mentions?: string[]; mention_roles?: string[] }
+): boolean {
   const me = auth.user?.id;
   if (!me) return false;
-  if (mentionsEveryone(content)) return true;
-  if (extractMentionedUserIds(content).includes(me)) return true;
-  const roleIds = extractMentionedRoleIds(content);
+  if (serverFlags ? serverFlags.mention_everyone === true : mentionsEveryone(content)) return true;
+  if ((serverFlags ? (serverFlags.mentions ?? []) : extractMentionedUserIds(content)).includes(me)) return true;
+  const roleIds = serverFlags ? (serverFlags.mention_roles ?? []) : extractMentionedRoleIds(content);
   if (roleIds.length === 0) return false;
   for (const [spaceId, list] of Object.entries(spaces.spaceRoomsBySpaceId)) {
     if (!list.some((r) => r.id === roomId)) continue;
@@ -148,7 +173,7 @@ export function maybeNotifyMessage(roomId: string, messageId: string): void {
   if (focusedHere && !prefs.whileFocused) return;
 
   const spaceId = roomSpaceId(roomId);
-  const sender = senderProfile(roomId, msg.sender_id, spaceId);
+  const sender = webhookSenderProfile(msg) ?? senderProfile(roomId, msg.sender_id, spaceId);
   const ctx = roomContext(roomId, sender.name);
   if (!ctx) return;
   if (ctx.muted) return;
@@ -170,7 +195,7 @@ export function maybeNotifyMessage(roomId: string, messageId: string): void {
     mode = prefs.pmMode;
   }
   if (mode === 'none') return;
-  if (mode === 'mentions' && !mentionsMe(roomId, body)) return;
+  if (mode === 'mentions' && !mentionsMe(roomId, body, msg.webhook_id ? msg : undefined)) return;
 
   if (prefs.sounds) playNotificationSound(prefs.volume);
   if (prefs.desktop) {

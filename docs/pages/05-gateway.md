@@ -116,7 +116,8 @@ Payloads carry the same ids, the way Discord's carry `channel_id` and `guild_id`
 | `rooms` | Private messages and group PMs (room types `1` and `2`) with their `recipients` |
 | `relationships` | Friends and friend requests; a friend's `user.presence` carries their `activities` |
 | `spaces` | Every space the account is in, each with its `roles` (sorted by position) and settings |
-| `space_rooms` | Space id → the rooms you can see in it (text `3`, voice `4`, section `5`, and active threads `6` with their `thread` block), each with `e2ee_enabled`, `slowmode_seconds` and its permission overrides. `SPACE_CREATE` carries a space's list in this same form |
+| `space_rooms` | Space id → the rooms you can see in it (text `3`, voice `4`, section `5`, and active threads `6` with their `thread` block), each with `e2ee_enabled`, `slowmode_seconds` and its permission overrides. A bridged room also has `bridges`: the [summaries](/docs/rest/#the-bridge-object) of what it is bridged with. `SPACE_CREATE` carries a space's list in this same form |
+| `bridges` | Bots only: the [bridges](/docs/rest/#bridges) your application drives, as full objects. Their [feed](#bridge-feed) comes on this connection with no subscription |
 | `voice_states`, `calls` | Who is in which voice room, and ringing PM calls |
 
 Member lists are not in `READY` - fetch `GET /spaces/:id/members` when you need one and keep it current from the member events.
@@ -182,10 +183,10 @@ Room events reach every subscriber of the room; space events reach every subscri
 
 | `t` | `d` |
 | --- | --- |
-| `MESSAGE_CREATE` | The [message](/docs/rest/#the-message-object), plus `space_id` when the room is in a space. System notices (joins, leaves) have `sender_id: "0"` and a `system_type`. `embeds` is always there, an array (empty when the message has none) |
+| `MESSAGE_CREATE` | The [message](/docs/rest/#the-message-object), plus `space_id` when the room is in a space. System notices (joins, leaves) have `sender_id: "0"` and a `system_type`. `embeds` is always there, an array (empty when the message has none). A message a [webhook](/docs/rest/#webhooks) posted has `webhook_id` and `masquerade` - most bots skip those to avoid loops |
 | `MESSAGE_UPDATE` | The edited message, with `space_id` likewise. It carries the message's whole `embeds` list as it now stands - an edit that removed them sends `[]` |
 | `MESSAGE_DELETE` | `{"room_id", "space_id"?, "message_id"}` |
-| `MESSAGE_REACTION_ADD` | `{"room_id", "space_id"?, "message_id", "user_id", "emoji"}` - `emoji` is a unicode string or `"custom:<id>"` |
+| `MESSAGE_REACTION_ADD` | `{"room_id", "space_id"?, "message_id", "user_id", "emoji"}` - `emoji` is a unicode string or `"custom:<id>"`. A bridged user's reaction adds `puppet: {"bridge_id", "puppet_id", "platform", "platform_name", "name", "avatar"}` - `platform_name` is the label to show on their tag ("Discord", "Mastodon"), `name` and `avatar` (`null` when they have none) who reacted - and `user_id` is then their `puppet_id`, not an account |
 | `MESSAGE_REACTION_REMOVE` | same |
 | `ROOM_PINS_UPDATE` | `{"room_id", "space_id"?, "message_id", "user_id", "pinned", "pinned_at", "last_pin_timestamp"}` - a message was pinned (`pinned: true`, with `pinned_at`) or unpinned; `last_pin_timestamp` is when the room's newest remaining pin was made, `null` when none |
 | `TYPING_START` | `{"room_id", "space_id"?, "user_id", "timestamp"}` (unix seconds) |
@@ -199,6 +200,9 @@ Room events reach every subscriber of the room; space events reach every subscri
 | `SPACE_ROOM_DELETE` | space or account | `{"space_id", "room_id"}`. On your own channel it can also mean you lost sight of the room, not that it is gone |
 | `SPACE_ROOM_OVERRIDE_UPDATE` / `_DELETE` | space | `{"space_id", "room_id", "role_id", "allow", "deny"}` |
 | `SPACE_ROOM_USER_OVERRIDE_UPDATE` / `_DELETE` | space | `{"space_id", "room_id", "user_id", "allow", "deny"}` |
+| `WEBHOOKS_UPDATE` | room | `{"space_id", "room_id"}` - something about the room's [webhooks](/docs/rest/#webhooks) changed (one was created, edited, moved, had its URL reset or was deleted). It says only that, like Discord's: refetch `GET /rooms/:id/webhooks` if you show them. Sent to the room's viewers |
+| `BRIDGE_CREATE` / `BRIDGE_UPDATE` | room | The [bridge summary](/docs/rest/#the-bridge-object) with `space_id` and `room_id`: the room was bridged, or a bridge was paused, resumed, disabled or renamed. Sent to the room's viewers - everyone may know what their room is bridged with. The driving bot also gets the full object on its feed |
+| `BRIDGE_DELETE` | room | `{"id", "space_id", "room_id"}` - the bridge was removed |
 | `ROOM_CREATE` | account | A PM or group PM you are in was opened - by someone else, or by you on another connection - or you were added to one (ahead of the notice in the room that says so). The room. Subscribes you to it |
 | `ROOM_UPDATE` | account | A PM's name or settings changed |
 | `ROOM_LEAVE` | account | `{"room_id"}` - you were removed from a group PM |
@@ -209,6 +213,20 @@ Room events reach every subscriber of the room; space events reach every subscri
 A room event goes to the space's channel only when nobody is kept out of the room; otherwise it goes to each member who can view it, on their own channel, with `space_id` in the payload.
 
 Who can view a room can change without the room changing. When an override, the Section a room is synced to, or a member's roles change, when a role's View Room, Administrator or Manage Threads bit changes, or when a role is deleted, members who can view the affected rooms get `SPACE_ROOM_CREATE` and members who cannot get `SPACE_ROOM_DELETE`, which also ends their subscription to the room. A thread sent this way carries its `thread` block with the member's own `joined`; archived threads are not sent.
+
+### Bridge feed
+
+What a [bridge](/docs/rest/#bridges) copies to its platform. Only the bot that drives the bridge gets these, on its own connection, already filtered: messages of people who said no to bridges in that space are not there, nor the bridge's own messages, other bridges' or bots' and webhooks' unless the bridge's settings say so, system notices, threads, members of other instances, or anything from before the bridge existed (see [Bridges and privacy](/docs/rest/#bridges-and-privacy)). Copy from these, never from `MESSAGE_CREATE`.
+
+| `t` | `d` |
+| --- | --- |
+| `BRIDGE_MESSAGE_CREATE` | `{"bridge_id", "room_id", "message", "reply_external"?}` - the [message](/docs/rest/#the-message-object) as a bot sees it; `referenced_message` is removed when its author is filtered out, and `reply_external: {"external_message_id", "part"}` is there when the message it answers has a copy on the platform |
+| `BRIDGE_MESSAGE_UPDATE` | `{"bridge_id", "room_id", "message", "external": [{"external_message_id", "part"}]}` |
+| `BRIDGE_MESSAGE_DELETE` | `{"bridge_id", "room_id", "message_id", "external": [...], "by_moderator"}` - sent whenever a copy is known, even for someone who opted out, so the copies can go |
+| `BRIDGE_REACTION_ADD` / `BRIDGE_REACTION_REMOVE` | `{"bridge_id", "room_id", "message_id", "external", "user", "emoji"}` - `user` is the reactor's public user object |
+| `BRIDGE_OPTOUT` | `{"bridge_id", "user_id", "external": [...]}` - someone switched to "don't copy my messages": the copies of theirs still in the map, to delete on the platform. The bridge never gets a list of who said no |
+| `BRIDGE_PUPPET_BLOCK` / `BRIDGE_PUPPET_UNBLOCK` | `{"bridge_id", "puppet_id", "external_user_id"}` - a moderator blocked or unblocked a bridged user |
+| `BRIDGE_UPDATE` / `BRIDGE_DELETE` | The full bridge (settings, state) / `{"id", "room_id"}` |
 
 ### Threads
 
@@ -235,6 +253,8 @@ Sent space-wide when everyone can view the parent channel, otherwise only to the
 | `SPACE_MEMBER_UPDATE` | space | `{"space_id", "user_id", "role_ids", "nick", "space_avatar", "space_banner", "space_about_me", "space_bio", "space_pronouns"}` - roles or the space profile changed; always the full state, so replace all seven fields |
 | `SPACE_ROLE_CREATE` / `SPACE_ROLE_UPDATE` | space | The [role](/docs/rest/#the-role-object) |
 | `SPACE_ROLE_DELETE` | space | `{"space_id", "role_id"}` |
+| `SPACE_EMOJI_CREATE` / `SPACE_EMOJI_UPDATE` | space | The [emoji](/docs/rest/#the-emoji-object). A bulk upload sends one `SPACE_EMOJI_CREATE` per emoji |
+| `SPACE_EMOJI_DELETE` | space | `{"space_id", "emoji_id"}` |
 
 ### Account
 

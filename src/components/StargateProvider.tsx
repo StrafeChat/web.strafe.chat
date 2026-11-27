@@ -1,4 +1,6 @@
 import { initPinHandlers } from '../stores/pinnedMessages';
+import { initWebhooksHandler } from '../stores/webhooks';
+import { initBridgesHandler } from '../stores/bridges';
 import type { Component } from 'solid-js';
 import { createEffect, onMount, onCleanup } from 'solid-js';
 import { auth } from '../stores/auth';
@@ -37,6 +39,8 @@ export const StargateProvider: Component<{ children?: import('solid-js').JSX.Ele
     initPresenceHandler();
     initReadStateHandler();
     initPinHandlers();
+    initWebhooksHandler();
+    initBridgesHandler();
     initTypingHandler();
     initRelationshipHandlers();
     initRoomHandlers();

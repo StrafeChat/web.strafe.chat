@@ -5,7 +5,7 @@ import type { RoomParticipant } from '../../api/rooms';
 import type { SpaceRole } from '../../api/spaces';
 import { appActivityRail, appSectionLabel } from '../../theme/appChrome';
 import { IconButton } from '../ui/IconButton';
-import { getMessageBodyText, getSenderDisplay } from '../messageList';
+import { getMessageBodyText, getMessageSenderDisplay, getSenderDisplay } from '../messageList';
 import { MessageAvatar } from '../messageList/MessageAvatar';
 import { MessageBody } from '../messageList/MessageBody';
 import { MessageAttachments } from '../messageList/MessageAttachments';
@@ -191,7 +191,7 @@ export const RoomSearchPanel: Component<RoomSearchPanelProps> = (props) => {
                   <For each={group.matches}>
                     {(hit) => {
                       const msg = hit.message;
-                      const sender = () => getSenderDisplay(msg.sender_id, props.participants, currentUserId());
+                      const sender = () => getMessageSenderDisplay(msg, props.participants, currentUserId());
                       return (
                         <div
                           role="button"

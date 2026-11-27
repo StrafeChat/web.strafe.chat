@@ -27,6 +27,8 @@ function ensureBioLinkClickHook(): void {
   document.addEventListener(
     'click',
     (ev) => {
+      // Already taken: a link to a room here opens in the app (lib/openRoomLink).
+      if (ev.defaultPrevented) return;
       const a = (ev.target as Element | null)?.closest?.('a[data-bio-link]');
       if (!(a instanceof HTMLAnchorElement)) return;
       const href = a.getAttribute('href') ?? '';

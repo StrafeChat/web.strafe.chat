@@ -14,6 +14,8 @@ export interface CustomEmoji {
 
 export const EMOJI_MAX_BYTES = 512 * 1024;
 export const EMOJIS_PER_SPACE = 50;
+/** The most images one `POST /spaces/:id/emojis/bulk` takes (equinox MaxEmojiBulkFiles). */
+export const EMOJI_BULK_MAX_FILES = 10;
 
 export function listSpaceEmojis(spaceId: string) {
   return api<CustomEmoji[]>(`/spaces/${spaceId}/emojis`);
@@ -34,6 +36,27 @@ export function uploadSpaceEmoji(spaceId: string, file: File, name: string) {
   form.append('file', file, file.name);
   form.append('name', name);
   return api<CustomEmoji>(`/spaces/${spaceId}/emojis`, { method: 'POST', body: form });
+}
+
+/** One item's outcome in a bulk upload, in request order: `emoji` when created, else `error`. */
+export interface BulkEmojiResult {
+  index: number;
+  name: string;
+  status: number;
+  emoji?: CustomEmoji;
+  error?: string;
+}
+
+/**
+ * Upload up to EMOJI_BULK_MAX_FILES emoji in one request. One refusal never fails the rest:
+ * the answer lists a result per item. Only a refusal of the whole request (permission, a
+ * malformed form, the rate limit) throws.
+ */
+export function uploadSpaceEmojisBulk(spaceId: string, items: { file: File; name: string }[]) {
+  const form = new FormData();
+  for (const item of items) form.append('file', item.file, item.file.name);
+  for (const item of items) form.append('name', item.name);
+  return api<{ created: number; results: BulkEmojiResult[] }>(`/spaces/${spaceId}/emojis/bulk`, { method: 'POST', body: form });
 }
 
 export function renameSpaceEmoji(spaceId: string, emojiId: string, name: string) {

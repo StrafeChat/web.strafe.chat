@@ -3,7 +3,7 @@ import { For, Show } from 'solid-js';
 import type { DecryptedMessage } from '../../stores/messages';
 import type { RoomParticipant } from '../../api/rooms';
 import type { SpaceRole } from '../../api/spaces';
-import { getMessageBodyText, getSenderDisplay } from '../messageList';
+import { getMessageBodyText, getMessageSenderDisplay, getSenderDisplay } from '../messageList';
 import { MessageAvatar } from '../messageList/MessageAvatar';
 import { MessageBody } from '../messageList/MessageBody';
 import { MessageAttachments } from '../messageList/MessageAttachments';
@@ -61,7 +61,7 @@ export const RoomPinnedPanel: Component<RoomPinnedPanelProps> = (props) => {
           <div class="space-y-2">
             <For each={props.messages}>
               {(msg) => {
-                const sender = () => getSenderDisplay(msg.sender_id, props.participants, currentUserId());
+                const sender = () => getMessageSenderDisplay(msg, props.participants, currentUserId());
                 const body = () => getMessageBodyText(msg);
                 function openMentionProfile(userId: string, anchor: HTMLElement) {
                   const s = getSenderDisplay(userId, props.participants, currentUserId());

@@ -23,7 +23,7 @@ import {
 } from '../../api/developers';
 import { BotTag } from '../BotTag';
 import { confirmDialog } from '../../stores/confirmDialog';
-import { PermAdministrator, SPACE_ROLE_PERM_GROUPS } from '../../lib/spacePermissions';
+import { hasPerm, PermAdministrator, SPACE_ROLE_PERM_GROUPS, togglePerm as togglePermBit } from '../../lib/spacePermissions';
 import { Button } from '../ui/Button';
 import { Input } from '../ui/Input';
 import { Textarea } from '../ui/Textarea';
@@ -380,7 +380,7 @@ export const DevelopersSettingsPage: Component = () => {
     });
   }
   function togglePerm(bit: number, on: boolean) {
-    setGenPerms((cur) => (on ? cur | bit : cur & ~bit));
+    setGenPerms((cur) => togglePermBit(cur, bit, on));
   }
   const genHasBot = () => genScopes().has('bot');
   /** Every scope but a bare `bot` needs somewhere to deliver the code. */
@@ -859,7 +859,7 @@ export const DevelopersSettingsPage: Component = () => {
                         <For each={group.rows}>
                           {(r) => (
                             <Checkbox
-                              checked={(genPerms() & r.bit) !== 0}
+                              checked={hasPerm(genPerms(), r.bit)}
                               onChange={(on) => togglePerm(r.bit, on)}
                               label={r.label}
                             />
@@ -869,7 +869,7 @@ export const DevelopersSettingsPage: Component = () => {
                     )}
                   </For>
                 </div>
-                <Show when={(genPerms() & PermAdministrator) !== 0}>
+                <Show when={hasPerm(genPerms(), PermAdministrator)}>
                   <p class="mt-2 text-xs text-destructive">{t('settings.developers.administratorWarning')}</p>
                 </Show>
               </div>

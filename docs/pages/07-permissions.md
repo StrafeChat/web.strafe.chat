@@ -7,7 +7,7 @@ description: Every permission bit, how a member's permissions resolve from roles
 
 Permissions are a bitmask: each permission is one bit, a role's `permissions` is the OR of the bits it grants, and a member's permissions are the OR of their roles'. The same numbers appear in role objects, room overrides, the `permissions` parameter of install links, and `GET /users/@me/spaces`.
 
-Add the values of the bits you need to build a mask; test a bit with `(mask & bit) !== 0`.
+Add the values of the bits you need to build a mask. Masks now go past 32 bits (Manage Webhooks is bit 31, Masquerade bit 32), so never use JavaScript's `&`, `|`, `~` or `<<` on them - those are 32-bit operators: bit 31 comes out negative and bit 32 and up disappear (`1 << 32` is `1`, View Room). Test a bit with BigInt, `(BigInt(mask) & (1n << 31n)) !== 0n`, or with 64-bit integers in other languages.
 
 ## The bits
 
@@ -44,8 +44,19 @@ Add the values of the bits you need to build a mask; test a bit with `(mask & bi
 | 28 | `268435456` | Change Nickname | space | Set or clear their own nickname in the space (on for `@everyone` by default) |
 | 29 | `536870912` | Manage Nicknames | space | Change or clear the nicknames of members ranked below them, and reset those members' space profiles (avatar, banner, pronouns, About Me, bio); their own nickname too |
 | 30 | `1073741824` | Embed Links | room | Post a message with rich [embeds](/docs/embeds/) (bots), on top of Send Messages. On for `@everyone` by default; spaces created before it existed have it wherever Send Messages was granted |
+| 31 | `2147483648` | Manage Webhooks | room | Create, edit, reset and delete the room's [webhooks](/docs/rest/#webhooks), and allow one to ping `@everyone` (with Mention @everyone too); change, pause and remove the room's [bridges](/docs/rest/#bridges). Executing a webhook needs only its token. Off by default |
+| 32 | `4294967296` | Masquerade | room | Run [bridges](/docs/rest/#bridges) that post as people from other platforms: a bot needs it, with Manage Webhooks, to create a bridge, and keeps needing it (with View Room and Send Messages) to post through one. Off by default; cleared without Send Messages |
 
-New permissions are only ever appended; existing values never change meaning. Bit 30 is the highest a signed 32-bit integer holds: masks now reach `2147483647`, so keep them in a 64-bit integer (or a JavaScript number, not a 32-bit int) if you compute with them.
+New permissions are only ever appended; existing values never change meaning.
+
+### Writing permissions: send a string
+
+Every value is below 2^53, so a JSON number reads exactly in every language, and responses keep sending numbers. **Writes** are different: a client from before bit 31 does its maths in 32 bits, so the server reads the two forms differently wherever a permission is written (role `permissions`, override `allow`/`deny`, the `permissions` of an install or an OAuth2 authorize):
+
+- a **decimal string** (`"6442450944"`) is the full value. It must be a whole number below 2^53 made of known bits, or the request fails with `400 unknown_permission_bits`;
+- a **JSON number** is the legacy form: the server keeps its low 31 bits (which also repairs a negative number an old client produced) and **keeps whatever bits 31 and up were already stored** (none on a create).
+
+So send permissions as strings, and keep them in a 64-bit integer, a BigInt, or a JavaScript number you never apply bitwise operators to. A client that still sends numbers keeps working, but cannot set or clear Manage Webhooks or Masquerade.
 
 ### Useful masks
 
@@ -53,8 +64,8 @@ New permissions are only ever appended; existing values never change meaning. Bi
 | --- | --- |
 | Read and post (View Room + Send Messages + Read Message History) | `7` |
 | `@everyone` in a new space (read, post, attach files, embed links, react, external emoji, invite, start public threads and talk in threads, join and talk in voice, change their nickname) | `1436786719` |
-| Every room-scoped bit | `1342144639` |
-| Every bit | `2147483647` |
+| Every room-scoped bit | `7784595583` |
+| Every bit | `8589934591` |
 
 ## How permissions resolve
 
@@ -65,7 +76,7 @@ For a member in a space:
 3. **Administrator?** If bit 11 is set, the member has every permission in every room; stop here.
 4. **Room overrides**, applied in order to the space-wide mask for that room: the `@everyone` override, then overrides of the member's other roles (every deny first, then every allow), then the member's own user override (deny, then allow). Overrides can only touch room-scoped bits.
 5. **Threads** have no overrides of their own: a thread resolves against its channel's effective overrides (and so a synced section's), with the thread bits above on top. A private thread yields no permissions at all to anyone who is neither a member nor a Manage Threads holder.
-6. **Two implicit rules**, the same as Discord's: without View Room the member has no permission at all in that room, whatever the bits say; and without Send Messages they cannot Attach Files, Embed Links or Mention @everyone either.
+6. **Two implicit rules**, the same as Discord's: without View Room the member has no permission at all in that room, whatever the bits say; and without Send Messages they cannot Attach Files, Embed Links, Mention @everyone or Masquerade either (Manage Webhooks stays: it is management, not posting).
 
 Administrator also grants every space-scoped permission for management actions (adding bots, editing the space, invites, emoji, roles, nicknames, kicks and bans), though role hierarchy still applies to Administrators - only the owner is above it.
 
@@ -73,7 +84,7 @@ Administrator also grants every space-scoped permission for management actions (
 
 ## Room overrides
 
-A room can allow or deny room-scoped bits per role or per member, independent of the space-wide mask. Each override is `{allow, deny}`; a bit in `deny` removes the permission for that role in that room, a bit in `allow` grants it, and a bit in neither leaves the space-wide value. Text rooms accept the text bits (0–6, 23 and 30); voice rooms accept View Room and the voice bits (15–22). Managing overrides needs **Manage Roles**, and you cannot grant through an override what you do not hold yourself.
+A room can allow or deny room-scoped bits per role or per member, independent of the space-wide mask. Each override is `{allow, deny}`; a bit in `deny` removes the permission for that role in that room, a bit in `allow` grants it, and a bit in neither leaves the space-wide value. Text rooms accept the text bits (0–6, 23–27 and 30–32); voice rooms accept View Room, the voice bits (15–22) and Manage Webhooks (31), since a voice room's text can hold webhooks. Managing overrides needs **Manage Roles**, and you cannot grant through an override what you do not hold yourself.
 
 ## Hierarchy
 

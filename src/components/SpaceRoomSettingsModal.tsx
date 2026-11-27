@@ -11,7 +11,16 @@ import {
   type SpaceMember,
   type SpaceRoom,
 } from '../api/spaces';
-import { hasPerm, PermViewChannel, ROOM_OVERRIDE_PERM_ROWS, VOICE_ROOM_OVERRIDE_PERM_ROWS } from '../lib/spacePermissions';
+import {
+  hasPerm,
+  orPerms,
+  parsePerm,
+  PermViewChannel,
+  ROOM_OVERRIDE_PERM_ROWS,
+  togglePerm,
+  VOICE_ROOM_OVERRIDE_PERM_ROWS,
+  withoutPerms,
+} from '../lib/spacePermissions';
 import {
   applyRoomRoleOverride,
   applyRoomUserOverride,
@@ -29,10 +38,15 @@ import { Tabs } from './ui/Tabs';
 import { Toggle } from './ui/Toggle';
 import { TriStateToggle, type TriState } from './ui/TriStateToggle';
 import { SettingsNav, SettingsPanel, SettingsShell } from './settings';
+import { RoomWebhooksPage } from './settings/RoomWebhooksPage';
+import { RoomBridgesPage } from './settings/RoomBridgesPage';
+import { roomBridges } from '../stores/bridges';
+import { refreshRoomWebhooks, webhooks } from '../stores/webhooks';
+import { canBlockBridgedIn, canManageRolesIn, canManageWebhooksIn, canMentionEveryoneIn } from '../lib/roomPerms';
 import { zLayer } from '../theme/appChrome';
 import { t } from '../i18n';
 
-type Page = 'general' | 'encryption' | 'voice' | 'overrides';
+type Page = 'general' | 'encryption' | 'voice' | 'overrides' | 'integrations';
 
 const ROOM_TYPE_TEXT = 3;
 const ROOM_TYPE_VOICE = 4;
@@ -85,7 +99,17 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
 
   createEffect(() => {
     if (!props.open || !props.room) return;
-    setPage(props.canManageRooms || !props.canManageRoles ? 'general' : 'overrides');
+    // Open on a page the viewer can use: Manage Webhooks alone (a room override can grant it
+    // without Manage Rooms or Manage Roles) lands on Integrations.
+    setPage(
+      props.canManageRooms
+        ? 'general'
+        : props.canManageRoles
+          ? 'overrides'
+          : canIntegrations()
+            ? 'integrations'
+            : 'general'
+    );
     setErr('');
     setName(props.room.name ?? '');
     setTopic(props.room.topic ?? '');
@@ -97,6 +121,17 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
 
   const isTextRoom = () => props.room?.type === ROOM_TYPE_TEXT;
   const isVoiceRoom = () => props.room?.type === ROOM_TYPE_VOICE;
+  /** Webhooks live in text rooms and a voice room's text, for whoever has Manage Webhooks there. */
+  const canWebhooks = () =>
+    (isTextRoom() || isVoiceRoom()) && !!props.room && canManageWebhooksIn(props.spaceId, props.room.id);
+  /** What the room is bridged with (public summaries, kept current by BRIDGE_* events). */
+  const roomBridgeList = () => (props.room ? roomBridges(props.spaceId, props.room.id) : []);
+  /** Kick Members or Manage Messages here: may lift blocks on bridged people. */
+  const canModerateBridges = () => !!props.room && canBlockBridgedIn(props.spaceId, props.room.id);
+  /** Bridges live in text rooms: their managers (Manage Webhooks) and, for the blocks, the
+   * room's moderators once it is bridged. */
+  const canBridges = () => isTextRoom() && (canWebhooks() || (canModerateBridges() && roomBridgeList().length > 0));
+  const canIntegrations = () => canWebhooks() || canBridges();
   const overrideRows = () => (isVoiceRoom() ? VOICE_ROOM_OVERRIDE_PERM_ROWS : ROOM_OVERRIDE_PERM_ROWS);
   const voiceDirty = () => (props.room?.user_limit ?? 0) !== userLimit() || (props.room?.bitrate || 64_000) !== bitrate();
 
@@ -116,7 +151,7 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
   const isPrivateCategory = () => {
     const eid = everyoneRoleId();
     const ov = roleOverrides()?.find((o) => o.role_id === eid);
-    return !!ov && (ov.deny & PermViewChannel) !== 0;
+    return !!ov && hasPerm(ov.deny, PermViewChannel);
   };
 
   async function togglePrivateCategory(next: boolean) {
@@ -129,13 +164,13 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
       const existing = roleOverrides()?.find((o) => o.role_id === eid);
       const now = new Date().toISOString();
       if (next) {
-        const allow = (existing?.allow ?? 0) & ~PermViewChannel;
-        const deny = (existing?.deny ?? 0) | PermViewChannel;
+        const allow = withoutPerms(existing?.allow, PermViewChannel);
+        const deny = orPerms(existing?.deny, PermViewChannel);
         await putRoomPermissionOverride(props.spaceId, room.id, eid, { allow, deny });
         applyRoomRoleOverride(props.spaceId, room.id, { role_id: eid, allow, deny, created_at: now, updated_at: now });
       } else {
-        const allow = (existing?.allow ?? 0) & ~PermViewChannel;
-        const deny = (existing?.deny ?? 0) & ~PermViewChannel;
+        const allow = withoutPerms(existing?.allow, PermViewChannel);
+        const deny = withoutPerms(existing?.deny, PermViewChannel);
         if (allow === 0 && deny === 0) {
           await deleteRoomPermissionOverride(props.spaceId, room.id, eid);
           removeRoomRoleOverride(props.spaceId, room.id, eid);
@@ -183,6 +218,18 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
   }
   const e2eeStored = () => props.room?.e2ee_enabled === true;
   const e2eeDirty = () => e2ee() !== e2eeStored();
+  // Turning encryption on switches the room's webhooks off (the server disables them): say so
+  // before it happens, when the viewer can see them.
+  createEffect(() => {
+    const room = props.room;
+    if (props.open && room && page() === 'encryption' && canWebhooks() && !webhooks.byRoom[room.id]) {
+      void refreshRoomWebhooks(room.id).catch(() => undefined);
+    }
+  });
+  const activeWebhookCount = () =>
+    props.room ? (webhooks.byRoom[props.room.id] ?? []).filter((w) => !w.disabled_reason).length : 0;
+  /** Bridges a turn to encryption would switch off (everyone who can see the room knows them). */
+  const activeBridgeCount = () => roomBridgeList().filter((b) => b.state !== 'disabled').length;
 
   createEffect(() => {
     const list = roles();
@@ -199,13 +246,13 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
     if (!props.room || page() !== 'overrides') return;
     if (targetType() === 'role') {
       const o = roleOverrides()?.find((x) => x.role_id === selectedRoleId());
-      setAllowMask(o?.allow ?? 0);
-      setDenyMask(o?.deny ?? 0);
+      setAllowMask(parsePerm(o?.allow));
+      setDenyMask(parsePerm(o?.deny));
       return;
     }
     const o = userOverrides()?.find((x) => x.user_id === selectedUserId());
-    setAllowMask(o?.allow ?? 0);
-    setDenyMask(o?.deny ?? 0);
+    setAllowMask(parsePerm(o?.allow));
+    setDenyMask(parsePerm(o?.deny));
   });
 
   function overrideState(bit: number): TriState {
@@ -214,8 +261,8 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
     return 'neutral';
   }
   function setOverrideState(bit: number, state: TriState) {
-    setAllowMask((prev) => (state === 'allow' ? prev | bit : prev & ~bit));
-    setDenyMask((prev) => (state === 'deny' ? prev | bit : prev & ~bit));
+    setAllowMask((prev) => togglePerm(prev, bit, state === 'allow'));
+    setDenyMask((prev) => togglePerm(prev, bit, state === 'deny'));
   }
 
   async function saveGeneral() {
@@ -337,6 +384,7 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
               ...(isTextRoom() ? [{ id: 'encryption' as const, label: t('roomSettings.encryption'), icon: 'fa-lock' }] : []),
               ...(isVoiceRoom() ? [{ id: 'voice' as const, label: t('roomSettings.voice'), icon: 'fa-volume-high' }] : []),
               { id: 'overrides', label: t('roomSettings.overridesShort'), icon: 'fa-shield-halved' },
+              ...(canIntegrations() ? [{ id: 'integrations' as const, label: t('roomSettings.integrations'), icon: 'fa-plug' }] : []),
             ],
           },
         ]}
@@ -411,6 +459,20 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
               />
             </div>
 
+            <Show when={e2ee() && !e2eeStored() && (activeWebhookCount() > 0 || activeBridgeCount() > 0)}>
+              <p class="flex gap-2 rounded-lg border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-foreground" role="note" data-e2ee-integrations-warning>
+                <i class="fa-solid fa-plug-circle-xmark mt-0.5 text-amber-500" aria-hidden="true" />
+                <span>
+                  <Show when={activeWebhookCount() > 0}>{t('webhooks.e2eeWarning', { count: activeWebhookCount() })} </Show>
+                  <Show when={activeBridgeCount() > 0}>
+                    {activeWebhookCount() > 0
+                      ? t('bridges.e2eeWarningAlso', { count: activeBridgeCount() })
+                      : t('bridges.e2eeWarning', { count: activeBridgeCount() })}
+                  </Show>
+                </span>
+              </p>
+            </Show>
+
             <div class="space-y-2 rounded-xl border border-border/60 bg-card/10 p-4">
               <p class="text-sm font-medium text-foreground">{t('roomSettings.e2eeWhatChanges')}</p>
               <ul class="list-disc space-y-1.5 ps-5 text-xs leading-snug text-muted-foreground">
@@ -469,6 +531,33 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
               </Button>
             </div>
           </div>
+        </Show>
+
+        <Show when={page() === 'integrations' && props.room}>
+          {(room) => (
+            <div class="space-y-8">
+              <Show when={canWebhooks()}>
+                <RoomWebhooksPage
+                  spaceId={props.spaceId}
+                  roomId={room().id}
+                  roomLabel={roomLabel()}
+                  canManage={canWebhooks()}
+                  canMentionEveryone={canMentionEveryoneIn(props.spaceId, room().id)}
+                  encrypted={liveRoom()?.e2ee_enabled === true}
+                />
+              </Show>
+              <Show when={canBridges()}>
+                <RoomBridgesPage
+                  spaceId={props.spaceId}
+                  roomId={room().id}
+                  canManage={canWebhooks()}
+                  canManageRoles={props.canManageRoles || canManageRolesIn(props.spaceId, room().id)}
+                  canModerate={canModerateBridges()}
+                  encrypted={liveRoom()?.e2ee_enabled === true}
+                />
+              </Show>
+            </div>
+          )}
         </Show>
 
         <Show when={page() === 'overrides'}>

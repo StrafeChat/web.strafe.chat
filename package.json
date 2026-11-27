@@ -12,6 +12,7 @@
     "docs:build": "node scripts/docs-plugin.mjs dist",
     "check:i18n": "node scripts/check-i18n.mjs",
     "check:default-avatar": "node scripts/check-default-avatar.mjs",
+    "check:perm-bits": "node scripts/check-perm-bits.mjs",
     "serve": "vite preview"
   },
   "license": "MIT",

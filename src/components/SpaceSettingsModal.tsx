@@ -24,6 +24,7 @@ import {
   memberCanManageRoles,
   memberCanManageSpace,
   memberHighestRolePosition,
+  parsePerm,
   ROOM_OVERRIDE_PERM_ROWS,
   SPACE_ROLE_PERM_GROUPS,
   togglePerm,
@@ -281,7 +282,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
       hexToInt(roleColorHex()) !== (r.color ?? 0) ||
       roleHoist() !== !!r.hoist ||
       roleMentionable() !== !!r.mentionable ||
-      permMask() !== r.permissions
+      permMask() !== parsePerm(r.permissions)
     );
   }
 
@@ -311,7 +312,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
     setRoleColorHex(intToHex(next.color ?? 0));
     setRoleHoist(!!next.hoist);
     setRoleMentionable(!!next.mentionable);
-    setPermMask(next.permissions);
+    setPermMask(parsePerm(next.permissions));
   });
 
   createEffect(() => {
@@ -322,15 +323,15 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
       const id = selectedRoleId();
       if (id === '' || ovs === undefined) return;
       const o = ovs.find((x) => x.role_id === id);
-      setAllowMask(o?.allow ?? 0);
-      setDenyMask(o?.deny ?? 0);
+      setAllowMask(parsePerm(o?.allow));
+      setDenyMask(parsePerm(o?.deny));
       return;
     }
     const targetUserId = selectedOverrideUserId();
     if (!targetUserId || userOvs === undefined) return;
     const o = userOvs.find((x) => x.user_id === targetUserId);
-    setAllowMask(o?.allow ?? 0);
-    setDenyMask(o?.deny ?? 0);
+    setAllowMask(parsePerm(o?.allow));
+    setDenyMask(parsePerm(o?.deny));
   });
 
   /** Discord-style tri-state for one permission bit, derived from the allow/deny masks. */
@@ -340,8 +341,8 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
     return 'neutral';
   }
   function setOverrideState(bit: number, state: TriState) {
-    setAllowMask((prev) => (state === 'allow' ? prev | bit : prev & ~bit));
-    setDenyMask((prev) => (state === 'deny' ? prev | bit : prev & ~bit));
+    setAllowMask((prev) => togglePerm(prev, bit, state === 'allow'));
+    setDenyMask((prev) => togglePerm(prev, bit, state === 'deny'));
   }
 
   // Clear the "add members" search when switching roles, so it doesn't carry over.
@@ -419,7 +420,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
       // Discord starts a new role as a copy of @everyone's current permissions, not empty -
       // toggles read as "on" for whatever a member can already do, off only for the extras
       // this role is meant to grant.
-      const everyonePerms = roles()?.find(isEveryoneRole)?.permissions ?? 0;
+      const everyonePerms = parsePerm(roles()?.find(isEveryoneRole)?.permissions);
       const role = await createSpaceRole(props.spaceId, { name: n, permissions: everyonePerms });
       // It goes in at the bottom, just above @everyone (the roles it moved up arrive as one
       // SPACE_UPDATE); open it, since that is where the person goes next.
@@ -632,7 +633,7 @@ export const SpaceSettingsModal: Component<SpaceSettingsModalProps> = (props) =>
     setRoleColorHex(intToHex(r.color ?? 0));
     setRoleHoist(!!r.hoist);
     setRoleMentionable(!!r.mentionable);
-    setPermMask(r.permissions);
+    setPermMask(parsePerm(r.permissions));
   }
 
   const panelTitle = () => {

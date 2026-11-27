@@ -6,6 +6,8 @@ import { formatSystemMessageText, getSenderDisplay } from './utils';
 import { MessageAvatar } from './MessageAvatar';
 import { ReplyReference } from './ReplyReference';
 import { formatMessageTimestamp, formatTimeOfDay } from '../../lib/utils/datetime';
+import { BRIDGES_LEARN_MORE } from '../../lib/bridgePlatforms';
+import { t } from '../../i18n';
 
 type SystemMessage = DecryptedMessage & { system_type: string; system_payload: string };
 
@@ -92,6 +94,10 @@ function metaFor(msg: SystemMessage, payload: Record<string, string>): EventMeta
       return icon('fa-phone', TONES.emerald);
     case 'call_ended':
       return icon('fa-phone-slash', TONES.neutral);
+    case 'bridge_created':
+      return icon('fa-bridge', TONES.sky, !!payload.actor_id);
+    case 'bridge_deleted':
+      return icon('fa-bridge-circle-xmark', TONES.neutral, !!payload.actor_id);
     default:
       return icon('fa-circle-info', TONES.neutral);
   }
@@ -214,6 +220,19 @@ export const SystemMessageRow: Component<SystemMessageRowProps> = (props) => {
             )}
           </Show>
           {label().after}
+          {/* A bridge's notice links to what bridges do with messages and how to opt out. */}
+          <Show when={props.msg.system_type === 'bridge_created' || props.msg.system_type === 'bridge_deleted'}>
+            {' '}
+            <a
+              href={BRIDGES_LEARN_MORE}
+              target="_blank"
+              rel="noopener"
+              class="whitespace-nowrap font-medium text-primary hover:underline"
+              data-bridge-learn-more
+            >
+              {t('bridges.learnMore')}
+            </a>
+          </Show>
         </p>
         <time
           class="shrink-0 self-center text-[10px] tabular-nums text-muted-foreground/50"

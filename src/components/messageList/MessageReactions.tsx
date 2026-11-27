@@ -6,15 +6,27 @@ import { Emoji } from '../emoji/Emoji';
 import { Tooltip } from '../ui/Tooltip';
 import { resolveSpaceUser } from '../../lib/spaceProfile';
 import { t } from '../../i18n';
+import { bridgePlatformLabel } from '../../lib/bridgePlatforms';
 
 const CUSTOM_PREFIX = 'custom:';
+
+/** A reactor's name: "Alice (Discord)" for a bridged person (a puppet id is nobody here, so
+ * it never goes through the member list), else the member's name in this space. */
+function reactorName(u: Reactor, spaceId?: string): string {
+  const b = u.puppet ?? (u.bridge ? { platform: u.bridge.platform, platform_name: u.bridge.platform_name } : undefined);
+  if (b) {
+    const name = u.display_name || u.username || t('webhooks.defaultName');
+    return t('bridges.notificationName', { name, platform: bridgePlatformLabel(b.platform, b.platform_name) });
+  }
+  return resolveSpaceUser(spaceId, u.id, u, u.username).name;
+}
 
 /** The server sends reactors with their global profile; in a space room each name is
  * overlaid with that member's nickname from the member list, as the author rows are. */
 function reactorLabel(users: (Reactor | null)[], spaceId?: string): string {
   // A deleted reactor arrives as a `deleted` placeholder (resolved to "Deleted User"); an older
   // server sent null for it, which must not take the tooltip down.
-  const names = users.filter((u): u is Reactor => !!u).map((u) => resolveSpaceUser(spaceId, u.id, u, u.username).name);
+  const names = users.filter((u): u is Reactor => !!u).map((u) => reactorName(u, spaceId));
   if (names.length <= 3) return names.join(', ');
   return t('messages.reactions.andOthers', { names: names.slice(0, 3).join(', '), count: names.length - 3 });
 }

@@ -19,6 +19,7 @@ import { openMediaViewer } from '../../stores/mediaViewer';
 import { previewUrlsFor } from '../../lib/linkPreviewUrls';
 import { previewUrlsBesideEmbeds } from '../../lib/embeds/messageEmbeds';
 import { isExternalLink, requestOpenExternalLink } from '../../stores/externalLink';
+import { findRoomLinkTarget, roomLinkFromUrl, type RoomLinkTarget } from '../../lib/roomLinks';
 import { spaces } from '../../stores/spaces';
 import type { RoomParticipant } from '../../api/rooms';
 import type { SpaceRole } from '../../api/spaces';
@@ -67,6 +68,66 @@ function findChannel(roomId: string): { spaceId: string; name: string } | null {
   return null;
 }
 
+/** The icon a room link's pill shows for its room. */
+function roomLinkIcon(target: RoomLinkTarget): string {
+  if (target.notes) return 'fa-note-sticky';
+  switch (target.type) {
+    case 1:
+      return 'fa-user';
+    case 2:
+      return 'fa-user-group';
+    case 4:
+      return 'fa-volume-high';
+    case 6:
+      return 'fa-comments';
+    default:
+      return 'fa-hashtag';
+  }
+}
+
+/**
+ * A bare link to a room or message here (lib/roomLinks), drawn as Discord draws one: a pill
+ * with the room's name, and a message marker when it points at a message - instead of a web
+ * preview of the app's own page. Clicking it opens the room in the app (the room-link listener
+ * in lib/openRoomLink); it stays a real link, so Ctrl-click and "copy link" still work. A room
+ * this client does not hold, or may not see, keeps the plain link: a click explains.
+ */
+const RoomLinkPill: Component<{ href: string; fallback: import('solid-js').JSX.Element }> = (props) => {
+  const target = createMemo(() => {
+    const link = roomLinkFromUrl(props.href);
+    return link ? findRoomLinkTarget(link) : null;
+  });
+  return (
+    <Show when={target()} fallback={props.fallback}>
+      {(tg) => {
+        const label = () =>
+          tg().messageId
+            ? t('messages.roomLink.jumpToMessage', { name: tg().name })
+            : t('messages.roomLink.openRoom', { name: tg().name });
+        return (
+          <a
+            href={props.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            class={`${brandPillClickable} inline-flex max-w-full items-baseline gap-1 align-baseline`}
+            title={label()}
+            aria-label={label()}
+            data-room-link={tg().messageId ? 'message' : 'room'}
+            onClick={guardClick(props.href)}
+          >
+            <i class={`fa-solid ${roomLinkIcon(tg())} text-[0.8em]`} aria-hidden="true" />
+            <span class="truncate">{tg().name}</span>
+            <Show when={tg().messageId}>
+              <i class="fa-solid fa-chevron-right text-[0.6em] opacity-70" aria-hidden="true" />
+              <i class="fa-regular fa-message text-[0.8em]" aria-hidden="true" />
+            </Show>
+          </a>
+        );
+      }}
+    </Show>
+  );
+};
+
 /** Discord-style "jumbo" emoji: a message that is nothing but a few emoji renders them big. */
 const JUMBO_MAX = 10;
 
@@ -108,8 +169,11 @@ const Spoiler: Component<{ children: (open: () => boolean) => import('solid-js')
 };
 
 /** A link's click handler: an external link goes through the "leaving Strafe" check (which
- * shows where a masked link really goes); Shift+click skips it. */
+ * shows where a masked link really goes); Shift+click skips it. A link to a room here has
+ * already been taken by the app's room-link listener (lib/openRoomLink), which prevents the
+ * default. */
 export const guardClick = (href: string) => (e: MouseEvent) => {
+  if (e.defaultPrevented) return;
   if (!isExternalLink(href)) return;
   if (e.shiftKey) return;
   e.preventDefault();
@@ -397,12 +461,7 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
                 target="_blank"
                 rel="noopener noreferrer"
                 class="text-primary underline underline-offset-2 break-words hover:text-primary/90 cursor-pointer"
-                onClick={(e) => {
-                  if (!isExternalLink(href)) return;
-                  if (e.shiftKey) return;
-                  e.preventDefault();
-                  requestOpenExternalLink(href);
-                }}
+                onClick={guardClick(href)}
               >
                 {seg.text}
               </a>
@@ -423,12 +482,7 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
               rel="noopener noreferrer"
               title={props.embedded && seg.text !== href ? href : undefined}
               class="text-primary underline underline-offset-2 break-words hover:text-primary/90 cursor-pointer"
-              onClick={(e) => {
-                if (!isExternalLink(href)) return;
-                if (e.shiftKey) return; // Shift+click: bypass modal, open directly
-                e.preventDefault();
-                requestOpenExternalLink(href);
-              }}
+              onClick={guardClick(href)}
             >
               {seg.text}
             </a>
@@ -446,6 +500,10 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
                 </div>
               </Show>
             );
+          }
+          // A bare link to a room or message here: a pill that opens it in the app.
+          if (!props.embedded && seg.text === href && roomLinkFromUrl(href)) {
+            return <RoomLinkPill href={href} fallback={linkAnchor()} />;
           }
           return linkAnchor();
         }

@@ -1,6 +1,7 @@
 import { api, getApiUrl } from './client';
 import { publicWebOrigin } from '../lib/runtimeConfig';
 import { ApiError } from './ApiError';
+import { toWire, type PermWire } from '../lib/permBits';
 
 /**
  * Developer platform: OAuth2 applications and their bots. An application's client_id is its
@@ -145,7 +146,8 @@ export interface InstallTarget {
   name: string;
   name_acronym: string;
   icon: string;
-  grantable_permissions: number;
+  /** A permission mask: read it with parsePerm (a number today, maybe a string later). */
+  grantable_permissions: PermWire;
   /** The instance hosting the space when it is not this one: the bot is added through it. */
   hosted_on?: string;
 }
@@ -155,7 +157,8 @@ export interface AuthorizeInfo {
   scopes: OAuthScope[];
   /** Present when `bot` is among the scopes. */
   bot?: BotProfile;
-  permissions?: number;
+  /** The requested bot permissions; read with parsePerm. */
+  permissions?: PermWire;
   spaces?: InstallTarget[];
 }
 
@@ -188,7 +191,7 @@ export interface AuthorizeResult {
   /** Where to send the browser (with ?code=&state=), or "" for a bare bot install. */
   location: string;
   space_id?: string;
-  permissions?: number;
+  permissions?: PermWire;
 }
 
 /** Records consent (installing the bot when asked) and returns the redirect location. */
@@ -222,7 +225,7 @@ export interface AuthorizeUrlOptions {
 function authorizeQuery(opts: AuthorizeUrlOptions): string {
   const params = new URLSearchParams({ response_type: 'code', client_id: opts.clientId, scope: opts.scopes.join(' ') });
   if (opts.redirectUri) params.set('redirect_uri', opts.redirectUri);
-  if (opts.permissions) params.set('permissions', String(opts.permissions));
+  if (opts.permissions) params.set('permissions', toWire(opts.permissions));
   if (opts.spaceId) params.set('space_id', opts.spaceId);
   if (opts.state) params.set('state', opts.state);
   return params.toString();

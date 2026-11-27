@@ -8,7 +8,7 @@ import { MessageAvatar } from '../components/messageList/MessageAvatar';
 import { Button } from '../components/ui/Button';
 import { Select } from '../components/ui/Select';
 import { Checkbox } from '../components/ui/Checkbox';
-import { PermAdministrator, SPACE_ROLE_PERM_ROWS } from '../lib/spacePermissions';
+import { andPerms, hasAnyPerm, hasPerm, orPerms, parsePerm, PermAdministrator, SPACE_ROLE_PERM_ROWS, togglePerm, toWire } from '../lib/spacePermissions';
 import {
   authCardClass,
   authCardContentClass,
@@ -92,13 +92,13 @@ const OAuthAuthorizePage: Component = () => {
   const [granted, setGranted] = createSignal<number>(0);
   const spaceLocked = () => params.disable_space_select === 'true' && targets().some((s) => s.id === params.space_id);
   const selectedTarget = () => targets().find((s) => s.id === spaceId());
-  const grantable = () => selectedTarget()?.grantable_permissions ?? 0;
+  const grantable = () => parsePerm(selectedTarget()?.grantable_permissions);
   /** The permission rows the application asked for, in the role editor's order. */
   const requestedRows = createMemo(() => {
-    const bits = info()?.permissions ?? 0;
-    return SPACE_ROLE_PERM_ROWS.filter((r) => (bits & r.bit) !== 0);
+    const bits = parsePerm(info()?.permissions);
+    return SPACE_ROLE_PERM_ROWS.filter((r) => hasPerm(bits, r.bit));
   });
-  const canGrant = (bit: number) => (grantable() & (bit | PermAdministrator)) !== 0;
+  const canGrant = (bit: number) => hasAnyPerm(grantable(), orPerms(bit, PermAdministrator));
 
   // Seed the picker (the link may name a space) and the checked permissions once the
   // request is known, and re-seed the permissions when the space changes: what can be
@@ -114,11 +114,13 @@ const OAuthAuthorizePage: Component = () => {
     const d = info();
     if (!d?.bot) return;
     const g = grantable();
-    setGranted((d.permissions ?? 0) & (g & PermAdministrator ? ~0 : g));
+    // An Administrator may grant everything asked for; anyone else only what they hold.
+    const asked = parsePerm(d.permissions);
+    setGranted(hasPerm(g, PermAdministrator) ? asked : andPerms(asked, g));
   });
 
   function togglePermission(bit: number, on: boolean) {
-    setGranted((cur) => (on ? cur | bit : cur & ~bit));
+    setGranted((cur) => togglePerm(cur, bit, on));
   }
 
   function describeError(e: unknown): string {
@@ -142,7 +144,7 @@ const OAuthAuthorizePage: Component = () => {
           return;
         }
         req.space_id = spaceId();
-        req.permissions = String(granted());
+        req.permissions = toWire(granted());
       }
       const res = await authorize(req);
       if (res.location) {
@@ -337,7 +339,7 @@ const OAuthAuthorizePage: Component = () => {
                                   {(r) => (
                                     <li>
                                       <Checkbox
-                                        checked={(granted() & r.bit) !== 0}
+                                        checked={hasPerm(granted(), r.bit)}
                                         disabled={!canGrant(r.bit) || targets().length === 0}
                                         onChange={(on) => togglePermission(r.bit, on)}
                                         label={r.label}

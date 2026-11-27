@@ -29,7 +29,7 @@ import {
   type UiDensity,
 } from '../../stores/appearance';
 import type { ThemeDefinition } from '../../theme/themes';
-import { setEmojiProvider, setEmojiSkinTone, setGifProvider } from '../../stores/appearance';
+import { setEmojiProvider, setEmojiSkinTone, setExternalAvatars, setGifProvider } from '../../stores/appearance';
 import { EMOJI_ATTRIBUTIONS, EMOJI_PROVIDERS, getEmojiProvider, type EmojiProviderId } from '../../lib/emoji/providers';
 import { GIF_PROVIDERS, type GifProviderId } from '../../lib/gif/providers';
 import { SKIN_TONES } from '../../lib/emoji/data';
@@ -443,6 +443,18 @@ export const AppearanceSettingsPage: Component = () => {
                 label={t('settings.appearance.chat.botEmbeds')}
                 checked={(settings as SettingsData).botEmbeds !== false}
                 onChange={(on) => setBotEmbeds(on)}
+              />
+            }
+          />
+          <SettingRow
+            icon="fa-bridge"
+            title={t('settings.appearance.chat.externalAvatars')}
+            description={t('settings.appearance.chat.externalAvatarsDescription')}
+            control={
+              <Toggle
+                label={t('settings.appearance.chat.externalAvatars')}
+                checked={appearance.externalAvatars}
+                onChange={(on) => setExternalAvatars(on)}
               />
             }
           />

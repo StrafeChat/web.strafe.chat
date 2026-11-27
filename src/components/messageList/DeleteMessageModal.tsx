@@ -3,7 +3,7 @@ import { Show } from 'solid-js';
 import type { DecryptedMessage } from '../../stores/messages';
 import type { RoomParticipant } from '../../api/rooms';
 import { formatMessageTimestamp } from '../../lib/utils/datetime';
-import { getMessageBodyText, getSenderDisplay, formatSystemMessageText, isSystemMessage } from './utils';
+import { getMessageBodyText, getMessageSenderDisplay, formatSystemMessageText, isSystemMessage } from './utils';
 import { MessageAvatar } from './MessageAvatar';
 import { ResponsiveDialog } from '../ui/ResponsiveDialog';
 import { Button } from '../ui/Button';
@@ -22,7 +22,7 @@ export const DeleteMessageModal: Component<DeleteMessageModalProps> = (props) =>
   <Show when={props.pending}>
     {(pd) => {
       const msg = () => pd().message;
-      const sender = () => getSenderDisplay(msg().sender_id, props.participants, props.currentUserId);
+      const sender = () => getMessageSenderDisplay(msg(), props.participants, props.currentUserId);
       const system = () => isSystemMessage(msg());
       const senderName = () => (system() ? t('messages.system.default') : sender().name);
       const preview = () =>

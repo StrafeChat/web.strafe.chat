@@ -51,9 +51,32 @@ const ACTION_ICON: Record<string, string> = {
   member_voice_deafen: 'fa-volume-xmark',
   member_voice_move: 'fa-arrow-right-arrow-left',
   member_voice_disconnect: 'fa-phone-slash',
+  webhook_create: 'fa-plug',
+  webhook_update: 'fa-plug',
+  webhook_delete: 'fa-plug-circle-xmark',
+  webhook_token_reset: 'fa-key',
+  bridge_create: 'fa-bridge',
+  bridge_update: 'fa-bridge',
+  bridge_delete: 'fa-bridge-circle-xmark',
+  bridge_puppet_block: 'fa-user-slash',
+  bridge_puppet_unblock: 'fa-user-check',
+  bridge_consent_update: 'fa-user-shield',
 };
 
-const DESTRUCTIVE = new Set(['room_delete', 'role_delete', 'member_kick', 'member_ban_add', 'member_profile_reset', 'invite_delete', 'emoji_delete', 'override_delete', 'member_voice_disconnect']);
+const DESTRUCTIVE = new Set([
+  'room_delete',
+  'role_delete',
+  'member_kick',
+  'member_ban_add',
+  'member_profile_reset',
+  'invite_delete',
+  'emoji_delete',
+  'override_delete',
+  'member_voice_disconnect',
+  'webhook_delete',
+  'bridge_delete',
+  'bridge_puppet_block',
+]);
 
 /** Most changes are an {old, new} pair; a space-profile reset's is just the list of fields it
  * cleared (`{"fields": ["avatar", "bio"]}`). */
@@ -148,7 +171,21 @@ export const SpaceAuditLogPage: Component<Props> = (props) => {
         return `${who} · #${room?.name ?? roomId}`;
       }
       case 'space_update':
+      case 'bridge_consent_update':
         return t('space.thisSpace');
+      // A webhook's or bridge's name is in the change set (they may be gone by now).
+      case 'webhook_create':
+      case 'webhook_update':
+      case 'webhook_delete':
+      case 'webhook_token_reset':
+      case 'bridge_create':
+      case 'bridge_update':
+      case 'bridge_delete':
+        return nameFromChanges() ?? e.target_id;
+      // The bridged person, by the name the block recorded (never their id on the platform).
+      case 'bridge_puppet_block':
+      case 'bridge_puppet_unblock':
+        return nameFromChanges() ?? t('bridges.audit.bridgedUser');
       default:
         return e.target_id;
     }

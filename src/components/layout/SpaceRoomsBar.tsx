@@ -47,6 +47,8 @@ import { ChevronDownIcon } from './spaceRooms/RoomTypeIcon';
 import { SpaceChannelRow } from './spaceRooms/SpaceChannelRow';
 import { t } from '../../i18n';
 import { publicWebOrigin } from '../../lib/runtimeConfig';
+import { canManageWebhooksIn } from '../../lib/roomPerms';
+import { openSpaceBridgeConsent } from '../../stores/bridgeConsentDialog';
 
 const ROOM_TYPE_TEXT = 3;
 const ROOM_TYPE_VOICE = 4;
@@ -349,9 +351,10 @@ export const SpaceRoomsBar: Component = () => {
     showContextMenu(e, [
       {
         // Manage Roles opens it too: room permission overrides live there (Discord's rule).
+        // So does Manage Webhooks in this room, for its Integrations page.
         label: t('space.roomSettings'),
         icon: 'fa-gear',
-        disabled: !(canManageRooms() || canManageRoles()),
+        disabled: !(canManageRooms() || canManageRoles() || canManageWebhooksIn(sid, room.id)),
         onClick: () => setEditingRoom(room),
       },
       ...(msgId && unread
@@ -692,6 +695,22 @@ export const SpaceRoomsBar: Component = () => {
                   >
                     <span>{t('spaceProfile.edit')}</span>
                     <i class="fa-solid fa-id-badge text-[13px] text-muted-foreground" aria-hidden />
+                  </button>
+                  {/* Every member decides whether bridges here copy their messages to other
+                      platforms (spec 5.9), bridged rooms or not yet. */}
+                  <button
+                    type="button"
+                    role="menuitem"
+                    class={`${appMenuItemDefault} justify-between`}
+                    data-space-bridge-privacy
+                    onClick={() => {
+                      setSpaceMenuOpen(false);
+                      const sid = spaceId();
+                      if (sid) openSpaceBridgeConsent(sid);
+                    }}
+                  >
+                    <span>{t('bridges.consent.menuItem')}</span>
+                    <i class="fa-solid fa-bridge text-[13px] text-muted-foreground" aria-hidden />
                   </button>
                   <Show when={showSpaceSettings()}>
                     <button

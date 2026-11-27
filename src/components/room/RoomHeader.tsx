@@ -1,4 +1,4 @@
-import type { Component } from 'solid-js';
+import type { Component, JSX } from 'solid-js';
 import { Show } from 'solid-js';
 import { PresenceDot } from '../PresenceDot';
 import { appPageHeader, appPageTitle } from '../../theme/appChrome';
@@ -27,6 +27,8 @@ export interface RoomHeaderProps {
   pmOtherUserId: string | undefined;
   /** Show the end-to-end-encrypted badge next to the name. */
   e2ee?: boolean;
+  /** More badges after the name (a space room's "Bridged: Discord"). */
+  badges?: JSX.Element;
   isGroup: boolean;
   messageCompact: boolean;
   onToggleCompact: () => void;
@@ -72,7 +74,9 @@ export interface RoomHeaderProps {
 
 export const RoomHeader: Component<RoomHeaderProps> = (props) => (
   <div class={`${appPageHeader} justify-between gap-3`}>
-    <div class="flex min-w-0 flex-1 items-center gap-2">
+    {/* overflow-hidden: when the header is too narrow even for the badges (the name has
+        already shrunk to nothing), they are clipped rather than painted over the buttons. */}
+    <div class="flex min-w-0 flex-1 items-center gap-2 overflow-hidden">
       <MobileRailsOpenButton />
       <Show when={props.parentName}>
         {(parent) => (
@@ -107,6 +111,7 @@ export const RoomHeader: Component<RoomHeaderProps> = (props) => (
           </span>
         </Tooltip>
       </Show>
+      {props.badges}
       <Show when={props.topic?.trim()}>
         {(topic) => (
           <>

@@ -22,3 +22,4 @@ export { DevelopersSettingsPage } from './DevelopersSettingsPage';
 export { AuthorizedAppsSettingsPage } from './AuthorizedAppsSettingsPage';
 export { DesktopSettingsPage } from './DesktopSettingsPage';
 export { ActivitySettingsPage } from './ActivitySettingsPage';
+export { PrivacySettingsPage } from './PrivacySettingsPage';

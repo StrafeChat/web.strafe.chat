@@ -112,6 +112,13 @@ const SERVER_MESSAGE_TO_KEY: Record<string, string> = {
   'invalid file size': 'settings.profile.imageSizeError',
   'could not read file': 'settings.profile.uploadFailed',
   'could not store image': 'settings.profile.uploadFailed',
+  // Custom emoji (spaces/service_emoji.go, handler_emoji.go). "emoji images must be under
+  // N KB" carries the limit and is handled by lib/emojiBulk's emojiUploadErrorText.
+  'emoji names are 2-32 letters, numbers, or underscores': 'spaceEmoji.nameRule',
+  'an emoji with that name already exists in this space': 'spaceEmoji.nameTaken',
+  'this space has reached its custom emoji limit': 'spaceEmoji.limitReached',
+  'unsupported image type (use png, jpg, gif, or webp)': 'spaceEmoji.bulk.problemType',
+  'could not store emoji': 'spaceEmoji.uploadFailed',
   // A 1:1 PM (send or call) whose other account an administrator deleted.
   'this account no longer exists': 'errors.api.recipientDeleted',
   // Admin account deletion (instance/account_delete_handler.go); the codes below say the same.
@@ -219,6 +226,48 @@ const CODE_TO_KEY: Record<string, string> = {
   // A 1:1 PM whose other account was deleted refuses sends and calls.
   recipient_deleted: 'errors.api.recipientDeleted',
   confirm_mismatch: 'errors.api.deleteConfirmMismatch',
+  // Webhooks (spec section 12) and the string permission rule.
+  invalid_avatar: 'errors.api.invalidAvatar',
+  unknown_permission_bits: 'errors.api.unknownPermissionBits',
+  missing_permissions: 'errors.api.missingPermission',
+  room_encrypted: 'errors.api.roomEncrypted',
+  unknown_webhook: 'errors.api.unknownWebhook',
+  invalid_webhook_token: 'errors.api.invalidWebhookToken',
+  invalid_allowed_mentions: 'errors.api.invalidAllowedMentions',
+  unsupported_field: 'errors.api.unsupportedField',
+  empty_message: 'errors.api.emptyMessage',
+  thread_not_in_room: 'errors.api.threadNotInRoom',
+  thread_locked: 'errors.api.threadLocked',
+  unknown_message: 'errors.api.unknownMessage',
+  // Bridges (spec sections 5 and 12).
+  invalid_platform: 'errors.api.invalidPlatform',
+  invalid_bridge_token: 'errors.api.invalidBridgeToken',
+  unknown_bridge: 'errors.api.unknownBridge',
+  unknown_puppet: 'errors.api.unknownPuppet',
+  unknown_external_message: 'errors.api.unknownExternalMessage',
+  external_message_conflict: 'errors.api.externalMessageConflict',
+  puppet_cannot_send: 'errors.api.puppetCannotSend',
+  puppet_blocked: 'errors.api.puppetBlocked',
+  invalid_consent: 'errors.api.invalidConsent',
+};
+
+/** Why a bridge is not running (`bridge_inactive`'s `state_reason`, a summary's `state_reason`). */
+const BRIDGE_REASON_KEY: Record<string, string> = {
+  paused_by_manager: 'bridges.state.reason.paused_by_manager',
+  paused_by_driver: 'bridges.state.reason.paused_by_driver',
+  became_private: 'bridges.state.reason.became_private',
+  driver_lost_permission: 'bridges.state.reason.driver_lost_permission',
+  encrypted: 'bridges.state.reason.encrypted',
+};
+
+/** `invalid_name` (webhook names and their per-message overrides) says why in `reason`. */
+const WEBHOOK_NAME_REASON_KEY: Record<string, string> = {
+  empty: 'errors.api.webhookNameEmpty',
+  length: 'errors.api.webhookNameLength',
+  reserved: 'errors.api.webhookNameReserved',
+  staff: 'errors.api.webhookNameStaff',
+  role: 'errors.api.webhookNameRole',
+  characters: 'errors.api.webhookNameCharacters',
 };
 
 /**
@@ -290,6 +339,32 @@ export function translateCaughtApiError(err: unknown, t: ErrorTranslateFn): stri
   // About Me or bio: only the member sets those.
   if (isApiError(err) && err.code === 'cannot_edit_member_profile') {
     return [t('errors.api.spaceProfileNotOwn')];
+  }
+  if (isApiError(err) && err.code === 'invalid_name') {
+    return [t(WEBHOOK_NAME_REASON_KEY[String(err.body?.reason ?? '')] ?? 'errors.api.webhookNameInvalid')];
+  }
+  // The room (15) or the space (200) is full; `max` says which limit was hit.
+  if (isApiError(err) && err.code === 'webhook_limit') {
+    const max = err.body?.max;
+    return [typeof max === 'number' || typeof max === 'string' ? t('errors.api.webhookLimit', { max: String(max) }) : t('errors.api.webhookLimitNoMax')];
+  }
+  // A bridge that is paused or off: `state_reason` says why (a manager, the room became
+  // private, the bot lost its permissions, the room is encrypted).
+  if (isApiError(err) && err.code === 'bridge_inactive') {
+    const reason = String(err.body?.state_reason ?? '');
+    const key = BRIDGE_REASON_KEY[reason];
+    return [key ? t(key) : err.body?.state === 'disabled' ? t('errors.api.bridgeDisabled') : t('errors.api.bridgePaused')];
+  }
+  // The room (3) or the space (20) has as many bridges as it may.
+  if (isApiError(err) && err.code === 'bridge_limit') {
+    const max = err.body?.max;
+    return [typeof max === 'number' || typeof max === 'string' ? t('errors.api.bridgeLimit', { max: String(max) }) : t('errors.api.bridgeLimitNoMax')];
+  }
+  // Bridging (or resuming a bridge in) a room not everyone can see needs the acknowledgement;
+  // `audience` is how many people can.
+  if (isApiError(err) && err.code === 'private_room_ack_required') {
+    const n = Number(err.body?.audience);
+    return [Number.isFinite(n) && n > 0 ? t('errors.api.privateRoomAck', { audience: String(n) }) : t('errors.api.privateRoomAckNoCount')];
   }
   // Likewise a 429 that means "one was just sent", not "slow down".
   if (isApiError(err) && err.code === 'email_cooldown') {

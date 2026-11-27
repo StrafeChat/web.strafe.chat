@@ -104,7 +104,7 @@ export const LinkPreview: Component<{ url: string }> = (props) => {
 const Card: Component<{ d: LinkMetadata; fallbackUrl: string }> = (props) => {
   const href = () => props.d.url || props.fallbackUrl;
   const openGuarded = (e: MouseEvent) => {
-    if (!isExternalLink(href())) return;
+    if (e.defaultPrevented || !isExternalLink(href())) return;
     if (e.shiftKey) return;
     e.preventDefault();
     requestOpenExternalLink(href());

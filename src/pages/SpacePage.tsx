@@ -10,6 +10,7 @@ import {
   createResource,
   createEffect,
   createSignal,
+  on,
   onCleanup,
   Show,
   untrack,
@@ -56,10 +57,15 @@ import {
   UnreadBanner,
 } from '../components/room';
 import { MobileRailsOpenButton } from '../components/layout/MobileRailsOpenButton';
-import { getMessagePreviewSource, getSenderDisplay, messagePreviewText } from '../components/messageList';
+import { RoomBridgeBadge } from '../components/room/RoomBridgeBadge';
+import { RoomBridgeHint, markBridgeHintSeen } from '../components/room/RoomBridgeHint';
+import { getMessagePreviewSource, getMessageSenderDisplay, getSenderDisplay, messagePreviewText } from '../components/messageList';
 import { spaceMembers, loadSpaceMembers, ensureSpaceMembers } from '../stores/spaceMembers';
 import { lastSpaceRoom } from '../stores/lastSpaceRoom';
 import { pickLandingRoomId } from '../lib/spaceRoomsNav';
+import { resolveRoomLink } from '../lib/roomLinks';
+import { roomTargetPath } from '../lib/openRoomLink';
+import { EmptyState } from '../components/ui/EmptyState';
 import { createPM } from '../api/rooms';
 import { dismissNewHeader, clearNewHeaderDismissed, newHeaderDismissed } from '../stores/newHeaderDismissed';
 import { ensureRoomPins, pinnedMessages } from '../stores/pinnedMessages';
@@ -186,6 +192,25 @@ const SpacePage: Component = () => {
     const target = pickLandingRoomId(sid);
     if (target) navigate(`/spaces/${sid}/rooms/${target}`, { replace: true });
   });
+
+  /**
+   * An address naming a room the space's list does not have (a link opened in a new tab, an
+   * old bookmark): an archived thread is fetched into the list and opens; a room of another
+   * space or a PM is opened where it lives; anything else is gone or hidden from us, and the
+   * page says so (`roomMissing`) instead of staying blank.
+   */
+  const [missingRoomId, setMissingRoomId] = createSignal<string | null>(null);
+  createEffect(
+    on([roomId, spaceId, () => !!currentRoom(), () => spaceRooms().length > 0], ([rid, sid, found, listed]) => {
+      if (!rid || !sid || found || !listed) return;
+      void resolveRoomLink({ roomId: rid, spaceId: sid, messageId: null }).then((target) => {
+        if (roomId() !== rid || currentRoom()) return;
+        if (target && target.spaceId !== sid) navigate(roomTargetPath(target), { replace: true });
+        else if (!target) setMissingRoomId(rid);
+      });
+    })
+  );
+  const roomMissing = () => !!roomId() && missingRoomId() === roomId() && !currentRoom();
 
   // Keyed on the room *id* (plus the E2EE flag, which the send path reads from the
   // rooms-store copy), not the room object: updateSpaceRoomLastMessage replaces the
@@ -396,6 +421,7 @@ const SpacePage: Component = () => {
       .then(() => {
         dismissNewHeader(id);
         startSlowmode(id, slowmodeSeconds());
+        markBridgeHintSeen(spaceId(), id);
       })
       .catch((err) => {
         console.error('Send failed:', err);
@@ -417,6 +443,7 @@ const SpacePage: Component = () => {
       .then(() => {
         dismissNewHeader(id);
         startSlowmode(id, slowmodeSeconds());
+        markBridgeHintSeen(spaceId(), id);
       })
       .catch((err) => {
         console.error('Send GIF failed:', err);
@@ -577,7 +604,7 @@ const SpacePage: Component = () => {
     const id = replyToMessageId();
     if (!id) return null;
     const target = roomMessages().find((m) => m.id === id);
-    const sender = target ? getSenderDisplay(target.sender_id, allSpaceMembers(), auth.user?.id) : null;
+    const sender = target ? getMessageSenderDisplay(target, allSpaceMembers(), auth.user?.id) : null;
     return {
       name: sender?.name ?? t('room.replyFallback'),
       preview: target ? messagePreviewText(getMessagePreviewSource(target), allSpaceMembers(), auth.user?.id, 120) : '',
@@ -1085,6 +1112,9 @@ const SpacePage: Component = () => {
           threadActions={isThread() ? threadActions() : undefined}
           pmOtherUserId={undefined}
           e2ee={currentRoom()?.e2ee_enabled === true}
+          // What the room is bridged with: anyone who can see the room may know (spec 5.9).
+          // Bridges copy the room itself, never its threads.
+          badges={isThread() ? undefined : <RoomBridgeBadge spaceId={spaceId()} roomId={roomId()} />}
           isGroup={false}
           messageCompact={!!settings.messageCompact}
           onToggleCompact={() => {}}
@@ -1130,6 +1160,15 @@ const SpacePage: Component = () => {
         <div class="flex-1 flex flex-col items-center justify-center p-8 text-center">
           <p class="text-muted-foreground">{t('space.selectRoom')}</p>
         </div>
+      </Show>
+
+      <Show when={roomMissing()}>
+        <EmptyState
+          size="page"
+          icon="fa-solid fa-link-slash"
+          title={t('messages.roomLink.unavailableTitle')}
+          body={t('messages.roomLink.unavailableBody')}
+        />
       </Show>
 
       <Show when={roomId() && isVoiceChannel()}>
@@ -1261,6 +1300,9 @@ const SpacePage: Component = () => {
               {/* Keyed on the room so the composer's own state (a voice recording in progress, an
                   open picker, the completion list) ends with the room instead of following you. */}
               <Show when={roomId()} keyed>
+              <Show when={!isThread() && canSendMessages()}>
+                <RoomBridgeHint spaceId={spaceId()} roomId={roomId()} />
+              </Show>
               <RoomMessageInput
                 draft={draft()}
                 onInput={onInput}

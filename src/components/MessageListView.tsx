@@ -1,3 +1,4 @@
+import { messageLinkUrl } from '../lib/roomLinks';
 import { MessageThreadFooter } from './messageList/MessageThreadFooter';
 import type { ThreadIntroInfo } from './messageList/MessageListIntro';
 import type { Component } from 'solid-js';
@@ -23,7 +24,12 @@ import { formatMessageTimestamp, formatDateHeader, formatTimeOfDay } from '../li
 import { t } from '../i18n';
 import { BotTag } from './BotTag';
 import { OfficialTag } from './OfficialTag';
-import { showContextMenu } from '../stores/contextMenu';
+import { WebhookTag } from './WebhookTag';
+import { openWebhookCard } from '../stores/webhookCard';
+import { messageAuthorKey } from '../lib/webhookMessages';
+import { confirmBlockBridgedUser } from '../lib/bridgeModeration';
+import { spaces as spacesStore } from '../stores/spaces';
+import { showContextMenu, type ContextMenuItem } from '../stores/contextMenu';
 import { onEditLastMessageRequest } from '../lib/chatShortcuts';
 import { buildUserMenuItems, buildSpaceModerationItems } from '../lib/userContextMenu';
 import type { SpaceModerationContext } from '../lib/userContextMenu';
@@ -35,6 +41,7 @@ import {
   getMessageBodyText,
   isEdited,
   getSenderDisplay,
+  getMessageSenderDisplay,
   augmentParticipants,
   isSystemMessage,
   MessageAvatar,
@@ -334,11 +341,78 @@ export const MessageList: Component<MessageListProps> = (props) => {
   });
 
   function openAuthorProfile(msg: DecryptedMessage, anchor: HTMLElement) {
+    const s = getMessageSenderDisplay(msg, resolvedParticipants(), currentUserId());
+    if (s.webhook) {
+      // Not a person: its own small card, never a profile looked up by the webhook's id. A
+      // bridged person's card names the bot behind it, one click away.
+      openWebhookCard(
+        {
+          webhookId: s.webhook.id,
+          name: s.name,
+          avatar: s.avatar,
+          spaceId: props.spaceId,
+          roomId: props.roomId,
+          ...(s.webhook.bridge
+            ? {
+                bridge: s.webhook.bridge,
+                puppetId: s.webhook.puppetId,
+                colour: s.colour,
+                canBlock: canBlockBridged(),
+                openUser: (id: string, el: HTMLElement) => openProfileForUser(id, el),
+              }
+            : {}),
+        },
+        anchor
+      );
+      return;
+    }
     openProfileForUser(msg.sender_id, anchor);
   }
 
   function openAuthorMenu(msg: DecryptedMessage, e: MouseEvent) {
+    const s = getMessageSenderDisplay(msg, resolvedParticipants(), currentUserId());
+    if (s.webhook) {
+      const id = s.webhook.id;
+      // Nothing a person's menu has (message, add friend, nickname, roles, kick) applies. A
+      // bridged person can be blocked from the bridge by a moderator, and the bot behind it
+      // is one click away.
+      showContextMenu(e, [...bridgedPersonMenuItems(msg, e), ...(s.webhook.bridge ? [] : [{ label: t('webhooks.copyId'), icon: 'fa-copy', onClick: () => navigator.clipboard.writeText(id) }])]);
+      return;
+    }
     openUserMenu(msg.sender_id, e);
+  }
+
+  /** Kick Members, or Manage Messages in this room: may block a bridged person (spec 5.6). */
+  const canBlockBridged = () => props.canKickMembers === true || props.canManageMessages === true;
+
+  /** The bridged-person items of a menu: the bot behind it, and the moderator's block. */
+  function bridgedPersonMenuItems(msg: DecryptedMessage, e: MouseEvent): ContextMenuItem[] {
+    const s = getMessageSenderDisplay(msg, resolvedParticipants(), currentUserId());
+    const b = s.webhook?.bridge;
+    if (!b) return [];
+    const puppetId = s.webhook?.puppetId;
+    const anchor = e.currentTarget instanceof HTMLElement ? e.currentTarget : null;
+    const items: ContextMenuItem[] = [];
+    if (b.via) {
+      const viaId = b.via.id;
+      items.push({
+        label: t('bridges.menu.viewBot'),
+        icon: 'fa-robot',
+        onClick: () => {
+          if (anchor) openProfileForUser(viaId, anchor);
+        },
+      });
+    }
+    if (puppetId && canBlockBridged()) {
+      items.push({
+        label: t('bridges.menu.block', { name: s.name }),
+        icon: 'fa-user-slash',
+        danger: true,
+        onClick: () =>
+          void confirmBlockBridgedUser({ bridgeId: b.bridgeId, puppetId, name: s.name, platform: b.platform, platformName: b.platformName }),
+      });
+    }
+    return items;
   }
 
   function openUserMenu(userId: string, e: MouseEvent) {
@@ -876,7 +950,9 @@ export const MessageList: Component<MessageListProps> = (props) => {
     // Replies always start a new visual block
     if (msg.reply_to_id) return true;
     if (!prev) return true;
-    if (prev.sender_id !== msg.sender_id) return true;
+    // The sender, and for a webhook message also the name and avatar it was posted under:
+    // one webhook posting as "CI" and as "Deploy" is two authors (map.md, sender_id grouping).
+    if (messageAuthorKey(prev) !== messageAuthorKey(msg)) return true;
     const prevTime = new Date(prev.created_at).getTime();
     const currTime = new Date(msg.created_at).getTime();
     if (currTime - prevTime > MESSAGE_GROUP_THRESHOLD_MS) return true;
@@ -1002,13 +1078,16 @@ export const MessageList: Component<MessageListProps> = (props) => {
             const showHeader = () => shouldShowHeader(msg, prev());
             const needsDateHeader = () => shouldShowDateHeader(msg, prev());
             const sender = () =>
-              getSenderDisplay(msg.sender_id, resolvedParticipants(), currentUserId());
+              getMessageSenderDisplay(msg, resolvedParticipants(), currentUserId());
             /**
              * Discord-style: the sender's name takes their highest hoisted role's colour.
              * Read off the participant's roles, never presence, so an author's colour in
              * history doesn't depend on whether they're online right now.
              */
             const senderNameColor = () => {
+              // A webhook has no roles (and a bridged person must not wear the bot's colour);
+              // a bridged person may carry their own when the bridge allows colours.
+              if (msg.webhook_id) return sender().colour;
               const p = resolvedParticipants()?.find((x) => x.id === msg.sender_id);
               return memberNameColorHex((p as { roles?: string[] } | undefined)?.roles, props.spaceRoles);
             };
@@ -1088,7 +1167,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                   onContextMenu={(e) => {
                     const roomId = props.roomId;
                     const bodyText = getMessageBodyText(msg);
-                    const isOwn = msg.sender_id === currentUserId();
+                    const isOwn = !msg.webhook_id && msg.sender_id === currentUserId();
                     const pinned = msg.pinned === true;
                     showContextMenu(e, [
                       ...(props.roomId && canReact()
@@ -1110,6 +1189,18 @@ export const MessageList: Component<MessageListProps> = (props) => {
                         icon: 'fa-hashtag',
                         onClick: () => navigator.clipboard.writeText(msg.id),
                       },
+                      ...(roomId && /^\d+$/.test(msg.id)
+                        ? [
+                            {
+                              label: t('messages.actions.copyLink'),
+                              icon: 'fa-link',
+                              // Opens this message in the app for anyone who can see the room
+                              // (lib/roomLinks): this instance's address, or a federated
+                              // space's origin's.
+                              onClick: () => navigator.clipboard.writeText(messageLinkUrl(roomId, msg.id)),
+                            },
+                          ]
+                        : []),
                       ...(props.onReply && props.canReply !== false
                         ? [
                             {
@@ -1140,7 +1231,46 @@ export const MessageList: Component<MessageListProps> = (props) => {
                             },
                           ]
                         : []),
-                      ...(!isOwn && roomId
+                      // A moderator may block a bridged person from the bridge.
+                      ...(msg.webhook_id ? bridgedPersonMenuItems(msg, e).filter((x) => x.danger) : []),
+                      ...(!isOwn && roomId && msg.webhook_id && props.spaceId
+                        ? [
+                            {
+                              // A webhook is the space's own integration, not an account: the
+                              // report goes to the instance about the space. A bot-driven
+                              // bridge's message is the bot's doing: the report names the bot.
+                              label: t('messages.actions.report'),
+                              icon: 'fa-flag',
+                              danger: true,
+                              onClick: () => {
+                                const sid = props.spaceId!;
+                                const via = sender().webhook?.bridge?.via;
+                                if (via) {
+                                  openReportDialog({
+                                    targetType: 'user',
+                                    targetId: via.id,
+                                    targetName: via.name || getSenderDisplay(via.id, resolvedParticipants(), currentUserId()).name,
+                                    spaceId: sid,
+                                    roomId,
+                                    messageId: msg.id,
+                                    messageText: bodyText,
+                                  });
+                                  return;
+                                }
+                                openReportDialog({
+                                  targetType: 'space',
+                                  targetId: sid,
+                                  targetName: spacesStore.spaces.find((x) => x.id === sid)?.name ?? '',
+                                  spaceId: sid,
+                                  roomId,
+                                  messageId: msg.id,
+                                  messageText: bodyText,
+                                });
+                              },
+                            },
+                          ]
+                        : []),
+                      ...(!isOwn && roomId && !msg.webhook_id
                         ? [
                             {
                               label: t('messages.actions.report'),
@@ -1284,6 +1414,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                         {sender().name}
                       </span>
                       <BotTag bot={sender().bot} size="sm" class="-ms-0.5" />
+                      <WebhookTag webhook={sender().webhook} size="sm" class="-ms-0.5" />
                       <OfficialTag system={sender().system} size="sm" class="-ms-0.5" />
                       <span class="text-[11px] text-muted-foreground shrink-0">
                         {formatMessageTimestamp(new Date(msg.created_at))}
@@ -1363,6 +1494,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                         {sender().name}
                       </span>
                         <BotTag bot={sender().bot} size="sm" class="-ms-0.5" />
+                        <WebhookTag webhook={sender().webhook} size="sm" class="-ms-0.5" />
                       <OfficialTag system={sender().system} size="sm" class="-ms-0.5" />
                         <span class="text-[13px] text-muted-foreground shrink-0">
                           {formatMessageTimestamp(new Date(msg.created_at))}
@@ -1506,7 +1638,7 @@ export const MessageList: Component<MessageListProps> = (props) => {
                       }}
                     />
                   </Tooltip>
-                  <Show when={msg.sender_id === currentUserId() && props.roomId}>
+                  <Show when={!msg.webhook_id && msg.sender_id === currentUserId() && props.roomId}>
                     <Tooltip label={t('messages.actions.edit')} inline side="top">
                       <IconButton
                         size="sm"

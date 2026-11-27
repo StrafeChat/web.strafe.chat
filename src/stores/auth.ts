@@ -8,6 +8,8 @@ import { getMe, toAuthUser } from '../api/users';
 import { api } from '../api/client';
 import { ApiError } from '../api/ApiError';
 import { clearLinkPreviews } from './linkPreviews';
+import { clearWebhooks } from './webhooks';
+import { clearBridges } from './bridges';
 import { clearMediaDimensions } from '../lib/mediaDimensions';
 import { clearRecentEmoji } from '../lib/emoji/recent';
 import { lastVisited } from './lastVisited';
@@ -45,6 +47,9 @@ export interface AuthState {
      * verification level is decided against these (see lib/spaceVerification.ts). */
     verified_email?: boolean;
     created_at?: string;
+    /** Account default for bridges: `deny` = don't copy my messages to other platforms
+     * (a space's own setting can still say otherwise). Absent = leave it to each space. */
+    bridge_consent?: 'allow' | 'deny';
   } | null;
   token: string | null;
   sessionId: string | null;
@@ -80,6 +85,8 @@ export function logout() {
   clearRooms();
   clearRelationships();
   clearSpaces();
+  clearWebhooks();
+  clearBridges();
   // The key-backup sweep would otherwise keep firing against a torn-down session, and a
   // recovery prompt left open belongs to the account that just signed out.
   stopBackupSync();
@@ -141,6 +148,7 @@ export function hydrateFromReady(payload: {
     bot?: boolean;
     verified_email?: boolean;
     created_at?: string;
+    bridge_consent?: 'allow' | 'deny' | null;
     presence?: { status: string; custom_status?: string; activities?: unknown };
   };
   session_id?: string;
@@ -171,6 +179,9 @@ export function hydrateFromReady(payload: {
         ? { verified_email: payload.user.verified_email }
         : {}),
       ...(typeof payload.user.created_at === 'string' ? { created_at: payload.user.created_at } : {}),
+      ...(payload.user.bridge_consent === 'deny' || payload.user.bridge_consent === 'allow'
+        ? { bridge_consent: payload.user.bridge_consent }
+        : {}),
     };
     setAuth('user', user);
     if (payload.user.presence?.status) {

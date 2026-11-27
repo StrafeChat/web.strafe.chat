@@ -47,6 +47,9 @@ export interface AppearanceState {
   emojiSkinTone: number;
   /** Which service backs the composer's GIF picker. */
   gifProvider: GifProviderId;
+  /** Show the pictures webhooks and bridged users post under (off: their default avatar).
+   * Those images come from other services, through this instance's media proxy. */
+  externalAvatars: boolean;
 }
 
 const STORAGE_KEY = 'strafe_appearance';
@@ -68,6 +71,7 @@ const DEFAULTS: AppearanceState = {
   emojiProvider: DEFAULT_EMOJI_PROVIDER,
   emojiSkinTone: 0,
   gifProvider: DEFAULT_GIF_PROVIDER,
+  externalAvatars: true,
 };
 
 function sanitizeTheme(raw: unknown): ThemeDefinition | null {
@@ -116,6 +120,7 @@ function load(): AppearanceState {
       emojiSkinTone:
         typeof p.emojiSkinTone === 'number' && p.emojiSkinTone >= 0 && p.emojiSkinTone <= 5 ? Math.floor(p.emojiSkinTone) : 0,
       gifProvider: isGifProviderId(p.gifProvider) ? p.gifProvider : DEFAULT_GIF_PROVIDER,
+      externalAvatars: p.externalAvatars !== false,
     };
   } catch {
     return { ...DEFAULTS };
@@ -219,6 +224,10 @@ export function setEmojiSkinTone(v: number) {
 }
 export function setGifProvider(v: GifProviderId) {
   setAppearance('gifProvider', v);
+  persist();
+}
+export function setExternalAvatars(v: boolean) {
+  setAppearance('externalAvatars', v);
   persist();
 }
 export function setCustomCss(css: string) {

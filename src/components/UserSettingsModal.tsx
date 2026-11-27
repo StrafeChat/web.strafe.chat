@@ -14,6 +14,7 @@ import {
   LanguageSettingsPage,
   DevicesSettingsPage,
   SecuritySettingsPage,
+  PrivacySettingsPage,
   NotificationsSettingsPage,
   VoiceVideoSettingsPage,
   AccessibilitySettingsPage,
@@ -202,6 +203,9 @@ export const UserSettingsModal: Component = () => {
           </div>
           <Show when={section() === 'security'}>
             <SecuritySettingsPage />
+          </Show>
+          <Show when={section() === 'privacy'}>
+            <PrivacySettingsPage />
           </Show>
           <Show when={section() === 'accessibility'}>
             <AccessibilitySettingsPage />

@@ -11,6 +11,7 @@ import NotesPage from '../pages/NotesPage';
 import DiscoverPage from '../pages/DiscoverPage';
 import SpacePage from '../pages/SpacePage';
 import RoomPage from '../pages/RoomPage';
+import MessageLinkPage from '../pages/MessageLinkPage';
 import InvitePage from '../pages/InvitePage';
 import AdminPage from '../pages/AdminPage';
 import OAuthAuthorizePage from '../pages/OAuthAuthorizePage';
@@ -109,6 +110,9 @@ function Home(props: { children?: import('solid-js').JSX.Element }) {
   );
 }
 
+const SNOWFLAKE = /^\d{1,20}$/;
+const messageLinkFilters = { roomId: SNOWFLAKE, messageId: SNOWFLAKE };
+
 export function AppRouter() {
   return (
     <Router root={RootLayout}>
@@ -129,6 +133,14 @@ export function AppRouter() {
         <Route path="/rooms/:roomId" component={RoomPage} />
         <Route path="/spaces/:spaceId" component={SpacePage} />
         <Route path="/spaces/:spaceId/rooms/:roomId" component={SpacePage} />
+        {/* A message link (lib/roomLinks.ts) opened in a tab of its own: opens the room and
+            jumps to the message, then replaces itself with the room's address. */}
+        <Route path="/rooms/:roomId/:messageId" component={MessageLinkPage} matchFilters={messageLinkFilters} />
+        <Route
+          path="/spaces/:spaceId/rooms/:roomId/:messageId"
+          component={MessageLinkPage}
+          matchFilters={messageLinkFilters}
+        />
       </Route>
       <Route path="/invite/:code" component={InvitePage} />
       <Route path="/admin" component={AdminPage} />

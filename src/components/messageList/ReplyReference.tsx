@@ -2,11 +2,12 @@ import type { Component } from 'solid-js';
 import { Show, createMemo } from 'solid-js';
 import type { DecryptedMessage } from '../../stores/messages';
 import type { RoomParticipant } from '../../api/rooms';
-import { getMessagePreviewSource, getSenderDisplay, messagePreviewText } from './utils';
+import { getMessagePreviewSource, getMessageSenderDisplay, messagePreviewText } from './utils';
 import { MessageAvatar } from './MessageAvatar';
 import { jumpToMessage } from '../../stores/messages';
 import { t } from '../../i18n';
 import { BotTag } from '../BotTag';
+import { WebhookTag } from '../WebhookTag';
 
 export interface ReplyReferenceProps {
   replyToId: string;
@@ -36,7 +37,7 @@ export const ReplyReference: Component<ReplyReferenceProps> = (props) => {
   const replied = createMemo(() => props.messages.find((m) => m.id === props.replyToId) ?? props.referenced);
   const sender = createMemo(() => {
     const r = replied();
-    return r ? getSenderDisplay(r.sender_id, props.participants, props.currentUserId) : null;
+    return r ? getMessageSenderDisplay(r, props.participants, props.currentUserId) : null;
   });
   const preview = createMemo(() => {
     const r = replied();
@@ -72,8 +73,15 @@ export const ReplyReference: Component<ReplyReferenceProps> = (props) => {
           }}
         >
           <MessageAvatar name={sender()!.name} avatar={sender()!.avatar} user={sender()} class="size-4 text-[9px] ring-0" />
-          <span class="shrink-0 font-semibold text-foreground/90 group-hover/reply:underline">{sender()!.name}</span>
+          <span
+            class="shrink-0 font-semibold text-foreground/90 group-hover/reply:underline"
+            style={sender()!.colour ? { color: sender()!.colour } : undefined}
+          >
+            {sender()!.name}
+          </span>
           <BotTag bot={sender()!.bot} size="xs" class="ms-0" />
+          {/* A bridged reply shows the bridged person and their platform, never the bot. */}
+          <WebhookTag webhook={sender()!.webhook} size="xs" class="ms-0" />
           <span class="min-w-0 truncate text-muted-foreground group-hover/reply:text-foreground/80">
             {preview() || <span class="italic">{t('messages.noText')}</span>}
           </span>

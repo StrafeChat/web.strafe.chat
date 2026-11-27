@@ -87,6 +87,11 @@ export interface Reactor {
   avatar?: string;
   /** The reactor's account was deleted: every name is empty; shown as "Deleted User". */
   deleted?: boolean;
+  /** A bridged person who reacted through a bridge (`id` is their puppet id, never a member):
+   * labelled with their platform, never looked up in the member list. */
+  puppet?: { bridge_id?: string; puppet_id?: string; platform?: string; platform_name?: string | null };
+  /** Same, as some payloads name it. */
+  bridge?: { id?: string; platform?: string; platform_name?: string | null };
 }
 
 export interface Message {
@@ -125,9 +130,41 @@ export interface Message {
   pinned_by?: string;
   /** The thread started from this message (its own id), when there is one. */
   thread_id?: string;
+  /** Set when a webhook (or a bridge) posted it. Then `sender_id` is the webhook id (or, for a
+   * bot-driven bridge, the bot's), never a person: render from `masquerade`, and keep `author`
+   * (a compatibility copy with `bot: true`) out of every user cache. See lib/webhookMessages. */
+  webhook_id?: string;
+  /** Who the message shows as, snapshotted when it was posted (renaming the webhook later
+   * does not rewrite history). */
+  masquerade?: MessageMasquerade;
   created_at: string;
   updated_at: string;
   deleted_at?: string;
+}
+
+/** A webhook message's (or a bridged message's) identity. The avatar is already an absolute
+ * URL served by this instance (its media proxy for anything from elsewhere). */
+export interface MessageMasquerade {
+  kind: 'webhook' | 'bridge' | (string & {});
+  name?: string;
+  avatar?: string | null;
+  /** 0xRRGGBB, bridges only, when the bridge allows colours. */
+  colour?: number | null;
+  /** Bridges (P2): which bridge and which bridged person. */
+  bridge?: {
+    id: string;
+    name?: string;
+    platform?: string;
+    platform_name?: string | null;
+    puppet_id?: string;
+    external_bot?: boolean;
+    profile_url?: string | null;
+  };
+  /** Bridges: the member of this space whose name the bridged person's matches, worked out by
+   * the server when it was posted. The card says "Not the Strafe account @username". */
+  lookalike?: { id: string; username: string } | null;
+  /** The real sender: a bot's public user object, or `{ webhook: { id, name, avatar } }`. */
+  via?: Record<string, unknown>;
 }
 
 export interface CreateMessageInput {

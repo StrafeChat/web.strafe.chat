@@ -28,6 +28,9 @@ export interface MeResponse {
   system?: boolean;
   /** When the account was created - a space's verification level can require a minimum age. */
   created_at?: string;
+  /** The account default for bridges (spec 5.9): `deny` = don't copy my messages to other
+   * platforms unless a space's own setting says otherwise; null/absent = leave it to spaces. */
+  bridge_consent?: 'allow' | 'deny' | null;
   presence?: unknown;
 }
 
@@ -127,6 +130,7 @@ export function toAuthUser(
   bot?: boolean;
   verified_email?: boolean;
   created_at?: string;
+  bridge_consent?: 'allow' | 'deny';
 } {
   return {
     id: me.id,
@@ -143,6 +147,7 @@ export function toAuthUser(
     ...(me.bot ? { bot: true } : {}),
     ...(typeof me.verified_email === 'boolean' ? { verified_email: me.verified_email } : {}),
     ...(typeof me.created_at === 'string' ? { created_at: me.created_at } : {}),
+    ...(me.bridge_consent === 'deny' || me.bridge_consent === 'allow' ? { bridge_consent: me.bridge_consent } : {}),
   };
 }
 

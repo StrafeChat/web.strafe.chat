@@ -1,6 +1,6 @@
 ---
 title: REST API
-description: Reference for the endpoints bots and applications use - the instance, users, spaces, members, roles, invites, rooms, messages, reactions, attachments, GIFs, the image proxy - plus error and rate-limit behaviour.
+description: Reference for the endpoints bots and applications use - the instance, users, spaces, members, roles, invites, rooms, messages, reactions, attachments, webhooks, bridges, GIFs, the image proxy - plus error and rate-limit behaviour.
 ---
 
 # REST API
@@ -177,7 +177,7 @@ The space's rooms with overrides and, for the caller, read state. Same shape as 
 
 ### `GET` /spaces/:id/audit-log — *Manage Space*
 
-`?limit=` (≤100) `&before=<entry id>` `&action=<type>`. Returns `{"entries": [{id, action_type, user_id, target_id, changes, reason, created_at}], "users": {…}}`. Bot installs are `action_type: "bot_add"` with the bot as target.
+`?limit=` (≤100) `&before=<entry id>` `&action=<type>`. Returns `{"entries": [{id, action_type, user_id, target_id, changes, reason, created_at}], "users": {…}}`. Bot installs are `action_type: "bot_add"` with the bot as target. Webhooks and bridges log `webhook_create`, `webhook_update`, `webhook_delete`, `webhook_token_reset`, `bridge_create`, `bridge_update`, `bridge_delete`, `bridge_puppet_block`, `bridge_puppet_unblock` (target: the webhook, bridge or bridged user) and `bridge_consent_update` (the space's [bridge mode](#bridges-and-privacy)); a change made with a webhook's own token has actor `0` and `changes.via = "token"`.
 
 ### `POST` /spaces/:id/leave
 
@@ -256,6 +256,8 @@ Add a user who authorized your application with `spaces.join`: `{"access_token":
 { "id": "2105144670576185344", "name": "Docs Bot", "permissions": 8768, "position": 1, "color": 0, "hoist": false, "mentionable": false, "bot_id": "2105141069376131072", "created_at": "…", "updated_at": "…" }
 ```
 
+`permissions` comes back as a JSON number (exact: every bit is below 2^53). **Send it as a decimal string** when you write it (`"permissions": "2147483648"`): a JSON number is read as the legacy 31-bit form and cannot set or clear Manage Webhooks (bit 31) or Masquerade (bit 32) - see [Permissions › Writing permissions](/docs/permissions/#writing-permissions-send-a-string). The same goes for override `allow` / `deny`.
+
 `position` orders roles: `@everyone` is always `0`, custom roles hold unique positions from `1` up, and higher outranks lower (see [Permissions › Hierarchy](/docs/permissions/#hierarchy)). `bot_id` is present on a **managed role** created by a bot install: the bot's user id.
 
 ### `GET` /spaces/:id/roles
@@ -314,6 +316,44 @@ The invite link is `<web>/invite/<code>`.
 ### `GET` /spaces/invites/:code — *no auth*
 
 Public preview `{space: {id, name, icon, …}, inviter_display_name}`. `POST /spaces/invites/:code/join` joins (the caller must be a person or a bot allowed to join; bots are normally added through install links instead).
+
+## Emoji
+
+### The emoji object
+
+```json
+{ "id": "…", "space_id": "…", "name": "party_blob", "url": "https://your-instance.example/cdn/v1/emojis/…/….png", "animated": false, "creator_id": "…", "created_at": "…", "updated_at": "…" }
+```
+
+Used in message text as `<:name:id>` (`<a:name:id>` when `animated`). A name is 2-32 letters, numbers or underscores, unique in its space ignoring case; surrounding colons are ignored. A space holds at most 50. Images are PNG, JPEG, GIF or WebP (judged by the file name's extension) up to 512 KB unless the instance changed it; a GIF is `animated`. Uploading, renaming and deleting need Manage Emojis (Manage Space or Administrator also do).
+
+### `GET` /spaces/:id/emojis
+
+The space's emoji (members only). `GET /emojis` lists the emoji of every space you are in; `GET /emojis/:emojiId` resolves one seen in a message from a space you may not be in.
+
+### `POST` /spaces/:id/emojis — *Manage Emojis*
+
+Multipart: `file` (the image) and `name`. Returns `201` with the emoji object. 10 per minute per account.
+
+### `POST` /spaces/:id/emojis/bulk — *Manage Emojis*
+
+Multipart: up to 10 `file` parts and as many `name` parts, paired in order (the first name is the first file's). Each image is checked and created exactly as by the single route - the same rules, one [`SPACE_EMOJI_CREATE`](/docs/gateway/#events) and one audit log entry per emoji - and one refusal does not stop the rest: the answer is `200` with a result per item, in request order:
+
+```json
+{
+  "created": 1,
+  "results": [
+    { "index": 0, "name": "party_blob", "status": 201, "emoji": { "id": "…", "name": "party_blob", … } },
+    { "index": 1, "name": "wave", "status": 400, "error": "an emoji with that name already exists in this space" }
+  ]
+}
+```
+
+Items past the space's free slots, and names already in the space or earlier in the same request, are refused without being uploaded. The whole request is refused (`400`) with no files, more than 10, or a different number of names than files, and (`403`) without the permission. 5 requests per minute per account, a budget separate from the single route's - enough to fill an empty space in a minute.
+
+### `PATCH` /spaces/:id/emojis/:emojiId, `DELETE` /spaces/:id/emojis/:emojiId — *Manage Emojis*
+
+`PATCH` takes `{"name"}`. Messages that used a deleted emoji show its `:name:` instead.
 
 ## Rooms
 
@@ -390,6 +430,50 @@ Every active thread in the space the caller can see, and a channel's archived th
 }
 ```
 
+A message a [webhook](#webhooks) posted also carries:
+
+```json
+{
+  "sender_id": "2106000000000000001",
+  "webhook_id": "2106000000000000001",
+  "masquerade": { "kind": "webhook", "name": "CI", "avatar": "https://your-instance.example/api/media/v1/external/…" },
+  "author": { "id": "2106000000000000001", "username": "CI", "display_name": "CI", "avatar": "…", "bot": true, "webhook": true }
+}
+```
+
+`sender_id` is then the webhook's id, not a user: there is no account to look up, message or mention. Show the message as `masquerade.name` with `masquerade.avatar` (the name and avatar it was posted under - renaming the webhook later does not change it; with no avatar, pick the [default avatar](#default-avatars) from `webhook_id`), and keep `author` - a compatibility copy with `bot: true` - out of any cache of users keyed by id: one webhook posts under many names.
+
+A message a [bridge](#bridges) posted as a bridged user carries a `bridge` masquerade:
+
+```json
+{
+  "sender_id": "2105141069376131072",
+  "webhook_id": "2107000000000000009",
+  "masquerade": {
+    "kind": "bridge",
+    "name": "Alice",
+    "avatar": "https://your-instance.example/api/media/v1/external/…",
+    "colour": 15158332,
+    "bridge": {
+      "id": "2107000000000000009",
+      "name": "Discord #general",
+      "platform": "discord",
+      "platform_name": null,
+      "puppet_id": "2107000000000000077",
+      "external_bot": false,
+      "profile_url": null
+    },
+    "lookalike": { "id": "2101000000000000042", "username": "alice" },
+    "via": { "id": "2105141069376131072", "username": "strife", "display_name": "Strife", "avatar": "…", "bot": true }
+  },
+  "author": { "id": "2107000000000000077", "username": "Alice", "display_name": "Alice", "avatar": "…", "bot": true, "webhook": true }
+}
+```
+
+`sender_id` is the bot that drives the bridge (`via`, its public user object); the person shown is someone on another platform, identified here only by `bridge.puppet_id` - a stable id per bridged user, never their id on that platform. Render it as `masquerade.name` followed by a platform tag (`DISCORD`, `MATRIX`, …, or `platform_name` for `other`) so it cannot pass for a member, with `masquerade.avatar` or the [default avatar](#default-avatars) picked from `puppet_id`. `colour` (0xRRGGBB) is present only when the bridge allows name colours, `profile_url` only when it shows profile links, and `lookalike` when a member of the space has the same name (say "Not the Strafe account @alice"). Two consecutive messages are the same author only when `webhook_id` and `puppet_id` match. As with webhooks, keep `author` out of user caches.
+
+A bridge's arrival and removal leave a system notice in the room: `system_type` `bridge_created` or `bridge_deleted`, `system_payload` `{"bridge_id", "bridge_name", "platform", "platform_name"?, "remote_name"?, "driver_id", "driver_name", "actor_id"}`. `actor_id` is present whenever someone acted, the driving bot included: when it equals `driver_id` the bot did it itself ("Strife bridged this room"), otherwise a person did it through the bot. `driver_name` is left out once the bot's account is deleted.
+
 `plaintext` is present in plain rooms; encrypted rooms carry `ciphertext` instead. `embeds` is always an array - a bot's rich embeds, empty when there are none and in every encrypted room; load their pictures from `proxy_url` / `proxy_icon_url` ([Embeds](/docs/embeds/#receiving-embeds)). `reactions` is included when fetching messages, not in gateway events; gateway events add `space_id` for a room in a space. `pinned`, `pinned_at` and `pinned_by` are present while the message is pinned in its room. Deleted messages keep their id with a `deleted_at`. System notices have `sender_id: "0"`, a `system_type` (`space_member_join`, `space_member_leave`, `space_birthday`, …) and a `system_payload`. `space_birthday` is posted once a day in the space's `birthday_channel_id` for each opted-in member whose birthday is that day (UTC); its payload is `{"user_id": "…", "message": "…"}`, with `message` being the space's `birthday_message` (possibly empty, meaning use the default greeting).
 
 ### `GET` /rooms/:id/messages
@@ -416,7 +500,7 @@ See [Bots › Sending messages](/docs/bots/#sending-messages). `201` with the me
 
 ### Reactions — *Add Reactions*
 
-`PUT` / `DELETE` /rooms/:id/messages/:msg_id/reactions/:emoji, `GET …/reactions/:emoji` (who reacted). `:emoji` is a URL-encoded unicode emoji or `custom:<id>`. Custom emoji from other spaces need **Use External Emojis**.
+`PUT` / `DELETE` /rooms/:id/messages/:msg_id/reactions/:emoji, `GET …/reactions/:emoji` (who reacted; a bridged user's entry adds `puppet: {"bridge_id", "puppet_id", "platform", "platform_name"}`, `platform_name` being the label for their tag - show them as a bridged user, never look them up as a member). `:emoji` is a URL-encoded unicode emoji or `custom:<id>`. Custom emoji from other spaces need **Use External Emojis**.
 
 ### Pins — *Manage Messages in a space room; anyone in a PM or group*
 
@@ -427,6 +511,310 @@ See [Bots › Sending messages](/docs/bots/#sending-messages). `201` with the me
 ### `POST` /rooms/:id/attachments — *Send Messages*
 
 `multipart/form-data` with `file` and optional `width`/`height`. Returns the attachment record; reference its `id` in a message within the same room. Size limit per the instance's configuration (25 MB on a default deployment).
+
+## Webhooks
+
+A webhook posts into one room through a secret URL - an incoming webhook, compatible with Discord's: a tool that posts to a Discord webhook (a CI job, a monitor, a GitHub Action) works by changing the host. Someone with **Manage Webhooks** in the room makes one; anything that holds its token can post. Webhook messages show the name and avatar the request gave, with a **WEBHOOK** tag, and nothing else a person has (no profile, PMs, roles or reactions of its own).
+
+Webhooks live in a space's text rooms (and a voice room's text), **never in an end-to-end encrypted room**: creating one there is `409 room_encrypted`, and turning encryption on in a room disables its webhooks (`disabled_reason: "encrypted"`; executing then answers `403 room_encrypted`) until it is turned off again. Never in PMs or group PMs.
+
+### The webhook object
+
+```json
+{
+  "id": "2106000000000000001",
+  "type": 1,
+  "space_id": "2102443061534523000",
+  "room_id": "2102443061534523392",
+  "name": "CI",
+  "avatar": "https://your-instance.example/cdn/v1/webhooks/2106…/a1b2c3.png",
+  "application_id": null,
+  "creator": { "id": "…", "username": "sam", "display_name": "Sam", "avatar": "…" },
+  "mass_mentions": false,
+  "disabled_reason": null,
+  "created_at": "2026-11-17T12:00:00Z",
+  "last_used_at": "2026-11-17T12:05:00Z",
+  "token": "swh_…",
+  "url": "https://your-instance.example/api/webhooks/2106000000000000001/swh_…"
+}
+```
+
+- `type` `1` is an incoming webhook (Discord's type 1).
+- `token` and `url` come back **only** from create and from a token reset - never from a list or a get (Discord returns them forever; Strafe does not). Store the URL when you get it; if you lose it, reset it.
+- `application_id` is set when a bot made it: that bot may manage it without Manage Webhooks, and execute it with its own bot token.
+- `creator` is left out of answers to token-authenticated requests.
+- `mass_mentions`: whether the webhook may ping `@everyone`, `@here` and roles at all. Off by default, and only someone with **Mention @everyone** in the room can turn it on - stricter than Discord, where a leaked webhook URL is a mass-ping weapon.
+- Tokens start with `swh_`, so secret scanners can spot one that leaked.
+
+### Managing webhooks
+
+All of these take a session or a bot token (not an OAuth2 access token); mutations take an optional `reason` for the [audit log](#get-spaces-id-audit-log-manage-space) and fire [`WEBHOOKS_UPDATE`](/docs/gateway/#rooms) to the room's viewers.
+
+| Method + path | Who | Body / answer |
+| --- | --- | --- |
+| `POST /rooms/:id/webhooks` | Manage Webhooks in the room | `{"name", "avatar"?, "mass_mentions"?, "reason"?}` → `201`, the webhook **with `token` and `url`** |
+| `GET /rooms/:id/webhooks` | Manage Webhooks in the room | the room's webhooks (no tokens) |
+| `GET /spaces/:id/webhooks` | Manage Webhooks somewhere in the space | the webhooks of the rooms where you have it |
+| `GET /webhooks/:id` | Manage Webhooks in its room, or its owning bot | the webhook |
+| `PATCH /webhooks/:id` | as above | `{"name"?, "avatar"?, "room_id"?, "mass_mentions"?, "reason"?}`. `room_id` moves it to another plaintext room of the same space (Manage Webhooks in both); `avatar: null` clears it |
+| `DELETE /webhooks/:id` | as above | `204` |
+| `POST /webhooks/:id/token` | as above | `200`, the webhook with a **new** `token` and `url`; the old one stops working at once |
+| `GET /webhooks/:id/:token` | the token | the webhook, without `creator` |
+| `PATCH /webhooks/:id/:token` | the token | `{"name"?, "avatar"?}` only |
+| `DELETE /webhooks/:id/:token` | the token | `204` - so whoever finds a leaked URL can kill it |
+
+`name` is 1-80 characters. It cannot be a reserved name (`Strafe`, `system`, `everyone`, `admin`, `moderator`, …, and the instance's official account), the name of one of the space's owner or moderators, or the name of a role in the space (`400 invalid_name` with a `reason`: `empty`, `length`, `characters`, `reserved`, `staff`, `role`). Names are compared ignoring case, width, accents, invisible characters and letters of other scripts that look like Latin ones (a Cyrillic `а` counts as `a`); control characters, line breaks and bidi embedding/override/isolate controls are refused (`characters`). The same rule applies to a message's `username`. `avatar` is a `data:image/png|jpeg|gif|webp;base64,…` URI (Discord's form) within the avatar size limit (`400 invalid_avatar` otherwise).
+
+At most 15 webhooks per room and 200 per space (`409 webhook_limit` with `max`); an instance can change both (`WEBHOOKS_PER_ROOM`, `WEBHOOKS_PER_SPACE`).
+
+### Executing a webhook
+
+`POST /webhooks/:id` with the header `Authorization: Webhook <token>` - preferred, since it keeps the token out of URLs and logs - or `POST /webhooks/:id/:token`, Discord's form. The owning application's bot may also use `Authorization: Bot <token>`. No session, no CORS.
+
+Query parameters:
+
+| Parameter | Meaning |
+| --- | --- |
+| `wait` | `false` (default): answer `204` without the message, as Discord does. `true`: answer `200` with the [message](#the-message-object) |
+| `thread_id` | Post into a thread of the webhook's room. An archived thread is unarchived; a locked one is `403 thread_locked`; a thread elsewhere is `400 thread_not_in_room` |
+
+The body is JSON, or `multipart/form-data` with a `payload_json` part and `files[0]`, `files[1]`, … parts (Discord's form):
+
+| Field | Notes |
+| --- | --- |
+| `content` | Up to 4000 characters. Mentions in it are parsed by the server, then filtered by `allowed_mentions` |
+| `username` | Show the message under this name instead of the webhook's (1-80, the name rules above) |
+| `avatar_url` | Show it with this picture: an `https://` URL up to 512 characters, or `attachment://<filename>` of a file in the same request. Readers load it through the instance's image proxy, never from your server |
+| `embeds` | Up to 10 [embeds](/docs/embeds/), with the same limits as a bot's. A webhook needs no Embed Links bit |
+| `allowed_mentions` | Discord's object: `{"parse": ["users", "roles", "everyone"], "users": [ids], "roles": [ids], "replied_user": false}`. `parse` lists the kinds that notify; `users` / `roles` whitelist ids (up to 100 each; naming a kind in `parse` and listing ids for it is `400 invalid_allowed_mentions`). Leaving it out means all three kinds; `{}` notifies nobody. On top of it, `everyone` and `roles` notify only when the webhook has `mass_mentions`. A mention that does not notify stays in the text |
+| `files[n]`, `attachments` | Uploads, stored like any room upload (same per-file limit), up to 10 |
+| `flags` | `4096` (SUPPRESS_NOTIFICATIONS: no mention badges, no push) and `4` (SUPPRESS_EMBEDS, accepted and ignored - link previews are drawn by clients). Anything else is `400 unsupported_field` |
+| `tts`, `components` | Accepted and ignored |
+| `poll`, `thread_name`, `applied_tags` | `400 unsupported_field` (no polls or forum rooms) |
+
+At least one of `content`, `embeds` or a file (`400 empty_message`). A webhook is the room manager's own integration, so - as on Discord - it skips slowmode, verification levels and automod; it still cannot post into an encrypted room.
+
+```sh
+# Preferred: the token in a header
+curl -X POST "https://your-instance.example/api/webhooks/$WEBHOOK_ID?wait=true" \
+  -H "Authorization: Webhook $WEBHOOK_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"content": "Build #42 passed", "username": "CI", "allowed_mentions": {"parse": []}}'
+
+# Discord's form: the whole URL, as Discord tools expect it
+curl -X POST "$WEBHOOK_URL" -H "Content-Type: application/json" -d '{"content": "Deploy finished"}'
+
+# A file, with an embed that shows it
+curl -X POST "https://your-instance.example/api/webhooks/$WEBHOOK_ID" \
+  -H "Authorization: Webhook $WEBHOOK_TOKEN" \
+  -F 'payload_json={"embeds": [{"title": "Coverage", "image": {"url": "attachment://coverage.png"}}]}' \
+  -F 'files[0]=@coverage.png'
+```
+
+In a GitHub Actions workflow, keep the URL in a repository secret:
+
+```yaml
+- name: Tell the room
+  if: always()
+  run: |
+    curl -sS -X POST "${{ secrets.STRAFE_WEBHOOK_URL }}" \
+      -H "Content-Type: application/json" \
+      -d "{\"content\": \"${{ github.workflow }} on ${{ github.ref_name }}: ${{ job.status }}\", \"allowed_mentions\": {\"parse\": []}}"
+```
+
+### A webhook's own messages
+
+| Method + path | Notes |
+| --- | --- |
+| `GET /webhooks/:id/:token/messages/:message_id` | Only a message this webhook posted (`404 unknown_message` otherwise); `thread_id` for one in a thread |
+| `PATCH /webhooks/:id/:token/messages/:message_id` | `content`, `embeds`, `allowed_mentions`, `attachments` (the files to keep) and new `files[n]`. Mentions are parsed and filtered again. Fires `MESSAGE_UPDATE` |
+| `DELETE /webhooks/:id/:token/messages/:message_id` | `204`, `MESSAGE_DELETE` |
+
+All three also work as `/webhooks/:id/messages/:message_id` with `Authorization: Webhook <token>`. Moderators delete webhook messages with the ordinary [delete](#delete-rooms-id-messages-msg-id-own-or-manage-messages) (Manage Messages).
+
+### Webhook errors and limits
+
+| Status | `code` | When |
+| --- | --- | --- |
+| `400` | `invalid_name` (+`reason`), `invalid_avatar`, `invalid_allowed_mentions`, `unsupported_field` (+`field`), `empty_message`, `invalid_embed` (+`path`), `thread_not_in_room` | The request |
+| `401` | `invalid_webhook_token` | A wrong or reset token. Limited to 30 failures a minute per address |
+| `403` | `missing_permissions` (+`permission`), `room_encrypted`, `thread_locked` | |
+| `404` | `unknown_webhook`, `unknown_message` | |
+| `409` | `webhook_limit` (+`max`), `room_encrypted` | Creating |
+| `429` | `rate_limited` (+`retry_after` in seconds, `scope`: `webhook` or `room`) | Executes: 5 per 2 seconds per webhook, and 30 per 10 seconds per room shared by every webhook in it. Edits and deletes: 30 per minute per webhook |
+
+Treat a webhook URL like a password. If one leaks - a screenshot, a public repository, a log - reset it (`POST /webhooks/:id/token`) or delete it; anyone holding it can post as the webhook, edit and delete its messages, rename it, or delete it.
+
+## Bridges
+
+A bridge connects a room to a room on another platform - Discord, Matrix, IRC, Telegram, Slack, XMPP, Revolt or another one. A **bot** drives it: it posts what people say over there into the room as **bridged users**, and reads the room's messages back from a filtered [feed](/docs/gateway/#bridge-feed) to post them on the other side. This is Strafe's take on Revolt's *masquerade* (a per-message name, avatar and colour), made strictly for bridging: a bridged message always relays something that exists elsewhere (an external user id and message id), always shows its platform tag and its real sender, can never ping `@everyone` or roles, and never exists in an end-to-end encrypted room. There is no masquerade on an ordinary message.
+
+The server does the bookkeeping a bridge used to need its own database for: the external-id ↔ Strafe-message map (so you edit, delete, reply and react by the other platform's ids, and retries are idempotent), the room's rules applied to each bridged user, moderator blocks, loop prevention and people's consent.
+
+Bridges live in a space's text rooms (type `3`), not in threads, voice rooms or encrypted rooms. Token-driven bridges (bridge software with no bot account) are not available yet: today every bridge is driven by the bot that created it.
+
+### The bridge object
+
+```json
+{
+  "id": "2107000000000000009",
+  "type": 4,
+  "space_id": "2102443061534523000",
+  "room_id": "2102443061534523392",
+  "name": "Discord #general",
+  "avatar": null,
+  "platform": "discord",
+  "platform_name": null,
+  "remote": { "name": "Example Server #general", "url": "https://discord.com/channels/1/2" },
+  "driver": "bot",
+  "application_id": "2105141069376131072",
+  "creator": { "id": "2105141069376131072", "username": "strife", "bot": true },
+  "state": "active",
+  "state_reason": null,
+  "settings": {
+    "relay_bots": false,
+    "relay_other_bridges": false,
+    "reply_pings": true,
+    "allow_colour": false,
+    "show_profile_links": false
+  },
+  "created_at": "2026-11-17T12:00:00Z"
+}
+```
+
+- `platform` is one of `discord`, `matrix`, `irc`, `telegram`, `slack`, `xmpp`, `revolt`, `other`; `other` needs `platform_name` (1-32, shown on the tag: "Mastodon").
+- `remote` is what the room is bridged with (name 1-100, an optional `https://` URL). The bot declares it; clients show it as the bridge's own description.
+- `state` is `active`, `paused` or `disabled`, and `state_reason` says why it is not running: `paused_by_manager`, `paused_by_driver` (the bot paused its own bridge; it may resume it, and so may the room's managers), `became_private` (the room stopped being open to everyone; someone resumes it with the acknowledgement), `driver_lost_permission` (the bot no longer has View Room, Send Messages or Masquerade there; it resumes by itself once it does) or `encrypted` (disabled while the room is end-to-end encrypted; turning encryption off leaves it paused).
+- `settings`: `relay_bots` (copy bots' and webhooks' messages to the platform), `relay_other_bridges` (copy what other bridges post here - off, so a room bridged to Discord and Matrix does not cross-feed), `reply_pings` (a bridged reply may notify the person it answers), `allow_colour` (bridged users may carry a name colour; turning it on needs **Manage Roles**), `show_profile_links` (cards offer the bridged user's profile on their platform).
+
+Everyone who can view the room gets the public **summary** - `{id, platform, platform_name, name, remote, state, state_reason, driver_name, driver_id, room_id, created_at}` - from `GET /rooms/:id/bridges`, from each room's `bridges` list in [`READY`](/docs/gateway/#ready), and from the [`BRIDGE_CREATE` / `BRIDGE_UPDATE` / `BRIDGE_DELETE`](/docs/gateway/#rooms) events. A room is never bridged silently.
+
+### Creating and managing bridges
+
+| Method + path | Who | Body / answer |
+| --- | --- | --- |
+| `POST /rooms/:id/bridges` | A bot with **Manage Webhooks** and **Masquerade** in the room | `{"platform", "platform_name"?, "name", "avatar"?, "remote"?, "settings"?, "acknowledge_private"?, "reason"?}` → `201`, the bridge. The bot drives it; the room gets the `bridge_created` notice |
+| `GET /rooms/:id/bridges` | Anyone who can view the room | the summaries |
+| `GET /bridges/:id` | Manage Webhooks in its room, or its bot | the bridge |
+| `PATCH /bridges/:id` | Manage Webhooks, or its bot for `name`, `avatar`, `remote` and `state` | `{"name"?, "avatar"?, "remote"?, "settings"?, "state"?: "active" \| "paused", "acknowledge_private"?, "reason"?}`. `allow_colour: true` needs Manage Roles. A bridge cannot move to another room: people agreed to this one |
+| `DELETE /bridges/:id` | Manage Webhooks, or its bot | `204`; the room gets the `bridge_deleted` notice |
+
+A room that not everyone in the space can see needs `acknowledge_private: true` to be bridged or resumed: without it the answer is `409 private_room_ack_required` with `audience` (how many people can see it). A room that becomes private later pauses its bridges (`became_private`). An encrypted room refuses with `409 room_encrypted`. At most 3 bridges per room and 20 per space, counted among the room's 15 webhooks (`409 bridge_limit` with `max`). When the bot leaves the space or its application is deleted, its bridges are deleted with it.
+
+### Posting as a bridged user
+
+`POST /bridges/:id/messages` with the driving bot's token (`Authorization: Bot <token>`). The bot must hold View Room, Send Messages and Masquerade in the room at that moment. `wait` defaults to `true` here.
+
+```json
+{
+  "external_user": {
+    "id": "81726354",
+    "name": "Alice",
+    "avatar_url": "https://cdn.discordapp.com/avatars/81726354/ab12.png",
+    "colour": null,
+    "bot": false,
+    "profile_url": "https://discord.com/users/81726354"
+  },
+  "external_message_id": "1300000000000000",
+  "part": 0,
+  "content": "hello from discord",
+  "embeds": [],
+  "reply_to": { "external_message_id": "1299999999999999" },
+  "allowed_mentions": { "replied_user": true }
+}
+```
+
+| Field | Notes |
+| --- | --- |
+| `external_user.id` | Required, 1-128 printable characters: who on the other platform said it. Never shown to readers |
+| `external_user.name` | 1-32 characters after the [name rules](#managing-webhooks) (no reserved, moderator or role names). A member's name is allowed; clients then say it is not that member |
+| `external_user.avatar_url` | `https://`, up to 512 characters, or `attachment://<filename>`. Readers load it through the instance's image proxy |
+| `external_user.colour` | 0xRRGGBB, only when the bridge has `allow_colour` |
+| `external_user.bot`, `profile_url` | A bot on the other platform; their profile (`https://`, shown only with `show_profile_links`) |
+| `external_message_id` | Required, 1-256 printable ASCII: the message on the other platform. With `part` (0-9, one external message as several Strafe messages) it makes the send **idempotent**: a retry of the same pair answers `200` with the existing message and `"duplicate": true` |
+| `content`, `embeds`, files | As for [executing a webhook](#executing-a-webhook). Embeds and files also need `@everyone` to have Embed Links / Attach Files in the room |
+| `reply_to` | `{"external_message_id", "part"?}` (a message this bridge posted or [linked](#external-message-ids)) or `{"message_id"}` (any message in the room). An unknown one sends without the reply and answers `"reply_dropped": true` |
+| `allowed_mentions` | Only `replied_user` counts, and only when the bridge has `reply_pings`. A bridge never pings `@everyone`, `@here` or roles; any `<@id>` in the text renders but notifies nobody |
+
+The answer is the [message](#the-message-object) plus `{"puppet_id", "duplicate"?, "reply_dropped"?}`. The first message from a new `external_user.id` mints the bridged user's `puppet_id`; later ones update their last-known name and avatar. Each message keeps the name and avatar it was sent with.
+
+| Method + path | Notes |
+| --- | --- |
+| `GET /bridges/:id/puppets/:external_user_id` | The bridged user: `puppet_id`, name, avatar, `blocked` |
+| `PATCH /bridges/:id/puppets/:external_user_id` | Update the name or avatar for future messages |
+| `DELETE /bridges/:id/puppets/:external_user_id` | Forget them now (a privacy request on the other platform): the record and its id-map entries go; their messages stay with the name they were sent under |
+
+### External message ids
+
+Both directions are kept, ids only and never text, for `BRIDGE_MAP_TTL_DAYS` (30 by default) after each message, and removed at once with the bridge or the bridged user.
+
+| Method + path | Notes |
+| --- | --- |
+| `PUT /bridges/:id/messages/:message_id/external` | `{"external_message_id", "part"?}`: you copied this Strafe message to the platform under that id (`204`; `409 external_message_conflict` if the id already maps elsewhere). Replies to the copy then resolve, and its edits, deletes and reactions reach your feed with the external ids |
+| `GET /bridges/:id/messages/external/:external_message_id` | `{"message_id", "room_id", "part", "direction": "inbound" \| "outbound", "external_message_id", "parts": [...]}`: the top-level fields are the lowest part's entry, and `parts` lists every part's entry (same shape, without `parts`), lowest first - a message split in several Strafe messages has one per part. `404 unknown_external_message` when nothing maps |
+| `GET /bridges/:id/messages/:message_id/external` | The external ids of a Strafe message: an array of `{"message_id", "room_id", "part", "direction", "external_message_id"}` |
+| `PATCH /bridges/:id/messages/external/:external_message_id` | `{"content"?, "embeds"?, "part"?}` - edit a message this bridge posted; `MESSAGE_UPDATE` |
+| `DELETE /bridges/:id/messages/external/:external_message_id` | Every part (or `?part=`); `MESSAGE_DELETE`. `404 unknown_external_message` once the entry expired |
+| `PUT` / `DELETE /bridges/:id/messages/external/:external_message_id/reactions/:emoji/:external_user_id` | The bridged user reacts or withdraws it. Also `/bridges/:id/messages/:message_id/reactions/…` for a Strafe message. `@everyone` needs Add Reactions (and Use External Emojis); custom emoji must be the space's own |
+
+A Strafe id works in place of `external/:external_message_id` in every path (`/bridges/:id/messages/:message_id`).
+
+### Room rules for bridged users
+
+A bridged user may do what a member with no roles may do in the room, and no more than the bot itself:
+
+| Rule | For bridged users |
+| --- | --- |
+| `@everyone` cannot send in the room | `403 puppet_cannot_send` (the bridge becomes one-way) |
+| `@everyone` lacks Attach Files, Embed Links or Add Reactions | Files, embeds or reactions refused: `403 missing_permissions` with `permission` |
+| Slowmode, automod content rules | Applied to each bridged user on their own |
+| Verification level | Not applied (there is no Strafe account to be old enough); enforce your platform's own |
+| Moderator block | `403 puppet_blocked` |
+| Rate | Per bridge 50 sends per 10 s and 100 edits, deletes and reactions per 10 s; per bridged user 5 per 5 s; plus the room's 30 per 10 s shared with webhooks (`429 rate_limited` with `scope`: `bridge`, `puppet` or `room`) |
+
+### Blocking a bridged user
+
+| Method + path | Who | Notes |
+| --- | --- | --- |
+| `PUT /bridges/:id/blocks/:puppet_id` | Kick Members, or Manage Messages in the room | `{"reason"?}`. Their sends, edits and reactions through this bridge are refused from now on; audit-logged; the bot gets [`BRIDGE_PUPPET_BLOCK`](/docs/gateway/#bridge-feed) so it can say so on the other side |
+| `DELETE /bridges/:id/blocks/:puppet_id` | same | Unblock |
+| `GET /bridges/:id/blocks` | same | The blocks, newest first: `{puppet_id, name, avatar, reason, blocked_at, blocked_by}` |
+
+Moderators delete bridged messages with the ordinary [delete](#delete-rooms-id-messages-msg-id-own-or-manage-messages); the bot hears it as `BRIDGE_MESSAGE_DELETE` with `by_moderator: true`.
+
+### Loops and the feed
+
+Every message a bridge posts has `webhook_id` and `masquerade.kind: "bridge"`; every webhook message has `webhook_id`. A bot that is not a bridge should skip messages with `webhook_id` (strafe.js: `message.webhookId`, `message.isBridged`).
+
+A bridge's bot also still receives the ordinary `MESSAGE_CREATE` events of a room it is in, but a bridge must copy only what its [feed](/docs/gateway/#bridge-feed) gives it: the feed is already filtered (people who said no, the bridge's own messages, other bridges and bots unless the settings say so, system notices, threads, anything from before the bridge existed). After downtime, catch up with `GET /bridges/:id/messages?after=<message id>&limit=100`: the same filtered `BRIDGE_MESSAGE_CREATE` payloads, oldest first (Read Message History applies).
+
+### Bridges and privacy
+
+A bridge copies a room's messages to a third party, under that platform's terms. So:
+
+- **People decide.** Each person has an account default - *Settings › Privacy › Bridges*, "Let bridges copy my messages to other platforms" - and a per-space choice in the space's menu (*Bridge privacy*: use my default, allow, don't allow). A space is in **opt-out** mode (everyone is copied unless they said no; the default) or **opt-in** mode (only people who said yes for that space); Manage Space switches it, and it is audit-logged. The effective answer for a person in a space is their per-space choice, else "no" if their account default is off, else the space's mode.
+- **The server enforces it**, on the feed, before anything reaches the bot. The bot never gets a list of who said no; when someone switches to "no", it gets one `BRIDGE_OPTOUT` with the external ids of that person's messages it copied, so it can delete those copies.
+- **Members of other instances** in a federated space are left out of every bridge's feed until their own instance can say what they chose.
+- **Never silent**: the room shows a "Bridged: Discord" badge (what it is bridged with, by which bot, and whether *your* messages are copied), a notice when a bridge arrives or goes, and a one-line hint over the composer the first time you post there.
+- **What is stored**: the bridge's configuration; on each bridged message, the name, avatar URL, platform and bridged-user id it was sent with; per bridged user, their external id, last name, avatar and profile link and any block, until 90 days without a message (`BRIDGE_PUPPET_TTL_DAYS`), until the bot forgets them, or until the bridge goes; the id map for 30 days (`BRIDGE_MAP_TTL_DAYS`); people's consent choices until they change them or delete their account. Pictures from other platforms load only through the instance's image proxy, so readers' browsers never contact that platform. External user ids are never shown to readers; moderators act on `puppet_id`.
+
+| Method + path | Who | Body / answer |
+| --- | --- | --- |
+| `GET /users/@me/bridge-consent` | You | `{"default": "allow" \| "deny" \| null}` (null: never set) |
+| `PUT /users/@me/bridge-consent` | You | `{"default": "allow" \| "deny"}` |
+| `GET /spaces/:id/members/@me/bridge-consent` | A member | `{"state": "inherit" \| "allow" \| "deny", "mode": "optout" \| "optin"}` |
+| `PUT /spaces/:id/members/@me/bridge-consent` | A member | `{"state": "inherit" \| "allow" \| "deny"}`. Turning it to `deny` sends `BRIDGE_OPTOUT` to the space's bridges |
+| `PUT /spaces/:id/bridge-consent` | Manage Space | `{"mode": "optout" \| "optin"}` |
+
+### Bridge errors and limits
+
+| Status | `code` | When |
+| --- | --- | --- |
+| `400` | `invalid_platform`, `invalid_name` (+`reason`), `invalid_avatar`, `empty_message`, `invalid_embed` (+`path`) | The request |
+| `403` | `missing_permissions` (+`permission`), `room_encrypted`, `bridge_inactive` (+`state`, `state_reason`), `puppet_cannot_send`, `puppet_blocked` | |
+| `404` | `unknown_bridge`, `unknown_message`, `unknown_external_message`, `unknown_puppet` | |
+| `409` | `bridge_limit` (+`max`), `private_room_ack_required` (+`audience`), `external_message_conflict`, `room_encrypted` | |
+| `429` | `rate_limited` (+`retry_after`, `scope`: `bridge`, `puppet`, `room`) | See [Room rules](#room-rules-for-bridged-users) |
 
 ## GIFs
 
@@ -515,7 +903,7 @@ The end-to-end encryption key backup (`m.megolm_backup.v1.curve25519-aes-sha2`, 
 
 | Status | When |
 | --- | --- |
-| `400` | Invalid JSON, a missing or invalid field, an id that is not a snowflake; OAuth2 `invalid_*` errors. A refused embed adds `"code": "invalid_embed"` and the `path` of the field, e.g. `"embeds[0].fields[3].value"` ([Embeds › Errors](/docs/embeds/#errors)) |
+| `400` | Invalid JSON, a missing or invalid field, an id that is not a snowflake; OAuth2 `invalid_*` errors. A refused embed adds `"code": "invalid_embed"` and the `path` of the field, e.g. `"embeds[0].fields[3].value"` ([Embeds › Errors](/docs/embeds/#errors)). A permission written as a string with a bit the instance does not know: `unknown_permission_bits` |
 | `401` | No credential, or an invalid / expired / reset one |
 | `403` | Not a member, missing permission, role hierarchy, banned, an OAuth2 token without the needed scope (`insufficient_scope`), or a PM whose other account was deleted (`recipient_deleted`) |
 | `404` | No such space / room / message / role, or one you cannot see |
@@ -533,7 +921,10 @@ The end-to-end encryption key backup (`m.megolm_backup.v1.curve25519-aes-sha2`, 
 | Typing indicators | One broadcast per 5 s per room (extra calls succeed silently) |
 | `GET /gifs/search`, `GET /gifs/trending` | 60 per minute per account, each |
 | Gateway `op 2` frames | Burst of 20 per connection, refilling one every 250 ms |
+| Webhooks | Executing: 5 per 2 s per webhook and 30 per 10 s per room; editing or deleting its messages: 30 per minute per webhook; failed token checks: 30 per minute per address. See [Webhooks](#webhook-errors-and-limits) |
+| Bridges | Per bridge 50 sends and 100 edits, deletes and reactions per 10 s; per bridged user 5 per 5 s; the room's 30 per 10 s shared with webhooks. See [Bridges](#room-rules-for-bridged-users) |
 | Messages in a room with slowmode | One per `slowmode_seconds` per member; `429` with `retry_after` (seconds) and a `Retry-After` header. Members with Manage Messages are exempt |
+| Custom emoji uploads | Per account: 10 per minute `POST /spaces/:id/emojis`, 5 per minute `POST /spaces/:id/emojis/bulk` (up to 10 images each) |
 | Space member profiles | Per account: 60 per minute reading one member, 20 per minute `PATCH`, 10 per minute image uploads |
 | Member roles (`PUT …/members/:userId/roles`, `PUT` / `DELETE …/members/:userId/roles/:roleId`) | 120 per minute per account |
 | Sign-in, registration, key backup | Separate tight limits (not relevant to bots) |

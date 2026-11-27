@@ -1,65 +1,94 @@
 import type { SpaceRole, SpaceRoomOverride, SpaceRoomUserOverride } from '../api/spaces';
 import { t } from '../i18n';
+import { applyOverwrite, hasAnyPerm, hasPerm, orPerms, permBit, withoutPerms } from './permBits';
+
+// Every operation on a mask lives in permBits (BigInt underneath): bits 31 and up do not survive
+// JS's 32-bit `&`/`|`/`~`/`<<`. `npm run check:perm-bits` keeps it that way.
+export {
+  andPerms,
+  applyRoomOverwrites,
+  hasAnyPerm,
+  hasPerm,
+  orPerms,
+  parsePerm,
+  permBit,
+  togglePerm,
+  toWire,
+  withoutPerms,
+  type PermInput,
+  type PermWire,
+} from './permBits';
 
 /** Mirrors equinox/internal/modules/permissions/bits.go. Bit positions are permanent once
- * shipped (stored in role.permissions) - only ever append a new bit, never renumber one. */
-export const PermViewChannel = 1 << 0;
-export const PermSendMessages = 1 << 1;
-export const PermReadMessageHistory = 1 << 2;
-export const PermAddReactions = 1 << 3;
-export const PermUseExternalEmojis = 1 << 4;
-export const PermMentionEveryone = 1 << 5;
-export const PermManageMessages = 1 << 6;
-export const PermManageRoles = 1 << 7;
-export const PermManageRooms = 1 << 8;
-export const PermKickMembers = 1 << 9;
-export const PermBanMembers = 1 << 10;
-export const PermAdministrator = 1 << 11;
-export const PermManageSpace = 1 << 12;
-export const PermCreateInvite = 1 << 13;
-export const PermManageEmojis = 1 << 14;
+ * shipped (stored in role.permissions) - only ever append a new bit, never renumber one.
+ * Written as permBit(n) (2^n), never `1 << n`: that wraps at bit 31 and aliases bit 32 to 0. */
+export const PermViewChannel = permBit(0);
+export const PermSendMessages = permBit(1);
+export const PermReadMessageHistory = permBit(2);
+export const PermAddReactions = permBit(3);
+export const PermUseExternalEmojis = permBit(4);
+export const PermMentionEveryone = permBit(5);
+export const PermManageMessages = permBit(6);
+export const PermManageRoles = permBit(7);
+export const PermManageRooms = permBit(8);
+export const PermKickMembers = permBit(9);
+export const PermBanMembers = permBit(10);
+export const PermAdministrator = permBit(11);
+export const PermManageSpace = permBit(12);
+export const PermCreateInvite = permBit(13);
+export const PermManageEmojis = permBit(14);
 /** Voice bits (room-scoped). */
-export const PermConnect = 1 << 15;
-export const PermSpeak = 1 << 16;
-export const PermVideo = 1 << 17;
-export const PermMuteMembers = 1 << 18;
-export const PermDeafenMembers = 1 << 19;
-export const PermMoveMembers = 1 << 20;
-export const PermUseVAD = 1 << 21;
-export const PermPrioritySpeaker = 1 << 22;
+export const PermConnect = permBit(15);
+export const PermSpeak = permBit(16);
+export const PermVideo = permBit(17);
+export const PermMuteMembers = permBit(18);
+export const PermDeafenMembers = permBit(19);
+export const PermMoveMembers = permBit(20);
+export const PermUseVAD = permBit(21);
+export const PermPrioritySpeaker = permBit(22);
 /** Appended after voice (bit positions are permanent): upload files and images with a message. */
-export const PermAttachFiles = 1 << 23;
+export const PermAttachFiles = permBit(23);
 /** Threads (bits 24-27, Discord's four): Send Messages does not grant sending in a thread -
  * Send Messages In Threads does; Manage Threads edits, archives, locks and deletes any
  * thread and sees private ones. A thread otherwise takes its channel's permissions. */
-export const PermCreatePublicThreads = 1 << 24;
-export const PermCreatePrivateThreads = 1 << 25;
-export const PermSendMessagesInThreads = 1 << 26;
-export const PermManageThreads = 1 << 27;
-export const AllThreadsPermMask =
-  PermCreatePublicThreads | PermCreatePrivateThreads | PermSendMessagesInThreads | PermManageThreads;
+export const PermCreatePublicThreads = permBit(24);
+export const PermCreatePrivateThreads = permBit(25);
+export const PermSendMessagesInThreads = permBit(26);
+export const PermManageThreads = permBit(27);
+export const AllThreadsPermMask = orPerms(
+  PermCreatePublicThreads,
+  PermCreatePrivateThreads,
+  PermSendMessagesInThreads,
+  PermManageThreads
+);
 /** Nicknames (appended after threads; space-scoped, never a room override). Change Nickname: a
  * member may set or clear their own nickname in the space (on for @everyone, as on Discord).
  * Manage Nicknames: change or clear other members' nicknames, subject to the role hierarchy,
  * and your own. Only the owner may change the owner's nickname. */
-export const PermChangeNickname = 1 << 28;
-export const PermManageNicknames = 1 << 29;
+export const PermChangeNickname = permBit(28);
+export const PermManageNicknames = permBit(29);
 /** Embed Links (room-scoped, on for @everyone): post a message with rich embeds - a bot's
- * `embeds`, on top of Send Messages, as on Discord. Private messages need no bit.
- *
- * This is bit 30, the last one this file's 32-bit bitwise maths can hold (bit 31 is its sign
- * bit): the next permission needs `&`/`|`/`~` replaced (BigInt, or two halves) first. */
-export const PermEmbedLinks = 1 << 30;
+ * `embeds`, on top of Send Messages, as on Discord. Private messages need no bit. */
+export const PermEmbedLinks = permBit(30);
+/** Manage Webhooks (room-scoped, off by default): create, edit, reset and delete the room's
+ * webhooks, and change bridges' settings. Executing a webhook needs only its token. Bit 31, the
+ * first one past what 32-bit maths can hold - hence permBits. */
+export const PermManageWebhooks = permBit(31);
+/** Masquerade (room-scoped, off by default): run bridges that post as people from other
+ * platforms. Only through a bridge, never on an ordinary message; creating a bridge needs it on
+ * top of Manage Webhooks. Cleared with Send Messages. */
+export const PermMasquerade = permBit(32);
 
-export const AllVoicePermMask =
-  PermConnect |
-  PermSpeak |
-  PermVideo |
-  PermMuteMembers |
-  PermDeafenMembers |
-  PermMoveMembers |
-  PermUseVAD |
-  PermPrioritySpeaker;
+export const AllVoicePermMask = orPerms(
+  PermConnect,
+  PermSpeak,
+  PermVideo,
+  PermMuteMembers,
+  PermDeafenMembers,
+  PermMoveMembers,
+  PermUseVAD,
+  PermPrioritySpeaker
+);
 
 export interface PermRow {
   bit: number;
@@ -100,6 +129,7 @@ export const SPACE_ROLE_PERM_GROUPS: { category: string; rows: PermRow[] }[] = [
     row(PermManageRoles, 'manageRoles'),
     row(PermManageRooms, 'manageRooms'),
     row(PermManageEmojis, 'manageEmojis'),
+    row(PermManageWebhooks, 'manageWebhooks'),
     row(PermCreateInvite, 'createInvite'),
   ]),
   group('membership', [
@@ -122,6 +152,7 @@ export const SPACE_ROLE_PERM_GROUPS: { category: string; rows: PermRow[] }[] = [
     row(PermCreatePrivateThreads, 'createPrivateThreads'),
     row(PermSendMessagesInThreads, 'sendMessagesInThreads'),
     row(PermManageThreads, 'manageThreads'),
+    row(PermMasquerade, 'masquerade'),
   ]),
   group('voice', [
     row(PermConnect, 'connect'),
@@ -154,6 +185,8 @@ export const ROOM_OVERRIDE_PERM_ROWS: PermRow[] = [
   row(PermCreatePrivateThreads, 'createPrivateThreads', 'roomRows'),
   row(PermSendMessagesInThreads, 'sendMessagesInThreads', 'roomRows'),
   row(PermManageThreads, 'manageThreads', 'roomRows'),
+  row(PermManageWebhooks, 'manageWebhooks', 'roomRows'),
+  row(PermMasquerade, 'masquerade', 'roomRows'),
 ];
 
 /** Overrides that apply to a voice room: viewing it, plus every voice bit. */
@@ -167,6 +200,8 @@ export const VOICE_ROOM_OVERRIDE_PERM_ROWS: PermRow[] = [
   row(PermMuteMembers, 'muteMembers', 'roomRows'),
   row(PermDeafenMembers, 'deafenMembers', 'roomRows'),
   row(PermMoveMembers, 'moveMembers', 'roomRows'),
+  // A voice room's text side can hold webhooks too.
+  row(PermManageWebhooks, 'manageWebhooks', 'roomRows'),
 ];
 
 /** The voice slice of an effective permission mask. A null mask (roles unknown) is
@@ -199,10 +234,6 @@ export function voicePermsFromMask(mask: number | null): VoicePerms {
   };
 }
 
-export function hasPerm(mask: number, bit: number): boolean {
-  return (mask & bit) === bit;
-}
-
 /** True if the effective mask allows sending messages in the channel. */
 export function canSendMessagesInChannel(mask: number | null): boolean {
   if (mask === null) return true;
@@ -216,35 +247,24 @@ export function canAttachFilesInChannel(mask: number | null): boolean {
   return canSendMessagesInChannel(mask) && hasPerm(mask, PermAttachFiles);
 }
 
-export function togglePerm(mask: number, bit: number, on: boolean): number {
-  if (on) return mask | bit;
-  return mask & ~bit;
-}
-
 /** Mirrors equinox/internal/modules/permissions/bits.go AllRoom - what the owner and an
  * Administrator get in every room. A new room bit has to be added here as well as on the
  * server, or the owner is the one member the client wrongly shows as lacking it. */
-export const AllRoomPermMask =
-  PermViewChannel |
-  PermSendMessages |
-  PermReadMessageHistory |
-  PermAddReactions |
-  PermUseExternalEmojis |
-  PermMentionEveryone |
-  PermManageMessages |
-  PermAttachFiles |
-  PermEmbedLinks |
-  AllThreadsPermMask |
-  AllVoicePermMask;
-
-/** Discord-style overwrite stack (same as permissions.ApplyOverwrites). */
-export function applyRoomOverwrites(base: number, overwrites: { allow: number; deny: number }[]): number {
-  let p = base;
-  for (const o of overwrites) {
-    p = (p & ~o.deny) | o.allow;
-  }
-  return p;
-}
+export const AllRoomPermMask = orPerms(
+  PermViewChannel,
+  PermSendMessages,
+  PermReadMessageHistory,
+  PermAddReactions,
+  PermUseExternalEmojis,
+  PermMentionEveryone,
+  PermManageMessages,
+  PermAttachFiles,
+  PermEmbedLinks,
+  AllThreadsPermMask,
+  AllVoicePermMask,
+  PermManageWebhooks,
+  PermMasquerade
+);
 
 export interface EffectiveChannelPermInput {
   memberUserId: string;
@@ -277,7 +297,7 @@ export function effectiveChannelPermissionsForMember(input: EffectiveChannelPerm
   let base = 0;
   const everyone = byId.get(everyoneId);
   if (everyone) {
-    base |= everyone.permissions;
+    base = orPerms(base, everyone.permissions);
   }
 
   const memIds = memberRoleIds ?? [];
@@ -285,7 +305,7 @@ export function effectiveChannelPermissionsForMember(input: EffectiveChannelPerm
     if (rid === everyoneId) continue;
     const r = byId.get(rid);
     if (r) {
-      base |= r.permissions;
+      base = orPerms(base, r.permissions);
     }
   }
 
@@ -298,7 +318,7 @@ export function effectiveChannelPermissionsForMember(input: EffectiveChannelPerm
   // 1) @everyone overwrite.
   const everyoneOverride = overrides.find((o) => o.role_id === everyoneId);
   if (everyoneOverride) {
-    perms = (perms & ~everyoneOverride.deny) | everyoneOverride.allow;
+    perms = applyOverwrite(perms, everyoneOverride.allow, everyoneOverride.deny);
   }
 
   // 2) aggregate role overwrites (excluding @everyone), deny then allow.
@@ -307,15 +327,15 @@ export function effectiveChannelPermissionsForMember(input: EffectiveChannelPerm
   let roleAllow = 0;
   for (const o of overrides) {
     if (!memberRoleSet.has(o.role_id)) continue;
-    roleDeny |= o.deny;
-    roleAllow |= o.allow;
+    roleDeny = orPerms(roleDeny, o.deny);
+    roleAllow = orPerms(roleAllow, o.allow);
   }
-  perms = (perms & ~roleDeny) | roleAllow;
+  perms = applyOverwrite(perms, roleAllow, roleDeny);
 
   // 3) user overwrite (if present), deny then allow.
   const userOverride = userOverrides?.find((o) => o.user_id === memberUserId);
   if (userOverride) {
-    perms = (perms & ~userOverride.deny) | userOverride.allow;
+    perms = applyOverwrite(perms, userOverride.allow, userOverride.deny);
   }
 
   return applyImplicitRoomRules(perms);
@@ -323,10 +343,13 @@ export function effectiveChannelPermissionsForMember(input: EffectiveChannelPerm
 
 /** Discord's two dependent-permission rules, mirroring the server's applyImplicitRoomRules:
  * no View Channel means no permission at all in the room; no Send Messages means no Attach
- * Files, Embed Links or Mention @everyone either. */
+ * Files, Embed Links, Mention @everyone or Masquerade either (Manage Webhooks stays: it is
+ * management, not sending). */
 export function applyImplicitRoomRules(perms: number): number {
   if (!hasPerm(perms, PermViewChannel)) return 0;
-  if (!hasPerm(perms, PermSendMessages)) perms &= ~(PermAttachFiles | PermEmbedLinks | PermMentionEveryone);
+  if (!hasPerm(perms, PermSendMessages)) {
+    return withoutPerms(perms, PermAttachFiles, PermEmbedLinks, PermMentionEveryone, PermMasquerade);
+  }
   return perms;
 }
 
@@ -446,12 +469,13 @@ export function isRoomPrivate(
   if (!room || !everyoneRoleId) return false;
   const { overrides } = channelOverridesSource(room, allRooms);
   const ev = overrides?.find((o) => o.role_id === everyoneRoleId);
-  return !!ev && (ev.deny & PermViewChannel) !== 0;
+  return !!ev && hasAnyPerm(ev.deny, PermViewChannel);
 }
 
 export function spaceRoleColorHex(c: number): string {
-  const u = c >>> 0;
-  return `#${(u & 0xffffff).toString(16).padStart(6, '0')}`;
+  // The low 24 bits, as a non-negative number (no 32-bit operators in this file).
+  const rgb = ((Math.trunc(c) % 0x1000000) + 0x1000000) % 0x1000000;
+  return `#${rgb.toString(16).padStart(6, '0')}`;
 }
 
 /** Among roles the member has with `hoist`, pick the highest by `position`. */
@@ -507,10 +531,10 @@ function memberEffectivePermBase(
   const everyoneId = space.everyone_role_id ?? roles.find((r) => r.name === '@everyone')?.id;
   const byId = new Map(roles.map((r) => [r.id, r]));
   let base = 0;
-  if (everyoneId) base |= byId.get(everyoneId)?.permissions ?? 0;
+  if (everyoneId) base = orPerms(base, byId.get(everyoneId)?.permissions);
   for (const rid of member?.roles ?? []) {
     if (rid === everyoneId) continue;
-    base |= byId.get(rid)?.permissions ?? 0;
+    base = orPerms(base, byId.get(rid)?.permissions);
   }
   return base;
 }

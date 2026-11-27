@@ -1,9 +1,14 @@
+import { bridgeSummaryFromPayload, type BridgeSummary } from '../api/bridges';
 import { auth } from './auth';
 import { createStore, produce } from 'solid-js/store';
 import {
   getSpaceRooms,
   listSpaceRoles,
   listSpaces,
+  normalizeOverride,
+  normalizeRole,
+  normalizeRoomPerms,
+  normalizeSpacePerms,
   type Space,
   type SpaceRole,
   type SpaceRoom,
@@ -12,6 +17,7 @@ import {
   type ThreadInfo,
 } from '../api/spaces';
 import { onStargateEvent } from '../services/stargate/client';
+import { parsePerm } from '../lib/permBits';
 import { getThread } from '../api/threads';
 import { removeRoom } from './rooms';
 import { registerRoomIdentity } from './federationIds';
@@ -66,7 +72,8 @@ export function clearSpaces() {
 /** Add or update a single space (e.g. from SPACE_CREATE / SPACE_UPDATE). Idempotent.
  * Merges into the stored space so a payload without `roles` (SPACE_UPDATE carries only
  * the space's own fields) keeps the roles already loaded. */
-export function addOrUpdateSpace(space: Space): void {
+export function addOrUpdateSpace(raw: Space): void {
+  const space = normalizeSpacePerms(raw);
   setSpaces('spaces', (list) => {
     const idx = list.findIndex((s) => s.id === space.id);
     if (idx >= 0) return list.map((s, i) => (i === idx ? { ...s, ...space } : s));
@@ -117,7 +124,7 @@ export function spaceRoles(spaceId: string): SpaceRole[] | undefined {
 }
 
 export function setSpaceRoles(spaceId: string, roles: SpaceRole[]): void {
-  const sorted = sortRoles(roles);
+  const sorted = sortRoles(roles.map(normalizeRole));
   setSpaces('spaces', (list) => list.map((s) => (s.id === spaceId ? { ...s, roles: sorted } : s)));
 }
 
@@ -136,7 +143,8 @@ export function ensureSpaceRoles(spaceId: string, opts: { force?: boolean } = {}
   return p;
 }
 
-export function upsertSpaceRole(spaceId: string, role: SpaceRole): void {
+export function upsertSpaceRole(spaceId: string, raw: SpaceRole): void {
+  const role = normalizeRole(raw);
   setSpaces('spaces', (list) =>
     list.map((s) => {
       if (s.id !== spaceId) return s;
@@ -165,7 +173,7 @@ function roleStamp(role: SpaceRole): number {
  */
 export function mergeSpaceRoles(spaceId: string, roles: readonly SpaceRole[]): void {
   if (roles.length === 0) return;
-  const incoming = new Map(roles.map((r) => [r.id, r]));
+  const incoming = new Map(roles.map((r) => [r.id, normalizeRole(r)]));
   setSpaces('spaces', (list) =>
     list.map((s) => {
       if (s.id !== spaceId || !s.roles) return s;
@@ -201,7 +209,7 @@ function roleFromPayload(d: Record<string, unknown>): SpaceRole | null {
   return {
     id,
     name: typeof d.name === 'string' ? d.name : '',
-    permissions: typeof d.permissions === 'number' ? d.permissions : 0,
+    permissions: parsePerm(d.permissions),
     position: typeof d.position === 'number' ? d.position : 0,
     color: typeof d.color === 'number' ? d.color : 0,
     hoist: d.hoist === true,
@@ -231,8 +239,8 @@ function overrideFromPayload(d: Record<string, unknown>): SpaceRoomOverride | nu
   if (!roleId) return null;
   return {
     role_id: roleId,
-    allow: typeof d.allow === 'number' ? d.allow : 0,
-    deny: typeof d.deny === 'number' ? d.deny : 0,
+    allow: parsePerm(d.allow),
+    deny: parsePerm(d.deny),
     created_at: d.created_at != null ? String(d.created_at) : '',
     updated_at: d.updated_at != null ? String(d.updated_at) : '',
   };
@@ -243,8 +251,8 @@ function userOverrideFromPayload(d: Record<string, unknown>): SpaceRoomUserOverr
   if (!userId) return null;
   return {
     user_id: userId,
-    allow: typeof d.allow === 'number' ? d.allow : 0,
-    deny: typeof d.deny === 'number' ? d.deny : 0,
+    allow: parsePerm(d.allow),
+    deny: parsePerm(d.deny),
     created_at: d.created_at != null ? String(d.created_at) : '',
     updated_at: d.updated_at != null ? String(d.updated_at) : '',
   };
@@ -288,7 +296,8 @@ function patchRoom(spaceId: string, roomId: string, patch: (r: SpaceRoom) => Spa
   setSpaces('spaceRoomsBySpaceId', spaceId, (list) => (list ?? []).map((r) => (r.id === roomId ? patch(r) : r)));
 }
 
-export function applyRoomRoleOverride(spaceId: string, roomId: string, o: SpaceRoomOverride): void {
+export function applyRoomRoleOverride(spaceId: string, roomId: string, raw: SpaceRoomOverride): void {
+  const o = normalizeOverride(raw);
   patchRoom(spaceId, roomId, (r) => {
     const rest = (r.permission_overrides ?? []).filter((x) => x.role_id !== o.role_id);
     return { ...r, permission_overrides: [...rest, o] };
@@ -302,7 +311,8 @@ export function removeRoomRoleOverride(spaceId: string, roomId: string, roleId: 
   }));
 }
 
-export function applyRoomUserOverride(spaceId: string, roomId: string, o: SpaceRoomUserOverride): void {
+export function applyRoomUserOverride(spaceId: string, roomId: string, raw: SpaceRoomUserOverride): void {
+  const o = normalizeOverride(raw);
   patchRoom(spaceId, roomId, (r) => {
     const rest = (r.user_overrides ?? []).filter((x) => x.user_id !== o.user_id);
     return { ...r, user_overrides: [...rest, o] };
@@ -351,6 +361,9 @@ function spaceFromPayload(payload: unknown): Space | null {
     // SPACE_UPDATE go through, so one left out silently resets on the next refresh.
     automod_flags: typeof d.automod_flags === 'number' ? d.automod_flags : 0,
     automod_mention_limit: typeof d.automod_mention_limit === 'number' ? d.automod_mention_limit : 0,
+    // Absent (an older server, or a payload that leaves it out) stays absent, so the member's
+    // own consent read can say the mode instead (stores/bridges spaceBridgeConsentMode).
+    ...(d.bridge_consent_mode !== undefined ? { bridge_consent_mode: d.bridge_consent_mode === 'optin' ? ('optin' as const) : null } : {}),
     default_message_notifications:
       typeof d.default_message_notifications === 'number' ? d.default_message_notifications : 0,
     explicit_content_filter: typeof d.explicit_content_filter === 'number' ? d.explicit_content_filter : 0,
@@ -388,6 +401,10 @@ function federationFromPayload(raw: unknown): { origin_domain: string; origin_id
 
 /** Normalize a raw room from READY space_rooms (or a SPACE_ROOM_CREATE event, which uses
  * the same shape) to SpaceRoom. */
+function bridgeSummariesFromPayload(raw: unknown[]): BridgeSummary[] {
+  return raw.map(bridgeSummaryFromPayload).filter((b): b is BridgeSummary => !!b);
+}
+
 function spaceRoomFromReady(d: Record<string, unknown>): SpaceRoom | null {
   const id = d.id != null ? String(d.id) : d.room_id != null ? String(d.room_id) : null;
   if (!id) return null;
@@ -424,6 +441,8 @@ function spaceRoomFromReady(d: Record<string, unknown>): SpaceRoom | null {
     ...(thread ? { thread } : {}),
     ...(permission_overrides ? { permission_overrides } : {}),
     ...(user_overrides ? { user_overrides } : {}),
+    // Only when the payload says: a room event without the list must not wipe the badge.
+    ...(Array.isArray(d.bridges) ? { bridges: bridgeSummariesFromPayload(d.bridges) } : {}),
     created_at,
     updated_at,
     ...(d.space_id != null && { space_id: String(d.space_id) }),
@@ -813,7 +832,8 @@ function hydrateCreatedSpaceRooms(spaceId: string, raw: unknown): void {
  * fields as the READY payload, and every UI mention/unread indicator reads from readState,
  * not from the room objects directly, so skipping this left them stuck at nothing-loaded
  * until a WS READY happened to hydrate the room by some other path. */
-export function setSpaceRooms(spaceId: string, roomList: SpaceRoom[]): void {
+export function setSpaceRooms(spaceId: string, rawList: SpaceRoom[]): void {
+  const roomList = rawList.map(normalizeRoomPerms);
   // Empty counts too: an event for a room of a space not loaded yet leaves an empty list here.
   const newToSession = !spaces.spaceRoomsBySpaceId[spaceId]?.length;
   for (const r of roomList) {

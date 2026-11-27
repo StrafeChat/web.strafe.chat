@@ -9,6 +9,8 @@ import { MobileNotificationsPanel } from './MobileNotificationsPanel';
 import { MobileYouPanel } from './MobileYouPanel';
 import { ContextMenu } from '../ContextMenu';
 import { UserProfilePopover } from '../UserProfilePopover';
+import { WebhookCard } from '../WebhookCard';
+import { SpaceBridgeConsentDialog } from '../SpaceBridgeConsentDialog';
 import { NicknameDialog } from '../NicknameDialog';
 import { ReportDialog } from '../ReportDialog';
 import { UserProfileFullModal } from '../UserProfileFullModal';
@@ -24,6 +26,7 @@ import { auth } from '../../stores/auth';
 import { ackAllSpaceRooms } from '../../api/spaces';
 import { orderedViewableTextRooms } from '../../lib/spaceRoomsNav';
 import { onNavigateRequest } from '../../lib/notifications';
+import { installRoomLinkInterceptor } from '../../lib/openRoomLink';
 import { attachSwipeNavigation } from '../../lib/mobileSwipe';
 import {
   isMdViewport,
@@ -90,6 +93,8 @@ export const AppShell: Component<AppShellProps> = (props) => {
       }
     }
     onCleanup(onNavigateRequest((path) => navigate(path)));
+    // Links to rooms and messages here open in the app, not a new tab (lib/openRoomLink).
+    onCleanup(installRoomLinkInterceptor());
     onCleanup(
       initKeybinds({
         openSettings: () => openUserSettings(),
@@ -269,6 +274,8 @@ export const AppShell: Component<AppShellProps> = (props) => {
       <VoiceStatsPopover />
       <ScreenShareDialog />
       <UserProfilePopover />
+      <WebhookCard />
+      <SpaceBridgeConsentDialog />
       <NicknameDialog />
       <UserProfileFullModal />
       <IncomingCallModal />

@@ -7,6 +7,9 @@ import { birthdayIsToday } from '../../lib/utils/birthday';
 import { formatTimestamp, timestampStyle } from '../../lib/utils/messageTimestamp';
 import { embedPreviewText } from '../../lib/embeds/messageEmbeds';
 import { t } from '../../i18n';
+import { webhookAuthorOf, type BridgedIdentity } from '../../lib/webhookMessages';
+import { bridgePlatformLabel, masqueradeColourHex } from '../../lib/bridgePlatforms';
+import { appearance } from '../../stores/appearance';
 
 export const LOADING_PLACEHOLDER = '...';
 
@@ -38,9 +41,11 @@ export function augmentParticipants(
     }
   };
   for (const m of messages) {
-    add(m.author);
+    // A webhook's (or bridge's) `author` is a per-message identity under the webhook's id:
+    // folded in by id, one webhook would take one name for every message it posted.
+    if (!m.webhook_id) add(m.author);
     if (m.mention_users) for (const u of m.mention_users) add(u);
-    add(m.referenced_message?.author);
+    if (!m.referenced_message?.webhook_id) add(m.referenced_message?.author);
   }
   return extra.length ? [...base, ...extra] : base;
 }
@@ -127,9 +132,44 @@ export function formatSystemMessageText(
       return t('messages.system.callStarted', { actor });
     case 'call_ended':
       return t('messages.system.callEnded', { duration: formatCallDuration(Number(payload.duration_seconds ?? 0)) });
+    case 'bridge_created':
+    case 'bridge_deleted':
+      return formatBridgeNotice(msg.system_type, payload, participants, currentUserId);
     default:
       return t('messages.system.default');
   }
+}
+
+/**
+ * The notice a bridge leaves in its room when it is created or removed (spec 5.9): who did it,
+ * which platform (and remote room, as the bridge declared it) and through which bot, and that
+ * people's own privacy settings decide whether their messages are copied.
+ */
+function formatBridgeNotice(
+  type: 'bridge_created' | 'bridge_deleted',
+  payload: Record<string, unknown>,
+  participants?: RoomParticipant[],
+  currentUserId?: string
+): string {
+  const str = (v: unknown) => (typeof v === 'string' ? v.trim() : '');
+  const remoteObj = payload.remote && typeof payload.remote === 'object' ? (payload.remote as Record<string, unknown>) : undefined;
+  const platform = bridgePlatformLabel(str(payload.platform), str(payload.platform_name));
+  const remote = str(payload.remote_name) || str(remoteObj?.name);
+  const target = remote ? t('messages.system.bridgeTarget', { platform, remote }) : platform;
+  const driverId = str(payload.driver_id) || (payload.driver_id != null ? String(payload.driver_id) : '');
+  const driver =
+    str(payload.driver_name) ||
+    (driverId ? participantName(driverId, participants, currentUserId) : '') ||
+    str(payload.bridge_name) ||
+    t('bridges.card.theBot');
+  // A bot-driven bridge is made by its own bot: "Strife bridged this room...", not "Strife
+  // bridged this room ... through Strife".
+  const actorId = payload.actor_id != null && String(payload.actor_id) !== driverId ? String(payload.actor_id) : '';
+  const actor = actorId ? participantName(actorId, participants, currentUserId) : '';
+  if (type === 'bridge_created') {
+    return actor ? t('messages.system.bridgeCreated', { actor, target, driver }) : t('messages.system.bridgeCreatedNoActor', { target, driver });
+  }
+  return actor ? t('messages.system.bridgeDeleted', { actor, target }) : t('messages.system.bridgeDeletedNoActor', { target });
 }
 
 /** "1h 02m", "12m 05s", "38s". */
@@ -215,6 +255,42 @@ export interface SenderDisplay {
   originId?: string;
   /** The account was deleted: `name` is "Deleted User"; menus and cards offer only Copy ID. */
   deleted?: boolean;
+  /** Posted by a webhook (or a bridge): `userId` is the webhook id, not a person. Shown with
+   * the WEBHOOK tag, a webhook card and none of the person actions (message, add friend,
+   * nickname, roles, kick). */
+  webhook?: { id: string; kind: 'webhook' | 'bridge'; puppetId?: string; bridge?: BridgedIdentity };
+  /** A bridged person's name colour (0xRRGGBB as `#rrggbb`), when their bridge allows it. */
+  colour?: string;
+}
+
+/**
+ * Who a message shows as: getSenderDisplay for a person, or the message's own snapshotted
+ * identity when a webhook posted it (never looked up by id - one webhook posts under many
+ * names). Use this, not getSenderDisplay(msg.sender_id), anywhere a message is the subject.
+ */
+export function getMessageSenderDisplay(
+  msg: Pick<DecryptedMessage, 'sender_id' | 'webhook_id' | 'masquerade' | 'author'>,
+  participants?: RoomParticipant[],
+  currentUserId?: string
+): SenderDisplay {
+  const w = webhookAuthorOf(msg, t('webhooks.defaultName'));
+  if (!w) return getSenderDisplay(msg.sender_id, participants, currentUserId);
+  const colour = masqueradeColourHex(w.bridge?.colour);
+  return {
+    // The default avatar is picked from this id: a bridged person's own stable id, so each
+    // looks the same in every message and two people of one bridge don't share a picture.
+    userId: w.puppetId ?? w.webhookId,
+    name: w.name,
+    // The reader can turn pictures from other services off (Appearance).
+    avatar: appearance.externalAvatars ? w.avatar : undefined,
+    webhook: {
+      id: w.webhookId,
+      kind: w.kind,
+      ...(w.puppetId ? { puppetId: w.puppetId } : {}),
+      ...(w.bridge ? { bridge: w.bridge } : {}),
+    },
+    ...(colour ? { colour } : {}),
+  };
 }
 
 /**

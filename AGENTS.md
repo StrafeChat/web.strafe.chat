@@ -57,7 +57,21 @@ new i18n keys.
   differences are OK as "extra").
 - **Permissions**: `src/lib/spacePermissions.ts` mirrors the backend's permission
   bitmask bit-for-bit. If a permission bit is added or renamed on the backend, update
-  this file in the same change so the two don't drift.
+  this file in the same change so the two don't drift. Masks go past bit 31 (Manage Webhooks
+  31, Masquerade 32), so every operation on one goes through `src/lib/permBits.ts` (BigInt
+  underneath): never `&`, `|`, `~` or `<<` on a permission, constants are `permBit(n)`, reads
+  go through `parsePerm` (the server may send a string) and writes send `toWire(mask)` strings
+  (a JSON number is the server's legacy 31-bit form). `npm run check:perm-bits` enforces it.
+- **Webhook messages** (`webhook_id` set) are not from a person: name them through
+  `getMessageSenderDisplay(msg, …)` (never `getSenderDisplay(msg.sender_id)`), group them by
+  `messageAuthorKey` (lib/webhookMessages), and keep their `author` out of user caches.
+- **Bridged messages** (`masquerade.kind === 'bridge'`) are people on another platform posted by
+  a bot: always render the platform tag (`WebhookTag`) and open `WebhookCard`, which names the
+  bot one click away; never a person's profile, menu or PM. Their default avatar comes from
+  `puppet_id`, and external user ids never reach the UI. What a room is bridged with lives on
+  `SpaceRoom.bridges` (READY, room payloads), kept current by `BRIDGE_*` in `stores/bridges`,
+  which also holds the viewer's bridge consent; the server enforces consent on the bridge's
+  feed, so the client only explains it (`myBridgeConsentIn`) and never decides anything with it.
 - **Space profiles** (per-space nickname, avatar, banner, About Me, bio, pronouns): a member
   row carries the global profile in the usual keys and the space one in `nick` /
   `space_*`, and nothing merges them in a store. Any surface that names or pictures a

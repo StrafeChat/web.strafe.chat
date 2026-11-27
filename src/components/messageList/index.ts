@@ -3,6 +3,7 @@ export {
   getMessagePreviewSource,
   isEdited,
   getSenderDisplay,
+  getMessageSenderDisplay,
   augmentParticipants,
   type SenderDisplay,
   isSystemMessage,

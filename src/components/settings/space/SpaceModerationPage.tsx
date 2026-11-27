@@ -1,5 +1,5 @@
 import type { Component, JSX } from 'solid-js';
-import { createSignal, For, Show } from 'solid-js';
+import { createSignal, For, onMount, Show } from 'solid-js';
 import {
   AUTOMOD_DEFAULT_MENTION_LIMIT,
   AUTOMOD_INVITE_LINKS,
@@ -12,6 +12,10 @@ import {
   type Space,
 } from '../../../api/spaces';
 import { addOrUpdateSpace } from '../../../stores/spaces';
+import { setSpaceBridgeConsentMode } from '../../../api/bridges';
+import { ensureSpaceBridgeConsent, setSpaceModeLocal, spaceBridgeConsentMode } from '../../../stores/bridges';
+import { translateCaughtApiError } from '../../../lib/formatApiError';
+import { BRIDGES_LEARN_MORE } from '../../../lib/bridgePlatforms';
 import { Input } from '../../ui/Input';
 import { Toggle } from '../../ui/Toggle';
 import { settingsGroupFrame, settingsRowIcon, settingsRowShell, settingsSectionTitle } from '../settingsChrome';
@@ -41,8 +45,9 @@ const LEVEL_KEYS = ['none', 'low', 'medium', 'high'] as const;
 
 /**
  * Space settings → Moderation: the verification level (what a member with no role must
- * satisfy before they can talk - raid protection) and the light automod rules. Every
- * control saves on change; the space in the store is replaced with the server's copy.
+ * satisfy before they can talk - raid protection), the light automod rules, and whether the
+ * space's bridges copy everyone who has not opted out or only those who opted in (spec 5.9).
+ * Every control saves on change; the space in the store is replaced with the server's copy.
  */
 export const SpaceModerationPage: Component<Props> = (props) => {
   const [busy, setBusy] = createSignal(false);
@@ -66,6 +71,25 @@ export const SpaceModerationPage: Component<Props> = (props) => {
 
   function setFlag(bit: number, on: boolean) {
     void patch({ automod_flags: on ? flags() | bit : flags() & ~bit });
+  }
+
+  // The space object may not say its bridge mode; the member's consent read does.
+  onMount(() => void ensureSpaceBridgeConsent(props.spaceId));
+  const optIn = () => spaceBridgeConsentMode(props.spaceId) === 'optin';
+
+  async function setOptIn(on: boolean) {
+    if (!props.canManage || busy()) return;
+    setBusy(true);
+    props.onError('');
+    try {
+      const mode = on ? 'optin' : 'optout';
+      await setSpaceBridgeConsentMode(props.spaceId, mode);
+      setSpaceModeLocal(props.spaceId, mode);
+    } catch (e) {
+      props.onError(translateCaughtApiError(e, t).join(' ') || t('common.saveFailed'));
+    } finally {
+      setBusy(false);
+    }
   }
 
   function commitLimit() {
@@ -178,6 +202,31 @@ export const SpaceModerationPage: Component<Props> = (props) => {
               <p class="mt-1 text-xs text-muted-foreground">{t('spaceSettings.moderation.mentions.limitHint', { max: String(AUTOMOD_MAX_MENTION_LIMIT) })}</p>
             </div>
           </Show>
+        </div>
+      </section>
+
+      <section class="space-y-3" data-space-bridge-mode>
+        <h3 class={settingsSectionTitle}>{t('spaceSettings.moderation.bridges.title')}</h3>
+        <p class="text-xs text-muted-foreground">
+          {t('spaceSettings.moderation.bridges.hint')}{' '}
+          <a href={BRIDGES_LEARN_MORE} target="_blank" rel="noopener" class="font-medium text-primary hover:underline">
+            {t('bridges.learnMore')}
+          </a>
+        </p>
+        <div class={settingsGroupFrame}>
+          <Row
+            icon="fa-bridge"
+            title={t('spaceSettings.moderation.bridges.optIn')}
+            description={optIn() ? t('spaceSettings.moderation.bridges.optInOn') : t('spaceSettings.moderation.bridges.optInOff')}
+            control={
+              <Toggle
+                checked={optIn()}
+                disabled={!props.canManage || busy()}
+                label={t('spaceSettings.moderation.bridges.optIn')}
+                onChange={(on) => void setOptIn(on)}
+              />
+            }
+          />
         </div>
       </section>
     </div>

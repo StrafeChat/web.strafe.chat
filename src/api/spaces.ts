@@ -1,7 +1,39 @@
+import type { BridgeConsentMode, BridgeSummary } from './bridges';
 import { api, getApiUrl } from './client';
 import { ApiError, isApiError } from './ApiError';
 import type { RoomParticipant } from './rooms';
 import type { RoleOrderPlan, RolePosition } from '../lib/roleOrder';
+import { parsePerm, toWire, type PermInput } from '../lib/permBits';
+
+// Permission values: masks are held as numbers (exact below 2^53) and every operation on them
+// goes through lib/permBits. Reads accept a number or a decimal string (normalised below, so the
+// rest of the client sees numbers); writes always send a decimal string (toWire), the server's
+// full-value form - a JSON number is read as the legacy 31-bit form.
+
+/** A role with its permissions read as a mask (a string from the server becomes a number). */
+export function normalizeRole<T extends { permissions: unknown }>(r: T): T {
+  return typeof r.permissions === 'number' ? r : { ...r, permissions: parsePerm(r.permissions) };
+}
+/** An override with allow/deny read as masks. */
+export function normalizeOverride<T extends { allow: unknown; deny: unknown }>(o: T): T {
+  return typeof o.allow === 'number' && typeof o.deny === 'number'
+    ? o
+    : { ...o, allow: parsePerm(o.allow), deny: parsePerm(o.deny) };
+}
+/** A space whose roles' permissions are masks. */
+export function normalizeSpacePerms<T extends { roles?: SpaceRole[] }>(s: T): T {
+  return s.roles ? { ...s, roles: s.roles.map(normalizeRole) } : s;
+}
+/** A room whose overrides are masks. */
+export function normalizeRoomPerms<T extends { permission_overrides?: SpaceRoomOverride[]; user_overrides?: SpaceRoomUserOverride[] }>(r: T): T {
+  if (!r.permission_overrides && !r.user_overrides) return r;
+  return {
+    ...r,
+    permission_overrides: r.permission_overrides?.map(normalizeOverride),
+    user_overrides: r.user_overrides?.map(normalizeOverride),
+  };
+}
+
 
 export interface Space {
   id: string;
@@ -46,6 +78,9 @@ export interface Space {
    * GET /spaces, GET /spaces/:id, join) so permissions can be evaluated locally; kept
    * current by SPACE_ROLE_* gateway events. Absent only on the public invite preview. */
   roles?: SpaceRole[];
+  /** Bridge consent (spec 5.9): null/absent = opt-out (everyone is copied to bridged
+   * platforms unless they opt out), `optin` = only people who opted in. */
+  bridge_consent_mode?: BridgeConsentMode | null;
   /** Set when another instance hosts the space: this is a mirror kept current by that
    * instance (the origin). Members here chat in it like any space, but it can only be
    * managed from the origin. */
@@ -65,11 +100,11 @@ export interface CreateSpaceInput {
 }
 
 export function listSpaces() {
-  return api<Space[]>('/spaces');
+  return api<Space[]>('/spaces').then((list) => list.map(normalizeSpacePerms));
 }
 
 export function getSpace(id: string) {
-  return api<Space>(`/spaces/${id}`);
+  return api<Space>(`/spaces/${id}`).then(normalizeSpacePerms);
 }
 
 /** Room ids are strings; an empty string clears the setting. */
@@ -169,12 +204,15 @@ export interface SpaceRoom {
   /** The room's global identity when its space spans instances (see rooms.federation);
    * what the E2EE engine keys the channel's Megolm sessions by. */
   federation?: { origin_domain: string; origin_id: string };
+  /** What the room is bridged with (public summaries; READY, room payloads, BRIDGE_* events).
+   * Absent when the server sent none; an empty list when it is bridged with nothing. */
+  bridges?: BridgeSummary[];
   created_at: string;
   updated_at?: string;
 }
 
 export function getSpaceRooms(spaceId: string) {
-  return api<SpaceRoom[]>(`/spaces/${spaceId}/rooms`);
+  return api<SpaceRoom[]>(`/spaces/${spaceId}/rooms`).then((list) => list.map(normalizeRoomPerms));
 }
 
 export function createSpaceRoom(
@@ -406,7 +444,17 @@ export type AuditActionType =
   | 'member_voice_mute'
   | 'member_voice_deafen'
   | 'member_voice_move'
-  | 'member_voice_disconnect';
+  | 'member_voice_disconnect'
+  | 'webhook_create'
+  | 'webhook_update'
+  | 'webhook_delete'
+  | 'webhook_token_reset'
+  | 'bridge_create'
+  | 'bridge_update'
+  | 'bridge_delete'
+  | 'bridge_puppet_block'
+  | 'bridge_puppet_unblock'
+  | 'bridge_consent_update';
 
 export const AUDIT_ACTION_TYPES: AuditActionType[] = [
   'space_update',
@@ -434,6 +482,16 @@ export const AUDIT_ACTION_TYPES: AuditActionType[] = [
   'member_voice_deafen',
   'member_voice_move',
   'member_voice_disconnect',
+  'webhook_create',
+  'webhook_update',
+  'webhook_delete',
+  'webhook_token_reset',
+  'bridge_create',
+  'bridge_update',
+  'bridge_delete',
+  'bridge_puppet_block',
+  'bridge_puppet_unblock',
+  'bridge_consent_update',
 ];
 
 export interface AuditLogEntry {
@@ -638,7 +696,7 @@ export async function uploadSpaceBanner(spaceId: string, file: File): Promise<Sp
 }
 
 export function listSpaceRoles(spaceId: string) {
-  return api<SpaceRole[]>(`/spaces/${spaceId}/roles`);
+  return api<SpaceRole[]>(`/spaces/${spaceId}/roles`).then((list) => list.map(normalizeRole));
 }
 
 /** A new role goes in at position 1, just above @everyone (Discord's default), so whoever made
@@ -647,9 +705,12 @@ export function listSpaceRoles(spaceId: string) {
  * than working them out. */
 export function createSpaceRole(
   spaceId: string,
-  body: { name: string; permissions: number; color?: number; hoist?: boolean; mentionable?: boolean }
+  body: { name: string; permissions: PermInput; color?: number; hoist?: boolean; mentionable?: boolean }
 ) {
-  return api<SpaceRole>(`/spaces/${spaceId}/roles`, { method: 'POST', json: body });
+  return api<SpaceRole>(`/spaces/${spaceId}/roles`, {
+    method: 'POST',
+    json: { ...body, permissions: toWire(body.permissions) },
+  }).then(normalizeRole);
 }
 
 /**
@@ -661,7 +722,9 @@ export function createSpaceRole(
  * also covers instances from before this endpoint.
  */
 export function reorderSpaceRoles(spaceId: string, positions: RolePosition[]): Promise<SpaceRole[]> {
-  return api<SpaceRole[]>(`/spaces/${spaceId}/roles`, { method: 'PATCH', json: positions });
+  return api<SpaceRole[]>(`/spaces/${spaceId}/roles`, { method: 'PATCH', json: positions }).then((list) =>
+    list.map(normalizeRole)
+  );
 }
 
 /**
@@ -710,14 +773,15 @@ export function patchSpaceRole(
   roleId: string,
   body: Partial<{
     name: string;
-    permissions: number;
+    permissions: PermInput;
     position: number;
     color: number;
     hoist: boolean;
     mentionable: boolean;
   }>
 ) {
-  return api<SpaceRole>(`/spaces/${spaceId}/roles/${roleId}`, { method: 'PATCH', json: body });
+  const json = body.permissions === undefined ? body : { ...body, permissions: toWire(body.permissions) };
+  return api<SpaceRole>(`/spaces/${spaceId}/roles/${roleId}`, { method: 'PATCH', json }).then(normalizeRole);
 }
 
 export function deleteSpaceRole(spaceId: string, roleId: string) {
@@ -755,18 +819,20 @@ export function removeMemberSpaceRole(spaceId: string, userId: string, roleId: s
 }
 
 export function listRoomPermissionOverrides(spaceId: string, roomId: string) {
-  return api<SpaceRoomOverride[]>(`/spaces/${spaceId}/rooms/${roomId}/overrides`);
+  return api<SpaceRoomOverride[]>(`/spaces/${spaceId}/rooms/${roomId}/overrides`).then((list) =>
+    list.map(normalizeOverride)
+  );
 }
 
 export function putRoomPermissionOverride(
   spaceId: string,
   roomId: string,
   roleId: string,
-  body: { allow: number; deny: number }
+  body: { allow: PermInput; deny: PermInput }
 ) {
   return api<void>(`/spaces/${spaceId}/rooms/${roomId}/overrides/${roleId}`, {
     method: 'PUT',
-    json: body,
+    json: { allow: toWire(body.allow), deny: toWire(body.deny) },
   });
 }
 
@@ -775,18 +841,20 @@ export function deleteRoomPermissionOverride(spaceId: string, roomId: string, ro
 }
 
 export function listRoomUserPermissionOverrides(spaceId: string, roomId: string) {
-  return api<SpaceRoomUserOverride[]>(`/spaces/${spaceId}/rooms/${roomId}/overrides/users`);
+  return api<SpaceRoomUserOverride[]>(`/spaces/${spaceId}/rooms/${roomId}/overrides/users`).then((list) =>
+    list.map(normalizeOverride)
+  );
 }
 
 export function putRoomUserPermissionOverride(
   spaceId: string,
   roomId: string,
   userId: string,
-  body: { allow: number; deny: number }
+  body: { allow: PermInput; deny: PermInput }
 ) {
   return api<void>(`/spaces/${spaceId}/rooms/${roomId}/overrides/users/${userId}`, {
     method: 'PUT',
-    json: body,
+    json: { allow: toWire(body.allow), deny: toWire(body.deny) },
   });
 }
 
