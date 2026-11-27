@@ -25,6 +25,8 @@ import { Button } from '../components/ui/Button';
 import { Tabs } from '../components/ui/Tabs';
 import { EmptyState } from '../components/ui/EmptyState';
 import { showContextMenu } from '../stores/contextMenu';
+import { openUserProfileFullModal } from '../stores/userProfileFullModal';
+import { profileSubjectFromRelationship } from '../lib/relationshipProfile';
 import { ResponsiveDialog } from '../components/ui/ResponsiveDialog';
 import { appDialogActions, appPageHeader, appPageTitle, appSectionLabel, appContentBand } from '../theme/appChrome';
 import { t } from '../i18n';
@@ -57,13 +59,18 @@ const FriendRow: Component<{
   /** Dim the avatar (blocked / outgoing). */
   muted?: boolean;
   actions: JSX.Element;
+  onOpenProfile: () => void;
   onContextMenu?: (e: MouseEvent) => void;
 }> = (props) => (
   <div
     class="flex items-center justify-between gap-3 px-4 py-3 transition-colors hover:bg-muted/20"
     onContextMenu={(e) => props.onContextMenu?.(e)}
   >
-    <div class="flex min-w-0 flex-1 items-center gap-3">
+    <button
+      type="button"
+      class="group flex min-w-0 flex-1 items-center gap-3 text-start focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+      onClick={() => props.onOpenProfile()}
+    >
       <div class={`relative shrink-0 ${props.muted ? 'opacity-70' : ''}`}>
         <MessageAvatar name={friendDisplayName(props.rel)} avatar={props.rel.user.avatar} user={props.rel.user} class="size-10 text-sm" />
         <Show when={props.showPresence}>
@@ -73,7 +80,7 @@ const FriendRow: Component<{
         </Show>
       </div>
       <div class="min-w-0">
-        <div class="truncate text-sm font-medium text-foreground">{friendDisplayName(props.rel)}</div>
+        <div class="truncate text-sm font-medium text-foreground group-hover:underline group-hover:underline-offset-2">{friendDisplayName(props.rel)}</div>
         {/* A custom status first, then what they are playing (friends only - the rows of the
             pending and blocked tabs show no presence), then their handle. */}
         <Show
@@ -83,7 +90,7 @@ const FriendRow: Component<{
           {(a) => <PlayingText activity={a()} class="block truncate text-xs text-muted-foreground" />}
         </Show>
       </div>
-    </div>
+    </button>
     <div class="flex shrink-0 gap-2">{props.actions}</div>
   </div>
 );
@@ -163,8 +170,7 @@ const FriendsPage: Component = () => {
     }
   }
 
-  async function handleMessage(rel: Relationship) {
-    const userId = rel.user.id;
+  async function handleMessageForUser(userId: string) {
     setMessageLoading(userId);
     try {
       const room = await createPM(userId);
@@ -175,6 +181,17 @@ const FriendsPage: Component = () => {
     } finally {
       setMessageLoading(null);
     }
+  }
+
+  function handleMessage(rel: Relationship) {
+    return handleMessageForUser(rel.user.id);
+  }
+
+  function openProfile(rel: Relationship) {
+    openUserProfileFullModal(profileSubjectFromRelationship(rel), {
+      currentUserId: auth.user?.id,
+      onMessageUser: rel.type === RelType.Friend ? (userId) => void handleMessageForUser(userId) : undefined,
+    });
   }
 
   const friends = () => relationships.relationships.filter((r) => r.type === RelType.Friend);
@@ -217,6 +234,7 @@ const FriendsPage: Component = () => {
   function friendMenu(rel: Relationship) {
     return (e: MouseEvent) =>
       showContextMenu(e, [
+        { label: t('profile.viewFull'), icon: 'fa-id-badge', onClick: () => openProfile(rel) },
         { label: t('friends.actions.message'), icon: 'fa-message', onClick: () => handleMessage(rel) },
         { label: t('userArea.copyUsername'), icon: 'fa-copy', onClick: () => navigator.clipboard.writeText(userTag(rel)) },
         {
@@ -225,6 +243,28 @@ const FriendsPage: Component = () => {
           danger: true,
           onClick: () => handleRemove(rel).catch(() => {}),
         },
+      ]);
+  }
+
+  function incomingMenu(rel: Relationship) {
+    return (e: MouseEvent) =>
+      showContextMenu(e, [
+        { label: t('profile.viewFull'), icon: 'fa-id-badge', onClick: () => openProfile(rel) },
+        { label: t('friends.actions.accept'), icon: 'fa-user-plus', onClick: () => void handleAccept(rel) },
+        {
+          label: t('friends.actions.decline'),
+          icon: 'fa-user-xmark',
+          danger: true,
+          onClick: () => void handleRemove(rel),
+        },
+      ]);
+  }
+
+  function outgoingMenu(rel: Relationship) {
+    return (e: MouseEvent) =>
+      showContextMenu(e, [
+        { label: t('profile.viewFull'), icon: 'fa-id-badge', onClick: () => openProfile(rel) },
+        { label: t('common.cancel'), icon: 'fa-xmark', onClick: () => void handleRemove(rel) },
       ]);
   }
 
@@ -369,7 +409,7 @@ const FriendsPage: Component = () => {
                 <div class="divide-y divide-border/40 border-b border-border/40">
                   <For each={onlineFriends()}>
                     {(rel) => (
-                      <FriendRow rel={rel} showPresence actions={messageAction(rel)} onContextMenu={friendMenu(rel)} />
+                      <FriendRow rel={rel} showPresence actions={messageAction(rel)} onOpenProfile={() => openProfile(rel)} onContextMenu={friendMenu(rel)} />
                     )}
                   </For>
                 </div>
@@ -381,7 +421,7 @@ const FriendsPage: Component = () => {
                 <div class="divide-y divide-border/40 border-b border-border/40">
                   <For each={friends()}>
                     {(rel) => (
-                      <FriendRow rel={rel} showPresence actions={messageAction(rel)} onContextMenu={friendMenu(rel)} />
+                      <FriendRow rel={rel} showPresence actions={messageAction(rel)} onOpenProfile={() => openProfile(rel)} onContextMenu={friendMenu(rel)} />
                     )}
                   </For>
                 </div>
@@ -417,6 +457,8 @@ const FriendsPage: Component = () => {
                                 </Button>
                               </>
                             }
+                            onOpenProfile={() => openProfile(rel)}
+                            onContextMenu={incomingMenu(rel)}
                           />
                         )}
                       </For>
@@ -443,6 +485,8 @@ const FriendsPage: Component = () => {
                                 {t('common.cancel')}
                               </Button>
                             }
+                            onOpenProfile={() => openProfile(rel)}
+                            onContextMenu={outgoingMenu(rel)}
                           />
                         )}
                       </For>
@@ -471,6 +515,7 @@ const FriendsPage: Component = () => {
                             {t('friends.actions.unblock')}
                           </Button>
                         }
+                        onOpenProfile={() => openProfile(rel)}
                       />
                     )}
                   </For>

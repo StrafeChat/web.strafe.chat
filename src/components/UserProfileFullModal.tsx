@@ -15,6 +15,7 @@ import type { Relationship } from '../api/relationships';
 import type { Space } from '../api/spaces';
 import { markdownAndHtmlToSanitizedBioHtml } from '../lib/profileRichText';
 import { memberNameColorHex, rolesForMemberProfile } from '../lib/userProfilePopoverHelpers';
+import { profileSubjectFromRelationship } from '../lib/relationshipProfile';
 import {
   closeUserProfileFullModal,
   openUserProfileFullModal,
@@ -209,7 +210,8 @@ export const UserProfileFullModal: Component = () => {
   const isSelf = () => subject()?.userId === userProfileFullModal.currentUserId;
   const roleEditCtx = () => userProfileFullModal.spaceRoleContext;
   const [tab, setTab] = createSignal<ProfileTab>('profile');
-  const activeTab = (): ProfileTab => (isSelf() ? 'profile' : tab());
+  const activeTab = (): ProfileTab =>
+    isSelf() || (subject()?.bot && tab() === 'friends') ? 'profile' : tab();
   const [mutualLoading, setMutualLoading] = createSignal(false);
   const [mutualLoadedFor, setMutualLoadedFor] = createSignal<string | null>(null);
   const [mutualFailures, setMutualFailures] = createSignal(0);
@@ -262,21 +264,25 @@ export const UserProfileFullModal: Component = () => {
 
   const tabItems = (): { id: ProfileTab; label: string }[] => {
     const loaded = mutualLoadedFor() === subject()?.userId;
-    return [
+    const items: { id: ProfileTab; label: string }[] = [
       { id: 'profile', label: t('profile.tabs.profile') },
-      {
+    ];
+    // Bots cannot be friends, so a bot's profile has no mutual-friends tab.
+    if (!subject()?.bot) {
+      items.push({
         id: 'friends',
         label: loaded
           ? `${t('profile.tabs.mutualFriends')} (${mutualFriends().length})`
           : t('profile.tabs.mutualFriends'),
-      },
-      {
-        id: 'spaces',
-        label: loaded
-          ? `${t('profile.tabs.mutualSpaces')} (${sharedSpaces().length})`
-          : t('profile.tabs.mutualSpaces'),
-      },
-    ];
+      });
+    }
+    items.push({
+      id: 'spaces',
+      label: loaded
+        ? `${t('profile.tabs.mutualSpaces')} (${sharedSpaces().length})`
+        : t('profile.tabs.mutualSpaces'),
+    });
+    return items;
   };
 
   // A new subject starts on the profile tab with no stale shared-space result.
@@ -323,26 +329,10 @@ export const UserProfileFullModal: Component = () => {
   }
 
   function openMutualFriend(rel: Relationship) {
-    const user = rel.user;
-    openUserProfileFullModal(
-      {
-        userId: user.id,
-        displayName: friendDisplayName(rel),
-        username: user.username,
-        homeDomain: user.home_domain,
-        avatar: user.avatar,
-        banner: user.banner,
-        bio: user.bio,
-        aboutMe: user.about_me,
-        pronouns: user.pronouns,
-        birthday: user.birthday,
-        birthdayToday: user.is_birthday,
-      },
-      {
-        currentUserId: userProfileFullModal.currentUserId,
-        onMessageUser: userProfileFullModal.onMessageUser,
-      },
-    );
+    openUserProfileFullModal(profileSubjectFromRelationship(rel), {
+      currentUserId: userProfileFullModal.currentUserId,
+      onMessageUser: userProfileFullModal.onMessageUser,
+    });
   }
 
   function handleRolesSaved(roleIds: string[]) {

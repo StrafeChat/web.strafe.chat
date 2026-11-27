@@ -16,6 +16,9 @@ import { showContextMenu } from '../../stores/contextMenu';
 import { confirmDialog } from '../../stores/confirmDialog';
 import { removeRoomParticipant } from '../../api/rooms';
 import { removeRoom } from '../../stores/rooms';
+import { buildUserMenuItems } from '../../lib/userContextMenu';
+import { fullProfileSubjectFromPopoverSubject, popoverSubjectFromParticipant } from '../../lib/userProfilePopoverHelpers';
+import { openUserProfileFullModal } from '../../stores/userProfileFullModal';
 import { useNavigate } from '@solidjs/router';
 import {
   appChannelRail,
@@ -283,6 +286,10 @@ export const RoomsBar: Component = () => {
                   // fetched must not come back from the participant snapshot.
                   return customStatusOf(other.id, other.presence);
                 };
+                const profileSubject = () => {
+                  const other = otherParticipant();
+                  return isGroup() || !other ? undefined : popoverSubjectFromParticipant(other);
+                };
                 return (
                   <ConvItem
                     name={roomDisplayName(room, currentUserId())}
@@ -300,6 +307,7 @@ export const RoomsBar: Component = () => {
                     muted={isRoomMuted(room)}
                     onContextMenu={(e) => {
                       const msgId = lastMsgId();
+                      const subject = profileSubject();
                       showContextMenu(e, [
                         ...(msgId && unreadCount() > 0
                           ? [
@@ -333,6 +341,23 @@ export const RoomsBar: Component = () => {
                           icon: 'fa-copy',
                           onClick: () => navigator.clipboard.writeText(room.id),
                         },
+                        ...(subject
+                          ? buildUserMenuItems({
+                              userId: subject.userId,
+                              deleted: subject.deleted,
+                              username: subject.username,
+                              displayName: subject.displayName,
+                              homeDomain: subject.homeDomain,
+                              currentUserId: currentUserId(),
+                              bot: subject.bot,
+                              roomId: room.id,
+                              showFriendshipActions: true,
+                              onOpenProfile: () => {
+                                const full = fullProfileSubjectFromPopoverSubject(subject);
+                                if (full) openUserProfileFullModal(full, { currentUserId: currentUserId() });
+                              },
+                            })
+                          : []),
                       ]);
                     }}
                   />

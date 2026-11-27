@@ -2040,6 +2040,8 @@ export default {
   },
   userMenu: {
     acceptFriend: 'Accept friend request',
+    declineFriend: 'Decline friend request',
+    cancelRequest: 'Cancel friend request',
     block: 'Block',
     unblock: 'Unblock',
     blockTitle: 'Block {{name}}?',
