@@ -1,5 +1,5 @@
 import { createStore } from 'solid-js/store';
-import type { ProfileRole } from './userProfilePopover';
+import type { ProfileRole, SpaceMemberRoleEditContext } from './userProfilePopover';
 
 export type UserProfileFullSubject = {
   userId: string;
@@ -39,6 +39,7 @@ type State = {
   subject: UserProfileFullSubject | null;
   currentUserId: string | undefined;
   onMessageUser: ((userId: string) => void) | undefined;
+  spaceRoleContext: SpaceMemberRoleEditContext | null;
 };
 
 export const [userProfileFullModal, setUserProfileFullModal] = createStore<State>({
@@ -46,20 +47,31 @@ export const [userProfileFullModal, setUserProfileFullModal] = createStore<State
   subject: null,
   currentUserId: undefined,
   onMessageUser: undefined,
+  spaceRoleContext: null,
 });
 
 export function openUserProfileFullModal(
   subject: UserProfileFullSubject,
-  opts?: { currentUserId?: string; onMessageUser?: (userId: string) => void }
+  opts?: {
+    currentUserId?: string;
+    onMessageUser?: (userId: string) => void;
+    spaceRoleContext?: SpaceMemberRoleEditContext | null;
+  }
 ): void {
   setUserProfileFullModal({
     open: true,
     subject,
     currentUserId: opts?.currentUserId,
     onMessageUser: opts?.onMessageUser,
+    spaceRoleContext: opts?.spaceRoleContext ?? null,
   });
 }
 
 export function closeUserProfileFullModal(): void {
-  setUserProfileFullModal({ open: false, subject: null, onMessageUser: undefined });
+  setUserProfileFullModal({
+    open: false,
+    subject: null,
+    onMessageUser: undefined,
+    spaceRoleContext: null,
+  });
 }

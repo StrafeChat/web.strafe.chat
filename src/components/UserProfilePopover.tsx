@@ -6,7 +6,7 @@ import { ProfileBanner } from './ProfileBanner';
 import { ProfileIdentity } from './ProfileIdentity';
 import { ProfileBirthday } from './ProfileBirthday';
 import { RolePill } from './RolePill';
-import { SearchInput } from './ui/SearchInput';
+import { MemberRolesEditor } from './MemberRolesEditor';
 import { MessageBody } from './messageList/MessageBody';
 import { PresenceDot } from './PresenceDot';
 import { ProfileActivity } from './ActivityStatus';
@@ -17,22 +17,18 @@ import { sendMessage } from '../stores/messages';
 import { addOrUpdateRoom } from '../stores/rooms';
 import {
   closeUserProfilePopover,
+  isUserProfilePopoverAnchor,
   remeasureUserProfilePopover,
   setUserProfilePopover,
   userProfilePopover,
 } from '../stores/userProfilePopover';
-import { memberNameColorHex, rolesForMemberChips, rolesForMemberProfile } from '../lib/userProfilePopoverHelpers';
+import { memberNameColorHex, rolesForMemberProfile } from '../lib/userProfilePopoverHelpers';
 import { openUserProfileFullModal } from '../stores/userProfileFullModal';
 import { openSafetyNumberModal } from '../stores/safetyNumberModal';
 import { openUserSettings } from '../stores/userSettingsModal';
 import { openNicknameDialog } from '../stores/nicknameDialog';
 import { IconButton } from './ui/IconButton';
-import { setMemberSpaceRoles } from '../api/spaces';
-import type { SpaceRole } from '../api/spaces';
-import { canChangeMemberRole, spaceRoleColorHex } from '../lib/spacePermissions';
-import { compareRolesHighestFirst } from '../lib/roleOrder';
-import { translateRoleApiError } from '../lib/formatApiError';
-import { appMenuItemDefault, appMenuPanel, appSectionLabel, zLayer } from '../theme/appChrome';
+import { appSectionLabel, zLayer } from '../theme/appChrome';
 import { isMdViewport } from '../stores/mobileShellLayout';
 import { t } from '../i18n';
 import { openAppWindow } from '../lib/openWindow';
@@ -68,18 +64,6 @@ const BannerIconButton: Component<{
 );
 
 export const UserProfilePopover: Component = () => {
-  const [pickedCustomRoleIds, setPickedCustomRoleIds] = createSignal<Set<string>>(new Set());
-  const [roleSaveBusy, setRoleSaveBusy] = createSignal(false);
-  const [roleSaveErr, setRoleSaveErr] = createSignal('');
-  const [addRolesMenuOpen, setAddRolesMenuOpen] = createSignal(false);
-  const [roleSearch, setRoleSearch] = createSignal('');
-  const [roleMenuAnchor, setRoleMenuAnchor] = createSignal<{
-    top: number;
-    left: number;
-    maxHeight: number;
-  } | null>(null);
-  let roleAddBtnEl: HTMLButtonElement | undefined;
-  let roleMenuEl: HTMLDivElement | undefined;
   const [quickDraft, setQuickDraft] = createSignal('');
   const [quickSending, setQuickSending] = createSignal(false);
   const [quickError, setQuickError] = createSignal('');
@@ -99,43 +83,23 @@ export const UserProfilePopover: Component = () => {
   }
   const [rootRef, setRootRef] = createSignal<HTMLDivElement>();
 
+  function refreshPopoverHeight() {
+    const el = rootRef();
+    if (!el) return;
+    queueMicrotask(() => remeasureUserProfilePopover(el.getBoundingClientRect().height));
+  }
+
   const subject = () => userProfilePopover.subject;
   const roleEditCtx = () => userProfilePopover.spaceRoleContext;
   // Under the md breakpoint the card is a bottom-sheet drawer (with a dimmed backdrop)
   // instead of a floating popover anchored to the click - one surface, not a tiny card.
   const mobile = () => !isMdViewport();
 
-  function revertPickedFromContext() {
-    const ctx = roleEditCtx();
-    if (!ctx) {
-      setPickedCustomRoleIds(new Set<string>());
-      return;
-    }
-    const everyoneId = ctx.spaceRoles.find((r) => r.name === EVERYONE_ROLE_NAME)?.id;
-    const next = new Set<string>();
-    for (const rid of ctx.subjectRoleIds) {
-      if (rid && rid !== everyoneId) next.add(rid);
-    }
-    setPickedCustomRoleIds(next);
-  }
-
   createEffect(() => {
     if (!userProfilePopover.open) {
-      setPickedCustomRoleIds(new Set<string>());
-      setRoleSaveErr('');
-      setAddRolesMenuOpen(false);
-      setRoleSearch('');
       setQuickDraft('');
       setQuickError('');
-      return;
     }
-    const ctx = userProfilePopover.spaceRoleContext;
-    if (!ctx) {
-      setPickedCustomRoleIds(new Set<string>());
-      return;
-    }
-    revertPickedFromContext();
-    setRoleSaveErr('');
   });
 
   // The card's real height depends on which optional sections render (roles, about me,
@@ -146,84 +110,19 @@ export const UserProfilePopover: Component = () => {
     if (!userProfilePopover.open) return;
     const el = rootRef();
     if (!el) return;
-    // Re-run whenever content that changes height changes.
-    addRolesMenuOpen();
-    void displayedSortedRoles().length;
     // The activity card comes and goes live while the card is open (a game starts or ends).
     void !!activityOf(subject()?.userId);
-    queueMicrotask(() => remeasureUserProfilePopover(el.getBoundingClientRect().height));
+    refreshPopoverHeight();
   });
 
   createEffect(() => {
     if (!userProfilePopover.open) return;
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== 'Escape') return;
-      if (addRolesMenuOpen()) {
-        e.stopPropagation();
-        setAddRolesMenuOpen(false);
-        return;
-      }
       closeUserProfilePopover();
     };
     document.addEventListener('keydown', onKey);
     onCleanup(() => document.removeEventListener('keydown', onKey));
-  });
-
-  createEffect(() => {
-    if (!addRolesMenuOpen()) return;
-    const onDoc = (e: MouseEvent) => {
-      const menu = document.getElementById('profile-role-add-menu');
-      const btn = document.getElementById('profile-role-add-btn');
-      const t = e.target as Node;
-      if (menu?.contains(t) || btn?.contains(t)) return;
-      setAddRolesMenuOpen(false);
-    };
-    document.addEventListener('mousedown', onDoc, true);
-    onCleanup(() => document.removeEventListener('mousedown', onDoc, true));
-  });
-
-  // The role menu is portaled so it can overlap the card (which clips its own overflow) and
-  // the page. It opens below the + when that fits, else above; `maxHeight` is what the chosen
-  // side can hold, so a long list scrolls inside the viewport instead of running off it.
-  function placeRoleMenu() {
-    const btn = roleAddBtnEl;
-    const menu = roleMenuEl;
-    if (!btn || !menu) return;
-    const r = btn.getBoundingClientRect();
-    const h = menu.offsetHeight;
-    const w = menu.offsetWidth;
-    const gap = 6;
-    const edge = 8;
-    const belowSpace = window.innerHeight - r.bottom - gap - edge;
-    const aboveSpace = r.top - gap - edge;
-    const fitsBelow = h <= belowSpace;
-    const fitsAbove = h <= aboveSpace;
-    const openBelow = fitsBelow || (!fitsAbove && belowSpace >= aboveSpace);
-    const maxHeight = Math.max(80, openBelow ? belowSpace : aboveSpace);
-    const top = openBelow ? r.bottom + gap : r.top - gap - Math.min(h, maxHeight);
-    const left = Math.max(edge, Math.min(r.left, window.innerWidth - w - edge));
-    setRoleMenuAnchor({ top, left, maxHeight });
-  }
-
-  createEffect(() => {
-    if (!addRolesMenuOpen()) {
-      setRoleSearch('');
-      setRoleMenuAnchor(null);
-      return;
-    }
-    setRoleMenuAnchor(null);
-    const raf = requestAnimationFrame(() => {
-      placeRoleMenu();
-      roleMenuEl?.querySelector('input')?.focus({ preventScroll: true });
-    });
-    const onReflow = () => placeRoleMenu();
-    window.addEventListener('resize', onReflow);
-    window.addEventListener('scroll', onReflow, true);
-    onCleanup(() => {
-      cancelAnimationFrame(raf);
-      window.removeEventListener('resize', onReflow);
-      window.removeEventListener('scroll', onReflow, true);
-    });
   });
 
   onMount(() => {
@@ -233,8 +132,11 @@ export const UserProfilePopover: Component = () => {
       const menu = document.getElementById('profile-role-add-menu');
       const actions = document.getElementById('context-menu-portal');
       const submenu = document.getElementById('context-submenu-portal');
-      const t = e.target as Node;
-      if (el?.contains(t) || menu?.contains(t) || actions?.contains(t) || submenu?.contains(t)) return;
+      const target = e.target as Node;
+      if (el?.contains(target) || menu?.contains(target) || actions?.contains(target) || submenu?.contains(target)) return;
+      // Let the trigger's click decide: pressing the open trigger closes the card there, while
+      // closing on mousedown first made it disappear for a frame and reopen on the same click.
+      if (e.button === 0 && isUserProfilePopoverAnchor(target)) return;
       closeUserProfilePopover();
     };
     document.addEventListener('mousedown', onDoc, true);
@@ -251,91 +153,19 @@ export const UserProfilePopover: Component = () => {
     if (!ctx?.canManageMemberRoles || !subject()) return false;
     return ctx.spaceRoles.some((r) => r.name !== EVERYONE_ROLE_NAME);
   });
-
-  const displayedSortedRoles = createMemo((): SpaceRole[] => {
+  const emptyRolesLabel = createMemo(() => {
     const ctx = roleEditCtx();
-    if (!ctx) return [];
-    if (canEditMemberRoles()) {
-      const byId = new Map(ctx.spaceRoles.map((r) => [r.id, r]));
-      const list: SpaceRole[] = [];
-      for (const id of pickedCustomRoleIds()) {
-        const r = byId.get(id);
-        if (r && r.name !== EVERYONE_ROLE_NAME) list.push(r);
-      }
-      list.sort(compareRolesHighestFirst);
-      return list;
-    }
-    return rolesForMemberChips(ctx.subjectRoleIds, ctx.spaceRoles);
+    if (!ctx || rolesForMemberProfile(ctx.subjectRoleIds, ctx.spaceRoles)?.length) return '';
+    return canEditMemberRoles() ? t('profile.noRolesYetEditable') : t('profile.noRolesAssigned');
   });
 
-  const visibleRoleChips = createMemo(() =>
-    displayedSortedRoles().slice(0, MAX_ROLE_CHIPS_VISIBLE),
-  );
-  const hiddenRoleChipCount = createMemo(() =>
-    Math.max(0, displayedSortedRoles().length - MAX_ROLE_CHIPS_VISIBLE),
-  );
-
-  /** Roles at or above this the viewer may neither add nor take away (Infinity = owner). */
-  const roleCeiling = () => roleEditCtx()?.viewerHighestPosition ?? Number.POSITIVE_INFINITY;
-  const roleChangeable = (role: SpaceRole) => canChangeMemberRole(role, roleCeiling());
-
-  const rolesAvailableToAdd = createMemo(() => {
-    if (!canEditMemberRoles()) return [];
+  function handleRolesSaved(roleIds: string[]) {
     const ctx = roleEditCtx();
-    if (!ctx) return [];
-    return ctx.spaceRoles
-      .filter((r) => !pickedCustomRoleIds().has(r.id) && roleChangeable(r))
-      .sort(compareRolesHighestFirst);
-  });
-
-  const filteredRolesToAdd = createMemo(() => {
-    const q = roleSearch().trim().toLowerCase();
-    const list = rolesAvailableToAdd();
-    return q ? list.filter((r) => r.name.toLowerCase().includes(q)) : list;
-  });
-
-  async function persistCustomRoles(next: Set<string>) {
-    const ctx = roleEditCtx();
-    const s = subject();
-    if (!ctx || !s || !canEditMemberRoles()) return;
-    setRoleSaveErr('');
-    setRoleSaveBusy(true);
-    try {
-      const chosen = [...next];
-      await setMemberSpaceRoles(ctx.spaceId, s.userId, chosen);
-      const everyoneId = ctx.spaceRoles.find((r) => r.name === EVERYONE_ROLE_NAME)?.id;
-      const merged: string[] = [];
-      if (everyoneId) merged.push(everyoneId);
-      for (const id of chosen) {
-        if (!merged.includes(id)) merged.push(id);
-      }
-      setUserProfilePopover('spaceRoleContext', 'subjectRoleIds', merged);
-      setUserProfilePopover('subject', 'spaceRoles', rolesForMemberProfile(merged, ctx.spaceRoles));
-      setUserProfilePopover('subject', 'nameColor', memberNameColorHex(merged, ctx.spaceRoles));
-      ctx.onMemberRolesUpdated?.();
-    } catch (e) {
-      setRoleSaveErr(translateRoleApiError(e, t).join(' ') || t('profile.rolesUpdateFailed'));
-      revertPickedFromContext();
-    } finally {
-      setRoleSaveBusy(false);
-    }
-  }
-
-  async function removeMemberRole(roleId: string) {
-    if (!canEditMemberRoles() || roleSaveBusy()) return;
-    const next = new Set(pickedCustomRoleIds());
-    next.delete(roleId);
-    setPickedCustomRoleIds(next);
-    await persistCustomRoles(next);
-  }
-
-  async function addMemberRole(roleId: string) {
-    if (!canEditMemberRoles() || roleSaveBusy()) return;
-    const next = new Set(pickedCustomRoleIds());
-    next.add(roleId);
-    setPickedCustomRoleIds(next);
-    setAddRolesMenuOpen(false);
-    await persistCustomRoles(next);
+    if (!ctx) return;
+    setUserProfilePopover('spaceRoleContext', 'subjectRoleIds', roleIds);
+    setUserProfilePopover('subject', 'spaceRoles', rolesForMemberProfile(roleIds, ctx.spaceRoles));
+    setUserProfilePopover('subject', 'nameColor', memberNameColorHex(roleIds, ctx.spaceRoles));
+    ctx.onMemberRolesUpdated?.();
   }
 
   const showSpaceRolesRow = createMemo(() => !!roleEditCtx());
@@ -447,6 +277,7 @@ export const UserProfilePopover: Component = () => {
       {
         currentUserId: userProfilePopover.currentUserId,
         onMessageUser: userProfilePopover.onMessageUser,
+        spaceRoleContext: roleEditCtx(),
       }
     );
     closeUserProfilePopover();
@@ -479,18 +310,6 @@ export const UserProfilePopover: Component = () => {
       setQuickSending(false);
     }
   }
-
-  const RoleChip: Component<{
-    role: SpaceRole;
-    showRemove: boolean;
-  }> = (p) => (
-    <RolePill
-      role={{ id: p.role.id, name: p.role.name, color: p.role.color ?? 0 }}
-      onRemove={p.showRemove ? () => void removeMemberRole(p.role.id) : undefined}
-      removeLabel={t('profile.removeRole', { name: p.role.name })}
-      disabled={roleSaveBusy()}
-    />
-  );
 
   return (
     <Show when={userProfilePopover.open && subject()}>
@@ -627,103 +446,28 @@ export const UserProfilePopover: Component = () => {
 
             <Show when={showRolesOrJoinSection()}>
               <div class="space-y-2.5 px-4 pb-3">
-                <Show when={showSpaceRolesRow()}>
-                  <div>
-                    <p class={`mb-1.5 ${appSectionLabel}`}>{t('profile.roles')}</p>
-                    <div class="flex flex-wrap items-center gap-1.5">
-                      <For each={visibleRoleChips()}>
-                        {(role) => <RoleChip role={role} showRemove={canEditMemberRoles() && roleChangeable(role)} />}
-                      </For>
-                      <Show when={hiddenRoleChipCount() > 0}>
-                        <span
-                          class="inline-flex items-center rounded-full border border-border/80 bg-muted/20 px-2.5 py-1 text-xs font-medium tabular-nums text-muted-foreground"
-                          title={t('profile.moreRoles', { count: hiddenRoleChipCount() })}
-                        >
-                          +{hiddenRoleChipCount()}
-                        </span>
-                      </Show>
-                      <Show when={canEditMemberRoles()}>
-                        <button
-                          id="profile-role-add-btn"
-                          ref={(el) => (roleAddBtnEl = el)}
-                          type="button"
-                          disabled={roleSaveBusy()}
-                          class="flex size-7 shrink-0 items-center justify-center rounded-full border border-dashed border-border/90 text-muted-foreground transition hover:border-primary/60 hover:bg-muted/40 hover:text-foreground disabled:opacity-40"
-                          title={t('profile.addRole')}
-                          aria-label={t('profile.addRole')}
-                          aria-expanded={addRolesMenuOpen()}
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setAddRolesMenuOpen((o) => !o);
-                          }}
-                        >
-                          <i class="fa-solid fa-plus text-xs" />
-                        </button>
-                        <Show when={addRolesMenuOpen()}>
-                          <Portal mount={document.body}>
-                            <div
-                              id="profile-role-add-menu"
-                              ref={(el) => (roleMenuEl = el)}
-                              class={`fixed flex flex-col w-56 ${zLayer.popover} ${appMenuPanel}`}
-                              style={{
-                                top: `${roleMenuAnchor()?.top ?? -9999}px`,
-                                left: `${roleMenuAnchor()?.left ?? -9999}px`,
-                                'max-height': roleMenuAnchor() ? `${roleMenuAnchor()!.maxHeight}px` : undefined,
-                                visibility: roleMenuAnchor() ? 'visible' : 'hidden',
-                              }}
-                              onClick={(e) => e.stopPropagation()}
-                            >
-                              <div class="shrink-0 px-1.5 pb-2 pt-1.5">
-                                <SearchInput
-                                  value={roleSearch()}
-                                  onValueChange={setRoleSearch}
-                                  size="sm"
-                                  wrapperClass="w-full"
-                                  placeholder={t('profile.searchRoles')}
-                                  class="focus:border-input! focus-visible:ring-0!"
-                                  autofocus
-                                />
-                              </div>
-                              <div class="min-h-0 flex-1 overflow-y-auto pt-1" style={{ 'max-height': '180px' }}>
-                                <Show
-                                  when={filteredRolesToAdd().length > 0}
-                                  fallback={
-                                    <p class="px-3 py-2 text-xs text-muted-foreground">
-                                      {rolesAvailableToAdd().length === 0
-                                        ? t('profile.noRolesToAdd')
-                                        : t('profile.noRolesMatch')}
-                                    </p>
-                                  }
-                                >
-                                  <For each={filteredRolesToAdd()}>
-                                    {(role) => (
-                                      <button
-                                        type="button"
-                                        class={appMenuItemDefault}
-                                        onClick={() => void addMemberRole(role.id)}
-                                      >
-                                        <span
-                                          class="size-2 shrink-0 rounded-full ring-1 ring-border/40"
-                                          style={{ 'background-color': spaceRoleColorHex(role.color) }}
-                                        />
-                                        <span class="truncate">{role.name}</span>
-                                      </button>
-                                    )}
-                                  </For>
-                                </Show>
-                              </div>
-                            </div>
-                          </Portal>
+                <Show when={roleEditCtx()}>
+                  {(ctx) => (
+                    <div>
+                      <div class="mb-1.5 flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                        <p class={appSectionLabel}>{t('profile.roles')}</p>
+                        <Show when={emptyRolesLabel()}>
+                          {(label) => <p class="text-xs text-muted-foreground">{label()}</p>}
                         </Show>
-                      </Show>
+                      </div>
+                      <MemberRolesEditor
+                        spaceId={ctx().spaceId}
+                        userId={subject()!.userId}
+                        spaceRoles={ctx().spaceRoles}
+                        roleIds={ctx().subjectRoleIds}
+                        canManage={canEditMemberRoles()}
+                        viewerHighestPosition={ctx().viewerHighestPosition}
+                        maxVisible={MAX_ROLE_CHIPS_VISIBLE}
+                        onSaved={handleRolesSaved}
+                        onLayoutChange={refreshPopoverHeight}
+                      />
                     </div>
-                    <Show when={!displayedSortedRoles().length}>
-                      <p class="text-xs text-muted-foreground">
-                        {canEditMemberRoles() ? t('profile.noRolesYetEditable') : t('profile.noRolesAssigned')}
-                      </p>
-                    </Show>
-                    {roleSaveErr() && <p class="mt-1 text-xs text-destructive">{roleSaveErr()}</p>}
-                  </div>
+                  )}
                 </Show>
 
                 <Show when={!showSpaceRolesRow() && subject()?.spaceRoles?.length}>

@@ -10,7 +10,7 @@
  */
 import { currentLanguage, formatDate } from '../../i18n';
 
-export type TimestampStyle = 't' | 'T' | 'd' | 'D' | 'f' | 'F' | 'R';
+export type TimestampStyle = 't' | 'T' | 'd' | 'D' | 'f' | 'F' | 'R' | 's' | 'S';
 
 /** 'f' is the default: no `:f` and an empty style both mean short date + time. */
 const DEFAULT_STYLE: TimestampStyle = 'f';
@@ -27,6 +27,15 @@ const ABSOLUTE_OPTIONS: Record<Exclude<TimestampStyle, 'R'>, Intl.DateTimeFormat
   d: { month: '2-digit', day: '2-digit', year: 'numeric' },
   D: { month: 'long', day: 'numeric', year: 'numeric' },
   f: { month: 'long', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' },
+  s: { month: '2-digit', day: '2-digit', year: 'numeric', hour: 'numeric', minute: '2-digit' },
+  S: {
+    month: '2-digit',
+    day: '2-digit',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    second: '2-digit',
+  },
   F: {
     weekday: 'long',
     month: 'long',

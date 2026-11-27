@@ -858,6 +858,23 @@ export default {
     noRolesAssigned: 'Keine Rollen zugewiesen.',
     searchRoles: 'Rollen suchen',
     noRolesMatch: 'Keine Rollen passen dazu.',
+    tabs: {
+      aria: 'Profilbereiche',
+      profile: 'Profil',
+      mutualFriends: 'Gemeinsame Freunde',
+      mutualSpaces: 'Gemeinsame Spaces',
+    },
+    mutual: {
+      loading: 'Gemeinsame Spaces werden gesucht…',
+      loadFailed: 'Einige Spaces konnten nicht geprüft werden.',
+      retry: 'Erneut versuchen',
+      friendsEmptyTitle: 'Keine gemeinsamen Freunde',
+      friendsEmptyBody: 'Keiner deiner Freunde teilt bisher einen Space mit {{name}}.',
+      spacesEmptyTitle: 'Keine gemeinsamen Spaces',
+      spacesEmptyBody: 'Du und {{name}} seid noch in keinem gemeinsamen Space.',
+      openSpace: '{{name}} öffnen',
+      sharedSpace: 'Gemeinsamer Space',
+    },
   },
   spaceProfile: {
     edit: 'Space-Profil bearbeiten',

@@ -2,6 +2,7 @@ import type { Component } from 'solid-js';
 import { createMemo, Show } from 'solid-js';
 import type { DecryptedMessage } from '../../stores/messages';
 import type { RoomParticipant } from '../../api/rooms';
+import type { SpaceRole } from '../../api/spaces';
 import { formatSystemMessageText, getSenderDisplay } from './utils';
 import { MessageAvatar } from './MessageAvatar';
 import { ReplyReference } from './ReplyReference';
@@ -106,6 +107,7 @@ function metaFor(msg: SystemMessage, payload: Record<string, string>): EventMeta
 export interface SystemMessageRowProps {
   msg: SystemMessage;
   participants?: RoomParticipant[];
+  spaceRoles?: SpaceRole[];
   currentUserId?: string;
   messages?: DecryptedMessage[];
   roomId?: string;
@@ -167,6 +169,7 @@ export const SystemMessageRow: Component<SystemMessageRowProps> = (props) => {
               roomId={props.roomId}
               messages={props.messages ?? []}
               participants={props.participants}
+              spaceRoles={props.spaceRoles}
               currentUserId={props.currentUserId}
             />
           </div>

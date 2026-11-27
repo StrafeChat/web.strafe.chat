@@ -202,7 +202,7 @@ export function messagePreviewText(
     // Dynamic timestamps resolve to the reader's own rendering, same as the message body -
     // a raw `<t:…>` in a reply strip or a desktop notification helps nobody. (A timestamp
     // inside a code span also resolves here; the message body keeps showing it verbatim.)
-    .replace(/<t:(-?\d{1,11})(?::([tTdDfFR]))?>/g, (_m, unix: string, style?: string) =>
+    .replace(/<t:(-?\d{1,11})(?::([tTdDfFRsS]))?>/g, (_m, unix: string, style?: string) =>
       formatTimestamp(new Date(Number(unix) * 1000), timestampStyle(style))
     )
     .replace(/```[\s\S]*?```/g, (m) => m.replace(/```\w*\n?/g, '').trim())
