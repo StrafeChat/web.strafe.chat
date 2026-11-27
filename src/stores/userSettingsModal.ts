@@ -5,6 +5,7 @@ export type UserSettingsSection =
   | 'instance'
   | 'account'
   | 'spaceProfiles'
+  | 'connections'
   | 'security'
   | 'privacy'
   | 'devices'

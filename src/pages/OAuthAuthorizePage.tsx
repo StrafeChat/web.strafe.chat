@@ -41,6 +41,7 @@ const SCOPE_ICON: Record<OAuthScope, string> = {
   spaces: 'fa-layer-group',
   'spaces.join': 'fa-user-plus',
   bot: 'fa-robot',
+  connections: 'fa-link',
 };
 
 /**

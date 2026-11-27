@@ -1,6 +1,6 @@
 import { onMount } from 'solid-js';
 import { Show } from 'solid-js';
-import { Router, Route, Navigate, A } from '@solidjs/router';
+import { Router, Route, Navigate, A, useNavigate, useSearchParams } from '@solidjs/router';
 import { authGlassSurface } from '../components/auth/authLayout';
 import Login from '../pages/Login';
 import Register from '../pages/Register';
@@ -19,6 +19,9 @@ import VerifyEmailPage from '../pages/VerifyEmailPage';
 import ForgotPasswordPage from '../pages/ForgotPasswordPage';
 import ResetPasswordPage from '../pages/ResetPasswordPage';
 import ConfirmEmailPage from '../pages/ConfirmEmailPage';
+import PublicProfilePage from '../pages/PublicProfilePage';
+import { setConnectionsCallback } from '../stores/connections';
+import { openUserSettings } from '../stores/userSettingsModal';
 import { StargateProvider } from '../components/StargateProvider';
 import { ConnectionStatusBanner } from '../components/ConnectionStatusBanner';
 import { UpdateAvailableBanner } from '../components/UpdateAvailableBanner';
@@ -110,6 +113,27 @@ function Home(props: { children?: import('solid-js').JSX.Element }) {
   );
 }
 
+/**
+ * Where a connection's sign-in (GitHub, Discord, Bluesky) comes back to: /settings/connections
+ * ?connected=<provider> or ?error=<code>. It hands the result to the settings page, opens
+ * Settings on Connections and replaces itself with the home page.
+ */
+function ConnectionsLanding() {
+  const [params] = useSearchParams<{ connected?: string; error?: string }>();
+  const navigate = useNavigate();
+  onMount(() => {
+    const connected = typeof params.connected === 'string' ? params.connected : undefined;
+    const error = typeof params.error === 'string' ? params.error : undefined;
+    setConnectionsCallback({ ...(connected ? { connected } : {}), ...(error ? { error } : {}) });
+    openUserSettings('connections');
+    navigate('/', { replace: true });
+  });
+  return null;
+}
+
+/** A public page's address: /@username. */
+const PUBLIC_HANDLE = /^@[A-Za-z0-9_.-]{1,64}$/;
+
 const SNOWFLAKE = /^\d{1,20}$/;
 const messageLinkFilters = { roomId: SNOWFLAKE, messageId: SNOWFLAKE };
 
@@ -130,6 +154,7 @@ export function AppRouter() {
         <Route path="/friends" component={FriendsPage} />
         <Route path="/notes" component={NotesPage} />
         <Route path="/discover" component={DiscoverPage} />
+        <Route path="/settings/connections" component={ConnectionsLanding} />
         <Route path="/rooms/:roomId" component={RoomPage} />
         <Route path="/spaces/:spaceId" component={SpacePage} />
         <Route path="/spaces/:spaceId/rooms/:roomId" component={SpacePage} />
@@ -145,6 +170,8 @@ export function AppRouter() {
       <Route path="/invite/:code" component={InvitePage} />
       <Route path="/admin" component={AdminPage} />
       <Route path="/oauth2/authorize" component={OAuthAuthorizePage} />
+      {/* A person's public page (Settings > Connections), readable signed out. */}
+      <Route path="/:handle" component={PublicProfilePage} matchFilters={{ handle: PUBLIC_HANDLE }} />
       <Route path="*404" component={NotFound} />
     </Router>
   );

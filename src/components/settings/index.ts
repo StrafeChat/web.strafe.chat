@@ -23,3 +23,4 @@ export { AuthorizedAppsSettingsPage } from './AuthorizedAppsSettingsPage';
 export { DesktopSettingsPage } from './DesktopSettingsPage';
 export { ActivitySettingsPage } from './ActivitySettingsPage';
 export { PrivacySettingsPage } from './PrivacySettingsPage';
+export { ConnectionsSettingsPage } from './ConnectionsSettingsPage';

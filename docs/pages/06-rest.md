@@ -83,6 +83,36 @@ The order is part of the contract and never changes: `0` green, `1` teal, `2` bl
 
 The account's spaces with `owner` and its space-wide `permissions` there. See [OAuth2 › Listing the person's spaces](/docs/oauth2/#listing-the-persons-spaces).
 
+### Connections
+
+Accounts a person has elsewhere, verified, on their profile. Each has a **visibility**: `me`, `friends`, `spaces` (friends and people sharing a space) or `everyone`; a new one starts at `me`. Strafe keeps the account's name, a link and how it was verified: no third-party token outlives the verification.
+
+| Provider | How it is verified | Offered |
+| --- | --- | --- |
+| `domain` | A TXT record `_strafe-verify.<domain>` = `strafe-verify=<token>`, or the same line at `https://<domain>/.well-known/strafe-verify`; re-checked weekly | Always |
+| `fediverse` | The person's Strafe address (`https://<instance>/@<username>`) in a profile field or the bio, read through WebFinger and the ActivityPub actor; re-checked weekly | When the instance has a web URL |
+| `bluesky` | AT Protocol OAuth: the account that signs in must be the handle's DID | When the API has a public https URL (or runs on loopback in development) |
+| `github`, `discord` | OAuth with the operator's own app | When the operator configured one |
+
+A re-check that finds no proof twice in a row marks the connection unverified (`verified: false`); it stays on the profile without the mark.
+
+#### `GET` /users/:id/connections
+
+What the caller may see: `{ "connections": [{ "provider", "name", "url", "verified", "verified_by" }] }`. `verified_by` is the account's home instance; a remote account's connections are asked of its home, which decides for the caller. A block either way shows nothing.
+
+#### `GET` /users/@me/connections — *scope: connections for OAuth2 tokens*
+
+With a session: every connection (`id`, `provider`, `name`, `url`, `method`, `verified`, `visibility`, `position`, `verified_at`, `checked_at`), the `settings` (`public_page`), the account's `address` and the instance's `providers`. With an OAuth2 token: only the connections visible to everyone, in the shape above.
+
+#### Adding one (session only)
+
+- `POST /users/@me/connections/:provider` with `{ "identifier"? }` starts: for a proof provider the answer has `instructions` (`dns_name`, `dns_value`, `https_url`, `https_body`, or `address`) and a `challenge_id`; for an OAuth one an `authorize_url` to send the browser to. It comes back through `GET /connections/:provider/callback`, which ends on `<web>/settings/connections?connected=<provider>` or `?error=<code>`. A challenge lasts 30 minutes.
+- `POST /users/@me/connections/:provider/verify` with `{ "challenge_id" }` looks for the proof now: `422 proof_not_found` with `reason` `not_found`, `unreachable`, `signed_fetch` (the server only answers signed requests) or `mismatch`.
+- `PATCH /users/@me/connections/:provider/:id` with `{ "visibility"?, "position"? }`; `POST …/:id/recheck`; `DELETE …/:id`. `:id` is URL-encoded (an actor URL, a DID).
+- `PATCH /users/@me/connections/settings` with `{ "public_page" }` turns the public page at `<web>/@<username>` on or off (off by default); `GET /public/users/:username` is its data, with no auth.
+
+One identity belongs to at most one account per instance: a second claim answers `409 connection_claimed`. At most 20 connections per account (`409 connection_limit`). `USER_CONNECTIONS_UPDATE` arrives on the account's own channel when they change.
+
 ### Email address (session only)
 
 Reading and changing the account's own address. Only a person's session may call these: a bot token gets `403 session_required`, an OAuth2 token `403 insufficient_scope`. Every route answers the same object, with `Cache-Control: no-store`:

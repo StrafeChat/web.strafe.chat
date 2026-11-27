@@ -17,6 +17,7 @@ import { initRoomHandlers } from '../stores/rooms';
 import { spaces, initSpaceHandlers } from '../stores/spaces';
 import { initSpaceMembersHandlers, markSpaceMembersStale } from '../stores/spaceMembers';
 import { initUserProfileHandler } from '../stores/userProfile';
+import { initConnectionsHandler } from '../stores/connections';
 import { initE2EESyncHandlers } from '../stores/e2eeSync';
 import { bootstrapE2EEDevice } from '../stores/e2eeBootstrap';
 import { initCustomEmojiHandlers, loadCustomEmojis } from '../stores/customEmojis';
@@ -47,6 +48,7 @@ export const StargateProvider: Component<{ children?: import('solid-js').JSX.Ele
     initSpaceHandlers();
     initSpaceMembersHandlers();
     initUserProfileHandler();
+    initConnectionsHandler();
     initE2EESyncHandlers();
     initCustomEmojiHandlers();
     initRoomNotifySettingsHandler();

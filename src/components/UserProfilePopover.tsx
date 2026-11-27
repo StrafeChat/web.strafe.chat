@@ -5,6 +5,7 @@ import { MessageAvatar } from './messageList/MessageAvatar';
 import { ProfileBanner } from './ProfileBanner';
 import { ProfileIdentity } from './ProfileIdentity';
 import { ProfileBirthday } from './ProfileBirthday';
+import { ProfileConnections } from './ProfileConnections';
 import { RolePill } from './RolePill';
 import { MemberRolesEditor } from './MemberRolesEditor';
 import { MessageBody } from './messageList/MessageBody';
@@ -443,6 +444,10 @@ export const UserProfilePopover: Component = () => {
             </Show>
 
             <ProfileBirthday birthday={subject()?.birthday} class="px-4 pb-3" />
+
+            <Show when={!subject()?.deleted}>
+              <ProfileConnections userId={subject()?.userId} compact class="px-4 pb-3" />
+            </Show>
 
             <Show when={showRolesOrJoinSection()}>
               <div class="space-y-2.5 px-4 pb-3">

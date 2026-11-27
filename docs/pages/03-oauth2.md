@@ -122,6 +122,7 @@ A token can only reach the endpoints its scopes name. Every other endpoint answe
 | `spaces` | The spaces they are in, whether they own each, and their permissions there | `GET /users/@me/spaces` |
 | `spaces.join` | Lets a bot of yours add them to a space, without an invite | `PUT /spaces/:id/members/:user_id` (called by the bot) |
 | `bot` | Adds the application's bot to a space the person manages, with a chosen permission set | The consent page itself; see [Install links](/docs/applications/#install-links) |
+| `connections` | The accounts elsewhere they show to **everyone** on their profile (a domain, fediverse, Bluesky, GitHub, Discord) - never the ones they keep to friends, their spaces or themselves | `GET /users/@me/connections` |
 
 The address behind `email` can change: people change it from their settings, and administrators can too. Key the accounts you store on `id`, never on `email`, and read the address again from `GET /users/@me` when you need it.
 

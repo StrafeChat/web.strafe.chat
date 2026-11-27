@@ -130,10 +130,10 @@ export function uploadBotBanner(id: string, file: File) {
 
 // ---- OAuth2 (as an authorization server, for the consent screen) --------------------------
 
-export type OAuthScope = 'identify' | 'email' | 'spaces' | 'spaces.join' | 'bot';
+export type OAuthScope = 'identify' | 'email' | 'spaces' | 'spaces.join' | 'bot' | 'connections';
 
 /** Every scope, in the order the URL generator and consent screen list them. */
-export const OAUTH_SCOPES: OAuthScope[] = ['identify', 'email', 'spaces', 'spaces.join', 'bot'];
+export const OAUTH_SCOPES: OAuthScope[] = ['identify', 'email', 'spaces', 'spaces.join', 'bot', 'connections'];
 
 /** i18n key segment for a scope (`spaces.join` would otherwise nest in i18next). */
 export function scopeKey(scope: string): string {
