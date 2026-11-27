@@ -622,6 +622,25 @@ In a GitHub Actions workflow, keep the URL in a repository secret:
       -d "{\"content\": \"${{ github.workflow }} on ${{ github.ref_name }}: ${{ job.status }}\", \"allowed_mentions\": {\"parse\": []}}"
 ```
 
+### GitHub repository webhooks
+
+A GitHub repository or organization webhook can post straight into a room. In GitHub's webhook settings, paste the webhook's URL as the **Payload URL**, as it is or with `/github` on the end (`POST /webhooks/:id/:token/github`, Discord's form). Either content type works. A request that carries GitHub's `X-GitHub-Event` header is read as a GitHub delivery, and each event becomes one embed under the webhook's name and avatar, which never pings anyone.
+
+| Event | Posted |
+| --- | --- |
+| `push` | New commits (up to five listed). A push with no commits is not posted |
+| `pull_request` | Opened, closed, merged, reopened, ready for review |
+| `pull_request_review`, `pull_request_review_comment` | Approvals, requested changes, reviews with text, review comments |
+| `issues`, `issue_comment`, `commit_comment` | Issues opened, closed and reopened, and new comments |
+| `discussion`, `discussion_comment` | New discussions and comments |
+| `release` | Published releases and pre-releases |
+| `create`, `delete` | Branches and tags |
+| `workflow_run` | Every finished workflow run with its result (skipped runs are not posted) |
+| `check_run` | Failed, timed-out and action-needed checks only. There is one per CI job, so `workflow_run` is the one to subscribe to for every result |
+| `fork`, `watch`, `member`, `public` | Forks, stars, new collaborators, a repository made public |
+
+Any other event, and the parts of these that are not posted, is answered `200 {"posted": false, "event", "reason"}`, so GitHub's delivery log says why nothing appeared. A `ping` is answered the same way. A wrong token is `401` as usual. GitHub's `X-Hub-Signature-256` is not checked: the token in the URL is the credential, so leave GitHub's *Secret* empty or set it to anything.
+
 ### A webhook's own messages
 
 | Method + path | Notes |
