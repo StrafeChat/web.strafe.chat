@@ -75,6 +75,7 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
   const [name, setName] = createSignal('');
   const [topic, setTopic] = createSignal('');
   const [slowmode, setSlowmode] = createSignal('0');
+  const [announcement, setAnnouncement] = createSignal(false);
   const [e2ee, setE2ee] = createSignal(false);
   const [userLimit, setUserLimit] = createSignal(0);
   const [bitrate, setBitrate] = createSignal(64_000);
@@ -114,6 +115,7 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
     setName(props.room.name ?? '');
     setTopic(props.room.topic ?? '');
     setSlowmode(String(props.room.slowmode_seconds ?? 0));
+    setAnnouncement(props.room.announcement === true);
     setE2ee(props.room.e2ee_enabled === true);
     setUserLimit(props.room.user_limit ?? 0);
     setBitrate(props.room.bitrate || 64_000);
@@ -287,6 +289,8 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
         // Voice rooms have no topic or slowmode; sending them unchanged is harmless
         // but pointless.
         ...(isVoiceRoom() ? {} : { topic: topic().trim(), slowmode_seconds: slow }),
+        // Only sent when it changes: turning it off ends every follow of the room.
+        ...(isTextRoom() && announcement() !== (props.room.announcement === true) ? { announcement: announcement() } : {}),
       });
       props.onSaved();
       props.onClose();
@@ -426,6 +430,26 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
                 onInput={(e) => setSlowmode(e.currentTarget.value)}
                 disabled={!props.canManageRooms || busy()}
               />
+              <div class="flex items-start gap-4 rounded-xl border border-border bg-muted/20 px-4 py-3.5" data-announcement-setting>
+                <div class="flex size-10 shrink-0 items-center justify-center rounded-lg bg-muted/60 text-muted-foreground">
+                  <i class="fa-solid fa-bullhorn text-sm" aria-hidden="true" />
+                </div>
+                <div class="min-w-0 flex-1">
+                  <p class="text-[15px] font-semibold text-foreground">{t('announcements.setting')}</p>
+                  <p class="mt-0.5 text-xs leading-snug text-muted-foreground">
+                    {e2eeStored() ? t('announcements.settingEncrypted') : t('announcements.settingHint')}
+                  </p>
+                  <Show when={props.room?.announcement === true && !announcement()}>
+                    <p class="mt-1.5 text-xs leading-snug text-amber-500" role="note">{t('announcements.settingOffWarning')}</p>
+                  </Show>
+                </div>
+                <Toggle
+                  checked={announcement()}
+                  onChange={setAnnouncement}
+                  disabled={!props.canManageRooms || busy() || (e2eeStored() && !announcement())}
+                  label={t('announcements.setting')}
+                />
+              </div>
             </Show>
             <div class="pt-2">
               <Button type="button" onClick={() => saveGeneral()} disabled={!props.canManageRooms || busy()} loading={busy()}>
@@ -448,13 +472,17 @@ export const SpaceRoomSettingsModal: Component<Props> = (props) => {
               <div class="min-w-0 flex-1">
                 <p class="text-[15px] font-semibold text-foreground">{t('room.groupSettings.e2ee')}</p>
                 <p class="mt-0.5 text-xs leading-snug text-muted-foreground">
-                  {e2ee() ? t('roomSettings.e2eeOnHint') : t('roomSettings.e2eeOffHint')}
+                  {props.room?.announcement === true && !e2ee()
+                    ? t('announcements.encryptionBlocked')
+                    : e2ee()
+                      ? t('roomSettings.e2eeOnHint')
+                      : t('roomSettings.e2eeOffHint')}
                 </p>
               </div>
               <Toggle
                 checked={e2ee()}
                 onChange={setE2ee}
-                disabled={!props.canManageRooms || busy()}
+                disabled={!props.canManageRooms || busy() || (props.room?.announcement === true && !e2ee())}
                 label={t('room.groupSettings.e2ee')}
               />
             </div>

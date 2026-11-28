@@ -5,13 +5,18 @@ import type { BridgedIdentity } from '../lib/webhookMessages';
 import { bridgePlatformLabel } from '../lib/bridgePlatforms';
 
 /** What the tag needs to know: `true` (a plain webhook), or a sender display's `webhook`. */
-export type WebhookTagSubject = boolean | { kind: 'webhook' | 'bridge'; bridge?: BridgedIdentity } | null | undefined;
+export type WebhookTagSubject =
+  | boolean
+  | { kind: 'webhook' | 'bridge' | 'follow'; bridge?: BridgedIdentity; followRoom?: string }
+  | null
+  | undefined;
 
 /**
  * The tag after a webhook's or a bridged person's name, so a reader always knows it is not a
  * Strafe account:
  *
  * - a webhook message: the WEBHOOK tag, drawn like the BOT tag (identity, not flair);
+ * - a published copy of an announcement room's message: SPACE, saying which room it came from;
  * - a bridged message: the platform ("DISCORD", "MATRIX", or the bridge's own platform name)
  *   with a small bridge glyph, in a neutral colour so it can't pass for a role pill. Its
  *   tooltip and accessible name say who bridged it ("Bridged from Discord by Strife").
@@ -42,14 +47,33 @@ export const WebhookTag: Component<{ webhook?: WebhookTagSubject; size?: 'xs' | 
   const base = () =>
     `ms-1.5 inline-flex shrink-0 select-none items-center self-center rounded-[4px] align-middle font-semibold uppercase leading-none tracking-[0.02em] ${sizing()} ${props.class ?? ''}`;
 
+  const follow = () => {
+    const w = props.webhook;
+    return w && typeof w === 'object' && w.kind === 'follow' ? w : null;
+  };
+  const followLabel = () => {
+    const f = follow();
+    return f?.followRoom ? t('announcements.copyTagLabel', { room: f.followRoom }) : t('announcements.copyTagLabelPlain');
+  };
+
   return (
     <Show when={props.webhook}>
       <Show
         when={bridge()}
         fallback={
-          <span class={`${base()} bg-primary text-white`} title={t('badges.webhook')} aria-label={t('badges.webhook')}>
-            {t('badges.webhookTag')}
-          </span>
+          <Show
+            when={follow()}
+            fallback={
+              <span class={`${base()} bg-primary text-white`} title={t('badges.webhook')} aria-label={t('badges.webhook')}>
+                {t('badges.webhookTag')}
+              </span>
+            }
+          >
+            <span class={`${base()} gap-1 bg-primary text-white`} title={followLabel()} aria-label={followLabel()} data-follow-tag>
+              <i class="fa-solid fa-bullhorn text-[0.85em]" aria-hidden="true" />
+              {t('announcements.copyTag')}
+            </span>
+          </Show>
         }
       >
         <span

@@ -35,7 +35,11 @@ import { buildUserMenuItems, buildSpaceModerationItems } from '../lib/userContex
 import type { SpaceModerationContext } from '../lib/userContextMenu';
 import { isBlocked } from '../stores/relationships';
 import { openReportDialog } from './ReportDialog';
-import { deleteMessage as deleteMessageApi } from '../api/messages';
+import { openForwardDialog } from './ForwardMessageDialog';
+import { ForwardedMessage } from './messageList/ForwardedMessage';
+import { crosspostMessage, deleteMessage as deleteMessageApi, hasMessageFlag, MESSAGE_FLAGS } from '../api/messages';
+import { ApiError } from '../api/ApiError';
+import { confirmDialog } from '../stores/confirmDialog';
 import { Tooltip } from './ui/Tooltip';
 import {
   getMessageBodyText,
@@ -124,6 +128,9 @@ export interface MessageListProps {
   canReply?: boolean;
   /** When false, Pin message is omitted. Default true (DMs / non-space rooms). */
   canManageMessages?: boolean;
+  /** The room is an announcement room: its messages can be published to the rooms that follow
+   * it (your own with Send Messages, anyone's with Manage Messages). */
+  announcement?: boolean;
   /** Space text channels: offers "Create thread" on a message (omitted in threads and for
    * members without Create Public Threads). */
   onCreateThread?: (message: DecryptedMessage) => void;
@@ -384,6 +391,47 @@ export const MessageList: Component<MessageListProps> = (props) => {
 
   /** Kick Members, or Manage Messages in this room: may block a bridged person (spec 5.6). */
   const canBlockBridged = () => props.canKickMembers === true || props.canManageMessages === true;
+
+  /** A message of an announcement room that has not been published yet, and that this person may
+   * publish: their own (they can send here), or anyone's with Manage Messages. */
+  function canPublish(msg: DecryptedMessage): boolean {
+    if (props.announcement !== true || !props.roomId || !/^\d+$/.test(msg.id) || msg.system_type || msg.pending) return false;
+    if (hasMessageFlag(msg, MESSAGE_FLAGS.PUBLISHED | MESSAGE_FLAGS.IS_CROSSPOST) || msg.forward) return false;
+    const own = !msg.webhook_id && msg.sender_id === currentUserId();
+    return own ? props.canReply !== false : props.canManageMessages === true;
+  }
+
+  function publish(msg: DecryptedMessage) {
+    const roomId = props.roomId;
+    if (!roomId) return;
+    void crosspostMessage(roomId, msg.id).catch((err) => {
+      const body =
+        err instanceof ApiError && err.status === 429
+          ? t('announcements.publishLimited')
+          : err instanceof ApiError && err.status === 403
+            ? t('announcements.publishNoPermission')
+            : t('announcements.publishFailed');
+      void confirmDialog({ title: t('announcements.publish'), body, acknowledgeOnly: true, confirmLabel: t('common.close'), icon: 'fa-solid fa-bullhorn' });
+    });
+  }
+
+  /** Something there is to forward: a real message with text, files, embeds or a forward. */
+  function canForward(msg: DecryptedMessage): boolean {
+    if (!props.roomId || !/^\d+$/.test(msg.id) || msg.system_type || msg.pending || msg.decryptError || msg.decryptPending || msg.legacyUndecryptable) return false;
+    return !!(msg.plaintext || msg.attachments?.length || msg.embeds?.length || msg.forward);
+  }
+
+  function forward(msg: DecryptedMessage) {
+    openForwardDialog({
+      message: msg,
+      spaceId: props.spaceId,
+      names: {
+        people: resolvedParticipants(),
+        roles: props.spaceRoles,
+        roomName: (id) => (props.spaceId ? spacesStore.spaceRoomsBySpaceId[props.spaceId]?.find((r) => r.id === id)?.name : undefined),
+      },
+    });
+  }
 
   /** The bridged-person items of a menu: the bot behind it, and the moderator's block. */
   function bridgedPersonMenuItems(msg: DecryptedMessage, e: MouseEvent): ContextMenuItem[] {
@@ -1210,6 +1258,24 @@ export const MessageList: Component<MessageListProps> = (props) => {
                             },
                           ]
                         : []),
+                      ...(canForward(msg)
+                        ? [
+                            {
+                              label: t('forward.action'),
+                              icon: 'fa-share',
+                              onClick: () => forward(msg),
+                            },
+                          ]
+                        : []),
+                      ...(canPublish(msg)
+                        ? [
+                            {
+                              label: t('announcements.publish'),
+                              icon: 'fa-bullhorn',
+                              onClick: () => publish(msg),
+                            },
+                          ]
+                        : []),
                       ...(props.onCreateThread && !msg.thread_id
                         ? [
                             {
@@ -1457,6 +1523,11 @@ export const MessageList: Component<MessageListProps> = (props) => {
                         onMentionClick={openProfileForUser}
                       />
                     </Show>
+                    <Show when={msg.forward}>
+                      {(f) => (
+                        <ForwardedMessage forward={f()} participants={resolvedParticipants()} spaceRoles={props.spaceRoles} onMentionClick={openProfileForUser} />
+                      )}
+                    </Show>
                     <Show when={msg.thread_id}>
                       {(tid) => <MessageThreadFooter threadId={tid()} spaceId={props.spaceId} />}
                     </Show>
@@ -1537,6 +1608,11 @@ export const MessageList: Component<MessageListProps> = (props) => {
                         onMentionClick={openProfileForUser}
                       />
                     </Show>
+                    <Show when={msg.forward}>
+                      {(f) => (
+                        <ForwardedMessage forward={f()} participants={resolvedParticipants()} spaceRoles={props.spaceRoles} onMentionClick={openProfileForUser} />
+                      )}
+                    </Show>
                     <Show when={msg.thread_id}>
                       {(tid) => <MessageThreadFooter threadId={tid()} spaceId={props.spaceId} />}
                     </Show>
@@ -1579,6 +1655,35 @@ export const MessageList: Component<MessageListProps> = (props) => {
                         onClick={(e) => {
                           e.preventDefault();
                           props.onReply?.(msg);
+                        }}
+                      />
+                    </Tooltip>
+                  </Show>
+                  <Show when={canPublish(msg)}>
+                    <Tooltip label={t('announcements.publish')} inline side="top">
+                      <IconButton
+                        size="sm"
+                        icon="fa-solid fa-bullhorn"
+                        label={t('announcements.publish')}
+                        title=""
+                        data-publish-message
+                        onClick={(e) => {
+                          e.preventDefault();
+                          publish(msg);
+                        }}
+                      />
+                    </Tooltip>
+                  </Show>
+                  <Show when={canForward(msg)}>
+                    <Tooltip label={t('forward.action')} inline side="top">
+                      <IconButton
+                        size="sm"
+                        icon="fa-solid fa-share"
+                        label={t('forward.action')}
+                        title=""
+                        onClick={(e) => {
+                          e.preventDefault();
+                          forward(msg);
                         }}
                       />
                     </Tooltip>

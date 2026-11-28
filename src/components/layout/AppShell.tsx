@@ -13,6 +13,8 @@ import { WebhookCard } from '../WebhookCard';
 import { SpaceBridgeConsentDialog } from '../SpaceBridgeConsentDialog';
 import { NicknameDialog } from '../NicknameDialog';
 import { ReportDialog } from '../ReportDialog';
+import { ForwardMessageDialog } from '../ForwardMessageDialog';
+import { FollowAnnouncementDialog } from '../FollowAnnouncementDialog';
 import { UserProfileFullModal } from '../UserProfileFullModal';
 import { MediaViewer } from '../media/MediaViewer';
 import { IncomingCallModal, ScreenShareDialog, VoiceDock, VoiceStatsPopover, VoiceUserMenu } from '../voice';
@@ -280,6 +282,8 @@ export const AppShell: Component<AppShellProps> = (props) => {
       <UserProfileFullModal />
       <IncomingCallModal />
       <ReportDialog />
+      <ForwardMessageDialog />
+      <FollowAnnouncementDialog />
       <MediaViewer />
     </div>
   );

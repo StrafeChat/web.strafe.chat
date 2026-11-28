@@ -201,7 +201,7 @@ The space's rooms with overrides and, for the caller, read state. Same shape as 
 
 ### `PATCH` /spaces/:id/rooms/:roomId — *Manage Rooms*
 
-`name`, `topic`, `slowmode_seconds`, `e2ee_enabled` (text rooms; turning encryption **on** is one-way for existing history), `user_limit`, `bitrate`, `position`, `permissions_synced`. You must be able to view the room; `permissions_synced` rewrites the room's overrides, so it needs *Manage Roles* as well, and only for overrides you could have written yourself.
+`name`, `topic`, `slowmode_seconds`, `e2ee_enabled` (text rooms; turning encryption **on** is one-way for existing history), `user_limit`, `bitrate`, `position`, `permissions_synced`, `announcement` (text rooms: makes it an [announcement room](#announcement-rooms); turning it off ends every follow of it). You must be able to view the room; `permissions_synced` rewrites the room's overrides, so it needs *Manage Roles* as well, and only for overrides you could have written yourself.
 
 ### `DELETE` /spaces/:id/rooms/:roomId — *Manage Rooms*
 
@@ -502,6 +502,10 @@ A message a [bridge](#bridges) posted as a bridged user carries a `bridge` masqu
 
 `sender_id` is the bot that drives the bridge (`via`, its public user object); the person shown is someone on another platform, identified here only by `bridge.puppet_id` - a stable id per bridged user, never their id on that platform. Render it as `masquerade.name` followed by a platform tag (`DISCORD`, `MATRIX`, …, or `platform_name` for `other`) so it cannot pass for a member, with `masquerade.avatar` or the [default avatar](#default-avatars) picked from `puppet_id`. `colour` (0xRRGGBB) is present only when the bridge allows name colours, `profile_url` only when it shows profile links, and `lookalike` when a member of the space has the same name (say "Not the Strafe account @alice"). Two consecutive messages are the same author only when `webhook_id` and `puppet_id` match. As with webhooks, keep `author` out of user caches.
 
+A published copy of an [announcement room](#announcement-rooms)'s message is posted by the following room's follower webhook. Its masquerade has `kind: "follow"`: `name` and `avatar` are the source space's, `via.webhook.name` is the source room (`"#news"`); show it with a tag saying it was published from there. It carries `flags: 2` and `message_reference: {"type": 0, "space_id", "room_id", "message_id"}` naming the original (with a `domain` when the original is on another instance and the ids are that instance's). A room that starts following gets a `room_followed` system notice, `system_payload` `{"actor_id", "space_name", "room_name"}`.
+
+A [forward](#forwarding-messages) has no text of its own: `flags: 16384`, `message_reference: {"type": 1, "space_id"?, "room_id", "message_id"}` naming the source, and `message_snapshots: [{"message": {"content", "attachments", "embeds", "timestamp", "edited_timestamp", "flags"}}]` - a copy of the source as it was, with no author.
+
 A bridge's arrival and removal leave a system notice in the room: `system_type` `bridge_created` or `bridge_deleted`, `system_payload` `{"bridge_id", "bridge_name", "platform", "platform_name"?, "remote_name"?, "driver_id", "driver_name", "actor_id"}`. `actor_id` is present whenever someone acted, the driving bot included: when it equals `driver_id` the bot did it itself ("Strife bridged this room"), otherwise a person did it through the bot. `driver_name` is left out once the bot's account is deleted.
 
 `plaintext` is present in plain rooms; encrypted rooms carry `ciphertext` instead. `embeds` is always an array - a bot's rich embeds, empty when there are none and in every encrypted room; load their pictures from `proxy_url` / `proxy_icon_url` ([Embeds](/docs/embeds/#receiving-embeds)). `reactions` is included when fetching messages, not in gateway events; gateway events add `space_id` for a room in a space. `pinned`, `pinned_at` and `pinned_by` are present while the message is pinned in its room. Deleted messages keep their id with a `deleted_at`. System notices have `sender_id: "0"`, a `system_type` (`space_member_join`, `space_member_leave`, `space_birthday`, …) and a `system_payload`. `space_birthday` is posted once a day in the space's `birthday_channel_id` for each opted-in member whose birthday is that day (UTC); its payload is `{"user_id": "…", "message": "…"}`, with `message` being the space's `birthday_message` (possibly empty, meaning use the default greeting).
@@ -517,6 +521,12 @@ In a space hosted on another instance, that instance answers this, `GET /rooms/:
 ### `POST` /rooms/:id/messages — *Send Messages*
 
 See [Bots › Sending messages](/docs/bots/#sending-messages). `201` with the message. `embeds` (bots only, plain rooms only) also needs **Embed Links** in a space room; the object and its errors are on the [Embeds](/docs/embeds/) page. In a PM whose other account was deleted: `403` `this account no longer exists` (`code: "recipient_deleted"`).
+
+### Forwarding messages
+
+`POST /rooms/:id/messages` with `{"message_reference": {"type": 1, "room_id": "…", "message_id": "…"}}` (Discord's `channel_id` is accepted) and nothing else: no text, files, embeds or `reply_to_id` (`400` `forward_with_content` - send a comment as its own message). The server reads the source as you (**View Room** and **Read Message History** there) and copies it into `message_snapshots`: its text with mentions written out as names (`@alice`, `@moderators`, `#news`), so nothing in the copy pings or resolves anyone, its files and embeds, and when it was written and last edited - never who wrote it. Forwarding a forward copies its snapshot and keeps pointing at the original. The target needs **Send Messages**, plus **Attach Files** for files and **Embed Links** for embeds. A forward cannot be edited (`400` `forward_edit`), and is not updated when the source changes. Files are not copied: deleting the source deletes them.
+
+End-to-end encryption: a source in an encrypted room can only be forwarded into an encrypted room (`403` `forward_from_encrypted`), and into an encrypted room the server builds nothing (`400` `forward_encrypted_target`) - the client puts the copy inside the ciphertext as `forward`, `{"content", "attachments", "embeds", "timestamp", "edited_timestamp", "source": {"room_id", "message_id", "space_id"}}`, which the server never sees. Other errors: `400` `forward_source` (a system notice, a deleted or empty message), `400` `invalid_message_reference` (any `type` but 1).
 
 ### `PATCH` /rooms/:id/messages/:msg_id
 
@@ -537,6 +547,16 @@ See [Bots › Sending messages](/docs/bots/#sending-messages). `201` with the me
 `PUT` / `DELETE` /rooms/:id/messages/:msg_id/pin pin or unpin a message for everyone in the room (`204`, idempotent). A room holds at most 50 pins. Pinning posts a `message_pinned` system message whose `system_payload` names `actor_id` and `message_id`; every change fires [`ROOM_PINS_UPDATE`](/docs/gateway/#events). Deleting a message drops its pin.
 
 `GET` /rooms/:id/pins — the room's pinned messages, newest pin first: `{"items": [{"pinned_at", "pinned_by", "message": {…}}], "has_more": false}`. Needs **View Room** and **Read Message History**.
+
+### Announcement rooms
+
+A space text room with `announcement: true` (set with [`PATCH /spaces/:id/rooms/:roomId`](#patch-spacesidroomsroomid--manage-rooms)) can be followed from other spaces, and its messages reach them only when someone publishes them - Discord's announcement channels. An announcement room is never end-to-end encrypted: turning either on while the other is answers `409` `announcement_encrypted`.
+
+`POST /rooms/:id/followers` `{"webhook_room_id": "…"}` (`webhook_channel_id` is accepted) - follow the room into one of your rooms: you must be able to see the announcement room, and need **Manage Webhooks** in the target, a plain text room of a space hosted on this instance (`409` `managed_on_origin` otherwise; `409` `already_following`, `409` `webhook_limit`). It makes a [follower webhook](#the-webhook-object) (`type: 2`) there and returns `{"room_id", "webhook_id"}`. To unfollow, delete that webhook.
+
+`POST /rooms/:id/messages/:msg_id/crosspost` - publish a message to every room following this one. Your own message needs **Send Messages**, anyone else's (a webhook's too) **Manage Messages**. Returns the message with `flags: 1`; publishing it again sends nothing more. A room publishes at most 10 messages an hour (`429` `publish_rate_limited`). Each following room gets a copy (see [the message object](#the-message-object)) that pings nobody. Editing the original edits every copy and deleting it deletes them - unlike Discord, where copies stay. Turning `announcement` off, or deleting the room or its space, removes every follower webhook.
+
+In a space hosted on another instance, publishing is done there; following such a room into a room here registers the follow with that instance.
 
 ### `POST` /rooms/:id/attachments — *Send Messages*
 
@@ -596,6 +616,8 @@ All of these take a session or a bot token (not an OAuth2 access token); mutatio
 `name` is 1-80 characters. It cannot be a reserved name (`Strafe`, `system`, `everyone`, `admin`, `moderator`, …, and the instance's official account), the name of one of the space's owner or moderators, or the name of a role in the space (`400 invalid_name` with a `reason`: `empty`, `length`, `characters`, `reserved`, `staff`, `role`). Names are compared ignoring case, width, accents, invisible characters and letters of other scripts that look like Latin ones (a Cyrillic `а` counts as `a`); control characters, line breaks and bidi embedding/override/isolate controls are refused (`characters`). The same rule applies to a message's `username`. `avatar` is a `data:image/png|jpeg|gif|webp;base64,…` URI (Discord's form) within the avatar size limit (`400 invalid_avatar` otherwise).
 
 At most 15 webhooks per room and 200 per space (`409 webhook_limit` with `max`); an instance can change both (`WEBHOOKS_PER_ROOM`, `WEBHOOKS_PER_SPACE`).
+
+A **follower webhook** (`type: 2`) is a follow of an [announcement room](#announcement-rooms), made with `POST /rooms/:id/followers`. It is listed with the room's webhooks and adds `source: {"label": "Space #room", "space_id", "room_id", "domain"?}` (the ids as the instance hosting the announcement room names them). It has no token: it cannot be executed, its token cannot be reset (`400 unsupported_field`), it cannot move to another room or ping anyone, and deleting it is unfollowing. Followers count toward the limits above.
 
 ### Executing a webhook
 

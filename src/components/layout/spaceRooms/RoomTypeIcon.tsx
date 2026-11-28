@@ -27,12 +27,26 @@ const SpeakerIcon = () => (
   </svg>
 );
 
+/** An announcement room: a megaphone where a text room has its hash. */
+const AnnouncementIcon = () => (
+  <span class="flex size-4 shrink-0 items-center justify-center text-muted-foreground" title={t('announcements.roomBadge')}>
+    <i class="fa-solid fa-bullhorn text-[12px]" aria-hidden="true" />
+  </span>
+);
+
 /**
- * Hash or speaker by room type, with a small lock badge when the room is end-to-end encrypted
+ * Hash, megaphone (announcement room) or speaker by room type, with a small lock badge when the room is end-to-end encrypted
  * (brand-colored) or restricted from @everyone (muted). E2EE takes the color when both apply.
  */
 export function roomTypeIcon(room: SpaceRoom, opts?: { private?: boolean }): JSX.Element {
-  const base = room.type === ROOM_TYPE_VOICE ? <SpeakerIcon /> : <HashIcon />;
+  const base =
+    room.type === ROOM_TYPE_VOICE ? (
+      <SpeakerIcon />
+    ) : room.announcement === true ? (
+      <AnnouncementIcon />
+    ) : (
+      <HashIcon />
+    );
   const e2ee = room.e2ee_enabled === true;
   const isPrivate = opts?.private === true;
   if (!e2ee && !isPrivate) return base;

@@ -1,4 +1,5 @@
 import { RoomThreadsPanel } from '../components/room/RoomThreadsPanel';
+import { openFollowDialog } from '../components/FollowAnnouncementDialog';
 import { CreateThreadModal } from '../components/CreateThreadModal';
 import { MAX_THREAD_NAME_LENGTH, deleteThread, joinThread, leaveThread, updateThread } from '../api/threads';
 import { getMessage, type Message as ApiMessage } from '../api/messages';
@@ -1102,7 +1103,7 @@ const SpacePage: Component = () => {
         }
       >
         <RoomHeader
-          headerIcon={isThread() ? 'fa-comments' : 'fa-hashtag'}
+          headerIcon={isThread() ? 'fa-comments' : currentRoom()?.announcement === true ? 'fa-bullhorn' : 'fa-hashtag'}
           name={headerName()}
           topic={currentRoom()?.topic}
           threadsOpen={threadsOpen()}
@@ -1117,7 +1118,28 @@ const SpacePage: Component = () => {
           e2ee={currentRoom()?.e2ee_enabled === true}
           // What the room is bridged with: anyone who can see the room may know (spec 5.9).
           // Bridges copy the room itself, never its threads.
-          badges={isThread() ? undefined : <RoomBridgeBadge spaceId={spaceId()} roomId={roomId()} />}
+          badges={
+            isThread() ? undefined : (
+              <>
+                <RoomBridgeBadge spaceId={spaceId()} roomId={roomId()} />
+                {/* An announcement room can be followed into a room of your own (Discord's Follow). */}
+                <Show when={currentRoom()?.announcement === true}>
+                  <button
+                    type="button"
+                    class="ms-1 inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md border border-border/70 px-2 text-xs font-medium text-foreground transition-colors hover:bg-muted/60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={() => {
+                      const r = currentRoom();
+                      if (r) openFollowDialog({ roomId: r.id, roomName: r.name, spaceName: space()?.name ?? '' });
+                    }}
+                    data-follow-room
+                  >
+                    <i class="fa-solid fa-bullhorn text-[11px]" aria-hidden="true" />
+                    {t('announcements.follow')}
+                  </button>
+                </Show>
+              </>
+            )
+          }
           isGroup={false}
           messageCompact={!!settings.messageCompact}
           onToggleCompact={() => {}}
@@ -1285,6 +1307,7 @@ const SpacePage: Component = () => {
                   onReply={handleReplyToMessage}
                   canReply={canSendMessages()}
                   canManageMessages={canManageMessagesInRoom()}
+                  announcement={currentRoom()?.announcement === true}
                   canKickMembers={canKickMembers()}
                   canBanMembers={canBanMembers()}
                   viewerHighestRolePosition={viewerHighestRolePosition()}

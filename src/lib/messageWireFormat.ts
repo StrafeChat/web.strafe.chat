@@ -9,12 +9,13 @@
  */
 
 import type { SpaceMember } from '../api/spaces';
-import type { Attachment, Embed } from '../api/messages';
+import type { Attachment, Embed, MessageReference, MessageSnapshot } from '../api/messages';
 import type { Room, RoomParticipant } from '../api/rooms';
 import { decryptMessage, isLegacyCiphertext } from '../lib/e2ee';
 import { PLAINTEXT_PREFIX } from '../lib/e2ee/constants';
 import { spaceMemberUserIds } from '../lib/e2ee/spaceMembers';
 import { isEncryptedAttachmentMeta, viewFromEncryptedMeta, type AttachmentView } from '../lib/attachments/types';
+import { forwardFromContent, forwardFromServer, type ForwardView } from './forwardMessages';
 import { rooms } from '../stores/rooms';
 import { spaces } from '../stores/spaces';
 import { spaceMembers } from '../stores/spaceMembers';
@@ -92,6 +93,8 @@ export interface EncryptedMessageLike {
   plaintext?: string;
   attachments?: Attachment[];
   embeds?: Embed[];
+  message_snapshots?: MessageSnapshot[];
+  message_reference?: MessageReference;
 }
 
 /** Display form of a server-recorded (plaintext-room) attachment. */
@@ -130,6 +133,9 @@ export interface ResolvedFields {
    * never stores embeds for an encrypted room, and a message that arrived encrypted never
    * shows server-supplied ones, whatever the wire says. */
   embeds: Embed[];
+  /** A forward's copy (lib/forwardMessages): the server's snapshot in a plaintext room, the
+   * decrypted body's in an encrypted one. Always present as a key, so a spread clears it. */
+  forward: ForwardView | undefined;
 }
 
 /**
@@ -160,16 +166,16 @@ export async function resolvePlaintext(currentUserId: string, m: EncryptedMessag
   // real metadata and key only exist inside the ciphertext.
   const serverAttachments = (m.attachments ?? []).filter((a) => !a.encrypted).map(viewFromServerAttachment);
   if (m.plaintext != null && m.plaintext !== '') {
-    return { ...NO_STATE, plaintext: m.plaintext, notEncrypted: true, attachments: serverAttachments, embeds: serverEmbeds(m) };
+    return { ...NO_STATE, plaintext: m.plaintext, notEncrypted: true, attachments: serverAttachments, embeds: serverEmbeds(m), forward: forwardFromServer(m) };
   }
   const ctext = m.ciphertext ?? '';
   if (!ctext) {
     // Attachment- or embed-only message in a plaintext room (no text, so no plaintext column
     // either).
-    return { ...NO_STATE, plaintext: '', notEncrypted: true, attachments: serverAttachments, embeds: serverEmbeds(m) };
+    return { ...NO_STATE, plaintext: '', notEncrypted: true, attachments: serverAttachments, embeds: serverEmbeds(m), forward: forwardFromServer(m) };
   }
   if (isLegacyCiphertext(ctext)) {
-    return { ...NO_STATE, plaintext: '', legacyUndecryptable: true, attachments: [], embeds: [] };
+    return { ...NO_STATE, plaintext: '', legacyUndecryptable: true, attachments: [], embeds: [], forward: undefined };
   }
   const notEncrypted = ctext.startsWith(PLAINTEXT_PREFIX);
   try {
@@ -186,6 +192,7 @@ export async function resolvePlaintext(currentUserId: string, m: EncryptedMessag
         sentBeforeJoin: sentBeforeSpaceJoin(m.room_id, m.created_at, currentUserId),
         attachments: [],
         embeds: [],
+        forward: undefined,
       };
     }
     return {
@@ -194,10 +201,11 @@ export async function resolvePlaintext(currentUserId: string, m: EncryptedMessag
       notEncrypted,
       attachments: notEncrypted ? serverAttachments : attachmentsFromContent(result.content),
       embeds: notEncrypted ? serverEmbeds(m) : [],
+      forward: notEncrypted ? forwardFromServer(m) : forwardFromContent(result.content),
     };
   } catch (e) {
     console.error('[E2EE] Decrypt failed for message', m.id, 'from', m.sender_id, e);
-    return { ...NO_STATE, plaintext: '', decryptError: true, attachments: [], embeds: [] };
+    return { ...NO_STATE, plaintext: '', decryptError: true, attachments: [], embeds: [], forward: undefined };
   }
 }
 
@@ -219,6 +227,7 @@ export function preferResolved(existing: Readonly<Partial<ResolvedFields>>, inco
         legacyUndecryptable: existing.legacyUndecryptable,
         attachments: existing.attachments ?? [],
         embeds: existing.embeds ?? [],
+        forward: existing.forward,
       }
     : incoming;
 }

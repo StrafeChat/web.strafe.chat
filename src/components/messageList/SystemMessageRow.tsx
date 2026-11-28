@@ -86,6 +86,8 @@ function metaFor(msg: SystemMessage, payload: Record<string, string>): EventMeta
       return icon('fa-cake-candles', TONES.amber, true);
     case 'message_pinned':
       return icon('fa-thumbtack', TONES.primary);
+    case 'room_followed':
+      return icon('fa-bullhorn', TONES.primary, true);
     case 'thread_created':
       return icon('fa-comments', TONES.sky);
     case 'thread_renamed':

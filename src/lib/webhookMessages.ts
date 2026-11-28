@@ -16,7 +16,10 @@ type WebhookishMessage = Pick<Message, 'webhook_id' | 'masquerade' | 'author' | 
 export interface WebhookAuthor {
   /** The webhook (or bridge) that posted. */
   webhookId: string;
-  kind: 'webhook' | 'bridge';
+  /** `follow`: a published copy of an announcement room's message (the space's name and icon). */
+  kind: 'webhook' | 'bridge' | 'follow';
+  /** A published copy: the announcement room it came from ("#news"). */
+  followRoom?: string;
   name: string;
   /** Absolute URL, or undefined for the default avatar (picked from `webhookId`). */
   avatar?: string;
@@ -74,14 +77,16 @@ export function webhookAuthorOf(msg: WebhookishMessage | null | undefined, fallb
   if (!msg?.webhook_id) return null;
   const webhookId = String(msg.webhook_id);
   const m = masqueradeOf(msg);
-  const kind: 'webhook' | 'bridge' = m?.kind === 'bridge' ? 'bridge' : 'webhook';
+  const kind: WebhookAuthor['kind'] = m?.kind === 'bridge' ? 'bridge' : m?.kind === 'follow' ? 'follow' : 'webhook';
   const name = (m?.name || msg.author?.display_name || msg.author?.username || '').trim() || fallbackName;
   const avatar = (m?.avatar || (m ? undefined : msg.author?.avatar) || '').trim() || undefined;
   const puppetId = m?.bridge?.puppet_id ? String(m.bridge.puppet_id) : undefined;
   const identityKey =
     kind === 'bridge' && puppetId ? `b:${webhookId}:${puppetId}` : `w:${webhookId}:${name}\u0000${avatar ?? ''}`;
   const bridge = kind === 'bridge' ? bridgedIdentityOf(m, webhookId, msg.sender_id) : undefined;
-  return { webhookId, kind, name, avatar, puppetId, identityKey, ...(bridge ? { bridge } : {}) };
+  const via = (m?.via as { webhook?: { name?: unknown } } | undefined)?.webhook?.name;
+  const followRoom = kind === 'follow' && typeof via === 'string' && via ? via : undefined;
+  return { webhookId, kind, name, avatar, puppetId, identityKey, ...(bridge ? { bridge } : {}), ...(followRoom ? { followRoom } : {}) };
 }
 
 /** The real sender a masquerade names in `via`: a bot's public user object (bot-driven

@@ -188,6 +188,9 @@ export interface SpaceRoom {
   /** A text/voice channel follows its parent section's permission overrides (Discord category
    * sync) instead of its own. Resolved client-side in spacePermissions.channelOverridesSource. */
   permissions_synced?: boolean;
+  /** Text rooms only: an announcement room, which other spaces follow and whose messages reach
+   * them when someone publishes them. Never end-to-end encrypted. */
+  announcement?: boolean;
   /** Voice rooms only: connection cap (0 = unlimited) and audio bitrate in bits per
    * second (0 = the 64 kbps default). */
   user_limit?: number;
@@ -866,7 +869,16 @@ export function deleteRoomUserPermissionOverride(spaceId: string, roomId: string
 export function patchSpaceRoom(
   spaceId: string,
   roomId: string,
-  body: { name?: string; topic?: string; slowmode_seconds?: number; e2ee_enabled?: boolean; user_limit?: number; bitrate?: number; permissions_synced?: boolean }
+  body: {
+    name?: string;
+    topic?: string;
+    slowmode_seconds?: number;
+    e2ee_enabled?: boolean;
+    user_limit?: number;
+    bitrate?: number;
+    permissions_synced?: boolean;
+    announcement?: boolean;
+  }
 ) {
   return api<void>(`/spaces/${spaceId}/rooms/${roomId}`, { method: 'PATCH', json: body });
 }

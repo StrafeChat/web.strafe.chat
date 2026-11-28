@@ -177,10 +177,11 @@ export const RoomWebhooksPage: Component<Props> = (props) => {
   }
 
   async function remove(w: Webhook) {
+    const follow = w.type === 2;
     const ok = await confirmDialog({
-      title: t('webhooks.deleteConfirmTitle', { name: w.name }),
-      body: t('webhooks.deleteConfirmBody'),
-      confirmLabel: t('webhooks.delete'),
+      title: follow ? t('announcements.unfollowConfirmTitle', { source: w.source?.label || w.name }) : t('webhooks.deleteConfirmTitle', { name: w.name }),
+      body: follow ? t('announcements.unfollowConfirmBody') : t('webhooks.deleteConfirmBody'),
+      confirmLabel: follow ? t('announcements.unfollow') : t('webhooks.delete'),
       tone: 'danger',
     });
     if (!ok) return;
@@ -295,7 +296,7 @@ export const RoomWebhooksPage: Component<Props> = (props) => {
                 <div class="min-w-0 flex-1">
                   <div class="flex min-w-0 flex-wrap items-center gap-y-0.5">
                     <span class="min-w-0 max-w-full truncate text-sm font-semibold text-foreground">{w.name}</span>
-                    <WebhookTag webhook size="xs" />
+                    <WebhookTag webhook={w.type === 2 ? { kind: 'follow', followRoom: w.source?.label } : true} size="xs" />
                     <Show when={w.mass_mentions}>
                       <span class="ms-1.5 shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:text-amber-400">
                         {t('webhooks.massMentionsOn')}
@@ -307,6 +308,11 @@ export const RoomWebhooksPage: Component<Props> = (props) => {
                       </span>
                     </Show>
                   </div>
+                  <Show when={w.type === 2}>
+                    <p class="truncate text-xs leading-snug text-foreground/80" data-follows>
+                      {t('announcements.follows', { source: w.source?.label || t('announcements.unknownSource') })}
+                    </p>
+                  </Show>
                   <p class="text-xs leading-snug text-muted-foreground">
                     <Show when={creatorName(w)} fallback={t('webhooks.createdOn', { when: formatDate(w.created_at, { dateStyle: 'medium' }) })}>
                       {t('webhooks.createdByOn', { name: creatorName(w), when: formatDate(w.created_at, { dateStyle: 'medium' }) })}
@@ -318,24 +324,27 @@ export const RoomWebhooksPage: Component<Props> = (props) => {
                   </p>
                 </div>
                 <div class="flex shrink-0 items-center gap-0.5">
-                  <IconButton
-                    icon="fa-solid fa-pen"
-                    label={t('webhooks.edit')}
-                    size="md"
-                    active={editingId() === w.id}
-                    disabled={!props.canManage || busy()}
-                    onClick={() => (editingId() === w.id ? setEditingId(null) : startEdit(w))}
-                  />
-                  <IconButton
-                    icon="fa-solid fa-rotate"
-                    label={t('webhooks.resetUrl')}
-                    size="md"
-                    disabled={!props.canManage || busy()}
-                    onClick={() => void reset(w)}
-                  />
+                  {/* A follow has no URL to copy or reset and nothing to edit: unfollowing removes it. */}
+                  <Show when={w.type !== 2}>
+                    <IconButton
+                      icon="fa-solid fa-pen"
+                      label={t('webhooks.edit')}
+                      size="md"
+                      active={editingId() === w.id}
+                      disabled={!props.canManage || busy()}
+                      onClick={() => (editingId() === w.id ? setEditingId(null) : startEdit(w))}
+                    />
+                    <IconButton
+                      icon="fa-solid fa-rotate"
+                      label={t('webhooks.resetUrl')}
+                      size="md"
+                      disabled={!props.canManage || busy()}
+                      onClick={() => void reset(w)}
+                    />
+                  </Show>
                   <IconButton
                     icon="fa-solid fa-trash"
-                    label={t('webhooks.delete')}
+                    label={w.type === 2 ? t('announcements.unfollow') : t('webhooks.delete')}
                     size="md"
                     tone="danger"
                     disabled={!props.canManage || busy()}

@@ -36,6 +36,9 @@ export interface Webhook {
   disabled_reason?: string | null;
   created_at: string;
   last_used_at?: string | null;
+  /** A follow of an announcement room (type 2): what it follows. It has no token and is
+   * removed to unfollow. */
+  source?: { label?: string; space_id?: string; room_id?: string; domain?: string } | null;
   /** Only in the replies to create and token reset. */
   token?: string;
   url?: string;

@@ -68,6 +68,8 @@ export function getMessageBodyText(msg: DecryptedMessage): string {
  */
 export function getMessagePreviewSource(msg: DecryptedMessage): string {
   const body = getMessageBodyText(msg);
+  // A forward has no text of its own: its copy's is what it says.
+  if (!body && msg.forward) return msg.forward.content || embedPreviewText(msg.forward.embeds);
   if (body || !msg.notEncrypted) return body;
   return embedPreviewText(msg.embeds);
 }
@@ -122,6 +124,8 @@ export function formatSystemMessageText(
     }
     case 'message_pinned':
       return t('messages.system.pinned', { actor });
+    case 'room_followed':
+      return t('messages.system.roomFollowed', { actor, room: payload.room_name ?? '?', space: payload.space_name ?? '?' });
     case 'thread_created':
       return t('messages.system.threadCreated', { actor, name: payload.name ?? '?' });
     case 'thread_renamed':
@@ -258,7 +262,7 @@ export interface SenderDisplay {
   /** Posted by a webhook (or a bridge): `userId` is the webhook id, not a person. Shown with
    * the WEBHOOK tag, a webhook card and none of the person actions (message, add friend,
    * nickname, roles, kick). */
-  webhook?: { id: string; kind: 'webhook' | 'bridge'; puppetId?: string; bridge?: BridgedIdentity };
+  webhook?: { id: string; kind: 'webhook' | 'bridge' | 'follow'; puppetId?: string; bridge?: BridgedIdentity; followRoom?: string };
   /** A bridged person's name colour (0xRRGGBB as `#rrggbb`), when their bridge allows it. */
   colour?: string;
 }
@@ -288,6 +292,7 @@ export function getMessageSenderDisplay(
       kind: w.kind,
       ...(w.puppetId ? { puppetId: w.puppetId } : {}),
       ...(w.bridge ? { bridge: w.bridge } : {}),
+      ...(w.followRoom ? { followRoom: w.followRoom } : {}),
     },
     ...(colour ? { colour } : {}),
   };

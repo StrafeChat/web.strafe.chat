@@ -1,3 +1,5 @@
+import { encryptedForwardOf, flattenMentions, type ForwardView } from '../lib/forwardMessages';
+import type { SpaceRole } from '../api/spaces';
 import { previewUrlsFor } from '../lib/linkPreviewUrls';
 import { warmLinkPreviews } from './linkPreviews';
 import { batch } from 'solid-js';
@@ -279,6 +281,8 @@ export interface DecryptedMessage extends Omit<Message, 'attachments'> {
   /** True when message is optimistic (not yet confirmed by server) */
   pending?: boolean;
   reactions?: MessageReaction[];
+  /** A forward's copy of its source, ready to render (lib/forwardMessages). */
+  forward?: ForwardView;
 }
 
 export interface MessagesState {
@@ -1027,6 +1031,58 @@ export async function sendMessage(
   }
 }
 
+/** Who and what a forwarded message's mentions name, for writing them out as names. */
+export interface ForwardNames {
+  people?: RoomParticipant[];
+  roles?: SpaceRole[];
+  roomName?: (id: string) => string | undefined;
+}
+
+/**
+ * Forward a message into a room (Discord's forwarding; lib/forwardMessages). A plaintext room
+ * gets a server-built copy: the request names the source and the server reads it as this user.
+ * An end-to-end encrypted room gets the copy inside the ciphertext, built here from what this
+ * device decrypted. An encrypted source never goes into a plaintext room (the server refuses it
+ * too): its words would become readable to the server.
+ */
+export async function forwardMessage(targetRoomId: string, src: DecryptedMessage, sourceSpaceId: string | undefined, names: ForwardNames = {}): Promise<void> {
+  const currentUserId = auth.user?.id;
+  if (!currentUserId) return;
+  const room = roomForMessage(targetRoomId);
+  const participants = room.participants ?? [];
+  const isGroupRoom = room.type === 2 && participants.length >= 2;
+  const isSpaceTextRoom = room.type === 3 || room.type === 6;
+  const e2eeOff = roomE2EEOff(room, isGroupRoom, isSpaceTextRoom);
+  if (e2eeOff && src.notEncrypted !== true) throw new Error(t('forward.encryptedToPlain'));
+  await ensureDevice(currentUserId);
+  const deviceId = getCurrentDeviceId();
+  if (!deviceId) throw new Error('E2EE device not initialized');
+  if (e2eeOff) {
+    await createMessage(targetRoomId, {
+      sender_device_id: deviceId,
+      message_reference: { type: 1, room_id: src.room_id, message_id: src.id },
+    });
+    return;
+  }
+  const memberUserIds = await resolveMemberUserIds(currentUserId, room, participants, isSpaceTextRoom);
+  const copy = encryptedForwardOf(
+    {
+      id: src.id,
+      room_id: src.room_id,
+      ...(sourceSpaceId ? { space_id: sourceSpaceId } : {}),
+      plaintext: src.plaintext,
+      attachments: src.attachments,
+      embeds: src.embeds,
+      created_at: src.created_at,
+      updated_at: src.updated_at,
+      forward: src.forward,
+    },
+    (text) => flattenMentions(text, names.people, names.roles, names.roomName ?? (() => undefined))
+  );
+  const ciphertext = await encryptMessage(currentUserId, targetRoomId, memberUserIds, '', { forward: copy });
+  await createMessage(targetRoomId, { sender_device_id: deviceId, ciphertext });
+}
+
 export function clearMessages(roomId?: string) {
   if (roomId) {
     setMessages('byRoom', roomId, []);
@@ -1125,7 +1181,7 @@ export async function addMessageFromEvent(payload: {
   }
   const resolved: ResolvedFields = currentUserId
     ? await resolvePlaintext(currentUserId, payload)
-    : { plaintext: '', decryptError: true, attachments: [], embeds: [] };
+    : { plaintext: '', decryptError: true, attachments: [], embeds: [], forward: undefined };
 
   const msg: DecryptedMessage = { ...payload, ...resolved };
   let didReplaceInPlace = false;

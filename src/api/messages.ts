@@ -137,9 +137,50 @@ export interface Message {
   /** Who the message shows as, snapshotted when it was posted (renaming the webhook later
    * does not rewrite history). */
   masquerade?: MessageMasquerade;
+  /** Discord's message flags: MESSAGE_FLAGS.PUBLISHED (an announcement room's message that was
+   * published), IS_CROSSPOST (a published copy, posted here by a follow), HAS_SNAPSHOT (a
+   * forward). */
+  flags?: number;
+  /** A published copy's original (type 0), or a forward's source (type 1). */
+  message_reference?: MessageReference;
+  /** A forward's copy of its source (one, never more): no author, by design. */
+  message_snapshots?: MessageSnapshot[];
   created_at: string;
   updated_at: string;
   deleted_at?: string;
+}
+
+/** Message flags Strafe uses (Discord's numbering). */
+export const MESSAGE_FLAGS = {
+  PUBLISHED: 1 << 0,
+  IS_CROSSPOST: 1 << 1,
+  HAS_SNAPSHOT: 1 << 14,
+} as const;
+
+export function hasMessageFlag(msg: { flags?: number } | null | undefined, flag: number): boolean {
+  return ((msg?.flags ?? 0) & flag) !== 0;
+}
+
+/** What a published copy or a forward points at. `domain` is set when the ids are another
+ * instance's (the original lives there and this one does not hold it). */
+export interface MessageReference {
+  type: number;
+  space_id?: string;
+  room_id?: string;
+  message_id?: string;
+  domain?: string;
+}
+
+/** A forward's snapshot of its source. */
+export interface MessageSnapshot {
+  message: {
+    content: string;
+    attachments?: Attachment[];
+    embeds?: Embed[];
+    timestamp: string;
+    edited_timestamp?: string | null;
+    flags?: number;
+  };
 }
 
 /** A webhook message's (or a bridged message's) identity. The avatar is already an absolute
@@ -180,6 +221,9 @@ export interface CreateMessageInput {
   mention_roles?: string[];
   /** Ids from uploadAttachment, by this user, into this room, not yet used. */
   attachments?: string[];
+  /** A forward (type 1) of the message named: nothing else may be set. Plaintext rooms only -
+   * into an encrypted room the forward travels inside the ciphertext. */
+  message_reference?: { type: 1; room_id: string; message_id: string };
 }
 
 export interface UploadAttachmentOptions {
@@ -369,6 +413,19 @@ export function listPins(roomId: string) {
 }
 
 /** Pin for everyone in the room: Manage Messages in a space channel, anyone in a PM or group. */
+/** Publish an announcement room's message to every room following it. */
+export function crosspostMessage(roomId: string, msgId: string) {
+  return api<Message>(`/rooms/${roomId}/messages/${msgId}/crosspost`, { method: 'POST' });
+}
+
+/** Follow an announcement room into one of your rooms (Manage Webhooks there). */
+export function followAnnouncementRoom(roomId: string, targetRoomId: string) {
+  return api<{ room_id: string; webhook_id: string }>(`/rooms/${roomId}/followers`, {
+    method: 'POST',
+    json: { webhook_room_id: targetRoomId },
+  });
+}
+
 export function pinMessageRequest(roomId: string, msgId: string) {
   return api<void>(`/rooms/${roomId}/messages/${msgId}/pin`, { method: 'PUT' });
 }
