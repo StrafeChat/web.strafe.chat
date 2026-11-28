@@ -2083,6 +2083,8 @@ export default {
   },
   userMenu: {
     acceptFriend: 'Aceitar pedido de amizade',
+    declineFriend: 'Recusar pedido de amizade',
+    cancelRequest: 'Cancelar pedido de amizade',
     block: 'Bloquear',
     unblock: 'Desbloquear',
     blockTitle: 'Bloquear {{name}}?',

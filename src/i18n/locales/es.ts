@@ -2082,6 +2082,8 @@ export default {
   },
   userMenu: {
     acceptFriend: 'Aceptar solicitud de amistad',
+    declineFriend: 'Rechazar solicitud de amistad',
+    cancelRequest: 'Cancelar solicitud de amistad',
     block: 'Bloquear',
     unblock: 'Desbloquear',
     blockTitle: '¿Bloquear a {{name}}?',

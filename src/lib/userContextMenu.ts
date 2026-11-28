@@ -1,7 +1,7 @@
 import { formatHandle } from '../stores/instance';
 import type { ContextMenuItem } from '../stores/contextMenu';
-import { RelType, relationshipType } from '../stores/relationships';
-import { putRelationship, blockUser, unblockUser } from '../api/relationships';
+import { RelType, relationshipType, removeRelationshipLocally } from '../stores/relationships';
+import { putRelationship, removeRelationship, blockUser, unblockUser } from '../api/relationships';
 import { authorizeUrl } from '../api/developers';
 import { openReportDialog } from '../components/ReportDialog';
 import { confirmDialog } from '../stores/confirmDialog';
@@ -24,6 +24,8 @@ export interface UserMenuContext {
   bot?: boolean;
   /** Opens a DM with the user. Omitted for self. */
   onMessage?: (userId: string) => void;
+  onOpenProfile?: (userId: string) => void;
+  showFriendshipActions?: boolean;
   /** Where a report says the user was seen. */
   spaceId?: string;
   roomId?: string;
@@ -36,8 +38,8 @@ export interface UserMenuContext {
 
 /**
  * The one right-click menu for a user, shared by member rows and message authors so both
- * offer the same actions: message, add/accept friend, copy username/id, block or unblock,
- * report - plus any caller-supplied extras (space moderation). Actions the current
+ * offer the same actions: profile, message, add/accept/decline/remove friend, copy username/id,
+ * block or unblock, report - plus any caller-supplied extras (space moderation). Actions the current
  * relationship makes meaningless (add-friend when already friends/blocked) are omitted, and
  * everything but copy is hidden for your own entry.
  */
@@ -54,6 +56,10 @@ export function buildUserMenuItems(ctx: UserMenuContext): ContextMenuItem[] {
   }
   const rel = relationshipType(ctx.userId);
   const items: ContextMenuItem[] = [];
+
+  if (!isSelf && ctx.onOpenProfile) {
+    items.push({ label: t('profile.viewFull'), icon: 'fa-id-badge', onClick: () => ctx.onOpenProfile!(ctx.userId) });
+  }
 
   if (!isSelf && ctx.onMessage) {
     items.push({ label: t('friends.actions.message'), icon: 'fa-message', onClick: () => ctx.onMessage!(ctx.userId) });
@@ -72,6 +78,32 @@ export function buildUserMenuItems(ctx: UserMenuContext): ContextMenuItem[] {
       label: rel === RelType.IncomingRequest ? t('userMenu.acceptFriend') : t('friends.addFriend'),
       icon: 'fa-user-plus',
       onClick: () => void putRelationship(ctx.userId).catch(() => {}),
+    });
+  }
+
+  if (ctx.showFriendshipActions && !isSelf && !ctx.bot && rel === RelType.IncomingRequest) {
+    items.push({
+      label: t('userMenu.declineFriend'),
+      icon: 'fa-user-xmark',
+      danger: true,
+      onClick: () => {
+        void removeRelationship(ctx.userId)
+          .then(() => removeRelationshipLocally(ctx.userId))
+          .catch(() => {});
+      },
+    });
+  }
+
+  if (ctx.showFriendshipActions && !isSelf && !ctx.bot && (rel === RelType.Friend || rel === RelType.OutgoingRequest)) {
+    items.push({
+      label: t(rel === RelType.Friend ? 'friends.actions.removeFriend' : 'userMenu.cancelRequest'),
+      icon: 'fa-user-minus',
+      danger: true,
+      onClick: () => {
+        void removeRelationship(ctx.userId)
+          .then(() => removeRelationshipLocally(ctx.userId))
+          .catch(() => {});
+      },
     });
   }
 

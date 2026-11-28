@@ -2238,6 +2238,8 @@ export default {
   },
   userMenu: {
     acceptFriend: 'قبول طلب الصداقة',
+    declineFriend: 'رفض طلب الصداقة',
+    cancelRequest: 'إلغاء طلب الصداقة',
     block: 'حظر',
     unblock: 'إلغاء الحظر',
     blockTitle: 'حظر {{name}}؟',

@@ -2,6 +2,7 @@ import type { RoomParticipant } from '../api/rooms';
 import type { SpaceMember, SpaceRole } from '../api/spaces';
 import type { SenderDisplay } from '../components/messageList/utils';
 import type { ProfileRole, UserProfilePopoverSubject } from '../stores/userProfilePopover';
+import type { UserProfileFullSubject } from '../stores/userProfileFullModal';
 import { memberNameColorHex as sharedMemberNameColorHex } from './spacePermissions';
 import { resolveProfile } from './spaceProfile';
 import { birthdayIsToday } from './utils/birthday';
@@ -102,6 +103,33 @@ export function popoverSubjectFromParticipant(
     bot: p.bot,
     system: p.system,
     ...(r.deleted ? { deleted: true } : {}),
+  };
+}
+
+export function fullProfileSubjectFromPopoverSubject(
+  s: UserProfilePopoverSubject,
+): UserProfileFullSubject | undefined {
+  if (s.deleted) return undefined;
+  return {
+    userId: s.userId,
+    displayName: s.displayName,
+    globalName: s.globalName,
+    spaceId: s.spaceId,
+    username: s.username,
+    homeDomain: s.homeDomain,
+    avatar: s.avatar,
+    banner: s.banner,
+    bio: s.bio,
+    aboutMe: s.aboutMe,
+    spaceRoles: s.spaceRoles,
+    nameColor: s.nameColor,
+    pronouns: s.pronouns,
+    birthday: s.birthday,
+    birthdayToday: s.birthdayToday,
+    joinedAtLabel: s.joinedAtLabel,
+    publicFlags: s.publicFlags,
+    bot: s.bot,
+    system: s.system,
   };
 }
 

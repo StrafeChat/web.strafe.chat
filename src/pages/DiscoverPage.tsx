@@ -118,7 +118,7 @@ const DiscoverPage: Component = () => {
         />
       </div>
       <div class="flex min-h-0 flex-1 flex-col overflow-y-auto">
-        <div class="w-full max-w-5xl space-y-4 p-4">
+        <div class="w-full space-y-4 p-4">
           <p class="text-sm text-muted-foreground">{t('discover.subtitle')}</p>
           <Show when={tab() === 'spaces' && anyRemote()}>
             <Tabs<'all' | 'local'>
@@ -152,7 +152,7 @@ const DiscoverPage: Component = () => {
                   />
                 }
               >
-                <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+                <div class="grid grid-cols-[repeat(auto-fill,minmax(16rem,1fr))] gap-4">
                   <For each={visible()}>
                     {(e) => (
                       <Show when={e.space} fallback={<BotCard entry={e} onAdd={() => addBot(e)} />}>
