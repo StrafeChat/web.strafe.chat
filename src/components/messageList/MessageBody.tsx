@@ -448,6 +448,8 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
         }
         if (seg.type === 'link') {
           const href = seg.href;
+          // A styled masked label (`` [`abc123`](url) ``) renders its styling inside the link.
+          const label = () => (seg.children ? <For each={seg.children}>{(c) => renderSegment(c, revealed)}</For> : seg.text);
           // Inside a spoiler that is still closed, the embed below a link would give away what
           // the spoiler hides (the image itself, the space's name), so it waits for the reveal.
           const embedShown = () => revealed?.() ?? true;
@@ -463,7 +465,7 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
                 class="text-primary underline underline-offset-2 break-words hover:text-primary/90 cursor-pointer"
                 onClick={guardClick(href)}
               >
-                {seg.text}
+                {label()}
               </a>
             );
             return (
@@ -484,7 +486,7 @@ export const MessageBody: Component<MessageBodyProps> = (props) => {
               class="text-primary underline underline-offset-2 break-words hover:text-primary/90 cursor-pointer"
               onClick={guardClick(href)}
             >
-              {seg.text}
+              {label()}
             </a>
           );
           // A media link (GIF/image/video): keep the link and add the media (or, if the URL

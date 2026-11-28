@@ -24,8 +24,10 @@ export type MessageSegment =
   | { type: 'latex'; tex: string; display: boolean }
   | { type: 'latexDocument'; source: string }
   /** `suppressed` is Discord's <https://example.com>: still a link, but no preview card,
-   * no inline image or video, and no invite card either. */
-  | { type: 'link'; href: string; text: string; suppressed?: boolean }
+   * no inline image or video, and no invite card either. A masked link (`[label](url)`) whose
+   * label is styled (`` [`abc123`](url) ``, `[**v2**](url)`) also carries the label parsed as
+   * `children` - styling, code and emoji only - and `text` is then the label without markers. */
+  | { type: 'link'; href: string; text: string; suppressed?: boolean; children?: MessageSegment[] }
   | { type: 'mention'; userId: string }
   | { type: 'roleMention'; roleId: string }
   | { type: 'channelMention'; roomId: string }
@@ -207,7 +209,7 @@ function parseInline(text: string, styleOnly = false): MessageSegment[] {
       if (href.startsWith('<') && href.endsWith('>')) href = href.slice(1, -1);
       const safe = sanitizeHref(href);
       if (safe) {
-        out.push({ type: 'link', href: safe, text: mdLink[1]! || safe });
+        out.push(maskedLink(safe, mdLink[1]!));
         i += mdLink[0]!.length;
         continue;
       }
@@ -340,6 +342,32 @@ function parseInline(text: string, styleOnly = false): MessageSegment[] {
   }
 
   return out;
+}
+
+/** The plain text of parsed segments: what they read as, markers gone. */
+export function segmentsPlainText(nodes: readonly MessageSegment[]): string {
+  let out = '';
+  for (const n of nodes) {
+    if (n.type === 'text' || n.type === 'code') out += n.content;
+    else if (n.type === 'emoji') out += n.emoji;
+    else if (n.type === 'customEmoji') out += `:${n.name}:`;
+    else if (n.type === 'latex') out += n.tex;
+    else if (n.type === 'link') out += n.text;
+    else {
+      const kids = childrenOf(n);
+      if (kids) out += segmentsPlainText(kids);
+    }
+  }
+  return out;
+}
+
+/** `[label](href)`: the label is styling only (Discord's rule - no link or mention inside a
+ * link), kept as children when it has any. */
+function maskedLink(href: string, label: string): MessageSegment {
+  if (!label) return { type: 'link', href, text: href };
+  const children = parseInline(label, true);
+  if (children.length === 1 && children[0]!.type === 'text') return { type: 'link', href, text: children[0]!.content };
+  return { type: 'link', href, text: segmentsPlainText(children), children };
 }
 
 /** One line's worth of styling and nothing else: an embed's title or a field's name. No blocks
